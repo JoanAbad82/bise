@@ -5,7 +5,7 @@ use crate::*;
 use ratatui::layout::{Constraint, Direction, Layout, Rect};
 use ratatui::style::{Modifier, Style};
 use ratatui::text::{Line, Span, Text};
-use ratatui::widgets::{Block, Borders, Clear, Paragraph, Scrollbar, ScrollbarOrientation, ScrollbarState};
+use ratatui::widgets::{Paragraph, Scrollbar, ScrollbarOrientation, ScrollbarState};
 use ratatui::Frame;
 use std::time::Duration;
 use unicode_width::UnicodeWidthStr;
@@ -15,8 +15,7 @@ pub(crate) fn draw(app: &mut App, frame: &mut Frame) {
     // book §8 "The frame": the frame, the history and the panel, the
     // divider, the composer pane
     let cols = crate::layout::cols(full.width, full.height);
-    // the diff panel (site/m/artifacts D) takes the agents panel's
-    // place, wider; under its width the whole screen
+    // the diff panel (site/m/artifacts D) takes the agents panel's place, wider; under its width the whole screen
     let cols = match app.diff.is_some() && crate::diffview::side(full.width) {
         true => crate::layout::with_side(cols, full.width, crate::diffview::side_w(full.width)),
         false => cols,
@@ -28,6 +27,10 @@ pub(crate) fn draw(app: &mut App, frame: &mut Frame) {
     crate::diffview::draw_full(app, frame);
     crate::artifacts_screen::draw(app, frame);
     crate::scheduled_screen::draw(app, frame);
+    crate::plugins::draw(app, frame);
+    crate::running_screen::draw(app, frame);
+    crate::inbox_screen::draw(app, frame);
+    crate::usage_screen::draw(app, frame);
     computer_use::draw(app, frame);
     help::draw(app, frame);
 }
@@ -283,10 +286,10 @@ fn draw_bise(app: &mut App, frame: &mut Frame, area: Rect, cols: crate::layout::
     let (name, state) = divider_text(app);
     let working = sb::viewed_working(app);
     let who = sb::viewed_who(app);
-    let state = if rows.keys_in_divider {
-        vec![crate::keybar::line(app, chrome::divider_room(area.width, cols, &name, &who, working.as_ref())).spans]
+    let (state, watching) = if rows.keys_in_divider {
+        (vec![crate::keybar::line(app, chrome::divider_room(area.width, cols, &name, &who, working.as_ref())).spans], 0)
     } else {
-        state
+        sb::watching_rule(&app.sb, cols.panel.is_none(), state)
     };
     // the card view: `you → ? perf · your answer`, then a fresh note
     // (`✓ copied 9 chars`: the card's text copies too, BISE-290/302)
@@ -300,22 +303,24 @@ fn draw_bise(app: &mut App, frame: &mut Frame, area: Rect, cols: crate::layout::
     });
     // voice mode: `you ⇄ main · voice mode · headphones`
     let voice_label = voice.as_ref().map(|(v, _)| crate::voicemode::pane::divider(v));
-    let (state_rect, label_rect) = match card_label.or_else(|| sb::palette::divider_label(app)).or(voice_label) {
-        Some(label) => chrome::draw_divider_label(frame.buffer_mut(), area, cols, divider_y, label),
+    let (state_rect, label_rect) = match card_label.or_else(|| sb::palette::divider_label(app)).or(voice_label).or_else(|| sb::lead::label(app)) {
+        Some(label) => chrome::draw_divider_label(frame.buffer_mut(), area, cols, divider_y, label, |room| sb::answer_target::divider(app, room, fresh_note(&app.flash)).or_else(|| sb::lead::divider(app, room))),
         None => chrome::draw_divider(frame.buffer_mut(), area, cols, divider_y, &name, &who, working.as_ref(), state),
     };
     // BISE-290: the divider's words (who, the notes) select and copy
     crate::textlayer::text(Rect { y: divider_y, height: 1, ..area }.intersection(area));
     app.bottom_bar_rect = (!app.tail_visible && !rows.keys_in_divider).then_some(state_rect);
+    crate::scheduled_watch::place_count(app, watching, state_rect);
     if let Some(r) = app.bottom_bar_rect {
         crate::pointer::region(r, crate::pointer::Shape::Pointer);
     }
-    // the queued messages: ` › text`, the `›` under the composer's bar
+    // the queue drawer (designer m_25146): its left edge on the
+    // composer's bar column (m_26076), to the pane's right margin
     let queue = pane(chunks[7]);
     if queue.height > 0 {
-        let r = Rect { x: queue.x.saturating_sub(1), width: queue.width + 1, ..queue }.intersection(area);
+        let r = queue.intersection(area);
         frame.render_widget(Paragraph::new(crate::queue::lines(app, r.width as usize)), r);
-        crate::textlayer::text(r); // BISE-290
+        crate::queue::placed(app, r); // BISE-290's text, the undo's click
     }
     // the attachments box: from the bar's column (from 60 columns, the
     // composer's text column), at most the composer's width; no bar:
@@ -436,7 +441,11 @@ fn draw_feed(app: &mut App, frame: &mut Frame, area: Rect, bar: Option<Rect>) {
     // column is the scrollbar's
     let feed_w = (area.width as usize).saturating_sub(usize::from(bar.is_none())).max(1);
     let area_w = feed_w;
-    let area_h = area.height as usize;
+    // agent-waiting-states A: the agent in view pauses, one live dim line
+    // under its last row, `… continues when cargo bench ends · 3m` (its own
+    // row, a blank row above it); `… ` in the glyph column, the words after
+    let waiting = app.sb.waiting_words(crate::when::now_ms(), (area.width as usize).saturating_sub(3)).filter(|_| area.height > 3);
+    let area_h = (area.height as usize).saturating_sub(if waiting.is_some() { 2 } else { 0 });
     let text_area = Rect {
         x: area.x,
         y: area.y,
@@ -455,6 +464,13 @@ fn draw_feed(app: &mut App, frame: &mut Frame, area: Rect, bar: Option<Rect>) {
     // a message this feed's owner received names it in the `to` column (BISE-90)
     crate::render::set_feed_owner(app.sb.focus_name());
     let (debug, tick) = (app.debug, app.tick);
+    // the answer as it streams in (livetext.rs): its rows go under the
+    // last event, the feed's bottom leaves them room while it follows
+    let live_rows = match app.sb.lives.get(app.sb.focus_name()) {
+        Some(l) => crate::livetext::rows(&app.events, &l.text, debug, tick, area_w),
+        None => Vec::new(),
+    };
+    let ev_h = area_h.saturating_sub(live_rows.len());
     macro_rules! rows_of {
         () => {
             &mut |i: usize| ensure_rows(&app.events, &mut app.cache, i, debug, area_w, tick)
@@ -468,7 +484,7 @@ fn draw_feed(app: &mut App, frame: &mut Frame, area: Rect, bar: Option<Rect>) {
         app.quote_hint = false;
     }
     let mut anchor = if app.follow {
-        bottom_anchor(n, area_h, rows_of!())
+        bottom_anchor(n, ev_h, rows_of!())
     } else {
         move_anchor(app.anchor, app.scroll, n, rows_of!())
     };
@@ -518,17 +534,32 @@ fn draw_feed(app: &mut App, frame: &mut Frame, area: Rect, bar: Option<Rect>) {
             i += 1;
         }
         // a full screen that shows the last row is the tail too
-        if pass == 0 && vis.len() < area_h && anchor != (0, 0) {
-            anchor = bottom_anchor(n, area_h, rows_of!());
+        if pass == 0 && vis.len() < ev_h && anchor != (0, 0) {
+            anchor = bottom_anchor(n, ev_h, rows_of!());
             continue;
         }
         break;
+    }
+    // the live text in the room left under the tail: its last rows while
+    // the feed follows (a reply taller than the screen), else its first
+    // (no event index: hover, clicks and links stop at the last event)
+    if tail_visible && !live_rows.is_empty() {
+        let room = area_h.saturating_sub(vis.len());
+        let from = if app.follow { live_rows.len().saturating_sub(room) } else { 0 };
+        vis.extend(live_rows.into_iter().skip(from).take(room));
     }
     if tail_visible && down && !app.follow {
         app.follow = true;
         app.unseen = 0;
     }
+    let rows_shown = vis.len();
     frame.render_widget(Paragraph::new(Text::from(vis)), text_area);
+    if let Some(w) = waiting.filter(|_| tail_visible) {
+        let y = text_area.y + rows_shown as u16 + 1;
+        let line = Line::from(Span::styled(format!("{} {}", theme::G_WAITING, w), Style::default().fg(theme::dim())));
+        let r = Rect { y, height: 1, ..text_area }.intersection(area);
+        frame.render_widget(Paragraph::new(line), r);
+    }
     // the visible links, for the OSC 8 of the backend (links.rs)
     for (y, (&i, &ri)) in vis_events.iter().zip(&vis_rows).enumerate() {
         let Some(er) = app.cache.get(i).and_then(|c| c.as_ref()) else { continue };
@@ -847,7 +878,7 @@ fn draw_composer(app: &mut App, frame: &mut Frame, area: Rect, inner: usize, lea
     // dim, the placeholder says where the keys are
     let diff_keys = crate::diffview::has_keys(app);
     let rows = if empty {
-        let note = if diff_keys { crate::diffview::COMPOSER_NOTE.to_string() } else { sb::placeholder(app).unwrap_or_default() };
+        let note = if diff_keys { crate::diffview::COMPOSER_NOTE.to_string() } else { sb::answer_target::placeholder(app).or_else(|| sb::placeholder_parts(app).map(|(head, tail)| sb::placeholder_fit(&head, tail.as_deref(), text_w.saturating_sub(1)))).unwrap_or_default() };
         let caret = if finding || diff_keys { Style::default() } else { Style::default().fg(text()).add_modifier(Modifier::REVERSED) };
         let mut spans = vec![Span::styled(" ", caret)];
         if !note.is_empty() {
@@ -882,8 +913,8 @@ fn draw_composer(app: &mut App, frame: &mut Frame, area: Rect, inner: usize, lea
     } else {
         typed_lines(app, text_w, text_rows)
     };
-    let bar_st = Style::default().fg(composer_bar_color(app));
-    let bar = Span::styled(format!("│{}", " ".repeat(lead.saturating_sub(1) as usize)), bar_st);
+    // answering the open item (or a draft opening with `@<agent>`, sb/lead.rs): its heavy accent ┃ runs on into what you type (sb/answer_target.rs)
+    let bar = sb::answer_target::bar(app, lead).or_else(|| sb::lead::bar(app, lead)).unwrap_or_else(|| Span::styled(format!("│{}", " ".repeat(lead.saturating_sub(1) as usize)), Style::default().fg(composer_bar_color(app))));
     // a text taller than the box (designer): `↑ 4 lines above` /
     // `↓ 2 lines below`, dim, in the blank bar rows; without them (under
     // 20 rows) a dim ↑ / ↓ right of the first / last text row
@@ -942,94 +973,10 @@ fn composer_bar_color(app: &App) -> ratatui::style::Color {
     }
 }
 
-fn draw_popup(app: &App, frame: &mut Frame, prompt: Rect) {
-    // ---- slash-command popup (OpenCode autocomplete: split border,
-    // backgroundMenu, primary selection)
-    let matches = popup_items(app);
-    if !matches.is_empty() {
-        // `/archive`'s and `/restore`'s question, dim, above the rows
-        let title = crate::commands::popup_title(app);
-        let n = matches.len().min(8) as u16 + u16::from(title.is_some());
-        // wide enough for the widest line, whole (QA 6), within the prompt
-        let need = matches
-            .iter()
-            .map(|c| c.mark.map(|(g, _)| g.width() + 1).unwrap_or(0) + c.label.width() + c.desc.width() + 6)
-            .max()
-            .unwrap_or(0);
-        let min = if matches[0].closable { 72 } else { 56 };
-        let w = (need.max(min) as u16).min(prompt.width);
-        let sel_i = app.popup_sel.min(matches.len() - 1);
-        let top = popup_top(sel_i, matches.len(), 8);
-        let area = Rect {
-            x: prompt.x,
-            y: prompt.y.saturating_sub(n + 2),
-            width: w,
-            height: n + 2,
-        }
-        // a short terminal: the prompt sits near the top, the popup
-        // would hang below the screen (ratatui panics outside its buffer)
-        .intersection(frame.area());
-        frame.render_widget(Clear, area);
-        // BISE-272: over what it covers, no click does anything
-        crate::pointer::region(area, crate::pointer::Shape::Default);
-        let head = title.map(|t| Line::from(Span::styled(format!(" {t}"), Style::default().fg(theme::dim()))));
-        let lines: Vec<Line> = head
-            .into_iter()
-            .chain(matches
-            .iter()
-            .enumerate()
-            .skip(top)
-            .take(8)
-            .map(|(i, c)| {
-                let sel = i == sel_i;
-                let (name_style, desc_style) = if sel {
-                    (
-                        Style::default()
-                            .bg(theme::accent())
-                            .fg(theme::on_accent())
-                            .add_modifier(Modifier::BOLD),
-                        Style::default().bg(theme::accent()).fg(theme::on_accent()),
-                    )
-                } else if c.run.is_none() && c.fill == app.ed.text && !c.folder && c.desc.is_empty() {
-                    // a row that picks nothing (`/model`'s provider headers,
-                    // BISE-301): dim, so the rows you pick stay what you read
-                    (Style::default().fg(theme::dim()), Style::default().fg(theme::dim()))
-                } else {
-                    (Style::default().fg(theme::text()), Style::default().fg(theme::dim()))
-                };
-                let mut spans = Vec::new();
-                if let Some((g, color)) = c.mark {
-                    let st = if sel {
-                        Style::default().bg(theme::accent()).fg(theme::on_accent())
-                    } else {
-                        Style::default().fg(color)
-                    };
-                    spans.push(Span::styled(format!(" {}", g), st));
-                }
-                // columns, not chars: an emoji mark is 2 columns wide
-                let mark_w = c.mark.map(|(g, _)| g.width() + 1).unwrap_or(0);
-                // a long path keeps its end (the file name) in view
-                let label = truncate_left(&c.label, (w as usize).saturating_sub(mark_w + 4));
-                spans.push(Span::styled(format!(" {} ", label), name_style));
-                let room = (w as usize).saturating_sub(label.width() + mark_w + 6);
-                spans.push(Span::styled(truncate_chars(&c.desc, room), desc_style));
-                Line::from(spans)
-            }))
-            .collect();
-        frame.render_widget(
-            Paragraph::new(lines).block(
-                Block::default()
-                    .borders(Borders::LEFT | Borders::RIGHT)
-                    .border_set(SPLIT)
-                    .border_style(Style::default().fg(theme::rule()))
-                    .style(Style::default().bg(Color::Reset)),
-            ),
-            area,
-        );
-        // BISE-290: its text selects, copies and has links (between the rules)
-        crate::textlayer::text(Rect { x: area.x + 1, width: area.width.saturating_sub(2), ..area });
-    }
-}
+// the slash-command popup: ui_popup.rs
+#[path = "ui_popup.rs"]
+mod popup;
+use popup::draw_popup;
 
 /// `s` in at most `max` columns: its end, after a `…` when cut.
 pub(crate) fn truncate_left(s: &str, max: usize) -> String {

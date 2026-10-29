@@ -1,5 +1,5 @@
 use super::*;
-use serde_json::json;
+use serde_json::{json, Value};
 
 // 2025-09-30 12:41:00 UTC, a tuesday
 const T: u64 = 1_759_236_060_000;
@@ -7,32 +7,40 @@ const PARIS: i32 = 2 * 3600;
 const MIN: u64 = 60_000;
 
 fn row(id: &str, title: &str, kind: &str, agent: &str, ago_min: u64) -> Value {
-    json!({"id": id, "title": title, "kind": kind, "agent": agent, "ts_ms": T - ago_min * MIN, "v": 1, "target": format!("/w/{id}")})
+    json!({"id": id, "title": title, "kind": kind, "agent": agent, "at_ms": T - ago_min * MIN, "version": 1, "url": "", "new": false,
+           "target": format!("/w/{id}")})
+}
+
+/// The hub's typed rows (`hub/artifacts`) from their JSON.
+fn rows_of(v: Value) -> Vec<bise_proto::rows::Artifact> {
+    serde_json::from_value(v).unwrap()
 }
 
 #[test]
 fn the_hub_list_is_read_newest_first_with_its_versions() {
-    let v = json!({"ev": "artifacts", "new": 3, "rows": [
+    let items = rows_of(json!([
         row("deck", "onboarding deck", "slides", "launch", 180),
-        {"id": "pricing-page", "title": "pricing page", "kind": "page", "agent": "pricing-page", "ts_ms": T - 12 * MIN, "v": 3,
+        {"id": "pricing-page", "title": "pricing page", "kind": "page", "agent": "pricing-page", "at_ms": T - 12 * MIN, "version": 3,
+         "url": "http://127.0.0.1:47438/p/pricing-page", "new": true,
          "target": "http://127.0.0.1:47438/p/pricing-page", "detail": "2 notes open",
-         "versions": [{"v": 3, "ts_ms": T - 12 * MIN, "target": "http://127.0.0.1:47438/p/pricing-page", "note": "2 notes open"},
-                      {"v": 1, "ts_ms": T - 60 * MIN, "target": "x"}, {"v": 2, "ts_ms": T - 40 * MIN, "target": "x", "note": "3 notes done"}]},
-        {"title": "no id"},
-    ]});
-    set_from(&v);
+         "versions": [{"v": 3, "at_ms": T - 12 * MIN, "target": "http://127.0.0.1:47438/p/pricing-page", "note": "2 notes open"},
+                      {"v": 1, "at_ms": T - 60 * MIN, "target": "x"}, {"v": 2, "at_ms": T - 40 * MIN, "target": "x", "note": "3 notes done"}]},
+        {"id": "", "kind": "doc", "title": "no id", "agent": "", "version": 1, "at_ms": 0, "url": "", "new": true},
+        {"id": "mine", "kind": "doc", "title": "", "agent": "", "by": "you", "version": 1, "at_ms": T - 200 * MIN, "url": "", "new": false},
+    ]));
+    set_rows(&items, Some(T - 30 * MIN), "h-1");
     let rows = all();
-    assert_eq!(rows.iter().map(|a| a.id.as_str()).collect::<Vec<_>>(), ["pricing-page", "deck"]);
-    assert_eq!(new_count(), 3);
+    assert_eq!(rows.iter().map(|a| a.id.as_str()).collect::<Vec<_>>(), ["pricing-page", "deck", "mine"], "an item without an id is left out");
+    assert_eq!(new_count(), 2, "the items the hub marks new");
+    assert_eq!(seen_ms(), Some(T - 30 * MIN));
+    assert_eq!(rows[2].title, "mine", "no title: its id");
     let p = &rows[0];
     assert_eq!(p.versions.iter().map(|x| x.v).collect::<Vec<_>>(), [1, 2, 3]);
-    assert_eq!(p.last_words(), "v3 · 2 notes open");
     assert!(p.is_link());
     assert_eq!(p.where_words("/w"), "127.0.0.1:47438/p/pricing-page");
     let doc = Artifact { target: "/w/acme/docs/q3-plan.md".into(), ..Default::default() };
     assert_eq!(doc.where_words("/w/acme"), "docs/q3-plan.md");
     assert_eq!(doc.where_words("/w/other"), "/w/acme/docs/q3-plan.md");
-    assert_eq!(rows[1].last_words(), "");
     mark_seen();
     assert_eq!(new_count(), 0);
 }
@@ -50,12 +58,8 @@ fn a_gone_file_says_so_and_opens_the_copy() {
         gone: true,
         ..Default::default()
     };
-    assert_eq!(a.agent_words(), "subs-lead · archived");
-    assert_eq!(a.last_words(), "▲ gone from disk · bise kept a copy");
     assert_eq!(a.open_target(None), "/store/subs.md");
     assert_eq!(how(&a, None, false), How::Editor("/store/subs.md".into()));
-    let none = Artifact { copy: None, ..a };
-    assert_eq!(none.last_words(), "▲ gone from disk");
 }
 
 #[test]
@@ -180,4 +184,55 @@ fn a_reply_names_an_artifact_as_a_chip() {
     // a link it does not know stays a link
     let (_, urls) = crate::links::collect(|| crate::markdown::inline_spans("see https://example.com", st));
     assert_eq!(urls, ["https://example.com"]);
+}
+
+/// about-chip: his words about an open artifact (the desktop's `about
+/// [title](url): …`) draw its chip, never the link or its path, for an
+/// xlsx copy (spaces, an older version's), a page and an html file; an
+/// artifact the list lacks: its title alone.
+#[test]
+fn his_about_lead_is_the_artifacts_chip() {
+    let hub = "/Users/me/.bise/hubs/docs-1/artifacts";
+    let items = rows_of(json!([
+        {"id": "projection", "title": "projection achat ou location", "kind": "sheet", "agent": "office", "at_ms": T, "version": 3, "new": false,
+         "url": format!("{hub}/projection/v3/projection achat ou location.xlsx"), "target": "/w/projection achat ou location.xlsx",
+         "copy": format!("{hub}/projection/v3/projection achat ou location.xlsx"),
+         "versions": [{"v": 2, "at_ms": T - MIN, "target": "/w/projection achat ou location.xlsx", "copy": format!("{hub}/projection/v2/projection achat ou location.xlsx")}]},
+        {"id": "q3-notes", "title": "Q3 notes", "kind": "page", "agent": "writer", "at_ms": T, "version": 1, "new": false,
+         "url": "http://127.0.0.1:47438/p/q3-notes", "target": "/Users/me/.bise/pages/q3-notes/v1.html"},
+        {"id": "mock", "title": "the mock", "kind": "site", "agent": "web", "at_ms": T, "version": 2, "new": false,
+         "url": format!("{hub}/mock/v2/index.html"), "target": "/w/mock/index.html"},
+    ]));
+    set_rows(&items, None, "h-1");
+    let st = ratatui::style::Style::default();
+    let draw = |text: &str| crate::links::collect(|| crate::attach::chip_spans(text, st));
+    let words = |spans: &[ratatui::text::Span<'static>]| spans.iter().map(|s| s.content.as_ref()).collect::<String>().replace('\u{a0}', " ");
+    let (spans, urls) = draw(&format!("about [projection achat ou location]({hub}/projection/v2/projection achat ou location.xlsx): En fait 3200"));
+    assert_eq!(words(&spans), "about  ↗ projection achat ou location : En fait 3200");
+    assert_eq!(urls, ["artifact:projection"]);
+    let (spans, urls) = draw("about [Q3 notes](http://127.0.0.1:47438/p/q3-notes): why?");
+    assert_eq!(words(&spans), "about  ↗ Q3 notes : why?");
+    assert_eq!(urls, ["artifact:q3-notes"]);
+    let (_, urls) = draw(&format!("about [the mock]({hub}/mock/v2/index.html): ok"));
+    assert_eq!(urls, ["artifact:mock"]);
+    let (spans, urls) = draw("about [old deck](/x/y (1).pdf): hm");
+    assert_eq!(words(&spans), "about old deck: hm");
+    assert!(urls.is_empty());
+}
+
+/// page-unreach (Benjamin's refused page): a page link is asked before the
+/// browser opens it; one whose server doesn't answer says so, no dead tab.
+#[test]
+fn a_page_whose_server_does_not_answer_is_not_opened() {
+    assert_eq!(page_port("http://127.0.0.1:47415/p/blokhus-own-deployment"), Some(47415));
+    assert_eq!(page_port("http://127.0.0.1:47415/a/x/view"), Some(47415));
+    assert_eq!(page_port("http://127.0.0.1:47415x/p"), None);
+    assert_eq!(page_port("https://github.com/o/r/pull/1"), None);
+    assert_eq!(page_port("http://localhost:47415/p/x"), None);
+    // a port nothing listens on: one free a moment ago
+    let port = std::net::TcpListener::bind(("127.0.0.1", 0)).unwrap().local_addr().unwrap().port();
+    assert!(!answers(port));
+    let live = std::net::TcpListener::bind(("127.0.0.1", 0)).unwrap();
+    assert!(answers(live.local_addr().unwrap().port()));
+    assert!(no_answer_note(47415).starts_with("not opened: nothing answers at 127.0.0.1:47415"));
 }

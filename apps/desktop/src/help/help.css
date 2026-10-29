@@ -1,0 +1,102 @@
+/* ⌘/ the key list overlay (src/help/Help.tsx), placed like the palette */
+.help-over {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  /* a dialog as the ds sheet (designer's dialogs rules, ds/css/controls.css): 12% from the top,
+     over the window's ground at 62%, a short soft shadow, in with a fade and an 8 px rise */
+  padding-top: 12vh;
+  background: var(--c-scrim);
+  z-index: 20;
+  animation: b-fade-in 120ms var(--ease-out);
+}
+.help-over.out {
+  animation: b-fade-out 120ms var(--ease-out) forwards;
+  pointer-events: none;
+}
+
+.help-box {
+  display: flex;
+  flex-direction: column;
+  width: min(680px, 92vw);
+  max-height: 76vh;
+  /* opaque, as the ds sheet: nothing of the thread reads through its rows (designer m_22179) */
+  background: linear-gradient(var(--c-raised), var(--c-raised)), var(--c-solid);
+  border-radius: var(--r-3);
+  box-shadow: var(--e-sheet);
+  overflow: hidden;
+  animation: help-in 160ms var(--ease-out);
+}
+@keyframes help-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .help-box {
+    animation-name: b-fade-in;
+  }
+}
+
+.help-head {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  padding: var(--s-3) var(--s-4);
+  border-bottom: 1px solid var(--c-line);
+}
+
+.help-head .b-field {
+  flex: 1;
+}
+
+.help-list {
+  overflow-y: auto;
+  padding: var(--s-1) var(--s-4) var(--s-3);
+}
+
+.help-list h3 {
+  margin: var(--s-3) 0 var(--s-1);
+  font-size: var(--t-11);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--c-text-3);
+}
+
+.help-row {
+  display: grid;
+  grid-template-columns: 9.5em 1fr auto;
+  align-items: baseline;
+  gap: var(--s-3);
+  padding: var(--s-1) 0;
+}
+
+.help-row .a {
+  color: var(--c-text);
+}
+
+/* every key cap reads as ⌘K's: ink glyph, 1 px line; ⏎ and ⇧⏎ at a size that shows (designer m_22179) */
+.help-row .b-kbd {
+  color: var(--c-text);
+  font-size: var(--t-12);
+}
+
+.help-row .t,
+.help-none,
+.help-keys {
+  color: var(--c-text-3);
+  font-size: 12px;
+}
+
+.help-none {
+  padding: var(--s-3) 0;
+}
+
+.help-keys {
+  padding: var(--s-1) var(--s-4) var(--s-3);
+  border-top: 1px solid var(--c-line);
+}

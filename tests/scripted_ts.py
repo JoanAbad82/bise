@@ -19,19 +19,39 @@ ROOT = os.path.abspath(os.path.join(HERE, ".."))
 EXE = os.path.join(os.path.abspath(os.environ.get("CARGO_TARGET_DIR") or os.path.join(ROOT, "rust", "target")),
                    "debug", "bise")
 
+# what the engine is built from (run.sh's freshness list)
+JSRT_SRC = ("rust/jsrt/src", "rust/jsrt/Cargo.toml", "rust/jsrt/Cargo.lock",
+            "rust/images/src", "rust/images/Cargo.toml", "rust/.cargo/config.toml")
+
+def jsrt_fresh(path):
+    """This tree's debug engine, if no source of it is newer (run.sh's rule)."""
+    if not os.path.exists(path):
+        return False
+    built = os.path.getmtime(path)
+    for rel in JSRT_SRC:
+        top = os.path.join(ROOT, rel)
+        for d, _, files in (os.walk(top) if os.path.isdir(top) else [(os.path.dirname(top), [], [os.path.basename(top)])]):
+            for f in files:
+                p = os.path.join(d, f)
+                if os.path.exists(p) and os.path.getmtime(p) > built:
+                    return False
+    return True
+
 def jsrt_env():
-    """The harness finds this tree's rust/jsrt build; a fresh worktree has
-    none: take the main tree's (the engine rarely changes)."""
-    if os.path.exists(os.path.join(ROOT, "rust/jsrt/target/debug/bend-jsrt")):
+    """The engine of THIS tree's sources: the runtime and the engine speak
+    one protocol (a failed call's {error} entry, 5d6c08df), so another
+    tree's engine is never taken (main's stale debug build answered
+    {error} as a value). This tree's debug build when fresh, else the
+    build keyed by the sources' content (scripts/bins.sh path bend-jsrt:
+    a cache hit is a copy, a miss a cargo build)."""
+    if jsrt_fresh(os.path.join(ROOT, "rust/jsrt/target/debug/bend-jsrt")):
         return {}
-    wl = subprocess.run(["git", "worktree", "list", "--porcelain"], cwd=ROOT,
-                        capture_output=True, text=True).stdout
-    main = wl.splitlines()[0].split(" ", 1)[1] if wl else ROOT
-    for rel in ("rust/jsrt/target/debug/bend-jsrt", "rust/jsrt/target/release/bend-jsrt", "bend-jsrt"):
-        p = os.path.join(main, rel)
-        if os.path.exists(p):
-            return {"BEND_JSRT_BIN": p}
-    sys.exit("FAIL no bend-jsrt: build it with ./run.sh (or cd rust/jsrt && cargo build)")
+    r = subprocess.run([os.path.join(ROOT, "scripts", "bins.sh"), "path", "bend-jsrt"], cwd=ROOT,
+                       capture_output=True, text=True)
+    p = r.stdout.strip().splitlines()[-1] if r.stdout.strip() else ""
+    if r.returncode != 0 or not os.path.exists(p):
+        sys.exit("FAIL no bend-jsrt of this tree: scripts/bins.sh path bend-jsrt said: " + r.stderr[-2000:])
+    return {"BEND_JSRT_BIN": p}
 
 # the calling agent's variables (its run/ and tmp/bg too: its REPL's
 # files went to the live agent's run/): bise's internal and test ones
@@ -41,9 +61,33 @@ PROGRAMS = [
     ("return 6 * 7", "tool run_typescript ok: 42"),
     ('const r: string = await search_tool_functions({query: "bash"}); return typeof r',
      "tool run_typescript ok: string"),
-    ("return await no_such_tool({})",
-     "tool run_typescript failed: program call failed: unknown tool: no_such_tool"),
     ('throw new Error("boom")', "tool run_typescript failed: boom"),
+]
+
+# a bare name that is not one of ours (issue 21): named, our tools, how to
+# read a file. One session each: the answer is long (the scripted session
+# compacts past ~400 tokens and drops the earlier results)
+UNKNOWN_PROGRAMS = [
+    ("return await no_such_tool({})",
+     "tool run_typescript failed: program call failed: unknown tool: no_such_tool — the tools here are "),
+    ('return await read_file({path: "a.txt"})',
+     "tool run_typescript failed: program call failed: unknown tool: read_file — the tools here are "
+     "search_tool_functions, bash, run_typescript, skill, apply_patch, write_file, edit; read a file with "
+     "bash (`cat -n <path>`, `sed -n '1,200p' <path>`)"),
+]
+
+# a failed call rejects its promise (the user's case: allSettled over
+# several searches, one failing, kept the others' results); one session
+# each, like the image programs (long programs reach the compaction)
+REJECT_PROGRAMS = [
+    ('const rs = await Promise.allSettled([no_such_tool({}), search_tool_functions({query: "bash"})]); '
+     'return rs.map((r) => r.status === "fulfilled" ? "ok " + typeof r.value : r.reason.name + " " + r.reason.message).join(" | ")',
+     "tool run_typescript ok: ToolError unknown tool: no_such_tool — the tools here are search_tool_functions, "
+     "bash, run_typescript, skill, apply_patch, write_file, edit; read a file with bash (`cat -n <path>`, "
+     "`sed -n '1,200p' <path>`); connector tools run from run_typescript (find them with search_tool_functions) "
+     "| ok string"),
+    ('try { await no_such_tool({}); return "not caught" } catch (e) { return "caught " + e.tool + ": " + e.message }',
+     "tool run_typescript ok: caught no_such_tool: unknown tool: no_such_tool"),
 ]
 
 def run_session(env, codes):
@@ -79,6 +123,14 @@ def main():
     home = tempfile.mkdtemp(prefix="sb-scripted-ts-")
     session = check_programs(home, PROGRAMS)
     print("scripted run_typescript: %d programs on V8 (bend-jsrt)" % len(PROGRAMS))
+    unknown_home = tempfile.mkdtemp(prefix="sb-scripted-ts-unknown-")
+    for i, program in enumerate(UNKNOWN_PROGRAMS):
+        check_programs(os.path.join(unknown_home, str(i)), [program])
+    print("an unknown bare name: named, with our tools and how to read a file")
+    reject_home = tempfile.mkdtemp(prefix="sb-scripted-ts-reject-")
+    for i, program in enumerate(REJECT_PROGRAMS):
+        check_programs(os.path.join(reject_home, str(i)), [program])
+    print("a failed call rejects: Promise.allSettled keeps both outcomes, try/catch catches")
     # one session each: the scripted session compacts past ~400 tokens (its
     # CFG), an image or two long temp paths are more than that, and a
     # compaction drops the earlier results
@@ -145,8 +197,11 @@ def check_read_images_prompt():
                  "...self.readImages(['before.png', 'after.png'])"):
         if want not in text:
             sys.exit("FAIL tool-desc-run-typescript.txt lacks %r" % want)
-    if text.index("`self.compact`/`self.reload`") > text.index("`self.readImages(paths)`"):
-        sys.exit("FAIL self.readImages is not described after self.compact / self.reload")
+    for helper in ("`self.compact`", "`self.reload`"):
+        if helper not in text:
+            sys.exit("FAIL tool-desc-run-typescript.txt lacks %s" % helper)
+        if text.index(helper) > text.index("`self.readImages(paths)`"):
+            sys.exit("FAIL self.readImages is not described after %s" % helper)
     print("prompt: self.readImages described next to self.compact / self.reload")
 
 def atomic_script():

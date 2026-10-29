@@ -2,7 +2,10 @@
 //! known message and encodes back to the same JSON value, every known tag
 //! of every type appears in a fixture, and the unknown ones stay unknown.
 
-use bise_proto::draft::{AppCmd, CoreEv, DraftHubCmd, ProjectView};
+use bise_proto::app_cmd::AppCmd;
+use bise_proto::app_rpc;
+use bise_proto::core_ev::CoreEv;
+use bise_proto::draft::{DraftHubCmd, ProjectView};
 use bise_proto::hub::{HubCmd, HubEv};
 use serde_json::Value;
 use std::path::Path;
@@ -69,15 +72,20 @@ fn drafts_round_trip_and_cover_every_tag() {
 #[test]
 fn the_directions_never_mix() {
     // a hub can't emit the core's events, and the app's commands are no
-    // hub command: each decodes as unknown on the other side
+    // hub command: each decodes as unknown on the other side, or (a tag
+    // both have: send, answer, stop, archive, unarchive, follow) the
+    // project says which, as app_rpc::method_of routes it
+    let method = |l: &str| app_rpc::method_of(&json(l)).unwrap();
     for l in lines("core_ev.jsonl") {
         assert!(matches!(HubEv::decode(&l).unwrap(), HubEv::Unknown { .. }), "{l}");
     }
     for l in lines("app_cmd.jsonl") {
-        assert!(matches!(HubCmd::decode(&l).unwrap(), HubCmd::Unknown { .. }), "{l}");
+        assert!(method(&l).starts_with("core/"), "{l}");
     }
     for l in lines("hub_cmd.jsonl") {
-        assert!(matches!(AppCmd::decode(&l).unwrap(), AppCmd::Unknown { .. }), "{l}");
+        let tag = json(&l)["cmd"].as_str().unwrap().to_string();
+        let hub = matches!(AppCmd::decode(&l).unwrap(), AppCmd::Unknown { .. }) || method(&l) == format!("hub/{tag}");
+        assert!(hub, "{l}");
     }
 }
 
@@ -116,6 +124,9 @@ fn the_fn_context_round_trips() {
     }
     let c: FnContext = serde_json::from_str(r#"{"app":"Mail","later":"a field of a newer app"}"#).unwrap();
     assert_eq!(c, FnContext { app: Some("Mail".into()), ..Default::default() });
+    // an older core's `shot` (dropped, architect m_22053) still parses, ignored
+    let c: FnContext = serde_json::from_str(r#"{"app":"Safari","shot":"/Users/u/.bise/run/shots/fn-1.png"}"#).unwrap();
+    assert_eq!(c, FnContext { app: Some("Safari".into()), ..Default::default() });
 }
 
 /// bise-mac-helper's lines (architect m_9461): every line of both
@@ -130,6 +141,21 @@ fn the_helper_lines_round_trip_and_cover_every_tag() {
     covers(&t, HelperCmd::TAGS, "helper_cmd.jsonl");
     let e = HelperEv::decode(r#"{"ev":"pulse","n":1}"#).unwrap();
     assert!(matches!(&e, HelperEv::Unknown { tag, .. } if tag == "pulse"));
+}
+
+/// `bise office run` <-> bend-jsrt's script mode (architect m_23785):
+/// every line of both directions round-trips, every tag has a line, an
+/// unknown tag stays unknown.
+#[test]
+fn the_office_script_lines_round_trip_and_cover_every_tag() {
+    use bise_proto::office::{HarnessCmd, JsrtEv};
+    let t = round_trip("office_ev.jsonl", "ev", JsrtEv::decode, |m| !matches!(m, JsrtEv::Unknown { .. }), JsrtEv::to_value);
+    covers(&t, JsrtEv::TAGS, "office_ev.jsonl");
+    let t = round_trip("office_cmd.jsonl", "cmd", HarnessCmd::decode, |m| !matches!(m, HarnessCmd::Unknown { .. }), HarnessCmd::to_value);
+    covers(&t, HarnessCmd::TAGS, "office_cmd.jsonl");
+    let e = JsrtEv::decode(r#"{"ev":"progress","n":1}"#).unwrap();
+    assert!(matches!(&e, JsrtEv::Unknown { tag, .. } if tag == "progress"));
+    assert_eq!(e.to_value()["n"], 1);
 }
 
 /// `bise pty`'s lines (architect m_10140): every line of both directions

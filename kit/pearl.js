@@ -1,3 +1,4 @@
+// generated from pearl.ts by scripts/ts_emit.ts: never hand-edited (edit the .ts, then run it)
 // bise ambient · the pearl: bise's body in the capsule (SPEC §1, round 8; replaces the
 // constellation). A ball of pink mist with no rim, a cream light inside, lilac in its shadows, its
 // edge thinning into the air and breaking into dots of light. The fragment shader is the
@@ -12,9 +13,8 @@
 // 30 times a second; under reduced motion (`still`) the pearl stands still in every mood (its tint
 // still eases), and once settled it draws nothing more.
 (function (root) {
-  "use strict";
-
-  const FS = `
+    "use strict";
+    const FS = `
   precision highp float;
   uniform vec2 res; uniform float t, flow, variant, lvl, think, need, done, away, listen, still, gather, zoom;
   float hash(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
@@ -70,125 +70,173 @@
       float d2=step(.8,h2)*(1.-smoothstep(.0,.3,length(f2)))*(1.-smoothstep(R*.6,R*1.05,length(gs)))*gather;
       a*=(1.-gather); col=mix(col,mix(ROSE,CREAM,fract(h2*13.)),d2); a=max(a,d2*.95);}
     gl_FragColor=vec4(col*a,a);}`;
-  const VS = "attribute vec2 p;void main(){gl_Position=vec4(p,0.,1.);}";
-
-  // bise pink (SPEC §1): dark, body, light, needs you, done, away
-  const PINK = { UMBER: [0.14, 0.05, 0.11], AMBER: [0.96, 0.56, 0.64], CREAM: [1, 0.93, 0.91], ROSE: [1, 0.38, 0.6], OLIVE: [1, 0.87, 0.66], EMBER: [0.58, 0.46, 0.96] };
-  // moods: what each asks of the smoke (SPEC §1's table)
-  const MOODS = {
-    rest:   { speed: 0.18, think: 0, need: 0, done: 0, away: 0, listen: 0, voice: 0, still: 0 },
-    still:  { speed: 0, think: 0, need: 0, done: 0, away: 0.25, listen: 0, voice: 0, still: 1 },
-    listen: { speed: 0.7, think: 0, need: 0, done: 0, away: 0, listen: 1, voice: 1, still: 0 },
-    speak:  { speed: 0.5, think: 0, need: 0, done: 0, away: 0, listen: 0.4, voice: 0.6, still: 0 },
-    work:   { speed: 0.45, think: 1, need: 0, done: 0, away: 0, listen: 0, voice: 0, still: 0 },
-    need:   { speed: 0.2, think: 0, need: 1, done: 0, away: 0, listen: 0, voice: 0, still: 0 },
-    done:   { speed: 0.25, think: 0, need: 0, done: 1, away: 0, listen: 0, voice: 0, still: 0 },
-    fail:   { speed: 0, think: 0, need: 0, done: 0, away: 0.5, listen: 0, voice: 0, still: 1 },
-    away:   { speed: 0.06, think: 0, need: 0, done: 0, away: 1, listen: 0, voice: 0, still: 0 },
-  };
-  const KEYS = Object.keys(MOODS.rest);
-
-  // one step of the mood state (pure, for the checks): ease toward the mood's targets, integrate
-  // the flow; under reduced motion the pearl stands still (speed 0, no breath) whatever the mood
-  function ease(S, mood, level, dt, reduce) {
-    const M = { ...(MOODS[mood] || MOODS.rest) };
-    if (reduce) { M.speed = 0; M.still = 1; M.voice = 0; }
-    const k = dt > 1 ? 1 : 1 - Math.exp(-dt / 0.3);
-    const N = { ...S };
-    for (const key of KEYS) N[key] = S[key] + (M[key] - S[key]) * k;
-    N.flow = S.flow + dt * N.speed * (1 + 1.2 * N.voice * (level || 0));
-    return N;
-  }
-  // settled: every value at its target (nothing left to draw under reduced motion)
-  function settled(S, mood, reduce) {
-    const M = { ...(MOODS[mood] || MOODS.rest) };
-    if (reduce) { M.speed = 0; M.still = 1; M.voice = 0; }
-    return KEYS.every((key) => Math.abs(S[key] - M[key]) < 0.002);
-  }
-  const start = (flow) => ({ flow: flow || 0, ...MOODS.rest });
-
-  // the shader on a canvas: draw(S, t, level) with the mood values S as they are (the capsule
-  // eases them)
-  function renderer(cv, opts) {
-    const gl = cv.getContext("webgl", { premultipliedAlpha: true, alpha: true, antialias: false, ...(opts || {}) });
-    if (!gl) return null;
-    const sh = (type, src) => { const s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s); if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) console.error(gl.getShaderInfoLog(s)); return s; };
-    const prog = gl.createProgram();
-    gl.attachShader(prog, sh(gl.VERTEX_SHADER, VS)); gl.attachShader(prog, sh(gl.FRAGMENT_SHADER, FS));
-    gl.linkProgram(prog); gl.useProgram(prog);
-    const b = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, b);
-    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), gl.STATIC_DRAW);
-    const loc = gl.getAttribLocation(prog, "p"); gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
-    const U = {};
-    for (const k of ["res", "t", "flow", "variant", "lvl", "think", "need", "done", "away", "listen", "still", "gather", "zoom", ...Object.keys(PINK)]) U[k] = gl.getUniformLocation(prog, k);
-    for (const k in PINK) gl.uniform3fv(U[k], PINK[k]);
-    gl.uniform1f(U.variant, 1); gl.uniform1f(U.zoom, 1);
-    function draw(S, t, level) {
-      gl.viewport(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight);
-      gl.uniform2f(U.res, gl.drawingBufferWidth, gl.drawingBufferHeight); gl.uniform1f(U.t, t); gl.uniform1f(U.flow, S.flow);
-      gl.uniform1f(U.lvl, S.voice * (level || 0)); gl.uniform1f(U.think, S.think); gl.uniform1f(U.need, S.need);
-      gl.uniform1f(U.done, S.done); gl.uniform1f(U.away, S.away); gl.uniform1f(U.listen, S.listen); gl.uniform1f(U.still, S.still);
-      gl.clearColor(0, 0, 0, 0); gl.clear(gl.COLOR_BUFFER_BIT); gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+    const VS = "attribute vec2 p;void main(){gl_Position=vec4(p,0.,1.);}";
+    // bise pink (SPEC §1): dark, body, light, needs you, done, away
+    const PINK = { UMBER: [0.14, 0.05, 0.11], AMBER: [0.96, 0.56, 0.64], CREAM: [1, 0.93, 0.91], ROSE: [1, 0.38, 0.6], OLIVE: [1, 0.87, 0.66], EMBER: [0.58, 0.46, 0.96] };
+    // moods: what each asks of the smoke (SPEC §1's table)
+    const MOODS = {
+        rest: { speed: 0.18, think: 0, need: 0, done: 0, away: 0, listen: 0, voice: 0, still: 0 },
+        still: { speed: 0, think: 0, need: 0, done: 0, away: 0.25, listen: 0, voice: 0, still: 1 },
+        listen: { speed: 0.7, think: 0, need: 0, done: 0, away: 0, listen: 1, voice: 1, still: 0 },
+        speak: { speed: 0.5, think: 0, need: 0, done: 0, away: 0, listen: 0.4, voice: 0.6, still: 0 },
+        work: { speed: 0.45, think: 1, need: 0, done: 0, away: 0, listen: 0, voice: 0, still: 0 },
+        need: { speed: 0.2, think: 0, need: 1, done: 0, away: 0, listen: 0, voice: 0, still: 0 },
+        done: { speed: 0.25, think: 0, need: 0, done: 1, away: 0, listen: 0, voice: 0, still: 0 },
+        fail: { speed: 0, think: 0, need: 0, done: 0, away: 0.5, listen: 0, voice: 0, still: 1 },
+        away: { speed: 0.06, think: 0, need: 0, done: 0, away: 1, listen: 0, voice: 0, still: 0 },
+    };
+    const KEYS = Object.keys(MOODS.rest);
+    // one step of the mood state (pure, for the checks): ease toward the mood's targets, integrate
+    // the flow; under reduced motion the pearl stands still (speed 0, no breath) whatever the mood
+    function ease(S, mood, level, dt, reduce) {
+        const M = { ...(MOODS[mood] || MOODS.rest) };
+        if (reduce) {
+            M.speed = 0;
+            M.still = 1;
+            M.voice = 0;
+        }
+        const k = dt > 1 ? 1 : 1 - Math.exp(-dt / 0.3);
+        const N = { ...S };
+        for (const key of KEYS)
+            N[key] = S[key] + (M[key] - S[key]) * k;
+        N.flow = S.flow + dt * N.speed * (1 + 1.2 * N.voice * (level || 0));
+        return N;
     }
-    return { draw, gl };
-  }
-
-  function create(cv) {
-    const gl = cv.getContext("webgl", { premultipliedAlpha: true, alpha: true, antialias: false });
-    let S = start(Math.random() * 40), last = null, drawnAt = -1e9, settledKey = "";
-    if (!gl) return { frame: () => false, state: () => S, failed: true };
-    const sh = (type, src) => { const s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s); if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) console.error(gl.getShaderInfoLog(s)); return s; };
-    const prog = gl.createProgram();
-    gl.attachShader(prog, sh(gl.VERTEX_SHADER, VS)); gl.attachShader(prog, sh(gl.FRAGMENT_SHADER, FS));
-    gl.linkProgram(prog); gl.useProgram(prog);
-    const b = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, b);
-    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), gl.STATIC_DRAW);
-    const loc = gl.getAttribLocation(prog, "p"); gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
-    const U = {};
-    for (const k of ["res", "t", "flow", "variant", "lvl", "think", "need", "done", "away", "listen", "still", "gather", "zoom", ...Object.keys(PINK)]) U[k] = gl.getUniformLocation(prog, k);
-    for (const k in PINK) gl.uniform3fv(U[k], PINK[k]);
-    gl.uniform1f(U.variant, 1); gl.uniform1f(U.zoom, 1);
-
-    function fit() {
-      const dpr = Math.min(2, root.devicePixelRatio || 1);
-      // the pearl is round: one square buffer from the canvas's smaller side (a wrong width read
-      // during the hold drew the pearl into a wide buffer that the 64 px box then squeezed into a
-      // thin vertical streak: ambient's round 9 gate, WebKit and Chrome alike)
-      const cw = cv.clientWidth, chh = cv.clientHeight;
-      const side = Math.round(Math.min(cw || chh || 68, chh || cw || 68) * dpr);
-      const w = side, h = side;
-      if (cv.width !== w || cv.height !== h) { cv.width = w; cv.height = h; return true; }
-      return false;
+    // settled: every value at its target (nothing left to draw under reduced motion)
+    function settled(S, mood, reduce) {
+        const M = { ...(MOODS[mood] || MOODS.rest) };
+        if (reduce) {
+            M.speed = 0;
+            M.still = 1;
+            M.voice = 0;
+        }
+        return KEYS.every((key) => Math.abs(S[key] - M[key]) < 0.002);
     }
-
-    // one frame; returns whether the pearl is still moving (the loop keeps a 30 Hz pace while it is)
-    function frame(st, nowMs) {
-      const t = nowMs / 1000;
-      const dt = last == null ? 1 : Math.max(0, t - last);
-      last = t;
-      S = ease(S, st.mood, st.lvl, dt, !!st.still);
-      const resized = fit();
-      const calm = st.still && settled(S, st.mood, true) && !(st.gather > 0);
-      const key = calm ? `${st.mood}` : "";
-      if (calm && !resized && key === settledKey) return false;
-      settledKey = key;
-      // at most 30 draws a second
-      if (!calm && !resized && nowMs - drawnAt < 30) return true;
-      drawnAt = nowMs;
-      // the buffer the context really has (drawingBuffer*), never the attributes' idea of it
-      gl.viewport(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight);
-      gl.uniform2f(U.res, gl.drawingBufferWidth, gl.drawingBufferHeight); gl.uniform1f(U.t, st.still ? 0 : t); gl.uniform1f(U.flow, S.flow);
-      gl.uniform1f(U.lvl, S.voice * (st.lvl || 0)); gl.uniform1f(U.think, S.think); gl.uniform1f(U.need, S.need);
-      gl.uniform1f(U.gather, st.gather || 0); gl.uniform1f(U.zoom, st.zoom || 1);
-      gl.uniform1f(U.done, S.done); gl.uniform1f(U.away, S.away); gl.uniform1f(U.listen, S.listen); gl.uniform1f(U.still, S.still);
-      gl.clearColor(0, 0, 0, 0); gl.clear(gl.COLOR_BUFFER_BIT); gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
-      return !calm;
+    const start = (flow) => ({ flow: flow || 0, ...MOODS.rest });
+    // the shader on a canvas: draw(S, t, level) with the mood values S as they are (the capsule
+    // eases them)
+    function renderer(cv, opts) {
+        const gl = cv.getContext("webgl", { premultipliedAlpha: true, alpha: true, antialias: false, ...(opts || {}) });
+        if (!gl)
+            return null;
+        // (a live context makes its shaders: null only once the context is lost)
+        const sh = (type, src) => { const s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s); if (!gl.getShaderParameter(s, gl.COMPILE_STATUS))
+            console.error(gl.getShaderInfoLog(s)); return s; };
+        const prog = gl.createProgram();
+        gl.attachShader(prog, sh(gl.VERTEX_SHADER, VS));
+        gl.attachShader(prog, sh(gl.FRAGMENT_SHADER, FS));
+        gl.linkProgram(prog);
+        gl.useProgram(prog);
+        const b = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, b);
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), gl.STATIC_DRAW);
+        const loc = gl.getAttribLocation(prog, "p");
+        gl.enableVertexAttribArray(loc);
+        gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
+        const U = {};
+        for (const k of ["res", "t", "flow", "variant", "lvl", "think", "need", "done", "away", "listen", "still", "gather", "zoom", ...Object.keys(PINK)])
+            U[k] = gl.getUniformLocation(prog, k);
+        for (const k in PINK)
+            gl.uniform3fv(U[k], PINK[k]);
+        gl.uniform1f(U.variant, 1);
+        gl.uniform1f(U.zoom, 1);
+        const draw = (S, t, level) => {
+            gl.viewport(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight);
+            gl.uniform2f(U.res, gl.drawingBufferWidth, gl.drawingBufferHeight);
+            gl.uniform1f(U.t, t);
+            gl.uniform1f(U.flow, S.flow);
+            gl.uniform1f(U.lvl, S.voice * (level || 0));
+            gl.uniform1f(U.think, S.think);
+            gl.uniform1f(U.need, S.need);
+            gl.uniform1f(U.done, S.done);
+            gl.uniform1f(U.away, S.away);
+            gl.uniform1f(U.listen, S.listen);
+            gl.uniform1f(U.still, S.still);
+            gl.clearColor(0, 0, 0, 0);
+            gl.clear(gl.COLOR_BUFFER_BIT);
+            gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+        };
+        return { draw, gl };
     }
-    // fit: size the drawing buffer to the canvas without drawing (the bar keeps it right while
-    // nobody sees it, so the first frame shown is never the default 300x150 buffer squeezed into
-    // 64 px: amb-tools' read, m_6724)
-    return { frame, fit, state: () => S };
-  }
-
-  root.AmbPearl = { create, renderer, ease, settled, start, MOODS, PINK, FS };
+    function create(cv) {
+        const gl = cv.getContext("webgl", { premultipliedAlpha: true, alpha: true, antialias: false });
+        let S = start(Math.random() * 40), last = null, drawnAt = -1e9, settledKey = "";
+        if (!gl)
+            return { frame: () => false, state: () => S, failed: true };
+        const sh = (type, src) => { const s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s); if (!gl.getShaderParameter(s, gl.COMPILE_STATUS))
+            console.error(gl.getShaderInfoLog(s)); return s; };
+        const prog = gl.createProgram();
+        gl.attachShader(prog, sh(gl.VERTEX_SHADER, VS));
+        gl.attachShader(prog, sh(gl.FRAGMENT_SHADER, FS));
+        gl.linkProgram(prog);
+        gl.useProgram(prog);
+        const b = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, b);
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), gl.STATIC_DRAW);
+        const loc = gl.getAttribLocation(prog, "p");
+        gl.enableVertexAttribArray(loc);
+        gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
+        const U = {};
+        for (const k of ["res", "t", "flow", "variant", "lvl", "think", "need", "done", "away", "listen", "still", "gather", "zoom", ...Object.keys(PINK)])
+            U[k] = gl.getUniformLocation(prog, k);
+        for (const k in PINK)
+            gl.uniform3fv(U[k], PINK[k]);
+        gl.uniform1f(U.variant, 1);
+        gl.uniform1f(U.zoom, 1);
+        function fit() {
+            const dpr = Math.min(2, root.devicePixelRatio || 1);
+            // the pearl is round: one square buffer from the canvas's smaller side (a wrong width read
+            // during the hold drew the pearl into a wide buffer that the 64 px box then squeezed into a
+            // thin vertical streak: ambient's round 9 gate, WebKit and Chrome alike)
+            const cw = cv.clientWidth, chh = cv.clientHeight;
+            const side = Math.round(Math.min(cw || chh || 68, chh || cw || 68) * dpr);
+            const w = side, h = side;
+            if (cv.width !== w || cv.height !== h) {
+                cv.width = w;
+                cv.height = h;
+                return true;
+            }
+            return false;
+        }
+        // one frame; returns whether the pearl is still moving (the loop keeps a 30 Hz pace while it is)
+        const frame = (st, nowMs) => {
+            const t = nowMs / 1000;
+            const dt = last == null ? 1 : Math.max(0, t - last);
+            last = t;
+            S = ease(S, st.mood, st.lvl, dt, !!st.still);
+            const resized = fit();
+            const calm = st.still && settled(S, st.mood, true) && !(st.gather > 0); // (no gather: undefined > 0, false)
+            const key = calm ? `${st.mood}` : "";
+            if (calm && !resized && key === settledKey)
+                return false;
+            settledKey = key;
+            // at most 30 draws a second
+            if (!calm && !resized && nowMs - drawnAt < 30)
+                return true;
+            drawnAt = nowMs;
+            // the buffer the context really has (drawingBuffer*), never the attributes' idea of it
+            gl.viewport(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight);
+            gl.uniform2f(U.res, gl.drawingBufferWidth, gl.drawingBufferHeight);
+            gl.uniform1f(U.t, st.still ? 0 : t);
+            gl.uniform1f(U.flow, S.flow);
+            gl.uniform1f(U.lvl, S.voice * (st.lvl || 0));
+            gl.uniform1f(U.think, S.think);
+            gl.uniform1f(U.need, S.need);
+            gl.uniform1f(U.gather, st.gather || 0);
+            gl.uniform1f(U.zoom, st.zoom || 1);
+            gl.uniform1f(U.done, S.done);
+            gl.uniform1f(U.away, S.away);
+            gl.uniform1f(U.listen, S.listen);
+            gl.uniform1f(U.still, S.still);
+            gl.clearColor(0, 0, 0, 0);
+            gl.clear(gl.COLOR_BUFFER_BIT);
+            gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+            return !calm;
+        };
+        // fit: size the drawing buffer to the canvas without drawing (the bar keeps it right while
+        // nobody sees it, so the first frame shown is never the default 300x150 buffer squeezed into
+        // 64 px: amb-tools' read, m_6724)
+        return { frame, fit, state: () => S };
+    }
+    root.AmbPearl = { create, renderer, ease, settled, start, MOODS, PINK, FS };
 })(typeof window !== "undefined" ? window : globalThis);

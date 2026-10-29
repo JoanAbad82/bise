@@ -27,8 +27,9 @@ from e2e import Env, check  # noqa: E402
 
 
 def approvals(c):
-    evs = [e for e in c.events if e.get("ev") == "approvals"]
-    return evs[-1] if evs else None
+    """The latest hub/approvals (initialize's state, then each change)."""
+    with c.lock:
+        return c.hub.get("hub/approvals")
 
 
 def confirm_cards(c):
@@ -38,10 +39,6 @@ def confirm_cards(c):
 def card_of(c, agent):
     c.wait(lambda: any(cd["agent"] == agent for cd in confirm_cards(c)), 90, "a confirm card for %s" % agent)
     return [cd for cd in confirm_cards(c) if cd["agent"] == agent][0]
-
-
-def user_texts(E, agent):
-    return [r.get("user", "") for r in E.fake_requests() if r.get("agent") == agent]
 
 
 def tool_results(E, agent):
@@ -84,7 +81,7 @@ def main():
         check(not any(l.startswith("sb gate") for l in c.lines("ty")), "no gate line in yolo")
 
         # 2. shift+tab: auto, in config.toml, the mode files, after a restart
-        c.send({"op": "approvals", "mode": "toggle"})
+        check(c.approvals_set("toggle").get("result") == {}, "shift+tab answered")
         c.wait(lambda: approvals(c)["mode"] == "auto" and approvals(c)["flash"], 10, "the switch to auto")
         cfg = open(os.path.join(bise, "config.toml")).read()
         check('approvals = "auto"' in cfg and '[roles]' in cfg, "config.toml remembers it: %r" % cfg)
@@ -98,33 +95,33 @@ def main():
         # 6. a force push to main: a card with no "always"; no with a note
         c.say("/new t6: {{bash: git push origin main --force}}")
         card = card_of(c, "t6")
-        check("wants to run" in card["text"] and "| git push origin main --force" in card["text"], card["text"])
-        check("always:" not in card["text"], "a hard rule offers no always: %r" % card["text"])
+        check("wants to run" in card["question"] and "| git push origin main --force" in card["question"], card["question"])
+        check("always:" not in card["question"], "a hard rule offers no always: %r" % card["question"])
         c.wait(lambda: c.agent("t6")["status"] == "waiting" and c.agent("t6")["waiting_on"] == "you", 30,
                "t6 waits on you: %r" % c.agent("t6"))
-        c.wait(lambda: any(l.startswith("sb gate : card ") for l in c.lines("t6")), 10, "the gate line in t6's feed")
+        c.wait_feed("t6", "gate", 10, step="card")
         c.say("/answer %d no: use a branch" % card["id"])
         c.wait(lambda: not confirm_cards(c), 30, "the card closed")
         c.wait_idle("t6")
         check("the user said no: use a branch" in tool_results(E, "t6"), "t6 read the note")
         for who in ("t6", "main"):
-            c.wait_line(who, "sb approval : no : t6 : git push origin main --force : use a branch", 10)
+            c.wait_feed(who, "approval", 10, how="no", who="t6", what="git push origin main --force", note="use a branch")
 
         # 7. a card, then ctrl+c on the agent: the call does not run
         out7 = os.path.join(home, "outside7.txt")
         c.say("/new t7: {{bash: echo x > %s}}" % out7)
         card = card_of(c, "t7")
-        check("always:" in card["text"], "a checker-off card offers always: %r" % card["text"])
-        c.send({"op": "interrupt", "focus": "t7", "agent": "t7"})
+        check("always:" in card["question"], "a checker-off card offers always: %r" % card["question"])
+        c.interrupt("t7")
         c.wait(lambda: not confirm_cards(c), 30, "the card closed by the interrupt")
         c.wait_idle("t7")
         check(not os.path.exists(out7), "the interrupted call did not run")
-        c.wait_line("t7", "sb gate : done ", 10)
+        c.wait_feed("t7", "gate", 10, step="done")
 
         # 8. always allow npm run build here: saved; the next one asks nothing
         c.say("/new t8: {{bash: npm run build; echo one > t8a.txt}} {{bash: npm run build; echo two > t8b.txt}}")
         card = card_of(c, "t8")
-        check("always: npm run build *" in card["text"], "the pattern it saves: %r" % card["text"])
+        check("always: npm run build *" in card["question"], "the pattern it saves: %r" % card["question"])
         c.say("/answer %d 2" % card["id"])  # 2 always: approving words are refused (the composer rule)
         c.wait(lambda: os.path.exists(os.path.join(E.ws, "t8b.txt")), 90, "the second npm run build ran")
         c.wait_idle("t8")
@@ -146,7 +143,7 @@ def main():
         c.say("/answer %d 1" % card["id"])  # 1 allow
         c.wait_idle("t10a", "t10b")
         check(open(out10).read() == "y\ny\n", "one answer ran both calls")
-        c.wait_line("main", "sb approval : allowed : t10a, t10b : " + cmd, 10)
+        c.wait_feed("main", "approval", 10, how="allowed", who="t10a, t10b", what=cmd)
         ok = True
         print("approvals modes, gate and cards: ok")
     finally:

@@ -15,6 +15,7 @@ import ../core/text.bend as Tx
 import ./tools-pure.bend as Xp
 import ../core/edit.bend as Ed
 import ./selftools-pure.bend as Sfp
+import ../core/gen/obs.bend as OG
 
 # ---- runtime state and loop vocabulary ----
 
@@ -32,7 +33,9 @@ type Job is Data:
 type Effect is Data:
   EPrints{lines: List<&2, String>}
   # a real provider call: the hub HTTP client, in this process
-  EModel{action: U32, request: String, after: List<&2, T.Act>}
+  # live: an agent's answer call, whose text streams as partial lines
+  # (compaction calls stay silent)
+  EModel{action: U32, request: String, after: List<&2, T.Act>, live: Bool}
   # a real tool execution (bash, the merged search, remote MCP calls).
   # The live flag keeps scripted scenarios hermetic: no MCP index reads.
   EExec{call: T.Call, after: List<&2, T.Act>, live: Bool}
@@ -105,7 +108,8 @@ def trans.model.live(+sess: T.Session, +rt: Rt, +rest: List<&2, T.Act>,
     +action: U32, +input: List<&2, T.Msg>) -> Trans:
   match sess:
     case T.Sess{+cfg, _, _, _, _, _, _, _}:
-      Tr{EModel{action, Rem.build_request(cfg, input), rest}, rt, JIdle{}}
+      Tr{EModel{action, Rem.build_request(cfg, input), rest, True{}}, rt,
+        JIdle{}}
 
 def script_of(+rt: Rt) -> List<&2, M.Reply>:
   match rt:
@@ -147,7 +151,7 @@ def trans.model.compact.live(+sess: T.Session, +rt: Rt,
   match sess:
     case T.Sess{+cfg, _, _, _, _, +pending, _, _}:
       Tr{EModel{action, compact_request(compact_first(pending), cfg, input),
-        rest}, rt, JIdle{}}
+        rest, False{}}, rt, JIdle{}}
 
 def trans.model.compact.script(+rt: Rt, +rest: List<&2, T.Act>,
     +action: U32) -> Trans:
@@ -491,6 +495,30 @@ def prog_sleep.secs(m: Maybe<&2, J.Json>, +args: String) -> U32:
 def prog_sleep.bounds(+secs: U32) -> Bool:
   Bool.and(U32.is_lt(0, secs), U32.is_lt(secs, 20))
 
+# ---- a program's inner call, recorded for the re-run ----
+# A success is recorded as its text (a JSON string); a failure (a tool
+# error, a gate denial with its note) as {error: text}: the re-run
+# rejects that call's promise with the whole text (rust/jsrt's
+# ToolError), so the program can catch it and go on. Only a stop (the
+# interrupt flag is set) ends the program, with the failure's text.
+type ProgStep is Data:
+  PRecord{entry: J.Json}
+  PEnd{why: String}
+
+def prog_after.failed(stop: Bool, +out: String) -> ProgStep:
+  match stop:
+    case True{}:
+      PEnd{String.append("program call failed: ", out)}
+    case False{}:
+      PRecord{J.JObj{[Tuple{"error", J.JStr{out}}]}}
+
+def prog_after(ok: Bool, +out: String, stop: Bool) -> ProgStep:
+  match ok:
+    case True{}:
+      PRecord{J.JStr{out}}
+    case False{}:
+      prog_after.failed(stop, out)
+
 # the sub-call line renders in the TUI feed (live only): one line per
 # tool the program called, with the outcome. Out is Type-kind: every
 # emit writes the same connection, so the emitter param is shared and
@@ -632,8 +660,7 @@ def fin_label(ok: Bool) -> String:
       " failed"
 
 def replay.fin(+id: U32, ok: Bool) -> String:
-  hist(String.append("  obs: tool_finished #",
-    String.append(U32.show(id), fin_label(ok))))
+  hist(OG.tool_finished(U32.to_nat(id), ok))
 
 def replay.code(is_code: Bool, +c: T.Call) -> List<&2, String>:
   match is_code:
@@ -650,7 +677,7 @@ def replay.intent(ls: List<&2, String>) -> List<&2, String>:
       Con{hist(l), replay.intent(t)}
 
 def replay.call(+c: T.Call) -> List<&2, String>:
-  Con{hist(String.append("  obs: tool_started #", U32.show(call_id(c)))),
+  Con{hist(OG.tool_started(U32.to_nat(call_id(c)))),
     Con{hist(call_ann(c)),
       List.append(&2, String, replay.code(is_code_call(call_name(c)), c),
         replay.intent(intent_anns(c)))}}
@@ -828,7 +855,7 @@ def info_line(+model: String, +threshold: String, +steer: String,
 def drain_steer.emit_of(res: T.Res) -> List<&2, String>:
   match res:
     case T.Rejected{+reason}:
-      Con{String.append("  obs: steering_rejected: ", reason), Nil{}}
+      Con{OG.steering_rejected(reason), Nil{}}
     case T.Accepted{+obs, _, _}:
       obs_lines(obs)
 

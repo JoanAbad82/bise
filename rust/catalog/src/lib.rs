@@ -24,13 +24,21 @@ pub mod chatgpt;
 pub mod cli;
 pub mod config_cli;
 pub mod detect;
+mod efforts;
+pub use efforts::*;
+pub mod live_efforts;
+pub mod live_fetch;
 pub mod openrouter_login;
 pub mod names;
 pub mod picks;
+pub mod plan_list;
 pub mod roles;
 pub mod secrets_cli;
 pub mod spawn;
+mod threshold;
+pub use threshold::*;
 pub mod voice;
+pub mod voice_live;
 
 /// The command's name in messages and usages (BISE-165: was `bend-harness`).
 pub const CLI: &str = "bise";
@@ -43,9 +51,11 @@ pub const KEY_COMMAND_STATE: &str = "key from key_command · not checked";
 /// The built-in list, shipped in the binary.
 pub const BUILTIN: &str = include_str!("../models.toml");
 
-/// The wire families a provider may speak.
-pub const FAMILIES: [&str; 5] = [
+/// The wire families a provider may speak. `deepseek-chat` is Chat
+/// Completions with DeepSeek's reasoning replay (bend/core/deepseek.bend).
+pub const FAMILIES: [&str; 6] = [
     "openai-chat",
+    "deepseek-chat",
     "anthropic",
     "openai-responses",
     "gemini",
@@ -96,35 +106,6 @@ pub struct Caps {
 
 /// The thinking modes of the Anthropic family.
 pub const THINKING: [&str; 3] = ["adaptive", "budget", "none"];
-
-/// The reasoning efforts of the Anthropic family (BISE-135): `none` turns
-/// thinking off; the others are output_config.effort (adaptive) or the
-/// size of the thinking budget (budget).
-pub const ANTHROPIC_EFFORTS: [&str; 5] = ["none", "low", "medium", "high", "max"];
-
-/// The reasoning efforts of the OpenAI-compatible families
-/// (`reasoning_effort`, sent as is).
-pub const CHAT_EFFORTS: [&str; 4] = ["none", "low", "medium", "high"];
-
-/// The effort a reasoning model gets when nobody picks one: today's.
-pub const DEFAULT_EFFORT: &str = "high";
-
-/// An effort word: letters, digits, '-' or '_' (a provider may take its
-/// own, "minimal", "xhigh"...).
-pub fn is_effort_word(w: &str) -> bool {
-    !w.is_empty() && w.len() <= 20 && w.chars().all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
-}
-
-/// "none, low,high" -> ["none", "low", "high"]; empty when a word is not
-/// an effort word.
-pub fn effort_list(s: &str) -> Vec<String> {
-    let l: Vec<String> = s.split(',').map(|w| w.trim().to_string()).filter(|w| !w.is_empty()).collect();
-    if l.iter().all(|w| is_effort_word(w)) {
-        l
-    } else {
-        Vec::new()
-    }
-}
 
 /// The defaults of a model nothing describes.
 pub const DEFAULT_CAPS: Caps = Caps {
@@ -415,50 +396,6 @@ pub struct Resolved {
     pub known: Known,
 }
 
-impl Resolved {
-    /// The reasoning efforts the model takes (BISE-135), in order: its
-    /// `efforts` key, else its family's ([`ANTHROPIC_EFFORTS`],
-    /// [`CHAT_EFFORTS`]); none for a model that does not reason (an
-    /// Anthropic one with `thinking = "none"` included). The Bend
-    /// runtime computes the same (runtime/provider-pure.bend `efforts`).
-    pub fn efforts(&self) -> Vec<String> {
-        if !self.caps.reasoning || (self.api == "anthropic" && self.caps.thinking == "none") {
-            return Vec::new();
-        }
-        let own = effort_list(&self.caps.efforts);
-        if !own.is_empty() {
-            return own;
-        }
-        let family: &[&str] = if self.api == "anthropic" { &ANTHROPIC_EFFORTS } else { &CHAT_EFFORTS };
-        family.iter().map(|w| w.to_string()).collect()
-    }
-
-    /// The effort nobody picked: its `effort` key when it takes it, else
-    /// high, else the last of its list; "" when it takes none.
-    pub fn default_effort(&self) -> String {
-        let l = self.efforts();
-        let has = |w: &str| l.iter().any(|x| x == w);
-        if has(&self.caps.effort) {
-            self.caps.effort.clone()
-        } else if has(DEFAULT_EFFORT) {
-            DEFAULT_EFFORT.into()
-        } else {
-            l.last().cloned().unwrap_or_default()
-        }
-    }
-
-    /// The effort a call runs with when `asked` is asked ("" = nothing
-    /// asked): `asked` when the model takes it, else its default.
-    pub fn effort_for(&self, asked: &str) -> String {
-        let asked = asked.trim();
-        if self.efforts().iter().any(|w| w == asked) {
-            asked.to_string()
-        } else {
-            self.default_effort()
-        }
-    }
-}
-
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Catalog {
     pub providers: Vec<Provider>,
@@ -471,6 +408,8 @@ pub struct Catalog {
     pub default_voice_model: String,
     /// what was ignored while reading, one line each
     pub warnings: Vec<String>,
+    /// the plans' own model lists and their swaps ([`plan_list`])
+    pub plan: plan_list::Plans,
 }
 
 /// Split "provider/id" at the first '/' (ids may hold '/').
@@ -499,6 +438,7 @@ impl Catalog {
             default_model: String::new(),
             default_voice_model: String::new(),
             warnings: Vec::new(),
+            plan: Default::default(),
         }
     }
 
@@ -667,11 +607,12 @@ impl Catalog {
 
     /// The compaction threshold a model gets when neither
     /// BEND_THRESHOLD nor config `compaction_threshold` says (BISE-150):
-    /// 80 % of its context window, also the most any value gets
+    /// 450k from a 1M window, else 85 % of it (issue #18; the most any
+    /// value gets: 85 %)
     /// (BISE-300, [`compaction_threshold`]). The Bend runtime computes
-    /// the same (runtime/provider-pure.bend, `threshold_of`).
+    /// the same (runtime/threshold-pure.bend, `thr_default`).
     pub fn default_threshold(&self, name: &str) -> u64 {
-        threshold_of(self.context_window(name))
+        default_threshold_of(self.context_window(name))
     }
 
     /// Merge one TOML layer (the built-in list, then the config).
@@ -919,42 +860,6 @@ fn kind_of(v: &toml::Value) -> Option<Kind> {
     }
 }
 
-/// 80 % of a context window, in tokens.
-pub fn threshold_of(context: u64) -> u64 {
-    context / 5 * 4 + context % 5 * 4 / 5
-}
-
-/// A compaction threshold as written (BISE-300), in tokens for a model
-/// with this window: a number of tokens ("450000") or a share of the
-/// window ("45%", above 100 counts as 100). None when it is no threshold
-/// (0, empty, a word, a decimal share): the default applies. The Bend
-/// runtime reads the same (runtime/provider-pure.bend `thr_value`).
-pub fn threshold_written(v: &str, context: u64) -> Option<u64> {
-    fn digits(s: &str) -> Option<u64> {
-        if s.is_empty() || !s.bytes().all(|b| b.is_ascii_digit()) {
-            return None;
-        }
-        Some(s.parse::<u64>().unwrap_or(u64::MAX))
-    }
-    let v = v.trim();
-    let n = match v.strip_suffix('%') {
-        Some(p) => {
-            let p = digits(p.trim())?.min(100);
-            context / 100 * p + context % 100 * p / 100
-        }
-        None => digits(v)?,
-    };
-    (n > 0).then_some(n)
-}
-
-/// The compaction threshold of a model with this window (BISE-300): the
-/// value written (BEND_THRESHOLD, else config `compaction_threshold`),
-/// never above 80 % of the window; none or no threshold: that 80 %. A
-/// number written for a 1M model stays safe on a 200k one.
-pub fn compaction_threshold(written: Option<&str>, context: u64) -> u64 {
-    let cap = threshold_of(context);
-    written.and_then(|v| threshold_written(v, context)).map_or(cap, |n| n.min(cap))
-}
 
 fn set_str(slot: &mut String, v: Option<String>, where_: &str, k: &str, warn: &mut dyn FnMut(String)) {
     match v {
@@ -1167,7 +1072,7 @@ fn read_threshold(t: &toml::Table, warnings: &mut Vec<String>) -> Option<String>
         }
     };
     if threshold_written(&v, 1_000_000).is_none() {
-        warnings.push(format!("config.toml: compaction_threshold: {} (80% of the window applies)", WHAT));
+        warnings.push(format!("config.toml: compaction_threshold: {} (the default applies)", WHAT));
     }
     Some(v)
 }
@@ -1202,17 +1107,20 @@ impl Setup {
     /// is a warning: its tables are ignored, `model`/`agent_model` lines
     /// are still read.
     pub fn from_text(config: Option<&str>, env: &dyn Fn(&str) -> Option<String>) -> Setup {
-        Setup::from_parts(config, env, env)
+        Setup::from_parts(config, &[], env, env)
     }
 
-    /// [`Setup::from_text`] with the base URLs' variables read through
-    /// `url_env` (the env, then the .env files: [`Setup::load`]).
+    /// [`Setup::from_text`] with the APIs' effort lists (`live`,
+    /// [`live_fetch::read`]: over the table, under config.toml) and the
+    /// base URLs' variables read through `url_env` (the env, then the
+    /// .env files: [`Setup::load`]).
     pub fn from_parts(
         config: Option<&str>,
+        live: &[(String, Vec<String>)],
         env: &dyn Fn(&str) -> Option<String>,
         url_env: &dyn Fn(&str) -> Option<String>,
     ) -> Setup {
-        let mut catalog = Catalog::builtin();
+        let mut catalog = Catalog::builtin().with_live(live);
         let (mut model_cfg, mut agent_cfg, mut small_cfg) = (None, None, None);
         let (mut effort_cfg, mut agent_effort_cfg) = (None, None);
         let mut voice_cfg = voice::VoiceConfig::default();
@@ -1242,11 +1150,7 @@ impl Setup {
                     threshold_cfg = read_threshold(&t, &mut catalog.warnings);
                     profiles = spawn::read_profiles(&t, &mut catalog.warnings);
                     if let Some(v) = r.voice {
-                        voice_cfg = voice::VoiceConfig {
-                            model: v.model.or(voice_cfg.model),
-                            language: v.language.or(voice_cfg.language),
-                            vocabulary: if v.vocabulary.is_empty() { voice_cfg.vocabulary } else { v.vocabulary },
-                        };
+                        voice_cfg = v.over(voice_cfg);
                     }
                 }
                 Err(e) => {
@@ -1383,8 +1287,10 @@ impl Setup {
         let files = auth::EnvFile::read_all(&home.env_files());
         let real = |k: &str| std::env::var(k).ok();
         let store = auth::Store::read(&home.auth_file()).unwrap_or_default();
-        Setup::from_parts(text.as_deref(), &real, &|k| with_files(&real, &files, k))
+        Setup::from_parts(text.as_deref(), &live_fetch::read(&home.cache_dir()), &real, &|k| with_files(&real, &files, k))
+            .with_live_stt(&voice_live::read(&home.cache_dir()))
             .with_keys(&auth::Keys { env: &real, store: &store, files: &files })
+            .with_plan_lists(plan_list::read(&home.cache_dir()))
     }
 
     /// The model of a role: "main" or "agent".
@@ -1440,6 +1346,7 @@ impl Setup {
         for (a, to) in &c.aliases {
             o.push_str(&format!("{} = {}\n", q(a), q(to)));
         }
+        o.push_str(&plan_list::swaps_toml(c, q));
         // the runtime only calls chat models: the speech-to-text entries
         // (BISE-130) stay out, the file is the same as before them
         for p in c.providers.iter().filter(|p| p.chats()) {
@@ -1463,6 +1370,11 @@ impl Setup {
                 o.push_str(&format!("shape = {}\n", q(&p.shape)));
             }
             let mut caps = c.provider_caps(p);
+            // the family's list, so a model the file does not list gets
+            // it: the runtime has no list of its own (efforts.rs)
+            if caps.efforts.is_empty() {
+                caps.efforts = family_efforts(&p.api).join(",");
+            }
             // a provider that signs in: its token comes from this binary
             // (`bise auth token <id>`), unless config.toml names a command
             if p.signs_in() && caps.key_command.is_empty() {
@@ -1528,7 +1440,12 @@ impl Setup {
         if let Some(d) = path.parent() {
             std::fs::create_dir_all(d)?;
         }
-        let tmp: PathBuf = path.with_extension(format!("toml.{}.tmp", std::process::id()));
+        // one temp file per write, not per process: the hub writes it from
+        // several threads (a REPL start, its keys check, small jobs), and
+        // two writes on one temp name made one rename fail
+        static WRITES: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+        let n = WRITES.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        let tmp: PathBuf = path.with_extension(format!("toml.{}.{}.tmp", std::process::id(), n));
         std::fs::write(&tmp, self.handoff_toml())?;
         std::fs::rename(&tmp, path).inspect_err(|_| {
             let _ = std::fs::remove_file(&tmp);
@@ -1746,19 +1663,7 @@ fn key(s: &str) -> String {
     }
 }
 
-/// Write the hand-off where the runtime will find it and return its
-/// path: `<cache_dir>/models.toml`, else the temp dir. None when neither
-/// is writable (the runtime then keeps its old table). `env` gives the
-/// providers' `base_url_env` variables (the hub: its environment, then
-/// the .env files read again, so an edit reaches the next call).
-pub fn export_handoff(config: &Path, cache_dir: &Path, env: &dyn Fn(&str) -> Option<String>) -> Option<PathBuf> {
-    let text = std::fs::read_to_string(config).ok();
-    let setup = Setup::from_text(text.as_deref(), env);
-    let fallback = std::env::temp_dir().join(format!("bise-models-{}.toml", std::process::id()));
-    [cache_dir.join("models.toml"), fallback]
-        .into_iter()
-        .find(|p| setup.write_handoff(p).is_ok())
-}
+pub use live_fetch::export_handoff;
 
 #[cfg(test)]
 mod tests;

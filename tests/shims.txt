@@ -1,0 +1,18 @@
+# The live compatibility shims, each with who removes it and in which release (issue 31;
+# tests/shims_check.py reads it). A shim is code kept for an older install: an older desktop,
+# hub, TUI, transcript or bundle that a newer one still has to read or answer.
+#
+# One per line, tab-separated: <tag>	<owner>	<removal release>	<what>
+#   <tag>              the TODO(<tag>) on each of its sites in the code: one tag, every site
+#   <owner>            the agent (or role) that removes it
+#   <removal release>  a release tag, as the release scripts make them: v<YYYY.M.D>[-N] (the
+#                      terminal) or desktop-v<YYYY.M.N> (the app); the first release that must
+#                      not carry it any more
+#   <what>             what it keeps working, and for whom
+#
+# Adding one: in the same commit, its TODO(<tag>) on each site (say it goes in a later
+# release) and its line here. Removing one: its sites and its line in the same commit.
+# Red (shims_check): a TODO(<tag>) that says it goes later with no line here; a line whose
+# tag is on no site (stale); a line that doesn't parse; a line whose removal release is out
+# (the highest tag of that kind merged into HEAD is at or past it): red in quick, full and the
+# nightly, a warning in land (the owner gets the red at their next quick gate).

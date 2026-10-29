@@ -38,7 +38,7 @@ fn tui_words(ls: &[&str]) -> Vec<(EntryKind, String, String)> {
         let failed = matches!(read(l), Rec::Obs(Obs::TurnDone(TurnEnd::Failed(_))));
         match parse_line(l) {
             Some(Ev::Err(t) | Ev::Warn(t)) if failed => out.push((EntryKind::TurnFailed, t, String::new())),
-            Some(Ev::You(t, ..)) => out.push((EntryKind::You, t, String::new())),
+            Some(Ev::You(t, ..)) => out.push((EntryKind::You, t.text, String::new())),
             Some(Ev::Assistant(t)) => {
                 // run.rs makes its thinking a section, its head the shared
                 // words (no time: these lines have none); the fold puts it
@@ -54,8 +54,10 @@ fn tui_words(ls: &[&str]) -> Vec<(EntryKind, String, String)> {
             }
             Some(Ev::AgentMsg { from, to, text, level: 3, .. }) if from.is_empty() => out.push((EntryKind::ToAgent, text, to)),
             Some(Ev::AgentMsg { from, text, level: 3, .. }) => out.push((EntryKind::FromAgent, text, from)),
-            Some(Ev::AgentMsg { text, level: 2, .. }) => out.push((EntryKind::Agent, text, String::new())),
-            Some(Ev::Info(t) | Ev::Warn(t) | Ev::Err(t)) => out.push((EntryKind::Notice, t, String::new())),
+            // G5: an agent writing to him is the fold's agent entry with
+            // to_you and who
+            Some(Ev::AgentMsg { from, text, level: 2, .. }) => out.push((EntryKind::Agent, text, from)),
+            Some(Ev::Info(t) | Ev::Warn(t) | Ev::Retry { text: t, .. } | Ev::Err(t)) => out.push((EntryKind::Notice, t, String::new())),
             Some(Ev::Undelivered { name, text, .. }) => out.push((EntryKind::NotDelivered, text, name)),
             _ => {}
         }
@@ -135,22 +137,55 @@ fn the_tui_and_the_fold_agree_on_the_hubs_news() {
     }
 }
 
-/// architect m_10999: the TUI's gauge (usage::current over its events)
-/// and the hub's seed (lines::current_usage over the transcript's lines)
-/// read the same usage for the same lines, by the one rule.
+/// tui-parity F1 (proto-lead m_15352): the terminal's context meter
+/// comes from the hub's agent row since the feed reads entries (which
+/// carry no usage line). Law: over a corpus of usage lines, the meter the
+/// line path drew (the TUI's last `Ev::Usage` unless a compaction came
+/// after it: the divider's full label and resting words, the panel row's
+/// fill) equals the one the row gives (the hub's rule, `lines::
+/// current_usage` over the same lines, its `AgentUsage::of`, then the
+/// row's `label()`, `words`, `short`).
 #[test]
-fn the_tui_and_the_hub_read_the_same_current_usage() {
+fn the_meter_from_the_agent_row_is_the_meter_the_lines_gave() {
+    use bise_proto::thread::lines::{current_usage, usage_mark, UsageMark};
     let u1 = "  obs: usage: model=mistral/codestral-latest in=1200 out=30";
     let u2 = "  obs: usage: model=mistral/codestral-latest in=42000 out=310";
+    let big = "  obs: usage: model=anthropic/claude-haiku-4-5 in=209500 out=500 cache_read=0 cache_write=0";
+    let unknown = "  obs: usage: model=nowhere/some-model in=950 out=0";
     let done = "  obs: compaction_done: the summary";
-    for ls in [vec![u1], vec![u1, "sb you : hi", u2], vec![u1, done], vec![u1, done, u2], vec!["sb you : hi"]] {
+    let corpus: Vec<Vec<&str>> = vec![
+        vec![u1],
+        vec![u1, "sb you : hi", u2],
+        vec![u1, done],
+        vec![u1, done, u2],
+        vec![u2, big],
+        vec![unknown],
+        vec![big, "sb you : hi", unknown, done],
+        vec!["sb you : hi"],
+        vec![],
+    ];
+    let mut drawn = 0;
+    for ls in corpus {
+        // the line path: the TUI's events, as before the switch
         let evs: Vec<Ev> = ls.iter().filter_map(|l| parse_line(l)).collect();
-        let tui = crate::usage::current(&evs).map(|u| (u.model.clone(), u.input, u.output, u.short()));
-        let hub = bise_proto::thread::lines::current_usage(ls.iter().map(|l| bise_proto::thread::lines::usage_mark(l)))
+        let lines = current_usage(evs.iter().map(|e| match e {
+            Ev::Usage(u) => UsageMark::Usage(u),
+            Ev::Compacted { .. } => UsageMark::Compacted,
+            _ => UsageMark::Other,
+        }))
+        .map(|u| {
+            let w = crate::models::context_window(&u.model);
+            (u.label(), words::context_words(u.context(), w), words::short_words(u.context(), w))
+        });
+        // the row path: the hub's rule over the transcript's lines
+        let row = current_usage(ls.iter().map(|l| usage_mark(l)))
             .and_then(|t| bise_session::usage_line::parse(&t))
-            .map(|u| (u.model.clone(), u.input, u.output, words::short_words(u.input + u.output, crate::models::context_window(&u.model))));
-        assert_eq!(tui, hub, "{ls:?}");
+            .map(|u| bise_proto::rows::AgentUsage::of(&u.model, u.input, u.output, crate::models::context_window(&u.model)))
+            .map(|r| (r.label(), r.words.clone(), r.short.clone()));
+        assert_eq!(lines, row, "{ls:?}");
+        drawn += usize::from(row.is_some());
     }
+    assert_eq!(drawn, 5, "the corpus draws a meter in 5 of its cases");
 }
 
 /// A failed turn's words come from one place (`thread::words`), which the
@@ -158,7 +193,7 @@ fn the_tui_and_the_hub_read_the_same_current_usage() {
 #[test]
 fn a_failed_turn_reads_through_the_shared_words() {
     assert!(matches!(parse_line("  obs: turn_done: failed: 500"), Some(Ev::Err(t)) if t == "turn failed: 500"));
-    assert!(matches!(parse_line("  obs: provider_retry: 2/10 · 529 · retry in 4s"), Some(Ev::Warn(t)) if t == words::provider_retry("2/10 · 529 · retry in 4s")));
+    assert!(matches!(parse_line("  obs: provider_retry: 2/10 · 529 · retry in 4s"), Some(Ev::Retry { text: t, retry }) if t == words::provider_retry("2/10 · 529 · retry in 4s") && retry.attempt == 2));
     assert!(matches!(parse_line("  obs: turn_done: failed: your ChatGPT sign-in expired. x"), Some(Ev::Warn(t)) if t == EXPIRED_TUI));
 }
 
@@ -248,4 +283,43 @@ fn the_tui_and_the_fold_agree_on_tool_results() {
         let files: Vec<(String, u32, u32)> = crate::toolrow::edit_files(&patches).into_iter().map(|(p, a, d)| (p, a as u32, d as u32)).collect();
         assert_eq!(files, it.files.iter().map(|f| (f.path.clone(), f.add, f.del)).collect::<Vec<_>>(), "{:?}", it.text);
     }
+}
+
+/// architect m_16963 (sha 2): for the same lines, the TUI's marks of his
+/// messages and the fold's deliveries are the same: ids from `sb you-id`,
+/// ✓/✓✓ from sb-core's receipts by id, the runtime's steering words only
+/// for an id-less message.
+#[test]
+fn the_tui_and_the_fold_agree_on_his_messages_marks() {
+    let ls = [
+        "sb you : go",
+        "sb you-id : m_1",
+        "  obs: turn_started",
+        "  obs: tool_started #1",
+        "tool #1 bash : sleep 8",
+        "sb you : again",
+        "sb you-id : m_2",
+        "sb you : again",
+        "sb you-id : m_3",
+        "  obs: steering_received: again",
+        "sb steer-rx : m_2 m_3",
+        "  obs: steered: again",
+        "sb steered : m_2",
+        "tool_result #1 ok : done",
+        "  obs: turn_done: completed",
+    ];
+    let numbered: Vec<bise_proto::thread::Line> = ls.iter().enumerate().map(|(i, l)| (i as u64 + 1, 0, l.to_string())).collect();
+    let none = |_: &str| None;
+    let entries = fold(&numbered, &Ctx { open_cards: &[], page: &none, provider: &crate::models::provider_name, width: &unicode_width::UnicodeWidthStr::width, offset: &|_| 0, attached: &bise_proto::thread::Attached::plain });
+    let folded: Vec<(String, Option<Mark>, Option<u64>)> = entries.iter().filter(|e| e.kind == EntryKind::You).map(|e| (e.text.clone(), e.delivery, e.msg_id)).collect();
+    let mut events = Vec::new();
+    let mut cache = Vec::new();
+    for l in ls {
+        if let Some(ev) = parse_line(l) {
+            crate::feed::push_event(&mut events, &mut cache, ev);
+        }
+    }
+    let tui: Vec<(String, Option<Mark>, Option<u64>)> = events.iter().filter_map(|e| if let Ev::You(t, m, _, id) = e { Some((t.text.clone(), Some(*m), *id)) } else { None }).collect();
+    assert_eq!(tui, folded);
+    assert_eq!(tui.iter().map(|y| y.1).collect::<Vec<_>>(), [Some(Mark::Read), Some(Mark::Read), Some(Mark::Received)], "{tui:?}");
 }

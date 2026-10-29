@@ -2,6 +2,7 @@
 //! is documented in `.agents/skills/bend-harness-qa/reference/`).
 
 use crate::util::{strip_thinking, wire_unescape};
+use bise_proto::thread::lines::{self, Obs, Rec};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Wire {
@@ -23,6 +24,16 @@ pub enum Wire {
     /// `tool_intent #<id> : <text>` (BISE-223): the model's one-line
     /// description of a bash or run_typescript call.
     Intent(String),
+    /// `bg_handoff : {"slot", "cmd"}` (event-wake): the bash tool handed a
+    /// command off to the background; the JSON, as written.
+    BgHandoff(String),
+    /// `tool_result #<id> ok|fail : …`: a tool call ended (les bims:
+    /// the agent thinks again).
+    ToolResult,
+    /// `obs: compaction_started #<n> (auto|manual)`.
+    CompactionStarted,
+    /// `obs: compaction_done: …` or `obs: context_compaction_failed: …`.
+    CompactionEnded,
     /// A line replayed from a restored session.
     History,
     Other,
@@ -35,21 +46,24 @@ pub fn parse(line: &str) -> Wire {
     if line == "--- idle" {
         return Wire::Idle;
     }
-    let t = line.trim_start();
-    if t == "obs: turn_started" {
-        return Wire::TurnStarted;
+    // the runtime's observations, either form (bise_proto's lines::read)
+    if let Rec::Obs(o) = lines::read(line) {
+        return match o {
+            Obs::TurnStarted => Wire::TurnStarted,
+            Obs::Assistant(t) => Wire::Assistant(strip_thinking(&wire_unescape(&t))),
+            Obs::SteeringReceived(_) => Wire::SteeringReceived,
+            Obs::Steered(_) => Wire::Steered,
+            Obs::TurnDone(end) => Wire::TurnDone(end.text().trim().to_string()),
+            Obs::CompactionStarted => Wire::CompactionStarted,
+            Obs::CompactionDone(_) | Obs::CompactionFailed(_) => Wire::CompactionEnded,
+            _ => Wire::Other,
+        };
     }
-    if let Some(rest) = t.strip_prefix("obs: assistant: ") {
-        return Wire::Assistant(strip_thinking(&wire_unescape(rest)));
+    if line.starts_with("tool_result #") {
+        return Wire::ToolResult;
     }
-    if t.starts_with("obs: steering_received: ") {
-        return Wire::SteeringReceived;
-    }
-    if t.starts_with("obs: steered: ") {
-        return Wire::Steered;
-    }
-    if let Some(rest) = t.strip_prefix("obs: turn_done: ") {
-        return Wire::TurnDone(rest.trim().to_string());
+    if let Some(rest) = line.strip_prefix("bg_handoff : ") {
+        return Wire::BgHandoff(rest.trim().to_string());
     }
     if let Some(rest) = line.strip_prefix("tool_intent #") {
         if let Some((_, text)) = rest.split_once(" : ") {
@@ -145,6 +159,23 @@ mod tests {
                 args: "{\"arg\":\"sb list\"}".into()
             }
         );
+    }
+
+    #[test]
+    fn bg_handoff_line() {
+        let l = "bg_handoff : {\"slot\":\"/t/bg/3\",\"cmd\":\"cargo test\"}";
+        assert_eq!(parse(l), Wire::BgHandoff("{\"slot\":\"/t/bg/3\",\"cmd\":\"cargo test\"}".into()));
+        assert_eq!(parse(&format!("history {}", l)), Wire::History);
+    }
+
+    #[test]
+    fn tool_results_and_compactions() {
+        assert_eq!(parse("tool_result #3 ok : done"), Wire::ToolResult);
+        assert_eq!(parse("tool_result #4 fail : exit 1"), Wire::ToolResult);
+        assert_eq!(parse("  obs: compaction_started #750 (auto)"), Wire::CompactionStarted);
+        assert_eq!(parse("  obs: compaction_done: ## Who I am"), Wire::CompactionEnded);
+        assert_eq!(parse("  obs: context_compaction_failed: too big"), Wire::CompactionEnded);
+        assert_eq!(parse("history tool_result #3 ok : done"), Wire::History);
     }
 
     #[test]

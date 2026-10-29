@@ -1,0 +1,13 @@
+# tests/pick_gate.py's ratchet: the Bool.pick walks left (<file>:<def>).
+# It only shrinks: a fixed one leaves the list in the same commit.
+bend/core/image.bend:img_lookup
+bend/core/wire.bend:name_in
+bend/runtime/gate-pure.bend:verdict_lines
+bend/vendor/json.bend:get_kv
+bend/vendor/json.bend:set_kv
+bend/vendor/json.bend:remove_kv
+bend/vendor/json.bend:insert_kv_go
+bend/vendor/http/http.bend:reason.go
+bend/vendor/http/http.bend:hex.trim
+bend/vendor/http/json/json.bend:hex4.go
+bend/vendor/http/zlib/zlib.bend:nth

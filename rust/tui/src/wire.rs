@@ -54,6 +54,9 @@ pub(crate) struct ToolData {
     pub(crate) fold_open: bool,
     // how long it took, frozen at finish (the fold's total)
     pub(crate) took: Option<std::time::Duration>,
+    // in memory only (cost-pause, designer m_19111): a call /pause cut:
+    // its row reads `– stopped by the pause`, dim, no ✗, no output
+    pub(crate) paused: bool,
 }
 
 impl ToolData {
@@ -83,21 +86,18 @@ impl ToolData {
             fold_open: false,
             gate: None,
             took,
+            paused: false,
         }
     }
 }
 
 /// Your message's mark (contract C3, book §13): `·` sent, `✓` the agent
 /// got it (`steering_received`), `✓✓` the model read it (`steered`, or
-/// its turn started). Only ever moves up.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
-pub(crate) enum Mark {
-    Sent,
-    Received,
-    Read,
-    // the hub could not deliver it (C2 `undelivered`, BISE-86): `✗`
-    Failed,
-}
+/// its turn started), `✗` the hub could not deliver it (C2
+/// `undelivered`, BISE-86). Only ever moves up. bise-proto's
+/// `Delivery`: the hub's fold moves it by the same rule
+/// (`thread::lines::deliver`, G1).
+pub(crate) use bise_proto::thread::Delivery as Mark;
 
 /// Where a call waits in the approvals gate (the hub's `sb gate` lines).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -112,15 +112,36 @@ pub(crate) enum Gate {
 
 #[derive(Clone)]
 pub(crate) enum Ev {
-    // your message; the bool: opened whole (a long one folds, BISE-239)
-    You(String, Mark, bool),
+    // your message; the bool: opened whole (a long one folds, BISE-239);
+    // its id (sb-core's `sb you-id` line right after it; None: a
+    // transcript before 9633cd2a, or not yet read)
+    // msg-parts: its text and typed parts (drawn from the parts)
+    You(crate::said::Said, Mark, bool, Option<u64>),
+    // in memory only (cost-pause, designer m_18932): his message typed
+    // while the project is paused, his row dim with `held until /resume`
+    // under it; the hub's `you` line at delivery takes its place (no new
+    // row)
+    Held(crate::said::Said),
+    // in memory only: the id of your message right before it (`sb you-id
+    // : m_N`); push_event sets it on that message, never appended
+    YouId(u64),
+    // in memory only: your message `msg` went to the project `name`
+    // (bise's home hub, `sb routed`); push_event tags that message,
+    // never appended
+    YouWent { msg: u64, name: String },
+    // the answer he read as it streamed in, kept when its turn failed
+    // before it came (`sb kept`, escaped like a reply): the reply's rows,
+    // dim (livetext::kept_rows, designer m_13334)
+    Kept(String),
     // the approvals gate of the running call (`sb gate : check|card|done <n>`)
     Gate(Gate),
     // an inbox item answered (`sb approval`, an answer's `sb route`, or
     // the box's own fold): allowed or not, the sentence, the user's own
     // words under it (a typed answer, a no's note), what the item asked,
     // opened (BISE-307: the full question and the whole answer)
-    Approval { ok: bool, text: String, note: String, asked: String, open: bool },
+    // `parts`: his answer's typed parts (msg-parts): its quotes, pastes
+    // and images drawn under the sentence; `note` then his words alone
+    Approval { ok: bool, text: String, note: String, parts: Vec<bise_proto::parts::Part>, asked: String, open: bool },
     Assistant(String),
     // the model's reasoning for the message that follows: rendered
     // collapsed as "thought for Ns"; ctrl+o expands every section, a
@@ -177,6 +198,13 @@ pub(crate) enum Ev {
     Warn(String),
     Err(String),
     Info(String),
+    // H9: a model call that failed and waits to retry, drawn as a warn;
+    // a run of them is one row, updated in place (feed.rs push_event,
+    // lines::is_same_retry_run)
+    Retry {
+        text: String,
+        retry: bise_proto::thread::Retry,
+    },
     // pr-news (pr-design §4, main's feed): a PR's news, `↑ #412 changes
     // asked · dark-mode is on it`; the number links to the PR. `tone`:
     // plain, dim (merged, closed) or red (checks fail; bold on NO_COLOR).
@@ -235,6 +263,18 @@ pub(crate) enum Ev {
         words: String,
         open: bool,
     },
+    // event-wake (designer's page event-wake): a watch of the agent
+    // ended, one row from the hub's `wake` entry: `· cargo test ended ·
+    // rc 0 · after 2m04s  ▸ its last 3 lines` dim (an end, still running)
+    // or `– stopped waiting for …` faint (`stopped`); `head` its parts
+    // with whether each is an error (only a non-zero rc, red); `tail`
+    // the output's last lines, open under it (ctrl+o)
+    Wake {
+        head: Vec<(String, bool)>,
+        stopped: bool,
+        tail: Vec<String>,
+        open: bool,
+    },
     Idle,
     Raw(String),
     // switchboard (hub line protocol v2, contract C2): a message between
@@ -248,6 +288,10 @@ pub(crate) enum Ev {
         text: String,
         level: u8,
         id: String,
+        // its typed parts (the entry's; none: its text alone). A forward's
+        // (a `forwarded` part, msg-forward): drawn as the note, the `↪`
+        // line and the original quoted (forwarded.rs), never its text
+        parts: Vec<bise_proto::parts::Part>,
         // in memory only (not on the wire): a folded message (a report,
         // a brief) is disclosed (BISE-12, a click or feed::toggle_event);
         // a level-3 line shows its whole text (BISE-14)
@@ -273,11 +317,12 @@ pub(crate) enum Ev {
     // in memory only (BISE-14, book §10): a faint `· 14:31 ·` after a
     // pause of 5 minutes without a line; the text is the time
     TimeMark(String),
-    // switchboard: an attention card (`#3 question @docs : text`);
-    // `closed`, in memory only (BISE-31, book §12): how it was closed,
-    // the hub's word (empty: open)
+    // switchboard: an attention card, typed (architect m_15013): from
+    // the hub's line (`#3 question @docs : text`, [`CardParts::of_line`])
+    // or its entry (entry_ev.rs); `closed`, in memory only (BISE-31, book
+    // §12): how it was closed, the hub's word (empty: open)
     Card {
-        text: String,
+        card: CardParts,
         closed: String,
     },
     // in memory only (BISE-31): the hub closed card `id` (`card-closed :
@@ -287,12 +332,12 @@ pub(crate) enum Ev {
         id: u64,
         res: String,
     },
-    // in memory only (C3): a wire line that moves the mark of your last
-    // message with this text (push_event applies it, never appended);
-    // `or` shows instead when there is none (an injected notification)
+    // in memory only (C3): a wire line that moves the marks of your
+    // messages (bise-proto's `lines::mark_of`, G1; push_event applies it
+    // by `lines::deliver`, never appended); `or` shows instead when none
+    // of yours matched (an injected notification)
     MarkYou {
-        text: String,
-        mark: Mark,
+        mark: lines::Mark,
         or: Option<Box<Ev>>,
     },
     // switchboard (C2 `undelivered`, BISE-86): your message `text` did not
@@ -313,7 +358,10 @@ pub(crate) enum Ev {
 // the assistant text (the transport the API re-send depends on); the TUI
 // never shows the markers: it splits them into a Thinking section (one
 // reply can carry several blocks; the text around them stays visible).
-// The one parser of the line is bise-proto's (thread::lines).
+// The one parser of the line is bise-proto's (thread::lines); only the
+// tests read lines here since the desktop core reads entries
+// (client-protocol step 5).
+#[cfg(test)]
 pub(crate) use bise_proto::thread::lines::split_thinking;
 
 // --resume / reload: the REPL replays the restored history as the live
@@ -321,6 +369,7 @@ pub(crate) use bise_proto::thread::lines::split_thinking;
 // lines exist only there: "you : <text>" (a user message: live, the
 // client echoes what it sends) and "injected : <text>" (steering and
 // notifications the Core committed). Everything else is a live line.
+#[cfg(test)]
 pub(crate) fn strip_history(line: &str) -> (&str, bool) {
     match line.strip_prefix("history ") {
         Some(rest) => (rest, true),
@@ -328,10 +377,17 @@ pub(crate) fn strip_history(line: &str) -> (&str, bool) {
     }
 }
 
+#[cfg(test)]
 pub(crate) fn parse_history_line(line: &str) -> Option<Ev> {
     rec_ev(lines::read_history(line))
 }
 
+/// One feed line as the TUI's event: the tests' and the parity laws'
+/// reader since the desktop core reads entries too (client-protocol
+/// step 5). Not cfg(test) itself: it is the one root of the line
+/// parser's chain (rec_ev, tool_ev, obs_ev, hub_ev, scheduled's...),
+/// which would each need its own cfg(test) otherwise.
+#[cfg_attr(not(test), allow(dead_code))]
 pub(crate) fn parse_line(line: &str) -> Option<Ev> {
     rec_ev(lines::read(line))
 }
@@ -339,32 +395,52 @@ pub(crate) fn parse_line(line: &str) -> Option<Ev> {
 /// A transcript line, read by bise-proto's one parser
 /// (`thread::lines`, architect m_10476), as the TUI's feed event.
 fn rec_ev(rec: Rec) -> Option<Ev> {
+    // the tool rows: bise-proto's rule (G3, the hub's fold reads the same
+    // moves): a row from tool_started, its annotations merged by id
+    if let Some(m) = lines::tool_move(&rec) {
+        return Some(tool_ev(m));
+    }
     Some(match rec {
         // the session-log facts (BISE-195) are for the hub's writer
         Rec::Empty | Rec::Fact | Rec::Dropped => return None,
+        // the live answer comes as the hub's `partial` event, not a line
+        Rec::Partial { .. } => return None,
         Rec::Idle => Ev::Idle,
         // switchboard: the hub's own lines in a feed
         Rec::Hub(h) => return sb::hub_ev(h),
-        // runtime annotations, merged into the matching Tool by id
-        Rec::Tool { id, name, args } => Ev::ToolInfo { id, name, args },
-        Rec::ToolIntent { id, text } => Ev::ToolIntent { id, text },
-        Rec::ToolCode { id, code } => Ev::ToolCode { id, code },
-        Rec::ToolResult { id, ok, preview } => Ev::ToolResult { id, ok, preview },
         Rec::Sub { name, ok, preview } => Ev::Sub { name, ok, preview },
+        // tool_move read these above
+        Rec::Tool { .. } | Rec::ToolIntent { .. } | Rec::ToolCode { .. } | Rec::ToolResult { .. } => return None,
         // BR-003: right after an interrupt, an info; else an error
         Rec::Rejected(r) => notice_ev(words::rejected(&r)),
         // a replayed message was committed: the model read it
-        Rec::HistYou(t) => Ev::You(t, Mark::Read, false),
+        Rec::HistYou(t) => Ev::You(t.into(), Mark::Read, false, None),
         // steering the Core committed: your message with this text was
         // read; none (a notification): the old info line
         Rec::Injected(text) => {
             let flat = text.replace('\n', " ");
             let info = Ev::Info(format!("injected · {}", truncate_chars(flat.trim(), 110)));
-            Ev::MarkYou { text, mark: Mark::Read, or: Some(Box::new(info)) }
+            let Some(mark) = lines::mark_of(&Rec::Injected(text)) else { return Some(info) };
+            Ev::MarkYou { mark, or: Some(Box::new(info)) }
         }
         Rec::Raw(l) => Ev::Raw(l),
         Rec::Obs(o) => return obs_ev(o),
     })
+}
+
+/// A tool move as the feed's event: a row (started; finished, which
+/// push_event merges into the running row with its id, else its own),
+/// or an annotation push_event merges into the newest row with its id.
+fn tool_ev(m: lines::ToolMove) -> Ev {
+    use lines::ToolMove as M;
+    match m {
+        M::Start(id) => Ev::Tool(ToolData::bare(id, ToolState::Run)),
+        M::Finish { id, ok } => Ev::Tool(ToolData::bare(id, if ok { ToolState::Ok } else { ToolState::Fail })),
+        M::Info { id, name, args } => Ev::ToolInfo { id, name, args },
+        M::Intent { id, text } => Ev::ToolIntent { id, text },
+        M::Code { id, code } => Ev::ToolCode { id, code },
+        M::Result { id, ok, preview } => Ev::ToolResult { id, ok, preview },
+    }
 }
 
 fn obs_ev(o: Obs) -> Option<Ev> {
@@ -373,12 +449,12 @@ fn obs_ev(o: Obs) -> Option<Ev> {
         // tool-call-only replies carry no text
         Obs::Assistant(t) if t.is_empty() => return None,
         Obs::Assistant(t) => Ev::Assistant(t),
-        Obs::ToolStarted(id) => Ev::Tool(ToolData::bare(id, ToolState::Run)),
-        Obs::ToolFinished { id, ok } => Ev::Tool(ToolData::bare(id, if ok { ToolState::Ok } else { ToolState::Fail })),
         Obs::Plumbing => return None,
-        // C3: steering moves the mark of your message, no info line
-        Obs::SteeringReceived(text) => Ev::MarkYou { text, mark: Mark::Received, or: None },
-        Obs::Steered(text) => Ev::MarkYou { text, mark: Mark::Read, or: None },
+        // C3: steering moves the mark of your message, no info line.
+        // id-less messages only: transcripts before 9633cd2a (and older
+        // hubs); a message with an id gets its marks from sb-core's
+        // receipts (`sb steer-rx`, `sb steered`, Mark::Ids)
+        o @ (Obs::SteeringReceived(_) | Obs::Steered(_)) => Ev::MarkYou { mark: lines::mark_of(&Rec::Obs(o))?, or: None },
         Obs::CompactionStarted => Ev::Compact,
         Obs::CompactionDone(text) => Ev::Compacted { text, open: false },
         Obs::Usage(t) => return usage::Usage::parse(&t).map(Ev::Usage),
@@ -398,6 +474,9 @@ fn obs_ev(o: Obs) -> Option<Ev> {
 
 /// A notice (bise-proto's words) as the TUI's line of its level.
 pub(crate) fn notice_ev(n: Notice) -> Ev {
+    if let Some(retry) = n.retry {
+        return Ev::Retry { text: n.text, retry };
+    }
     match n.level {
         NoticeLevel::Warn => Ev::Warn(n.text),
         NoticeLevel::Err => Ev::Err(n.text),
@@ -442,31 +521,49 @@ pub(crate) fn wire_decode(s: &str) -> String {
     bise_proto::thread::lines::wire_decode(s)
 }
 
-// switchboard (C2 `history`, amended): one line of a page of older feed
-// lines, `{pos, line, ts?}`. `ts` is when the hub's transcript wrote the
-// line (ms since the epoch); a hub before the amendment sends no `ts`.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub(crate) struct HistLine {
-    pub(crate) pos: usize,
-    pub(crate) line: String,
-    pub(crate) ts: Option<u64>,
+/// A card in the feed: its item id, its kind (the hub's word:
+/// `question`, `blocked`, `done`, …), who asked, its question and its
+/// options' labels (drawn `n. label` under it).
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub(crate) struct CardParts {
+    pub(crate) id: Option<u64>,
+    pub(crate) kind: String,
+    pub(crate) agent: String,
+    pub(crate) question: String,
+    pub(crate) options: Vec<String>,
+    /// the title of the page it is linked to (notif-artifact): the Sb's
+    /// view state fills it (cards::link_feed), the thread draws one line
+    pub(crate) page: Option<String>,
 }
 
-// the `lines` of a `history` event; a line without `pos` or `line` is
-// skipped
-pub(crate) fn parse_history(v: &serde_json::Value) -> Vec<HistLine> {
-    let Some(a) = v.get("lines").and_then(|l| l.as_array()) else {
-        return Vec::new();
-    };
-    a.iter()
-        .filter_map(|x| {
-            Some(HistLine {
-                pos: x.get("pos")?.as_u64()? as usize,
-                line: x.get("line")?.as_str()?.to_string(),
-                ts: x.get("ts").and_then(|t| t.as_u64()),
-            })
-        })
-        .collect()
+impl CardParts {
+    /// The hub's card line (`#3 question @docs : v1 or v2?\n1. …`), read
+    /// once: its body stays whole as the question (its options lines in
+    /// it, drawn as written). Not a card head: all of it is a question.
+    pub(crate) fn of_line(t: &str) -> CardParts {
+        let id = t.strip_prefix('#').and_then(|r| r.split(' ').next()).and_then(|n| n.parse().ok());
+        match crate::render::card_parts(t) {
+            Some((kind, agent, body)) => CardParts { id, kind: kind.into(), agent: agent.into(), question: body.into(), ..CardParts::default() },
+            None => CardParts { id, kind: "question".into(), question: t.into(), ..CardParts::default() },
+        }
+    }
+
+    /// Its body as drawn: the question's lines, then `n. label` each.
+    pub(crate) fn body(&self) -> String {
+        let opts = self.options.iter().enumerate().map(|(i, l)| format!("\n{}. {}", i + 1, l));
+        std::iter::once(self.question.clone()).chain(opts).collect()
+    }
+
+    /// What find searches: its head and its body, as the line said it
+    /// (a card without words: its head alone).
+    pub(crate) fn text(&self) -> String {
+        let id = self.id.map(|i| format!("#{i} ")).unwrap_or_default();
+        let head = format!("{id}{} @{}", self.kind, self.agent);
+        match self.body() {
+            b if b.is_empty() => head,
+            b => format!("{head} : {b}"),
+        }
+    }
 }
 
 /// The runtime's words for a model whose provider has no key (BISE-294,

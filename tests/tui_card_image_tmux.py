@@ -7,7 +7,7 @@ provider (Anthropic family: the user's own provider shape, foundry/opus):
    the clipboard image) in main's composer, sent: main's request carries
    an `image` block with the PNG's base64; the feed shows the chip
    `▣ clipboard`, never the marker.
-2. a card answer: task t3 asks main, main escalates with `sb card --for`,
+2. a card answer: task t3 asks main, main escalates with `sb notify --for`,
    the user opens the card (ctrl+1), pastes an image and answers: t3's
    request carries the image block, and the answer's text keeps the
    name the model reads (`[Image #1]`), never the stored path alone.
@@ -20,6 +20,7 @@ import os
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from words import w  # noqa: E402
 import e2e  # noqa: E402
 from tui_tmux import tui_session, run, tmux, wait_until, MAIN_IDLE  # noqa: E402
 
@@ -102,21 +103,21 @@ def main():
             t.keys("Enter")
             sc = t.wait("ack: look [Image #1] which color?", 60)
             assert "▣ clipboard" in sc and "<image name=" not in sc and ".b64" not in sc, sc
-            check_image(fake_bodies, "which color?", "main's thread")
+            check_image(fake_bodies, "which color?", w("thread.from_thread", name="main"))
             print("ok: a pasted image reaches main's model as an image block")
             t.wait_re(MAIN_IDLE)
             # 2. a card answer: t3 asks main, main escalates it to the user
             c = e2e.Client(os.path.join(E.state, "hub.sock"))
             c.say('/new t3: {{bash: sb send main --expect-reply "which logo, the red or the blue?"}}')
-            c.wait(lambda: any(l.startswith("sb msg-in : t3 m_") for l in c.lines("main")), 120, "t3's question in main")
-            msg = next(l.split()[4] for l in c.lines("main") if l.startswith("sb msg-in : t3 m_"))
+            q = c.wait_feed("main", "msg-in", 120, **{"from": "t3"})
+            msg = "m_%d" % q["id"]
             c.wait_idle("main", "t3")
-            c.say('[[bash: sb card --for %s "which logo, the red or the blue?"]]' % msg)
+            c.say('[[bash: sb notify --for %s "which logo, the red or the blue?"]]' % msg)
             c.wait(lambda: any(cd["kind"] == "question" and cd["agent"] == "t3" for cd in c.cards()), 60, "t3's card")
             c.wait_idle("main")
-            t.wait("waiting for you", 30)
+            t.wait(w("thread.gate_waits"), 30)
             t.typed(CTRL % ord("1"))
-            t.wait("your answer")
+            t.wait(w("inbox.your_answer"))
             t.typed("this one ")
             tmux("send-keys", "-t", t.name, "-l", "\x1b[200~\x1b[201~")
             t.wait_re(r"▣ 1\s+clipboard")

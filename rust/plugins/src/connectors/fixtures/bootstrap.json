@@ -1,0 +1,27 @@
+{"connectors": [
+  {"id": "c0ffee-01", "name": "Slack", "display_name": "Slack", "protocol": "mcp", "status": {"is_ready": true}, "auth_action": null,
+   "tools": [
+     {"name": "search_messages", "description": "Search\nmessages\r\nin a channel", "inputSchema": {"type": "object", "properties": {"query": {"type": "string", "maxLength": 9007199254740991}, "limit": {"type": "integer", "minimum": -9007199254740991, "maximum": 9007199254740991, "default": 20}}, "required": ["query"]}},
+     {"name": "post", "description": "Post \"quoted\" text \\ back\tslash", "inputSchema": {"zeta": 1, "Alpha": 2, "alpha": 3, "_u": 4, "10": 5, "9": 6, "é": "ü \u0001 \b \f / \u00e9", "nested": {"b": [1.0, 0.50, 1e-05, -0.0, 1E3], "a": null, "c": true, "d": false}}},
+     {"description": "a tool with no name"},
+     {"name": "no_desc", "inputSchema": {}},
+     {"name": "no_schema", "description": "nothing else"}
+   ]},
+  {"id": "c0ffee-02", "name": "slack", "display_name": "Slack (team)", "status": {"is_ready": true},
+   "tools": [{"name": "list", "description": "List", "inputSchema": {"type": "object"}}]},
+  {"id": "c0ffee-03", "name": "github app!", "display_name": "GitHub", "status": {"is_ready": false}, "auth_action": {"type": "oauth"}, "tools": []},
+  {"id": "c0ffee-04", "name": "github app!", "display_name": "GitHub 2", "status": {"is_ready": true},
+   "tools": [{"name": "create_issue", "description": "Create an issue", "inputSchema": {"type": "object", "properties": {"title": {"type": "string"}}}}]},
+  {"id": "c0ffee-06", "name": "Notion", "display_name": "Notion", "status": {"is_ready": false}, "auth_action": {"type": "no_auth_connect"}, "tools": []},
+  {"id": "c0ffee-07", "name": "Jira", "display_name": "Jira", "status": {"is_ready": false}, "auth_action": {"type": "credentials_setup"}, "tools": []},
+  {"id": "c0ffee-08", "name": "--x.y--", "status": {"is_ready": true},
+   "tools": [{"name": "t", "description": "edges trimmed", "inputSchema": {"type": "object"}}]},
+  {"id": "c0ffee-09", "status": {"is_ready": true},
+   "tools": [{"name": "t", "description": "no connector name", "inputSchema": {"type": "object"}}]},
+  {"id": "web_search", "name": "web_search", "display_name": "Web search", "status": {"is_ready": true},
+   "tools": [{"name": "web_search", "description": "Search the web", "inputSchema": {"type": "object", "properties": {"query": {"type": "string"}}, "required": ["query"]}}]},
+  {"id": "image_generation", "name": "image_generation", "display_name": "Image generation", "status": {"is_ready": true},
+   "tools": [{"name": "generate_image", "description": "Generate an image", "inputSchema": {"type": "object", "properties": {"prompt": {"type": "string"}}}},
+             {"name": "edit_image", "description": "Edit an image", "inputSchema": {"type": "object"}}]},
+  {"id": "c0ffee-11", "name": "Weird", "status": {"is_ready": true}, "tools": [{"name": 42, "description": ["not", "a string"], "inputSchema": [1, 2]}]}
+]}

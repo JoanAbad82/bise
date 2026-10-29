@@ -332,7 +332,7 @@ impl Find {
             return String::new();
         }
         if self.total == 0 {
-            return if self.busy() { String::new() } else { "no match".into() };
+            return if self.busy() { String::new() } else { bise_proto::words::thread::find_none.into() };
         }
         let plus = if more { "+" } else { "" };
         match self.rank() {
@@ -457,12 +457,14 @@ fn tier_of(ev: &Ev) -> Option<Tier> {
         Ev::Tool(_)
         | Ev::Err(_)
         | Ev::Warn(_)
+        | Ev::Retry { .. }
         | Ev::Info(_)
         | Ev::Pr { .. }
         | Ev::Card { .. }
         | Ev::Compacted { .. }
         | Ev::Fold { .. }
         | Ev::Scheduled { .. }
+        | Ev::Wake { .. }
         | Ev::Undelivered { .. } => Some(Tier::Other),
         _ => None,
     }
@@ -484,7 +486,8 @@ fn cap(s: &str) -> &str {
 fn sig(ev: &Ev) -> u64 {
     let mix = |h: u64, x: usize| (h ^ x as u64).wrapping_mul(0x100_0000_01b3);
     let lens: [usize; 5] = match ev {
-        Ev::You(t, ..) | Ev::Assistant(t) | Ev::Err(t) | Ev::Warn(t) | Ev::Info(t) => [1, t.len(), 0, 0, 0],
+        Ev::You(t, ..) => [1, t.len(), 0, 0, 0],
+        Ev::Assistant(t) | Ev::Kept(t) | Ev::Err(t) | Ev::Warn(t) | Ev::Retry { text: t, .. } | Ev::Info(t) => [1, t.len(), 0, 0, 0],
         Ev::AgentMsg { text, .. } => [2, text.len(), 0, 0, 0],
         Ev::Answered { question, answer, why, .. } => [3, question.len(), answer.len(), why.len(), 0],
         Ev::Tool(td) => [
@@ -494,10 +497,12 @@ fn sig(ev: &Ev) -> u64 {
             td.intent.as_ref().map_or(0, |s| s.len() + 1),
             td.result.as_ref().map_or(0, |(_, r)| r.len() + 1),
         ],
-        Ev::Card { text, .. } | Ev::Compacted { text, .. } | Ev::Undelivered { text, .. } => [5, text.len(), 0, 0, 0],
+        Ev::Card { card, .. } => [5, card.question.len(), card.options.len(), 0, 0],
+        Ev::Compacted { text, .. } | Ev::Undelivered { text, .. } => [5, text.len(), 0, 0, 0],
         Ev::Fold { head, text, open } => [6, head.len(), text.len(), *open as usize, 0],
         Ev::Scheduled { head, words, open } => [8, head.len(), words.len(), *open as usize, 0],
         Ev::Pr { text, .. } => [7, text.len(), 0, 0, 0],
+        Ev::Wake { head, tail, open, .. } => [9, head.len(), tail.len(), *open as usize, 0],
         _ => [0; 5],
     };
     lens.iter().fold(0xcbf2_9ce4_8422_2325, |h, &x| mix(h, x))
@@ -507,12 +512,18 @@ fn sig(ev: &Ev) -> u64 {
 /// folds hide; one text per line (a match never spans two).
 fn haystack(ev: &Ev) -> String {
     let parts: Vec<&str> = match ev {
-        Ev::You(t, ..) | Ev::Assistant(t) | Ev::Err(t) | Ev::Warn(t) | Ev::Info(t) => vec![cap(t)],
+        Ev::You(t, ..) => vec![cap(t)],
+        Ev::Assistant(t) | Ev::Kept(t) | Ev::Err(t) | Ev::Warn(t) | Ev::Retry { text: t, .. } | Ev::Info(t) => vec![cap(t)],
         Ev::AgentMsg { text, .. } => vec![cap(text)],
         Ev::Answered { question, answer, why, .. } => vec![cap(question), cap(answer), cap(why)],
-        Ev::Card { text, .. } | Ev::Compacted { text, .. } | Ev::Undelivered { text, .. } => vec![cap(text)],
+        Ev::Card { card, .. } => return cap(&card.text()).to_string(),
+        Ev::Compacted { text, .. } | Ev::Undelivered { text, .. } => vec![cap(text)],
         Ev::Fold { head, text, .. } | Ev::Scheduled { head, words: text, .. } => vec![cap(head), cap(text)],
         Ev::Pr { number, text, .. } => return format!("#{} {}", number, cap(text)),
+        Ev::Wake { head, tail, .. } => {
+            let h: Vec<&str> = head.iter().map(|(t, _)| t.as_str()).collect();
+            return std::iter::once(h.join(" · ")).chain(tail.iter().map(|t| cap(t).to_string())).collect::<Vec<_>>().join("\n");
+        }
         Ev::Tool(td) => return tool_text(td),
         _ => Vec::new(),
     };

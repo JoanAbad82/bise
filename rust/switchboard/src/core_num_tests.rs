@@ -18,7 +18,7 @@ fn notices(fx: &[Effect]) -> Vec<String> {
 fn still_up(t: &mut T) {
     let (_, card) = docs_question_card(t);
     let fx = t.user(MAIN, &format!("/close {}", card));
-    assert!(has_line(&fx, MAIN, &format!("#{} closed", card)), "{:?}", fx);
+    assert!(has_rec(&fx, MAIN, json!({"sb": "card-closed", "id": card, "res": "closed"})), "{:?}", fx);
 }
 
 #[test]
@@ -26,13 +26,13 @@ fn the_user_s_close_and_answer_refuse_a_bad_number_and_the_hub_stays_up() {
     let mut t = T::new();
     let big = "281474976710656"; // core_num::MAX + 1
     let cases: &[(&str, &str)] = &[
-        ("/close 999", "no open card #999"),
-        (&format!("/close {}", big), &format!("no open card #{}", big)),
-        ("/close 18446744073709551615", "no open card #18446744073709551615"),
-        ("/close 99999999999999999999999", "no open card #99999999999999999999999"),
+        ("/close 999", "no open notification #999"),
+        (&format!("/close {}", big), &format!("no open notification #{}", big)),
+        ("/close 18446744073709551615", "no open notification #18446744073709551615"),
+        ("/close 99999999999999999999999", "no open notification #99999999999999999999999"),
         ("/close -1", "not a card number: -1"),
         ("/close abc", "not a card number: abc"),
-        (&format!("/answer {} yes", big), &format!("no open card #{}", big)),
+        (&format!("/answer {} yes", big), &format!("no open notification #{}", big)),
         ("/answer -3 yes", "not a card number: -3"),
         ("/answer x yes", "not a card number: x"),
     ];
@@ -83,6 +83,6 @@ fn an_agent_s_garbage_numbers_are_refused_at_parse() {
         json!({"cmd": "wait", "msg": "m_x"}),
         json!({"cmd": "every", "step": "stop", "id": -1}),
     ] {
-        assert!(AgentReq::from_json(&v).is_err(), "{}", v);
+        assert!(AgentReq::decode(v.clone()).is_err(), "{}", v);
     }
 }

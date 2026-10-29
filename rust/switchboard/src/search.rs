@@ -81,21 +81,16 @@ pub fn classify(line: &str) -> Option<(Role, String)> {
     if let Some(r) = line.strip_prefix("tool #") {
         return tool(r, "tool");
     }
-    if let Some(r) = line.trim_start().strip_prefix("obs: compaction_done: ") {
-        return Some((Role::Hub, format!("compaction summary: {}", wire_unescape(r))));
+    if let bise_proto::thread::lines::Rec::Obs(bise_proto::thread::lines::Obs::CompactionDone(r)) = bise_proto::thread::lines::read(line) {
+        return Some((Role::Hub, format!("compaction summary: {}", wire_unescape(&r))));
     }
     let text = readable(line)?;
-    let role = if line.starts_with("sb you : ") {
-        Role::User
-    } else if line.trim_start().starts_with("obs: assistant: ") {
-        Role::Assistant
-    } else if ["sb msg-in : ", "sb msg : ", "sb msg-you : ", "sb answered : "]
-        .iter()
-        .any(|p| line.starts_with(p))
-    {
-        Role::Message
-    } else {
-        Role::Hub
+    use bise_proto::thread::lines::{read, Hub, Rec};
+    let role = match read(line) {
+        Rec::Hub(Hub::You(..)) => Role::User,
+        Rec::Obs(bise_proto::thread::lines::Obs::Assistant(_)) => Role::Assistant,
+        Rec::Hub(Hub::MsgIn { .. } | Hub::Msg { .. } | Hub::MsgYou { .. } | Hub::Answered { .. }) => Role::Message,
+        _ => Role::Hub,
     };
     Some((role, text))
 }
@@ -637,6 +632,12 @@ pub fn fmt_iso(ms: u64) -> String {
     let (y, m, d) = civil_from_days(s.div_euclid(86_400));
     let r = s.rem_euclid(86_400);
     format!("{:04}-{:02}-{:02}T{:02}:{:02}", y, m, d, r / 3600, r % 3600 / 60)
+}
+
+/// `2026-09-30 14:03 UTC`: a forwarded message's time in its header
+/// (msg-forward: the shell formats it, sb-core writes it as given).
+pub fn fmt_utc(ms: u64) -> String {
+    format!("{} UTC", fmt_iso(ms).replace('T', " "))
 }
 
 /// A time for `--since`/`--until`: an age (`30m`, `5h`, `2d`, `2j`,

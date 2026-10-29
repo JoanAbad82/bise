@@ -865,7 +865,6 @@ pub fn number(c: &str, about: bool, lang: Lang) -> Option<(Vec<String>, f64)> {
         return None;
     }
     let value = parse_value(num, lang)?;
-    // ordinals
     let ordinal = matches!((lang, suffix), (Lang::En, "st" | "nd" | "rd" | "th") | (Lang::Fr, "e" | "è" | "ème" | "eme" | "er" | "re" | "ère"));
     if ordinal && value.fract() == 0.0 {
         let fem = matches!(suffix, "re" | "ère");

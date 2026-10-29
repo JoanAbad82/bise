@@ -39,6 +39,9 @@ pub enum UserCmd {
     Answer {
         card: u64,
         text: String,
+        /// his answer's parts as JSON (msg-parts: `HubCmd::Answer.parts`;
+        /// "" for a typed `/answer` line)
+        parts: String,
     },
     /// `/close N`: close attention card N without answering it.
     Close {
@@ -51,6 +54,10 @@ pub enum UserCmd {
     Prs,
     /// `/interrupt`: the agent in focus stops its turn.
     Interrupt,
+    /// `/pause`, `/resume` (cost-pause): the whole project (sb-core's
+    /// hub/pause.bend). His only: the client socket.
+    Pause,
+    Resume,
     /// Any other `/command`: for the REPL of the agent in focus
     /// (`/compact`, `/status`...).
     Passthrough(String),
@@ -269,6 +276,7 @@ pub fn parse(line: &str, focus: &str) -> UserCmd {
                 Ok(card) if !text.trim().is_empty() => UserCmd::Answer {
                     card,
                     text: text.trim().to_string(),
+                    parts: String::new(),
                 },
                 Ok(_) => UserCmd::Invalid("usage: /answer <card> <answer>".into()),
                 Err(e) => UserCmd::Invalid(format!("{} (usage: /answer <card> <answer>)", e)),
@@ -283,6 +291,8 @@ pub fn parse(line: &str, focus: &str) -> UserCmd {
         "/agents" | "/tasks" => UserCmd::Tasks,
         "/prs" => UserCmd::Prs,
         "/interrupt" => UserCmd::Interrupt,
+        "/pause" => UserCmd::Pause,
+        "/resume" => UserCmd::Resume,
         "/model" => {
             let default = words.contains(&"default");
             let rest: Vec<&str> = words.iter().copied().filter(|w| *w != "default").collect();
@@ -439,7 +449,8 @@ mod tests {
             parse("/answer #3 v2", MAIN),
             UserCmd::Answer {
                 card: 3,
-                text: "v2".into()
+                text: "v2".into(),
+                parts: String::new()
             }
         );
         assert_eq!(

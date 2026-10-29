@@ -158,6 +158,7 @@ pub fn listen_job() -> ListenJob {
             key: "k".into(),
             language: None,
             vocabulary: Vec::new(),
+            fallback: None,
         },
     }
 }

@@ -1,0 +1,48 @@
+<!doctype html>
+<!-- The harness's own fixture: each detector must pass on the 'good' half and fail on the 'bad'
+     half (self/harness.spec.ts). ?anim=1 adds a moving dot (frame rate), ?flash=1 blanks the dot
+     one frame in eight (a flicker). -->
+<html><head><meta charset="utf-8"><style>
+  body { margin: 0; background: #fff; font: 16px -apple-system, sans-serif; color: #222; }
+  .f { position: absolute; left: 20px; width: 420px; height: 60px; font: 20px ui-monospace, monospace; padding: 6px; border: 1px solid #999; }
+  #good { top: 20px; }
+  #bad { top: 120px; }
+  #echo { position: absolute; left: 20px; top: 220px; width: 420px; min-height: 30px; }
+  #list { position: absolute; left: 20px; top: 280px; width: 420px; }
+  #c { position: absolute; left: 500px; top: 20px; }
+  #clip { position: absolute; left: 500px; top: 260px; width: 120px; height: 20px; overflow: hidden; white-space: nowrap; font-size: 14px; }
+  #tiny { position: absolute; left: 500px; top: 300px; font-size: 9px; }
+</style></head><body>
+<div id="good" class="f" contenteditable="true" data-testid="fixture.good"></div>
+<div id="bad" class="f" contenteditable="true" data-testid="fixture.bad"></div>
+<div id="echo"></div>
+<ul id="list"><li>one</li><li>two</li><li>three</li></ul>
+<canvas id="c" width="200" height="200"></canvas>
+<div id="clip">a line far too long for its little box, cut off</div>
+<div id="tiny">tiny words</div>
+<script>
+  // the bad field: every keystroke rewrites the field and the list with innerHTML (today's ui.js)
+  const bad = document.getElementById('bad');
+  bad.addEventListener('input', () => {
+    const t = bad.textContent;
+    bad.innerHTML = t.replace(/&/g, '&amp;').replace(/</g, '&lt;');
+    const r = document.createRange(); r.selectNodeContents(bad); r.collapse(false);
+    const s = getSelection(); s.removeAllRanges(); s.addRange(r);
+    document.getElementById('list').innerHTML = '<li>one</li><li>two</li><li>' + t.length + '</li>';
+  });
+  const q = new URLSearchParams(location.search);
+  if (q.get('anim') === '1') {
+    const c = document.getElementById('c').getContext('2d');
+    let n = 0;
+    const f = (t) => {
+      n++;
+      c.clearRect(0, 0, 200, 200);
+      if (!(q.get('flash') === '1' && n % 8 === 0)) {
+        c.fillStyle = '#c33'; c.beginPath(); c.arc(100 + 60 * Math.cos(t / 600), 100 + 60 * Math.sin(t / 600), 30, 0, 7); c.fill();
+      }
+      requestAnimationFrame(f);
+    };
+    requestAnimationFrame(f);
+  }
+</script>
+</body></html>

@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 # bins.sh — the Bend native binaries (repl-live, repl-scripted, sb-core,
-# harness-demo) and the V8 engine of a version (bend-jsrt, RELEASE build,
-# BISE-133). They are NOT in git (BISE-114): each one is built from
+# harness-demo), the V8 engine of a version (bend-jsrt, RELEASE build,
+# BISE-133), and the viewer's xlsx grid (office-sheet: Univer, ~7 MB of
+# JS built by office/sdk/build.ts into office/dist/office-sheet.js,
+# never committed, architect m_37322). They are NOT in git (BISE-114): each one is built from
 # its sources into a cache keyed by the CONTENT of those sources, shared
 # by every worktree and by versions.sh, then copied where it is run.
 #
@@ -9,6 +11,11 @@
 #                                          sources (default <dir>: this repo)
 #   scripts/bins.sh path [--src <dir>] <name>    build if needed, print the cache file
 #   scripts/bins.sh key [--src <dir>] <name>     the cache key (hash of the sources)
+#   scripts/bins.sh prefetch [--src <dir>] <name>...  build the missing ones into the
+#                                          cache, all at once (one process each:
+#                                          a miss of all four is the longest
+#                                          compile, not their sum); exit 1 when
+#                                          one fails
 #   scripts/bins.sh macos-target                 the oldest macOS every binary runs on
 #   scripts/bins.sh minos <file>...              check each binary against it: exit 1
 #                                          when one needs a newer macOS (or says
@@ -17,8 +24,7 @@
 # A hit is a copy (~0.3 s); a miss is a bend compile (sb-core ~15 s,
 # the REPLs 1-2 min, bend-jsrt a cargo build --release: ~1 min warm,
 # ~5 min cold). Cache: $SB_BUILD_DIR/cache/<name>-<key> (default
-# SB_BUILD_DIR=<bise dev dir>/build: ~/.local/state/switchboard/build
-# until the state moves to ~/.bise, BISE-160); of each name, the 3 newest
+# SB_BUILD_DIR=<bise dev dir>/build: ~/.bise/dev/build); of each name, the 3 newest
 # and those used in the last hour are kept (BISE-133; a hit touches its
 # file). bend-jsrt: `path` and `key` only (a dev tree runs its debug
 # build, run.sh keeps it fresh; a bend-jsrt at the root would win over
@@ -29,15 +35,19 @@
 # exported for the compile (bend -o calls cc) and part of the key.
 set -euo pipefail
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
-# the same dirs as bise_home (rust/home): $BISE_HOME/dev, ~/.bise/dev once
-# migrated, else today's ~/.local/state/switchboard (XDG_STATE_HOME unread)
-if [ -n "${BISE_HOME:-}" ]; then STATE="$BISE_HOME/dev"
-elif [ -e "$HOME/.bise/migrated.json" ]; then STATE="$HOME/.bise/dev"
-else STATE="$HOME/.local/state/switchboard"; fi
+# the same dir as bise_home (rust/home): $BISE_HOME/dev, else ~/.bise/dev
+STATE="${BISE_HOME:-$HOME/.bise}/dev"
 BUILD="${SB_BUILD_DIR:-$STATE/build}"
 CACHE="$BUILD/cache"
-export PATH="$HOME/.cargo/bin:$PATH"
-export PATH="$HOME/.bend/bin:$PATH"
+# the toolchains of the user's REAL home (the user database, never $HOME):
+# the Rust tests run on a temp HOME (bise_home::test_home), where
+# $HOME/.bend/bin is missing, `bend version` failed and the key of the
+# same sources differed from a shell's (bins-key)
+u="$(id -un)"; case "$u" in *[!A-Za-z0-9._-]*|"") TOOLS="$HOME" ;; *) eval "TOOLS=~$u" ;; esac
+export PATH="$TOOLS/.cargo/bin:$PATH"
+# bend: the one <src> pins (bend/VERSION, scripts/bend-pin.sh), put on
+# PATH below once <src> is known
+. "$REPO/scripts/bend-pin.sh"
 
 say() { echo "bins: $*" >&2; }
 
@@ -88,7 +98,9 @@ recipe() {
     sb-core) echo "${b}hub/main.bend ${b}hub ${b}vendor" ;;
     # a cargo build (release): the crate and its path dependencies
     bend-jsrt) echo "cargo rust/jsrt rust/images rust/home" ;;
-    *) say "unknown binary: $1 (repl-live repl-scripted sb-core harness-demo bend-jsrt)"; exit 2 ;;
+    # a node build (office/sdk/build.ts --only): its entry, the build, its node options and the lockfile
+    office-sheet) echo "node office/sdk/src/view/sheet.ts office/sdk/build.ts office/sdk/.npmrc office/sdk/package.json office/sdk/pnpm-lock.yaml" ;;
+    *) say "unknown binary: $1 (repl-live repl-scripted sb-core harness-demo bend-jsrt office-sheet)"; exit 2 ;;
   esac
 }
 
@@ -102,10 +114,13 @@ recipe() {
 key() {  # <src> <name>
   local r; r="$(recipe "$2" "$1")"
   if [ "${r%% *}" = cargo ]; then jsrt_key "$1" ${r#cargo }; return; fi
+  if [ "${r%% *}" = node ]; then node_key "$1" ${r#node }; return; fi
   set -- "$1" $r
   # only the dirs <src> has (find exits 1 on a missing one: pipefail)
   local d dirs=(); for d in "${@:3}"; do if [ -e "$1/$d" ]; then dirs+=("$d"); fi; done
-  local v; v="$(BEND_NO_TELEMETRY=1 bend version 2>/dev/null || echo "bend ?")"
+  # no bend: no key (a key of "bend ?" was another key of the same sources)
+  local v; v="$(BEND_NO_TELEMETRY=1 bend version 2>/dev/null)" && [ -n "$v" ] \
+    || { say "no key: \`bend version\` failed (bend not in $TOOLS/.bend/bin nor PATH)"; return 1; }
   (cd "$1" && { find "${dirs[@]}" -type f \( -name '*.bend' -o -name '*.c' -o -name '*.js' \) -print0 | sort -z | xargs -0 cat
                 echo "MACOSX_DEPLOYMENT_TARGET=$MACOSX_DEPLOYMENT_TARGET"; echo "$v"; } | shasum | cut -c1-12)
 }
@@ -120,6 +135,13 @@ jsrt_key() {  # <src> <dir>...
      | while read -r f; do printf '%s %s\n' "$(shasum < "$f" | cut -c1-40)" "$f"; done
    echo "MACOSX_DEPLOYMENT_TARGET=$MACOSX_DEPLOYMENT_TARGET $JSRT_PROFILE") | shasum | cut -c1-12
 }
+# the key of a node build: each file's path and content (the grid's entry
+# imports only types from the SDK: the SDK's own sources are not inputs)
+node_key() {  # <src> <file>...
+  local src="$1"; shift
+  (cd "$src" && for f in "$@"; do if [ -f "$f" ]; then printf '%s %s\n' "$(shasum < "$f" | cut -c1-40)" "$f"; fi; done) | shasum | cut -c1-12
+}
+
 # the engine's release profile (BISE-133, measured): plain release 68.1 MB
 # (a rebuild of the local crates 2 s), thin LTO 68.1 MB, fat LTO + 1
 # codegen unit 63.5 MB (rebuild 38 s, cold ~4 min): a new engine is rare.
@@ -134,6 +156,12 @@ copy() { cp -c "$1" "$2" 2>/dev/null || cp "$1" "$2"; }
 # compile <name> of <src> into <out>
 compile() {  # <src> <name> <out>
   local src="$1" name="$2" out="$3" r; r="$(recipe "$name" "$src")"
+  if [ "${r%% *}" = node ]; then
+    # its own node_modules from the lockfile, every time: a fresh worktree has
+    # none, a kept one's can predate a new dependency (a no-op when current)
+    (cd "$src/office/sdk" && pnpm -s install --frozen-lockfile --prefer-offline \
+      && pnpm -s build --only "$name.js" --out "$out" >/dev/null && chmod +x "$out"); return
+  fi
   if [ "${r%% *}" != cargo ]; then
     (cd "$src" && bend "${r%% *}" -o "$out" >/dev/null); return
   fi
@@ -141,10 +169,25 @@ compile() {  # <src> <name> <out>
   # a tree edited before a worktree was built would look fresh - the local
   # crates are always recompiled (the dependencies are kept)
   local t="$BUILD/target-jsrt"
-  (cd "$src/rust/jsrt" && export CARGO_TARGET_DIR="$t" $JSRT_PROFILE \
-    && { cargo clean -q --release -p bend-jsrt -p bend-images -p bise-home 2>/dev/null \
-         || cargo clean -q --release -p bend-jsrt 2>/dev/null || true; } \
-    && cargo build -q --release) && copy "$t/release/bend-jsrt" "$out"
+  # one clean + build + copy at a time in that shared target: a gate's
+  # `cargo clean -p bend-jsrt` deleted the binary a candidate was about to
+  # copy (10.8's candidate red, review-gates m_33193). lockf (macOS),
+  # flock (Linux CI), else unlocked as before
+  mkdir -p "$BUILD"
+  with_lock "$t.lock" /usr/bin/env CARGO_TARGET_DIR="$t" $JSRT_PROFILE /bin/bash -c '
+    cd "$1/rust/jsrt" \
+      && { cargo clean -q --release -p bend-jsrt -p bend-images -p bise-home 2>/dev/null \
+           || cargo clean -q --release -p bend-jsrt 2>/dev/null || true; } \
+      && cargo build -q --release \
+      && { cp -c "$2/release/bend-jsrt" "$3" 2>/dev/null || cp "$2/release/bend-jsrt" "$3"; }' _ "$src" "$t" "$out"
+}
+
+# run <cmd...> holding <lock file> (kept: the next one waits on the same inode)
+with_lock() {  # <lock file> <cmd...>
+  local l="$1"; shift
+  if [ -x /usr/bin/lockf ]; then /usr/bin/lockf -k "$l" "$@"
+  elif command -v flock >/dev/null 2>&1; then flock "$l" "$@"
+  else "$@"; fi
 }
 
 # keep the 3 newest of <name>, and those used in the last hour (the
@@ -163,24 +206,54 @@ prune() {  # <name>
 # build <name> of <src> into the cache if absent; print the cache file
 cached() {  # <src> <name>
   local src="$1" name="$2" k f
-  k="$(key "$src" "$name")"; f="$CACHE/$name-$k"
+  # (|| return: under `if ! cached` set -e is off)
+  k="$(key "$src" "$name")" || return 1; f="$CACHE/$name-$k"
   if [ ! -x "$f" ]; then
     mkdir -p "$CACHE"
     say "$name: compiling (sb-core ~15 s, a REPL 1-2 min, bend-jsrt 1-5 min)..."
     local s=$SECONDS
     compile "$src" "$name" "$f.tmp.$$" || { rm -f "$f.tmp.$$"; return 1; }
+    # signed with bise's stable dev identity (dev-sign.sh): every copy of
+    # it keeps one designated requirement, so macOS keeps its grants (a JS bundle: nothing to sign)
+    if [ "$name" != office-sheet ]; then "$REPO/scripts/dev-sign.sh" sign "$name" "$f.tmp.$$"; fi
     mv "$f.tmp.$$" "$f"
     say "$name: built in $((SECONDS - s)) s ($f)"
     prune "$name"
   else
+    # a build from before dev-sign.sh: signed now (a no-op once it is)
+    if [ "$name" != office-sheet ]; then "$REPO/scripts/dev-sign.sh" sign "$name" "$f"; fi
     touch "$f"
   fi
   echo "$f"
 }
 
+# cached for every <name> at once, each in its own process: a release's
+# miss compiled repl-live, sb-core, bend-jsrt and repl-scripted one after
+# the other (680 s on CI's darwin-arm64, 1207 s on x86_64). Their tmp files
+# are per name ($f.tmp.<pid>), the cargo one has its own target dir. Only
+# the names that miss are started (a hit is a key: no process)
+prefetch() {  # <src> <name>...
+  local src="$1" n pids=() names=() bad=0 i k; shift
+  for n in "$@"; do
+    k="$(key "$src" "$n")" || return 1
+    [ -x "$CACHE/$n-$k" ] && continue
+    ( cached "$src" "$n" >/dev/null ) &
+    pids+=($!); names+=("$n")
+  done
+  # ${a[@]+...}: macOS /bin/bash 3.2 calls an empty array unbound under set -u
+  i=0
+  for n in ${pids[@]+"${pids[@]}"}; do
+    wait "$n" || { say "prefetch: ${names[$i]} failed"; bad=1; }
+    i=$((i + 1))
+  done
+  return $bad
+}
+
 # <src>/<name> = the cache file (a new inode: a running binary keeps its own)
 place() {  # <src> <name>
   local src="$1" name="$2" f out="$1/$2"
+  # the grid's bundle goes where the page server reads it (pages/artifact BUNDLES)
+  if [ "$name" = office-sheet ]; then out="$1/office/dist/office-sheet.js"; fi
   if ! f="$(cached "$src" "$name")"; then
     if [ -x "$out" ]; then say "compiling $name failed: the existing $out is kept"; return 0; fi
     say "compiling $name failed"; return 1
@@ -197,13 +270,16 @@ case "${1:-}" in
   macos-target) echo "$MACOSX_DEPLOYMENT_TARGET"; exit 0 ;;
   minos) shift; check_minos "$@"; exit ;;
 esac
-case "${1:-}" in path|key) cmd="$1"; shift ;; ""|-h|--help) sed -n '2,28p' "$0" | sed 's/^# \{0,1\}//'; exit 2 ;; esac
+case "${1:-}" in path|key|prefetch) cmd="$1"; shift ;; ""|-h|--help) sed -n '2,33p' "$0" | sed 's/^# \{0,1\}//'; exit 2 ;; esac
 src="$REPO"
 if [ "${1:-}" = --src ]; then src="$(cd "$2" && pwd)"; shift 2; fi
 [ $# -gt 0 ] || { say "which binary? (repl-live repl-scripted sb-core harness-demo)"; exit 2; }
+bend_dir_of_src="$(bend_bin_dir "$src" "$TOOLS")" || exit 1
+export PATH="$bend_dir_of_src:$PATH"
 case "$cmd" in
   key) key "$src" "$1" ;;
   path) cached "$src" "$1" ;;
+  prefetch) prefetch "$src" "$@" ;;
   place) for n in "$@"; do
            [ "$n" = bend-jsrt ] && { say "bend-jsrt: 'bins.sh path bend-jsrt' (a dev tree runs its debug build)"; exit 2; }
            place "$src" "$n"

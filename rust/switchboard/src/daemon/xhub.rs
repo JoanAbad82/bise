@@ -45,21 +45,38 @@ impl Shell {
             "xin" => {
                 // sb-core answers through the token (Effect::Reply)
                 self.replies.insert(token, stream);
+                // his routed message's images completed in this hub's
+                // store (R41 (6), parts_in::restored): kept when already
+                // in it, else stored from their source or the sender's .b64
+                let (text, parts) = match s("kind").as_str() {
+                    "input" => {
+                        let store = bise_home::Home::from_env().images_dir();
+                        let r = crate::parts_in::restored(&s("text"), &s("parts"), &store, &super::fn_context::store_image, &super::fn_context::store_b64);
+                        if let Some(n) = &r.note {
+                            log_line(&self.opts.paths, &format!("xhub: x{xid} from {}: {n}", s("hub")));
+                        }
+                        (r.text, r.parts)
+                    }
+                    _ => (s("text"), String::new()),
+                };
                 // a routed message's fn context (S2, 9dc23d9c): rendered
                 // here once, the same block as a direct input's (S9)
                 let text = match crate::fn_context::of(v.get("context")) {
-                    Some(ctx) => crate::fn_context::with_context(&s("text"), &ctx),
-                    None => s("text"),
+                    Some(ctx) => crate::fn_context::with_context(&text, &ctx),
+                    None => text,
                 };
-                self.step(Input::XIn { token, hub: s("hub"), xid, kind: s("kind"), text, name: s("name") });
+                self.step(Input::XIn { token, hub: s("hub"), xid, kind: s("kind"), text, name: s("name"), parts });
             }
             // S10: bise's `sb follow <p>/<agent>`: main's follow here, its
             // answer (ok or why not) back to bise's hub at once
+            // his move here of this hub's artifacts, from another hub
+            // (daemon/art_folders.rs)
+            "xartmove" => self.xartmove(stream, &v),
             "xfollow" => {
                 self.replies.insert(token, stream);
                 // J: `hub` asked: the job's end goes back there (its outbox)
                 let req = crate::core::AgentReq::Follow { agent: s("agent"), on: v.get("on").and_then(Value::as_bool).unwrap_or(true), hub: s("hub") };
-                self.step(Input::Agent { token, from: crate::model::MAIN.into(), req });
+                self.step(Input::Agent { token, from: crate::model::MAIN.into(), req, by: crate::peer::Sender::hub() });
             }
             _ => {
                 self.step(Input::XReply { xid, name: s("name"), text: s("text") });
@@ -71,7 +88,9 @@ impl Shell {
     /// bise's home hub: deliver outbox entry `xid` to the hub `project`.
     /// `context`: a routed message's fn context (FnContext JSON text, ""
     /// none), sent as the op's `context` for the project to render.
-    pub(super) fn xdeliver(&mut self, xid: u64, project: String, kind: String, text: String, context: String) {
+    /// `parts`: a routed message's parts (msg-parts JSON, "" none), sent as
+    /// the op's `parts` for the project to complete in its own store.
+    pub(super) fn xdeliver(&mut self, xid: u64, project: String, kind: String, text: String, context: String, parts: String) {
         let own = crate::paths::workspace_id(&self.opts.paths.workspace);
         let ws = self.opts.paths.workspace.clone();
         let (tx, exe, root, log) = (self.tx.clone(), self.opts.exe.clone(), self.opts.app_root.clone(), self.opts.paths.clone());
@@ -81,6 +100,9 @@ impl Shell {
             if let Some(c) = serde_json::from_str::<Value>(&context).ok().filter(Value::is_object) {
                 req["context"] = c;
             }
+            if !parts.is_empty() {
+                req["parts"] = json!(parts);
+            }
             let res = hub_paths(&project).and_then(|p| call(&p, &exe, &root, &req));
             let input = match res {
                 Ok(_) => Input::XAck { xid },
@@ -89,24 +111,21 @@ impl Shell {
                     Input::XFail { xid }
                 }
             };
-            let _ = tx.send(Msg::In(input));
+            let _ = tx.send(Msg::input(input));
         });
     }
 
-    /// Whether `sb follow` request `v` goes to another project's hub: on
+    /// Whether `sb follow` of `agent` goes to another project's hub: on
     /// bise's home hub, an agent named `<p>/<agent>`.
-    pub(super) fn wants_follow(&self, v: &Value) -> bool {
-        crate::paths::is_home(&self.opts.paths.workspace) && v.get("agent").and_then(Value::as_str).is_some_and(|a| a.contains('/'))
+    pub(super) fn wants_follow(&self, agent: &str) -> bool {
+        crate::paths::is_home(&self.opts.paths.workspace) && agent.contains('/')
     }
 
     /// S10, bise's home hub: `sb follow <p>/<agent> [--off]` (main only):
     /// the project's hub follows its task (started first when stopped);
     /// a command, not a message: no outbox, its answer or its failure
     /// comes back to main at once (on a thread: the hub never waits).
-    pub(super) fn xfollow(&mut self, mut stream: UnixStream, v: &Value) {
-        let from = v.get("from").and_then(Value::as_str).unwrap_or("");
-        let target = v.get("agent").and_then(Value::as_str).unwrap_or("");
-        let on = !v.get("off").and_then(Value::as_bool).unwrap_or(false);
+    pub(super) fn xfollow(&mut self, mut stream: UnixStream, from: &str, target: &str, on: bool) {
         if from != crate::model::MAIN {
             write_json(&mut stream, &json!({"ok": false, "error": "only main follows a task: ask main"}));
             return;
@@ -177,6 +196,11 @@ pub(super) fn is_home(ws: &Path) -> bool {
     bise_home::projects::canonical(ws) == bise_home::projects::canonical(&crate::paths::home_workspace())
 }
 
+/// One request to the registered hub `id` (started when none runs).
+pub(super) fn call_hub(id: &str, exe: &Path, root: &Path, req: &Value) -> Result<Value, String> {
+    hub_paths(id).and_then(|paths| call(&paths, exe, root, req))
+}
+
 /// The paths of the registered hub `id` (its workspace from the registry).
 fn hub_paths(id: &str) -> Result<Paths, String> {
     let home = bise_home::Home::from_env();
@@ -189,7 +213,7 @@ fn hub_paths(id: &str) -> Result<Paths, String> {
 }
 
 /// This workspace's name in the registry (its folder's when absent).
-fn own_name(ws: &Path) -> String {
+pub(super) fn own_name(ws: &Path) -> String {
     let home = bise_home::Home::from_env();
     let id = crate::paths::workspace_id(ws);
     bise_home::projects::list(&home, &crate::paths::home_workspace())

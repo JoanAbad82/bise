@@ -4,32 +4,20 @@
 //! Every bise environment variable and the environment of each bise child
 //! process: [`env`] (issue 11). A workspace's hub id: [`hub_id`]. The
 //! projects registry (`projects.json`, bise layout only): [`projects`].
+//! The artifacts library's folders (`library/folders.json`): [`library`].
 //!
-//! Two layouts:
-//!
-//! - **bise** (`~/.bise`, or `$BISE_HOME`): `config.toml`, `auth.json`,
-//!   `.env`, `prefs.json`, `sessions/`, `hubs/<name>-<hash>/`, `images/`,
-//!   `crashes/`, `plugins.json`, `plugin-data/`, `cache/` (indexes),
-//!   `run/` (0700), `drafts/`, `dev/{versions,build}`.
-//! - **legacy** (today's places): `~/.bend-harness/*` for the user files,
-//!   `~/.local/state/switchboard/` for the hubs, the TUI's small state
-//!   files and the dev versions. `XDG_STATE_HOME` is no longer read.
-//!
-//! The bise layout is on when `$BISE_HOME` is set or `~/.bise/migrated.json`
-//! exists. The harness writes it at its first start ([`migrate`],
-//! BISE-161: user files copied, idle hubs moved and linked back, running
-//! hubs kept in the old place until they stop; `BISE_NO_MIGRATE=1` never
-//! migrates). Until then the legacy layout: a hub is never swapped for an
-//! empty one.
+//! The layout: `~/.bise` (or `$BISE_HOME`): `config.toml`, `auth.json`,
+//! `.env`, `prefs.json`, `sessions/`, `hubs/<name>-<hash>/`, `images/`,
+//! `crashes/`, `plugins.json`, `plugin-data/`, `cache/` (indexes),
+//! `run/` (0700), `drafts/`, `dev/{versions,build}`.
 //!
 //! Each path keeps its env override (`BEND_CONFIG`, `BEND_SESSIONS_DIR`,
 //! ...). The harness exports them all at its start ([`Home::exports`]),
 //! so the Bend runtime and older versions (a rollback) read the same
 //! paths. The export carries a stamp (`BISE_EXPORTS_FOR` = the HOME,
 //! BISE_HOME and root it was computed for): a process started with another
-//! HOME or BISE_HOME (a test with a temp HOME, from an agent's shell), or
-//! after the migration, ignores the inherited paths instead of writing into
-//! the wrong state.
+//! HOME or BISE_HOME (a test with a temp HOME, from an agent's shell)
+//! ignores the inherited paths instead of writing into the wrong state.
 
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
@@ -37,33 +25,52 @@ use std::path::{Path, PathBuf};
 pub mod clock;
 pub mod env;
 pub mod hub_id;
-pub mod migrate;
+pub mod hub_state;
+pub mod library;
 pub mod prefs;
 pub mod projects;
 pub mod release;
+pub mod release_offer;
 pub mod socket;
 pub mod style;
 pub mod test_home;
 pub use hub_id::hub_id;
-pub use migrate::migrate;
 
 crate::test_home!();
 pub use prefs::{Pref, Slot};
 
+/// The folder an executable's own files are looked up in, from the
+/// executable's (canonical) folder: a version dir's `bise` is a link to
+/// `<root>/bise.app/Contents/MacOS/bise` (scripts/versions.sh: one bundle
+/// id and signature, so macOS keeps a folder grant across versions), so
+/// `<root>/<x>.app/Contents/MacOS` with `VERSION` in `<root>` -> `<root>`;
+/// any other folder is itself.
+pub fn exe_home_dir(exe_dir: &Path) -> PathBuf {
+    let name = |p: Option<&Path>| p.and_then(Path::file_name).map(|n| n.to_string_lossy().into_owned());
+    let contents = exe_dir.parent();
+    let app = contents.and_then(Path::parent);
+    let root = app.and_then(Path::parent);
+    let bundled = name(Some(exe_dir)).as_deref() == Some("MacOS")
+        && name(contents).as_deref() == Some("Contents")
+        && name(app).is_some_and(|n| n.ends_with(".app"));
+    match root {
+        Some(r) if bundled && r.join("VERSION").is_file() => r.to_path_buf(),
+        _ => exe_dir.to_path_buf(),
+    }
+}
+
 /// Moves the whole state (the bise layout, at this path).
 pub const BISE_HOME: &str = "BISE_HOME";
+/// [`Home::dictation_dir`]'s name under the root (the sandbox denies it).
+pub const DICTATION_DIR: &str = "dictation";
 /// The stamp of the exported paths: `<HOME>\n<BISE_HOME>` they were computed for.
 pub const EXPORTS_FOR: &str = "BISE_EXPORTS_FOR";
-/// The marker that turns the bise layout on for `~/.bise` (BISE-161).
-pub const MIGRATED: &str = "migrated.json";
 
 /// The env overrides of single paths, in the order they are exported.
-pub const PATH_VARS: [&str; 10] = [
+pub const PATH_VARS: [&str; 8] = [
     "BEND_CONFIG",
     "BEND_SESSIONS_DIR",
     "BEND_IMAGE_DIR",
-    "BEND_MCP_INDEX",
-    "BEND_SKILLS_INDEX",
     "BEND_PLUGINS_STATE",
     "BEND_PLUGINS_DATA",
     "BEND_RUN_DIR",
@@ -71,26 +78,14 @@ pub const PATH_VARS: [&str; 10] = [
     "SB_BUILD_DIR",
 ];
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Layout {
-    /// `~/.bise` or `$BISE_HOME`.
-    Bise,
-    /// `~/.bend-harness` + `~/.local/state/switchboard`.
-    Legacy,
-}
-
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Home {
-    layout: Layout,
     /// `$HOME`, else `/tmp`.
     user: PathBuf,
-    /// `~/.bise` / `$BISE_HOME` (bise), `~/.bend-harness` (legacy).
+    /// `~/.bise`, or `$BISE_HOME`.
     root: PathBuf,
     /// The single-path overrides from the environment that apply.
     over: BTreeMap<&'static str, PathBuf>,
-    /// `~/.bise` after the migration (not an explicit `$BISE_HOME`): a hub
-    /// still running in the old place is used there until it moves.
-    migrated: bool,
 }
 
 /// An environment lookup: the real one, or a map in tests. Empty = unset.
@@ -110,13 +105,8 @@ impl Home {
     pub fn from_lookup(env: Lookup) -> Home {
         let get = |k: &str| env(k).filter(|v| !v.is_empty());
         let user = PathBuf::from(get("HOME").unwrap_or_else(|| "/tmp".into()));
-        let (layout, root, migrated) = match get(BISE_HOME) {
-            Some(b) => (Layout::Bise, PathBuf::from(b), false),
-            None if user.join(".bise").join(MIGRATED).exists() => (Layout::Bise, user.join(".bise"), true),
-            None => (Layout::Legacy, user.join(".bend-harness"), false),
-        };
-        // inherited paths computed for another HOME/BISE_HOME/root (before
-        // the migration) do not apply
+        let root = get(BISE_HOME).map_or_else(|| user.join(".bise"), PathBuf::from);
+        // inherited paths computed for another HOME/BISE_HOME/root do not apply
         let stamp = stamp_of(get("HOME").as_deref(), get(BISE_HOME).as_deref(), &root);
         let stale = get(EXPORTS_FOR).is_some_and(|s| s != stamp);
         let over = if stale {
@@ -124,59 +114,41 @@ impl Home {
         } else {
             PATH_VARS.iter().filter_map(|k| get(k).map(|v| (*k, PathBuf::from(v)))).collect()
         };
-        let mut h = Home { layout, user, root, over, migrated };
+        let mut h = Home { user, root, over };
         h.drop_foreign_defaults();
         h
     }
 
-    /// An inherited path that is some layout's default, computed for
-    /// another place than this home, is not an override:
-    ///
-    /// - in the bise layout, this HOME's legacy default: an older version
-    ///   computed it (before BISE-160 no stamp came with it, e.g.
-    ///   `BEND_MCP_INDEX=~/.bend-harness/mcp-index.txt`), and taking it
-    ///   would re-export it with a valid stamp for good (the agents read an
-    ///   empty connector index, not `<root>/cache/mcp-index.txt`);
-    /// - in any layout, another HOME's default (legacy or `~/.bise`): an
-    ///   agent's shell ran a test with a temp HOME and the stamp unset, and
-    ///   the test's REPL wrote its empty skills index over the user's one.
+    /// An inherited path that is another HOME's default is not an
+    /// override: an agent's shell ran a test with a temp HOME and the stamp
+    /// unset, and the test's REPL wrote its empty skills index over the
+    /// user's one.
     fn drop_foreign_defaults(&mut self) {
         if self.over.is_empty() {
             return;
         }
         let user = self.user.to_string_lossy().into_owned();
-        let bise = self.is_bise();
         self.over.retain(|k, v| {
             let v = v.to_string_lossy();
-            !default_suffixes(k).iter().any(|(suffix, legacy)| {
-                v.strip_suffix(suffix.as_str()).is_some_and(|home| {
-                    !home.is_empty() && (home != user || (bise && *legacy))
-                })
-            })
+            !default_suffixes(k)
+                .iter()
+                .any(|suffix| v.strip_suffix(suffix.as_str()).is_some_and(|home| !home.is_empty() && home != user))
         });
     }
 
-    /// A bise-layout home at `root` (tests, tools).
+    /// A home at `root` (tests, tools).
     pub fn at(root: impl Into<PathBuf>) -> Home {
         let root = root.into();
-        Home { layout: Layout::Bise, user: root.clone(), root, over: BTreeMap::new(), migrated: false }
+        Home { user: root.clone(), root, over: BTreeMap::new() }
     }
 
     fn or(&self, var: &str, default: PathBuf) -> PathBuf {
         self.over.get(var).cloned().unwrap_or(default)
     }
 
-    fn is_bise(&self) -> bool {
-        self.layout == Layout::Bise
-    }
-
-    /// `~/.local/state/switchboard`: the legacy hubs and TUI state.
-    fn legacy_state(&self) -> PathBuf {
-        self.user.join(".local").join("state").join("switchboard")
-    }
-
-    pub fn layout(&self) -> Layout {
-        self.layout
+    /// `$BISE_HOME` (or [`Home::at`]) chose the root, not `~/.bise`.
+    fn explicit(&self) -> bool {
+        self.root != self.user.join(".bise")
     }
 
     /// `$HOME` (else `/tmp`): the user's own dirs (`~/.agents`, `~/.vibe`).
@@ -184,7 +156,7 @@ impl Home {
         &self.user
     }
 
-    /// bise's own folder: `~/.bise` (`$BISE_HOME`), legacy `~/.bend-harness`.
+    /// bise's own folder: `~/.bise` (`$BISE_HOME`).
     pub fn root(&self) -> &Path {
         &self.root
     }
@@ -210,14 +182,9 @@ impl Home {
     }
 
     /// The `KEY=VALUE` files read for API keys, first wins: `<root>/.env`,
-    /// (bise layout) `~/.bend-harness/.env`, then `~/.vibe/.env`.
+    /// then `~/.vibe/.env`.
     pub fn env_files(&self) -> Vec<PathBuf> {
-        let mut v = vec![self.key_file()];
-        if self.is_bise() {
-            v.push(self.user.join(".bend-harness").join(".env"));
-        }
-        v.push(self.user.join(".vibe").join(".env"));
-        v
+        vec![self.key_file(), self.user.join(".vibe").join(".env")]
     }
 
     /// Single-agent sessions (`$BEND_SESSIONS_DIR`).
@@ -235,56 +202,35 @@ impl Home {
         }
     }
 
-    /// The folder of every hub: `<root>/hubs`, legacy `~/.local/state/switchboard`.
+    /// The folder of every hub: `<root>/hubs`.
     pub fn hubs_dir(&self) -> PathBuf {
-        if self.is_bise() {
-            self.root.join("hubs")
-        } else {
-            self.legacy_state()
-        }
+        self.root.join("hubs")
     }
 
     /// One workspace's hub (`id` = `<name>-<hash>`). `SB_STATE_DIR` is the
-    /// caller's business (switchboard::paths). After the migration, a hub
-    /// not moved yet (it was running, BISE-161) is still used in the old
-    /// place: a real folder there, and none in `hubs/`.
+    /// caller's business (switchboard::paths).
     pub fn hub_dir(&self, id: &str) -> PathBuf {
-        let new = self.hubs_dir().join(id);
-        if self.migrated && !new.exists() {
-            let old = self.legacy_state().join(id);
-            if std::fs::symlink_metadata(&old).is_ok_and(|m| m.is_dir()) {
-                return old;
-            }
-        }
-        new
+        self.hubs_dir().join(id)
     }
 
-    /// Every project's task worktrees (BISE-230): `<root>/worktrees`,
-    /// legacy `~/.local/state/switchboard/worktrees`; one folder per
-    /// project (`<id>`, like [`Home::hub_dir`]), one per task in it.
+    /// Every project's task worktrees (BISE-230): `<root>/worktrees`; one
+    /// folder per project (`<id>`, like [`Home::hub_dir`]), one per task in it.
     pub fn worktrees_dir(&self) -> PathBuf {
-        if self.is_bise() {
-            self.root.join("worktrees")
-        } else {
-            self.legacy_state().join("worktrees")
-        }
-    }
-
-    /// The old places (`~/.bend-harness`, `~/.local/state/switchboard`)
-    /// of this HOME: what [`migrate`] reads.
-    pub fn legacy(&self) -> Home {
-        Home {
-            layout: Layout::Legacy,
-            user: self.user.clone(),
-            root: self.user.join(".bend-harness"),
-            over: BTreeMap::new(),
-            migrated: false,
-        }
+        self.root.join("worktrees")
     }
 
     /// The image store (`$BEND_IMAGE_DIR`).
     pub fn images_dir(&self) -> PathBuf {
         self.or("BEND_IMAGE_DIR", self.root.join("images"))
+    }
+
+    /// The desktop core's dictation takes not yet in his composer (the
+    /// sound of each stopped take, one file each): kept across a quit so
+    /// a take still transcribed or failed comes back on relaunch. Machine
+    /// level like the core, not a cache (his unsent words); agents never
+    /// read it (the approvals sandbox denies it).
+    pub fn dictation_dir(&self) -> PathBuf {
+        self.root.join(DICTATION_DIR)
     }
 
     /// The TUI's crash logs.
@@ -304,21 +250,57 @@ impl Home {
         self.root.join("cache")
     }
 
-    /// The MCP connector index (`$BEND_MCP_INDEX`).
-    pub fn mcp_index(&self) -> PathBuf {
-        let d = if self.is_bise() { self.cache_dir() } else { self.root.clone() };
-        self.or("BEND_MCP_INDEX", d.join("mcp-index.txt"))
-    }
-
-    /// The skills index (`$BEND_SKILLS_INDEX`).
-    pub fn skills_index(&self) -> PathBuf {
-        let d = if self.is_bise() { self.cache_dir() } else { self.root.clone() };
-        self.or("BEND_SKILLS_INDEX", d.join("skills-index.txt"))
+    /// `<root>/cache/thumbs`: the desktop app's artifact card pictures, one
+    /// 480 px PNG per artifact version (`<project>/<id>-v<n>.<sig>.png`);
+    /// rebuildable, pruned by the app past its cap. The app gets it in
+    /// `initialize`'s result (`AppInitResult::thumbs_dir`).
+    pub fn thumbs_cache(&self) -> PathBuf {
+        self.cache_dir().join("thumbs")
     }
 
     /// The plugins' enable state (`$BEND_PLUGINS_STATE`).
     pub fn plugins_state(&self) -> PathBuf {
         self.or("BEND_PLUGINS_STATE", self.root.join("plugins.json"))
+    }
+
+    /// The Mistral connectors' catalog cache: `<root>/connectors/bootstrap.json`
+    /// (bend_plugins::connectors, its one writer, under a lock).
+    pub fn connectors_cache(&self) -> PathBuf {
+        self.root.join("connectors").join("bootstrap.json")
+    }
+
+    /// The plugin marketplaces he added: `<root>/marketplaces.json`.
+    pub fn marketplaces(&self) -> PathBuf {
+        self.root.join("marketplaces.json")
+    }
+
+    /// Each marketplace's last clone, `<cache>/marketplaces/<hash of its
+    /// url>` (bend_plugins::marketplace): rebuildable, read to list what
+    /// it offers, never run.
+    pub fn marketplace_cache(&self) -> PathBuf {
+        self.cache_dir().join("marketplaces")
+    }
+
+    /// `<cache>/mcp-tools`: each stdio plugin server's last `tools/list`,
+    /// one file per server spec (bend_plugins::tools_cache), shared by
+    /// every session's bridge so a session lists a server's tools
+    /// without starting it. Rebuildable.
+    pub fn mcp_tools_cache(&self) -> PathBuf {
+        self.cache_dir().join("mcp-tools")
+    }
+
+    /// `<cache>/mcp-tools.salt`: the per-home salt of the tools cache's
+    /// keyed hash of a server's env values (bend_plugins::tools_cache),
+    /// 32 random bytes, 0600, made on first use. Deleted: every key
+    /// changes, each server is listed once again.
+    pub fn mcp_tools_salt(&self) -> PathBuf {
+        self.cache_dir().join("mcp-tools.salt")
+    }
+
+    /// An MCP server's env and header values he typed in: `secrets/mcp-env/`,
+    /// kept by bise_secrets.
+    pub fn mcp_secrets_dir(&self) -> PathBuf {
+        self.secrets_dir().join("mcp-env")
     }
 
     /// The plugins' data (`$BEND_PLUGINS_DATA`).
@@ -343,51 +325,25 @@ impl Home {
         Ok(d)
     }
 
-    /// The TUI's small state (onboarded, hints, tip) and its drafts: `<root>`,
-    /// legacy `~/.local/state/switchboard`.
-    fn tui_state(&self) -> PathBuf {
-        if self.is_bise() {
-            self.root.clone()
-        } else {
-            self.legacy_state()
-        }
-    }
-
     /// The composer drafts, one file per workspace.
     pub fn drafts_dir(&self) -> PathBuf {
-        self.tui_state().join("drafts")
+        self.root.join("drafts")
     }
 
-    /// `prefs.json` (bise layout): voice, theme, hints, tip, onboarded,
-    /// setup, excluded_apps.
+    /// `prefs.json`: voice, theme, hints, tip, onboarded, setup,
+    /// excluded_apps.
     pub fn prefs_file(&self) -> PathBuf {
         self.root.join("prefs.json")
     }
 
-    /// Where one preference is kept: a key of `prefs.json`, or (legacy)
-    /// the file it always had.
+    /// Where one preference is kept: its key of `prefs.json`.
     pub fn pref(&self, p: Pref) -> Slot {
-        if self.is_bise() {
-            return Slot::key(self.prefs_file(), p.key());
-        }
-        let tui_json = self.root.join("tui.json");
-        match p {
-            Pref::Voice | Pref::Theme => Slot::key(tui_json, p.key()),
-            Pref::Hints => Slot::file(self.legacy_state().join("hints.json")),
-            Pref::Tip => Slot::file(self.legacy_state().join("tip")),
-            Pref::Onboarded => Slot::file(self.legacy_state().join("onboarded")),
-            Pref::Setup => Slot::file(self.legacy_state().join("setup.json")),
-            Pref::ExcludedApps => Slot::file(self.legacy_state().join("excluded_apps.json")),
-        }
+        Slot::key(self.prefs_file(), p.key())
     }
 
-    /// Dev builds (`versions.sh`): `<root>/dev`, legacy `~/.local/state/switchboard`.
+    /// Dev builds (`versions.sh`): `<root>/dev`.
     pub fn dev_dir(&self) -> PathBuf {
-        if self.is_bise() {
-            self.root.join("dev")
-        } else {
-            self.legacy_state()
-        }
+        self.root.join("dev")
     }
 
     /// The built versions (`$SB_VERSIONS_DIR`).
@@ -402,26 +358,22 @@ impl Home {
 
     /// The variables the harness sets at its start, so the Bend runtime,
     /// the hub, the agents and older versions all use these paths:
-    /// [`PATH_VARS`], `BISE_HOME` (bise layout only: in the legacy layout
-    /// it would turn the bise layout on at `~/.bend-harness`), and the
-    /// stamp [`EXPORTS_FOR`] last.
+    /// [`PATH_VARS`], `BISE_HOME` (an explicit root only), and the stamp
+    /// [`EXPORTS_FOR`] last.
     pub fn exports(&self) -> Vec<(&'static str, String)> {
         let s = |p: PathBuf| p.to_string_lossy().into_owned();
         let mut v = vec![
             ("BEND_CONFIG", s(self.config_file())),
             ("BEND_SESSIONS_DIR", s(self.sessions_dir())),
             ("BEND_IMAGE_DIR", s(self.images_dir())),
-            ("BEND_MCP_INDEX", s(self.mcp_index())),
-            ("BEND_SKILLS_INDEX", s(self.skills_index())),
             ("BEND_PLUGINS_STATE", s(self.plugins_state())),
             ("BEND_PLUGINS_DATA", s(self.plugin_data_dir())),
             ("BEND_RUN_DIR", s(self.run_dir())),
             ("SB_VERSIONS_DIR", s(self.versions_dir())),
             ("SB_BUILD_DIR", s(self.build_dir())),
         ];
-        // an explicit home only: after the migration ~/.bise is found by
-        // its marker, and a BISE_HOME would turn the old-place rule off
-        let bise = (self.is_bise() && !self.migrated).then(|| s(self.root.clone()));
+        // an explicit home only: ~/.bise is the default
+        let bise = self.explicit().then(|| s(self.root.clone()));
         if let Some(b) = &bise {
             v.push((BISE_HOME, b.clone()));
         }
@@ -444,28 +396,17 @@ fn stamp_of(home: Option<&str>, bise: Option<&str>, root: &Path) -> String {
     format!("{}\n{}\n{}", home.unwrap_or(""), bise.unwrap_or(""), root.display())
 }
 
-/// The defaults of a [`PATH_VARS`] variable relative to a HOME, in the
-/// legacy layout (`true`) and in `~/.bise` (`false`): e.g.
-/// `/.bend-harness/skills-index.txt` and `/.bise/cache/skills-index.txt`.
-fn default_suffixes(var: &str) -> Vec<(String, bool)> {
+/// The default of a [`PATH_VARS`] variable relative to a HOME: e.g.
+/// `/.bise/config.toml` for `BEND_CONFIG`.
+fn default_suffixes(var: &str) -> Vec<String> {
     const PROBE: &str = "/bise-probe-home";
     let user = PathBuf::from(PROBE);
-    let legacy = Home {
-        layout: Layout::Legacy,
-        user: user.clone(),
-        root: user.join(".bend-harness"),
-        over: BTreeMap::new(),
-        migrated: false,
-    };
-    let bise = Home { layout: Layout::Bise, user: user.clone(), root: user.join(".bise"), over: BTreeMap::new(), migrated: true };
-    [(legacy, true), (bise, false)]
+    let probe = Home { root: user.join(".bise"), user, over: BTreeMap::new() };
+    probe
+        .exports()
         .into_iter()
-        .flat_map(|(h, is_legacy)| {
-            h.exports()
-                .into_iter()
-                .filter(|(k, _)| *k == var)
-                .filter_map(move |(_, v)| v.strip_prefix(PROBE).map(|s| (s.to_string(), is_legacy)))
-        })
+        .filter(|(k, _)| *k == var)
+        .filter_map(|(_, v)| v.strip_prefix(PROBE).map(str::to_string))
         .collect()
 }
 

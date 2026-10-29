@@ -2,7 +2,8 @@
 //! step 2): fake hubs, one socket pair per connection the core opens.
 
 use super::*;
-use crate::ambient::core::{ProjectFacts, ProjectPorts, HUB_OLDER, LINGER, START};
+use crate::ambient::core::{ProjectFacts, ProjectPorts, HUB_LACKS, LINGER, START};
+use bise_proto::rpc::HUB_OLDER;
 use bise_home::projects::Row;
 use std::collections::HashMap;
 
@@ -28,6 +29,11 @@ fn docs_card() -> Value {
 }
 
 pub(super) fn world(t: &mut T) -> World {
+    world_running(t, &[])
+}
+
+/// [`world`] with these projects' hubs running (facts.running).
+pub(super) fn world_running(t: &mut T, up: &'static [&'static str]) -> World {
     let gone = std::sync::Arc::new(std::sync::Mutex::new(vec![PathBuf::from("/p/docs")]));
     let gone2 = gone.clone();
     let (etx, ends) = mpsc::channel::<(String, HubEnd)>();
@@ -36,11 +42,12 @@ pub(super) fn world(t: &mut T) -> World {
         let (etx, id) = (etx.clone(), id.to_string());
         let tag = id.clone();
         let connect: super::super::hub::Connect = Box::new(move || {
-            let (mut core_end, hub_end) = UnixStream::pair()?;
-            core_end.write_all(b"{\"op\":\"hello\"}\n")?;
+            // a project's connector says nothing: the core's first line
+            // is JSON-RPC's initialize (P1c)
+            let (core_end, hub_end) = UnixStream::pair()?;
             let r = BufReader::new(hub_end.try_clone()?);
             r.get_ref().set_read_timeout(Some(Duration::from_secs(3)))?;
-            etx.send((id.clone(), HubEnd { w: hub_end, r })).map_err(std::io::Error::other)?;
+            etx.send((id.clone(), HubEnd::new(hub_end, r))).map_err(std::io::Error::other)?;
             Ok(core_end)
         });
         Hub::start(connect, ptx.clone(), move |h| (tag.clone(), h), Duration::from_millis(20))
@@ -58,9 +65,12 @@ pub(super) fn world(t: &mut T) -> World {
             artifacts: vec![],
             artifacts_total: 0,
             scheduled: vec![serde_json::from_value(json!({"id": 7, "agent": "main", "by": "main", "words": "check the docs build", "every": "every day 07:30", "done": 2, "next_ms": 5})).unwrap()],
+            growth: Some(bise_proto::rows::Growth { jobs_done: 4, days_used: 2, artifacts_made: 0, since_ms: Some(1) }),
+            pulse: Some(bise_proto::rows::Pulse { from_ms: 1, busy_ms: vec![0; 21], last_ms: Some(2), ..Default::default() }),
         })),
-        running: Box::new(|_| false),
+        running: Box::new(move |p| up.iter().any(|id| p == Path::new(&format!("/p/{id}")))),
         exists: Box::new(move |p| !gone2.lock().unwrap().iter().any(|g| g == p)),
+        journal: Box::new(|id| (id == "mail").then(|| MAIL_JOURNAL.to_string())),
         git: Box::new(|p| {
             let shop = p == Path::new("/p/shop");
             crate::ambient::projects::Checkout {
@@ -69,6 +79,8 @@ pub(super) fn world(t: &mut T) -> World {
                 web: shop.then(|| "https://github.com/acme/shop".into()),
             }
         }),
+        // mail's hub runs from his install (shop's from no install: HUB_OLDER)
+        older: Box::new(|id| (id == "mail").then(|| MAIL_OLDER.to_string())),
     };
     t.core.set_projects(ProjectPorts { spawn, facts });
     World { ends, rx, open: HashMap::new(), gone }
@@ -127,31 +139,20 @@ impl World {
         self.open.get_mut(id).unwrap_or_else(|| panic!("no connection to {id}"))
     }
 
-    /// The hub of `id` says welcome (after the core's typed hello).
+    /// The hub of `id` answers the core's `initialize` (its welcome).
     pub(super) fn welcome(&mut self, t: &mut T, id: &str) {
         self.welcome_as(t, id, json!({}));
     }
 
-    /// [`welcome`] with `extra` fields on it (hub-skew: `cmds`, `proto`).
+    /// [`welcome`] as a hub of another kind (hub-skew): `cmds` the
+    /// HubCmd tags it serves (its methods).
     pub(super) fn welcome_as(&mut self, t: &mut T, id: &str, extra: Value) {
         self.until(t, |_| true);
-        // next() skips the hellos: read the raw lines up to the typed one
-        let e = self.end(id);
-        loop {
-            let mut l = String::new();
-            e.r.read_line(&mut l).expect("the typed hello");
-            let v: Value = serde_json::from_str(l.trim()).unwrap();
-            if v["cmd"] == "hello" {
-                assert_eq!(v, json!({"cmd": "hello", "proto": 1, "typed_only": true}), "a window's connection: typed only");
-                break;
-            }
-            assert_eq!(v["op"], "hello", "only the connector's hello before it: {v}");
-        }
-        let mut welcome = json!({"ev": "welcome", "project": id, "proto": 1, "workspace": format!("/p/{id}"), "name": id});
-        for (k, v) in extra.as_object().into_iter().flatten() {
-            welcome[k] = v.clone();
-        }
-        self.end(id).say(welcome);
+        let methods = extra.get("cmds").and_then(Value::as_array).map(|tags| {
+            let tags: Vec<&str> = tags.iter().filter_map(Value::as_str).collect();
+            bise_proto::rpc::METHODS.iter().filter(|r| tags.contains(&r.cmd)).map(|r| r.method.to_string()).collect()
+        });
+        self.end(id).initialized(id, methods);
         self.until(t, |o| o.iter().any(|v| v["ev"] == "welcome" && v["project"] == id));
     }
 }
@@ -172,13 +173,13 @@ fn a_hub_that_lacks_a_command_never_gets_it() {
     typed(&mut t, json!({"cmd": "shown", "projects": ["shop"]}));
     w.opened(&mut t, &["home", "shop"]);
     let older = |out: &[Value], cid: u64| {
-        out.iter().any(|v| v["ev"] == "error" && v["kind"] == "hub_older" && v["cid"] == cid && v["cmd"] == "slash" && v["project"] == "shop" && v["text"] == HUB_OLDER)
+        out.iter().any(|v| v["ev"] == "error" && v["kind"] == "hub_older" && v["cid"] == cid && v["cmd"] == "slash" && v["project"] == "shop" && v["text"] == HUB_LACKS)
     };
     // waits for the welcome, then refused there
     typed(&mut t, json!({"cmd": "slash", "project": "shop", "agent": "main", "line": "/flow", "cid": 5}));
     let hi = json!({"cmd": "send", "project": "shop", "agent": "main", "text": "hi", "mode": "now"});
     typed(&mut t, hi.clone());
-    w.welcome_as(&mut t, "shop", json!({"cmds": ["hello", "subscribe", "send"]}));
+    w.welcome_as(&mut t, "shop", json!({"cmds": ["subscribe", "send"]}));
     w.until(&mut t, |o| older(o, 5));
     assert_eq!(w.end("shop").next(), hi, "the slash never reached shop's hub; the send did");
     // after the welcome: refused at once, nothing written
@@ -189,30 +190,74 @@ fn a_hub_that_lacks_a_command_never_gets_it() {
     assert!(!t.take().iter().any(|v| v["ev"] == "notice"), "a hub that lists its commands is not 'older'");
 }
 
-/// hub-skew (architect m_11314 (3)): a hub too old to list its commands
-/// that speaks an older proto: one notice per project, its commands still
-/// go (its own errors pass as they are); the same proto: nothing.
+/// A project hub from before client-protocol (v2026.10.2-30) answers the
+/// core's `initialize` with its `does not serve the op`: refused like a
+/// refused hub (architect m_23313), with what to do
+/// (`bise_proto::rpc::HUB_OLDER`): one hub_refused, a command that waited
+/// fails with kind hub_older, nothing more is said to it and it is never
+/// connected again on its own; hub_retry opens it once more.
 #[test]
-fn a_hub_too_old_to_list_its_commands_says_so_once() {
+fn a_hub_without_initialize_is_refused_with_what_to_do() {
     let mut t = T::new();
     t.ready();
     let mut w = world(&mut t);
-    typed(&mut t, json!({"cmd": "shown", "projects": ["shop", "mail"]}));
-    w.opened(&mut t, &["home", "shop", "mail"]);
-    w.welcome_as(&mut t, "shop", json!({"proto": 0}));
-    w.welcome(&mut t, "mail");
-    let notices = |out: &[Value], p: &str| out.iter().filter(|v| v["ev"] == "notice" && v["project"] == p && v["text"] == HUB_OLDER).count();
+    typed(&mut t, json!({"cmd": "shown", "projects": ["shop"]}));
+    w.opened(&mut t, &["home", "shop"]);
+    typed(&mut t, json!({"cmd": "send", "project": "shop", "agent": "main", "text": "hi", "mode": "now", "cid": 7}));
+    let e = w.end("shop");
+    let mut l = String::new();
+    e.r.read_line(&mut l).expect("the core's first line");
+    assert!(l.contains("\"initialize\""), "initialize first: {l}");
+    e.write(json!({"ok": false, "error": "hub.sock does not serve the op \"\""}));
+    w.until(&mut t, |o| o.iter().any(|v| v["ev"] == "hub_refused"));
     let out = t.take();
-    assert_eq!((notices(&out, "shop"), notices(&out, "mail")), (1, 0), "{out:#?}");
-    let slash = json!({"cmd": "slash", "project": "shop", "agent": "main", "line": "/flow", "cid": 7});
-    typed(&mut t, slash.clone());
-    assert_eq!(w.end("shop").next(), slash, "no list: no guessing, it goes");
-    // shop's hub restarts, still old: no second notice
-    w.end("shop").w.shutdown(std::net::Shutdown::Both).unwrap();
+    let older = HUB_OLDER;
+    let refused: Vec<&Value> = out.iter().filter(|v| v["ev"] == "hub_refused").collect();
+    assert_eq!(refused, [&json!({"ev": "hub_refused", "project": "shop", "error": older})], "{out:#?}");
+    assert!(
+        out.iter().any(|v| v["ev"] == "error" && v["kind"] == "hub_older" && v["cid"] == 7 && v["text"] == older),
+        "the waiting send failed with what to do: {out:#?}"
+    );
+    // nothing more written to it: the core closed its connection
+    let mut more = String::new();
+    assert_eq!(w.end("shop").r.read_line(&mut more).unwrap_or(0), 0, "more: {more}");
     w.open.remove("shop");
+    for _ in 0..5 {
+        t.core.poll_projects(true);
+        w.until(&mut t, |_| true);
+        std::thread::sleep(Duration::from_millis(30));
+    }
+    assert!(w.ends.try_recv().is_err() && !w.open.contains_key("shop"), "never connected again on its own");
+    typed(&mut t, json!({"cmd": "hub_retry", "project": "shop"}));
     w.opened(&mut t, &["shop"]);
-    w.welcome_as(&mut t, "shop", json!({"proto": 0}));
-    assert_eq!(notices(&t.take(), "shop"), 0, "once per project");
+    w.welcome(&mut t, "shop");
+}
+
+const MAIL_OLDER: &str = "this project's hub runs an older bise: in a terminal, in that project, run `bise switchboard --stop`, then `bise update`, then `bise`";
+
+/// ambient-lead m_23937: an older hub that runs from his install says his
+/// install's steps (`ProjectFacts::older`) instead of HUB_OLDER, in the
+/// refusal and in the error of a command that waited.
+#[test]
+fn an_older_hub_of_his_install_says_the_update_steps() {
+    let mut t = T::new();
+    t.ready();
+    let mut w = world(&mut t);
+    typed(&mut t, json!({"cmd": "shown", "projects": ["mail"]}));
+    w.opened(&mut t, &["home", "mail"]);
+    typed(&mut t, json!({"cmd": "send", "project": "mail", "agent": "main", "text": "hi", "mode": "now", "cid": 8}));
+    let e = w.end("mail");
+    let mut l = String::new();
+    e.r.read_line(&mut l).expect("the core's first line");
+    e.write(json!({"ok": false, "error": "hub.sock does not serve the op \"\""}));
+    w.until(&mut t, |o| o.iter().any(|v| v["ev"] == "hub_refused"));
+    let out = t.take();
+    let refused: Vec<&Value> = out.iter().filter(|v| v["ev"] == "hub_refused").collect();
+    assert_eq!(refused, [&json!({"ev": "hub_refused", "project": "mail", "error": MAIL_OLDER})], "{out:#?}");
+    assert!(
+        out.iter().any(|v| v["ev"] == "error" && v["kind"] == "hub_older" && v["cid"] == 8 && v["text"] == MAIL_OLDER),
+        "the waiting send failed with his install's steps: {out:#?}"
+    );
 }
 
 /// G (architect m_10348): every send error the core makes itself echoes
@@ -321,7 +366,7 @@ fn the_window_reaches_every_projects_hub_through_the_core() {
     assert_eq!(shop.len(), 1, "its unsubscribe, then closed: {shop:?}");
     assert!(shop[0].contains("unsubscribe"));
     let mail = closed(w.end("mail"));
-    assert!(mail.iter().all(|l| l.contains("\"hello\"")), "mail never welcomed: only the hellos went: {mail:?}");
+    assert!(mail.iter().all(|l| l.contains("\"initialize\"")), "mail never welcomed: only its initialize went: {mail:?}");
     assert!(!w.open.contains_key("docs"), "a folder gone: never a connection");
 }
 
@@ -390,6 +435,29 @@ fn a_core_without_projects_holds_nothing() {
     assert!(!has(&t.take(), "projects"));
 }
 
+/// ambient-lead m_18943: his add answers with the rows even before the
+/// window's first `shown` (realshape's no-env core asks before any), and a
+/// refused add says why; other news says nothing until `shown`.
+#[test]
+fn an_add_before_shown_answers_with_the_rows() {
+    let mut t = T::new();
+    t.ready();
+    let _w = world(&mut t);
+    super::setup::setup_ports(&mut t);
+    t.out.extend(t.core.take_out());
+    assert!(!has(&t.take(), "projects"), "no rows before shown");
+    t.cmd(Cmd::parse(r#"{"cmd":"project_add","path":"/p/blog"}"#).unwrap());
+    t.out.extend(t.core.take_out());
+    let out = t.take();
+    let rows = out.iter().find(|v| v["ev"] == "projects").expect("the add answers with the rows");
+    assert_eq!(rows["projects"].as_array().map(Vec::len), Some(4));
+    assert!(!has(&out, "error"));
+    t.cmd(Cmd::parse(r#"{"cmd":"project_add","path":"/p/home"}"#).unwrap());
+    t.out.extend(t.core.take_out());
+    let e = t.take().into_iter().find(|v| v["ev"] == "error").expect("a refused add says why");
+    assert_eq!((e["cmd"].as_str(), e["text"].as_str()), (Some("project_add"), Some("that's bise's home")));
+}
+
 #[test]
 fn a_command_is_written_at_most_once_and_ends_written_or_errored() {
     // architect m_8956: waiting never re-sends what a hub may already have
@@ -417,6 +485,107 @@ fn a_command_is_written_at_most_once_and_ends_written_or_errored() {
     t.core.tick(Instant::now() + START + Duration::from_secs(2));
     t.out.extend(t.core.take_out());
     assert_eq!(t.take().iter().filter(|v| v["ev"] == "error" && v["cmd"] == "stop").count(), 1);
+}
+
+/// mail's journal (its hub not running): an answered card, a withdrawn
+/// one, a torn last line.
+const MAIL_JOURNAL: &str = r#"{"type":"card_opened","ts":10,"card":{"id":1,"kind":"question","agent":"perf","text":"webp or avif?\n1. webp\n2. avif","for_msg":null,"created_ms":10,"place":null,"pr":null}}
+{"type":"card_closed","id":1,"resolution":"answered","said":"2","pick_n":2,"pick":"avif","via":"inbox","ts":20}
+{"type":"card_answer_pos","card":1,"agent":"perf","pos":41,"ts":21}
+{"type":"card_opened","ts":30,"card":{"id":2,"kind":"question","agent":"docs","text":"ship it?","for_msg":null,"created_ms":30,"place":null,"pr":null}}
+{"type":"card_closed","id":2,"resolution":"withdrawn by main: moot","ts":40}
+{"type":"card_clo"#;
+
+/// inbox-record: the history of a project whose hub isn't connected is
+/// its journal, folded by the core (read-only): no hub started for it.
+#[test]
+fn the_history_of_a_project_not_held_is_its_journal() {
+    let mut t = T::new();
+    t.ready();
+    let mut w = world(&mut t);
+    typed(&mut t, json!({"cmd": "shown", "projects": []}));
+    w.opened(&mut t, &["home"]);
+    typed(&mut t, json!({"cmd": "inbox_history", "project": "mail", "state": "all"}));
+    w.until(&mut t, |o| o.iter().any(|v| v["ev"] == "inbox_history"));
+    let ev = t.take().into_iter().find(|v| v["ev"] == "inbox_history").unwrap();
+    assert_eq!(ev["project"], "mail");
+    let cards: Vec<u64> = ev["items"].as_array().unwrap().iter().filter_map(|r| r["card"].as_u64()).collect();
+    assert_eq!(cards, vec![2, 1]);
+    assert_eq!(ev["items"][1]["said"], "avif");
+    assert_eq!(ev["items"][1]["thread"], json!({"agent": "perf", "pos": 41}));
+    assert_eq!(ev["items"][0]["line2"], "withdrawn: moot");
+    assert_eq!((ev["answered"].as_u64(), ev["withdrawn"].as_u64()), (Some(1), Some(1)));
+    assert!(!w.open.contains_key("mail"), "no hub started to read it");
+}
+
+/// The running screen (architect m_38378): `processes_all {on}` holds
+/// every hub that runs and asks each for its watched list, never starts a
+/// stopped one; `off`, or its lease run out (a window closed without a
+/// word), lets them go.
+#[test]
+fn the_running_screen_holds_the_running_hubs_only_and_never_past_its_lease() {
+    let mut t = T::new();
+    t.ready();
+    // mail's hub runs, shop's doesn't
+    let mut w = world_running(&mut t, &["mail"]);
+    typed(&mut t, json!({"cmd": "shown", "projects": []}));
+    w.opened(&mut t, &["home"]);
+    w.welcome(&mut t, "home");
+    typed(&mut t, json!({"cmd": "processes_all", "on": true}));
+    assert_eq!(w.end("home").next(), json!({"cmd": "processes", "project": "home", "watch": true}), "a welcomed hub is asked at once");
+    w.opened(&mut t, &["mail"]);
+    w.welcome(&mut t, "mail");
+    assert_eq!(w.end("mail").next(), json!({"cmd": "processes", "project": "mail", "watch": true}), "a hub held for it is asked at its welcome");
+    w.until(&mut t, |_| true);
+    assert!(!w.open.contains_key("shop"), "a stopped hub is never started for the list");
+    // left: mail is let go, home told to stop watching (and kept: bise's own)
+    typed(&mut t, json!({"cmd": "processes_all", "on": false}));
+    assert_eq!(w.end("home").next(), json!({"cmd": "processes", "project": "home", "watch": false}));
+    let mut l = String::new();
+    assert_eq!(w.end("mail").r.read_line(&mut l).unwrap(), 0, "mail let go: {l}");
+    // shown again, then the window says nothing more: the lease runs out
+    w.open.remove("mail");
+    typed(&mut t, json!({"cmd": "processes_all", "on": true}));
+    assert_eq!(w.end("home").next(), json!({"cmd": "processes", "project": "home", "watch": true}));
+    w.opened(&mut t, &["mail"]);
+    t.core.tick(Instant::now() + crate::ambient::core::LISTS_LEASE + Duration::from_secs(1));
+    assert_eq!(w.end("home").next(), json!({"cmd": "processes", "project": "home", "watch": false}), "the lease ran out");
+    // never welcomed: its initialize, then its end
+    let mut l = String::new();
+    loop {
+        l.clear();
+        match w.end("mail").r.read_line(&mut l) {
+            Ok(0) => break,
+            Ok(_) if l.contains("\"initialize\"") => continue,
+            other => panic!("mail not let go at the lease's end: {other:?} {l}"),
+        }
+    }
+}
+
+/// A process's panel (proc-panel, architect m_47406) holds its own lease on
+/// its project only: the running screen leaving keeps that hub watched,
+/// and the panel's own off (or its lease's end) ends it.
+#[test]
+fn a_process_panel_keeps_its_hub_watched_when_the_screen_leaves() {
+    let mut t = T::new();
+    t.ready();
+    let mut w = world_running(&mut t, &["mail"]);
+    typed(&mut t, json!({"cmd": "shown", "projects": []}));
+    w.opened(&mut t, &["home"]);
+    w.welcome(&mut t, "home");
+    typed(&mut t, json!({"cmd": "processes_all", "on": true}));
+    assert_eq!(w.end("home").next(), json!({"cmd": "processes", "project": "home", "watch": true}));
+    // the panel on one of home's processes: home is watched already, nothing more said
+    typed(&mut t, json!({"cmd": "processes_all", "on": true, "by": "panel:home/perf/bg3", "project": "home"}));
+    // the screen leaves: home stays watched for the panel
+    typed(&mut t, json!({"cmd": "processes_all", "on": false}));
+    typed(&mut t, json!({"cmd": "processes_all", "on": false, "by": "panel:home/perf/bg3"}));
+    assert_eq!(w.end("home").next(), json!({"cmd": "processes", "project": "home", "watch": false}), "only the panel's off ends home's watch");
+    // the panel alone, then its lease runs out
+    typed(&mut t, json!({"cmd": "processes_all", "on": true, "by": "panel:home/perf/bg3", "project": "home"}));
+    assert_eq!(w.end("home").next(), json!({"cmd": "processes", "project": "home", "watch": true}));
+    t.core.tick(Instant::now() + crate::ambient::core::LISTS_LEASE + Duration::from_secs(1));
+    assert_eq!(w.end("home").next(), json!({"cmd": "processes", "project": "home", "watch": false}), "the panel's lease ran out");
 }
 
 #[test]
@@ -486,6 +655,25 @@ fn away_back_sums_up_every_project_since_he_left() {
 }
 
 #[test]
+fn a_held_hubs_pulse_rides_its_row() {
+    // the H1 sidebar (m-projects): a held hub's own hub/pulse replaces its
+    // row's pulse and the rows go again; a project not held keeps its
+    // view.json's (the window reads only the rows)
+    let mut t = T::new();
+    t.ready();
+    let mut w = world(&mut t);
+    typed(&mut t, json!({"cmd": "shown", "projects": ["shop"]}));
+    w.opened(&mut t, &["home", "shop"]);
+    w.welcome(&mut t, "shop");
+    let pulse = json!({"from_ms": 10, "busy_ms": [0, 3600000, 0], "last_ms": 99, "said_at": [98], "news": {"at_ms": 97, "what": {"kind": "landed", "agent": "perf", "sha": "abc", "target": "main"}}});
+    w.end("shop").say(json!({"ev": "pulse", "project": "shop", "pulse": pulse}));
+    w.until(&mut t, |o| o.iter().any(|v| v["ev"] == "projects" && v["projects"][1]["pulse"]["last_ms"] == 99));
+    let p = t.take().into_iter().rfind(|v| v["ev"] == "projects").unwrap();
+    assert_eq!(p["projects"][1]["pulse"], pulse, "held: its hub's own pulse");
+    assert_eq!(p["projects"][2]["pulse"]["last_ms"], 2, "not held: its view.json's");
+}
+
+#[test]
 fn the_rows_carry_the_open_cards_of_every_project() {
     // lead m_8769 (b): bise's "waiting for you" answers an unheld
     // project's cards from its row: a held hub's own cards, else its
@@ -532,6 +720,46 @@ fn a_send_to_a_hub_that_went_away_waits_for_it_then_says_so() {
     let e = t.take().into_iter().find(|v| v["ev"] == "error").expect("an error at the deadline");
     assert_eq!((e["project"].as_str(), e["cmd"].as_str()), (Some("shop"), Some("send")));
     assert!(e["text"].as_str().unwrap().contains("nothing sent"), "{e}");
+}
+
+/// His app-form send (new-project): a hub whose start failed says the
+/// start's cause, never 'try again in a moment', and the next command
+/// starts it again (a project connection starts its hub once only).
+#[test]
+fn a_hub_that_did_not_start_says_why_and_the_next_send_starts_it_again() {
+    let mut t = T::new();
+    t.ready();
+    let mut w = world(&mut t);
+    typed(&mut t, json!({"cmd": "shown", "projects": []}));
+    w.opened(&mut t, &["home"]);
+    let send = json!({"cmd": "send", "project": "mail", "agent": "main", "text": "a Typeform-like app", "mode": "now"});
+    typed(&mut t, send.clone());
+    w.opened(&mut t, &["mail"]);
+    // its initialize read: the core saw it up
+    let mut l = String::new();
+    w.end("mail").r.read_line(&mut l).unwrap();
+    w.open.remove("mail");
+    // client::open's cause for a start that failed
+    let cause = "the hub did not start: can't run /v/root-x/bise: No such file or directory (os error 2) (its log: /h/hub.err)";
+    t.core.project_hub("mail", HubIn::Down(Some(cause.into())));
+    t.core.tick(Instant::now() + START + Duration::from_secs(1));
+    t.out.extend(t.core.take_out());
+    let e = t.take().into_iter().find(|v| v["ev"] == "error").expect("its error at the deadline");
+    assert_eq!(
+        e["text"],
+        "its hub didn't start: can't run /v/root-x/bise: No such file or directory (os error 2) (its log: /h/hub.err). nothing sent."
+    );
+    // he sends again: a new connection, its hub started again, delivered
+    typed(&mut t, send.clone());
+    w.opened(&mut t, &["mail"]);
+    w.welcome(&mut t, "mail");
+    assert_eq!(w.end("mail").next(), send);
+}
+
+#[test]
+fn a_late_command_without_a_cause_says_how_long_it_waited() {
+    assert_eq!(crate::ambient::core::not_started(None), format!("its hub didn't start in {} s: nothing sent.", START.as_secs()));
+    assert_eq!(crate::ambient::core::not_started(Some("bise couldn't install its runtime: no /v/x/bise. reinstall bise")), "its hub didn't start: bise couldn't install its runtime: no /v/x/bise. reinstall bise. nothing sent.");
 }
 
 /// Law (bar N14/L8, architect m_10930): fn's words answer the card in view
@@ -662,6 +890,7 @@ fn the_index_lists_the_projects_not_held_from_their_files_only() {
     assert_eq!(rows.iter().map(|r| r["project"].as_str().unwrap()).collect::<Vec<_>>(), ["docs", "mail"], "held home and shop are never in it: {ix}");
     assert_eq!((rows[0]["up"].as_bool(), rows[0]["written_ms"].as_u64()), (Some(false), Some(1)), "docs: its view, as of when, its hub not up");
     assert_eq!((rows[0]["scheduled"][0]["id"].as_u64(), rows[0]["scheduled"][0]["every"].as_str()), (Some(7), Some("every day 07:30")), "docs: its scheduled tasks from its view");
+    assert_eq!((rows[0]["growth"]["jobs_done"].as_u64(), rows[1].get("growth")), (Some(4), None), "docs: its growth from its view; mail: none");
     assert_eq!((rows[1]["up"].as_bool(), rows[1].get("written_ms")), (Some(false), None), "mail: no view yet");
     let mut open: Vec<&String> = w.open.keys().collect();
     open.sort();
@@ -718,9 +947,9 @@ fn a_model_whose_provider_has_no_key_waits_for_its_setup() {
     assert!(first(&t.take()).is_some());
     // the key works: the newest line reaches the hub, once
     ready(&["anthropic", "openrouter"]);
-    t.cmd(Cmd::parse(&json!({"cmd": "key_set", "id": "openrouter", "key": "sk-or-1"}).to_string()).unwrap());
+    t.cmd(Cmd::parse(&json!({"cmd": "setup_check"}).to_string()).unwrap());
     assert_eq!(w.end("shop").next(), model(6, "openrouter/x-ai/grok-4"));
-    t.cmd(Cmd::parse(&json!({"cmd": "key_set", "id": "openrouter", "key": "sk-or-2"}).to_string()).unwrap());
+    t.cmd(Cmd::parse(&json!({"cmd": "setup_check"}).to_string()).unwrap());
     let hi = json!({"cmd": "send", "project": "shop", "agent": "main", "text": "hi", "mode": "now"});
     typed(&mut t, hi.clone());
     assert_eq!(w.end("shop").next(), hi, "the held line went once");
@@ -731,7 +960,7 @@ fn a_model_whose_provider_has_no_key_waits_for_its_setup() {
     assert!(first(&t.take()).is_some());
     t.cmd(Cmd::parse(r#"{"cmd":"setup_first_cancel"}"#).unwrap());
     ready(&["anthropic", "openrouter"]);
-    t.cmd(Cmd::parse(&json!({"cmd": "key_set", "id": "openrouter", "key": "sk-or-3"}).to_string()).unwrap());
+    t.cmd(Cmd::parse(&json!({"cmd": "setup_check"}).to_string()).unwrap());
     typed(&mut t, hi.clone());
     assert_eq!(w.end("shop").next(), hi, "a cancelled line never runs");
     // a ready provider: straight to the hub, no setup_first
@@ -756,4 +985,111 @@ fn a_picked_file_is_remembered_for_its_project() {
     // shop's root has no index here (never searched): a no-op, no error
     typed(&mut t, json!({"cmd": "file_picked", "project": "shop", "path": "src/b.rs"}));
     assert!(!t.take().iter().any(|v| v["ev"] == "error"));
+}
+
+/// architect m_23524 (inbox-fix): the app's `hub/<tag>` request is
+/// answered once, with its hub's own response: card/answer's result as is,
+/// a refusal to that very request with the hub's words, the core's own
+/// refusal at once, and an error when the hub goes before it answered.
+#[test]
+fn an_app_request_is_answered_with_its_hubs_own_response() {
+    use bise_proto::rpc::{Id, Response};
+    let mut t = T::new();
+    t.ready();
+    let mut w = world(&mut t);
+    typed(&mut t, json!({"cmd": "shown", "projects": ["shop"]}));
+    w.opened(&mut t, &["home", "shop"]);
+    w.welcome(&mut t, "shop");
+    t.take();
+    let ask = |t: &mut T, v: Value, id: u64| t.core.request(Cmd::parse(&v.to_string()).unwrap(), Id::Num(id), Instant::now());
+    let replies = |w: &mut World, t: &mut T| -> Vec<Response> {
+        let t0 = Instant::now();
+        loop {
+            w.until(t, |_| true);
+            let r = t.core.take_replies();
+            if !r.is_empty() {
+                return r;
+            }
+            assert!(t0.elapsed() < Duration::from_secs(3), "no reply");
+            std::thread::sleep(Duration::from_millis(5));
+        }
+    };
+    // his answer: nothing until its hub said, then its AnswerResult as is
+    ask(&mut t, json!({"cmd": "answer", "project": "shop", "card": 7, "reply": "1"}), 41);
+    assert!(t.core.take_replies().is_empty(), "never {{}} before the hub said");
+    let req = w.end("shop").raw(Duration::from_secs(3)).expect("card/answer written");
+    assert_eq!(req["method"], "card/answer");
+    let got = json!({"answer": {"agent": "perf", "question": "merge?", "said": "1", "pick": "yes", "notice": "you answered perf"}});
+    w.end("shop").write(json!({"jsonrpc": "2.0", "id": req["id"], "result": got}));
+    assert_eq!(replies(&mut w, &mut t), vec![Response::ok(Id::Num(41), got)]);
+    // a close the hub refuses: that very request gets its words
+    ask(&mut t, json!({"cmd": "close", "project": "shop", "card": 8}), 42);
+    let req = w.end("shop").raw(Duration::from_secs(3)).expect("card/close written");
+    w.end("shop").write(json!({"jsonrpc": "2.0", "id": req["id"], "error": {"code": bise_proto::rpc::code::HUB_REFUSED, "message": "no card 8 here"}}));
+    let r = replies(&mut w, &mut t);
+    assert_eq!((r[0].id.clone(), r[0].error.as_ref().map(|e| e.message.clone())), (Some(Id::Num(42)), Some("no card 8 here".into())));
+    // the core refuses it itself: at once, with its words
+    ask(&mut t, json!({"cmd": "answer", "project": "nowhere", "card": 1, "reply": "1"}), 43);
+    let r = t.core.take_replies();
+    assert_eq!((r[0].id.clone(), r[0].error.as_ref().map(|e| e.message.clone())), (Some(Id::Num(43)), Some("there's no project nowhere".into())));
+    // its hub goes before it answered: an error, never silence
+    ask(&mut t, json!({"cmd": "answer", "project": "shop", "card": 9, "reply": "2"}), 44);
+    w.end("shop").raw(Duration::from_secs(3)).expect("written");
+    w.end("shop").w.shutdown(std::net::Shutdown::Both).unwrap();
+    let r = replies(&mut w, &mut t);
+    assert_eq!(r[0].id, Some(Id::Num(44)));
+    assert!(r[0].error.as_ref().is_some_and(|e| e.message.contains("went away")), "{r:?}");
+    // a subscription the core keeps for a hub not welcomed yet: `{}` at once
+    ask(&mut t, json!({"cmd": "subscribe", "project": "shop", "agent": "perf"}), 45);
+    assert_eq!(t.core.take_replies(), vec![Response::ok(Id::Num(45), json!({}))]);
+    // a core command (not a hub's): `{}` at once, as before
+    ask(&mut t, json!({"cmd": "quiet", "on": true}), 46);
+    assert_eq!(t.core.take_replies(), vec![Response::ok(Id::Num(46), json!({}))]);
+}
+
+/// hub-older-race (ambient_projects_e2e red on ab4be8a4b): the window
+/// lets shop go (`shown []`) while its hub's notifications are still on
+/// their way to the core, then a send opens a new connection to it.
+/// Those lines of the closed connection, read on the new one before its
+/// `initialize` answered, made it ask `hub/read`: written first on the
+/// socket, the hub answered `does not serve the op ""` and the core said
+/// shop's hub is older than this bise. Now nothing but `initialize` goes
+/// first, and the send reaches shop at its welcome.
+#[test]
+fn a_new_connection_never_reads_the_lines_of_the_one_before() {
+    let mut t = T::new();
+    t.ready();
+    let mut w = world(&mut t);
+    typed(&mut t, json!({"cmd": "shown", "projects": ["shop"]}));
+    w.opened(&mut t, &["home", "shop"]);
+    w.welcome(&mut t, "shop");
+    // a hub-wide notification of the first connection, read by its
+    // reader thread but not by the core yet
+    w.end("shop").say(json!({"ev": "agents", "project": "shop", "agents": [
+        {"name": "main", "main": true, "status": "idle", "archived": false, "title": "", "purpose": "", "since_ms": 1, "waits": 0}]}));
+    let stale = loop {
+        let (id, h) = w.rx.recv_timeout(Duration::from_secs(3)).expect("the reader read it");
+        if id == "shop" && matches!(h, HubIn::Line(_)) {
+            break h;
+        }
+        t.core.project_hub(&id, h);
+    };
+    // the window lets it go, then sends to it: a new connection
+    typed(&mut t, json!({"cmd": "shown", "projects": []}));
+    let hi = json!({"cmd": "send", "project": "shop", "agent": "main", "text": "while not shown", "mode": "now"});
+    typed(&mut t, hi.clone());
+    let (id, end) = w.ends.recv_timeout(Duration::from_secs(3)).expect("a new connection to shop");
+    assert_eq!(id, "shop");
+    w.open.insert(id, end);
+    // the closed connection's line comes in before the new one's Up
+    t.core.project_hub("shop", stale);
+    w.until(&mut t, |_| true);
+    let first = w.end("shop").raw(Duration::from_secs(3)).expect("the core's first line");
+    assert_eq!(first["method"], "initialize", "initialize first on a new connection, nothing before it: {first}");
+    w.end("shop").take(first);
+    let before = t.take();
+    w.welcome(&mut t, "shop");
+    assert_eq!(w.end("shop").next(), hi, "the send reached shop at its welcome");
+    let out: Vec<Value> = before.into_iter().chain(t.take()).collect();
+    assert!(!out.iter().any(|v| v["kind"] == "hub_older" || v["ev"] == "hub_refused"), "never 'older' for a hub that is not: {out:#?}");
 }

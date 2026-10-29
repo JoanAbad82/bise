@@ -26,6 +26,9 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import e2e  # noqa: E402
 import wait  # noqa: E402
 from tui_tmux import tui_session, run, wait_until  # noqa: E402
+from words import w  # noqa: E402
+
+THEME_KEYS = w("settings.first_theme_keys", arrows="←→", enter="enter")
 
 NORMAL = "   @ file   "  # the key bar (BISE-98/99; `ctrl+1 inbox` may come before it, BISE-248)
 
@@ -50,7 +53,7 @@ def env(state_root, home):
     return "BISE_HOME=%s HOME=%s BISE_CTRL_DIGITS=1 %s" % (state_root, home, blank)
 
 
-DEMO = "show me what you can do"
+DEMO = w("composer.demo")
 TRY = 'try: "%s"' % DEMO
 READY = "⏎ try it · or just type your own"
 
@@ -104,7 +107,7 @@ def main():
         # the fake env has MISTRAL_API_KEY: no key step, three dots
         welcome = ["hi, i'm bise :*", "bise /beez/ · french, n.", "1. a quick kiss on the cheek :*",
                    "2. a brisk north wind", "3. a terminal where multi-agent coding is painless",
-                   "ideas in. little kisses out. also pull requests.", "● ○ ○"]
+                   w("settings.first_tagline"), "● ○ ○"]
         # typed one letter at a time: the whole welcome drawn
         sc = t.wait_any([lambda s: all(w in flat(s) for w in welcome)], 10)[1]
         for s in welcome:
@@ -120,12 +123,12 @@ def main():
         # (rushed) and the screen says nothing of it: one more key then
         t.keys("Space")
         try:
-            sc = t.wait("←→ switch · enter keep", 3)
+            sc = t.wait(THEME_KEYS, 3)
         except AssertionError:
             t.keys("Space")
-            sc = t.wait("←→ switch · enter keep")
-        for s in ["so i picked dark.", "you can change it any time with /theme.", "fix the flaky login test",
-                  "on it: auth-fix takes it.", "auth-fix is done.", "○ ● ○"]:
+            sc = t.wait(THEME_KEYS)
+        for s in ["so i picked dark.", w("settings.first_theme_note"), w("settings.first_preview_you"),
+                  w("settings.first_preview_main"), w("settings.first_preview_done"), "○ ● ○"]:
             assert s in flat(sc), sc
         shot("2-theme", sc)
         dark = t.screen(colors=True)
@@ -136,10 +139,10 @@ def main():
         # no folder step)
         t.keys("Enter")
         sc = t.wait("any key ↵")
-        for s in ["how it works", "1  you talk to me: main, your team lead. any time, keep typing",
+        for s in [w("settings.first_how"), "1  you talk to me: main, your team lead. any time, keep typing",
                   "2  i start an agent when a job needs one. they sync on their own",
                   "3  only the real decisions reach you, in your inbox · ctrl+1",
-                  "ctrl+o opens everything folded", "○ ○ ●"]:
+                  w("composer.tip_fold"), "○ ○ ●"]:
             assert s in flat(sc), sc
         assert "which model should do the work?" not in sc and "i'll work in" not in sc, sc
         shot("3-how-it-works", sc)
@@ -155,7 +158,7 @@ def main():
         sc = t.wait(TRY)
         assert composer_holds(sc, "h") and READY not in sc, sc
         t.keys("BSpace")
-        wait_until(lambda: composer_holds(t.screen(), "what's on your mind?"), 10,
+        wait_until(lambda: composer_holds(t.screen(), w("composer.placeholder_main")), 10,
                    lambda: "the placeholder: empty\n" + t.screen())
         sc = t.screen()
         # a click on the suggestion fills the composer, sends nothing
@@ -173,7 +176,7 @@ def main():
         # first one, so the first-item hint teaches the inbox (BISE-248)
         sc = t.wait("can i set bise up", 30)
         sc = t.wait("this is your inbox.")
-        assert "2 not now" not in sc and "what's on your mind?" in sc, sc
+        assert "2 not now" not in sc and w("composer.placeholder_main") in sc, sc
         shot("7-setup-card", sc)
         t.typed("\x1b[49;5u")             # ctrl+1 (the kitty form) opens it in place (BISE-302)
         sc = t.wait("1-2 answer")

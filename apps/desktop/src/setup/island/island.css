@@ -1,0 +1,10 @@
+/* the first launch's island (Island.tsx): the canvas fills its box; the bubble over his bim, the
+   pins under the little islands, the world's own shadows (tokens.css --sh-world). ds tokens only. */
+.setup-island { position: relative; width: 100%; height: 100%; min-height: 0; }
+.setup-island-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+/* a speech bubble: the window's ground, a hairline, the world's shadow; its tail under its left third */
+.setup-island-bubble { position: absolute; transform: translate(-28%, calc(-100% - var(--s-3))); max-width: 320px; padding: var(--s-2) var(--s-3); border-radius: var(--r-4); background: var(--c-solid); color: var(--c-text); font: var(--t-14)/var(--lh-ui) var(--font-ui); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; box-shadow: var(--sh-world), 0 0 0 1px var(--c-line); pointer-events: none; animation: setup-island-pop var(--d-slow) var(--ease-pop) both; transform-origin: 28% 100%; }
+.setup-island-pin { position: absolute; transform: translate(-50%, var(--s-2)); height: var(--h-kbd); display: inline-flex; align-items: center; padding: 0 var(--s-2); border-radius: var(--r-pill); background: var(--c-ink); color: var(--c-on-ink); font: 500 var(--t-12) var(--font-ui); white-space: nowrap; box-shadow: var(--sh-world); pointer-events: none; animation: setup-island-fade var(--d-base) var(--ease-out) both; }
+@keyframes setup-island-pop { from { opacity: 0; scale: .6; } to { opacity: 1; scale: 1; } }
+@keyframes setup-island-fade { from { opacity: 0; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .setup-island-bubble, .setup-island-pin { animation: none; } }

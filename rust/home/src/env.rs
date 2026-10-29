@@ -20,7 +20,10 @@
 //! ([`crate::Home::exports`], with their stamp), plus what the child needs.
 //! Names not in the table (`PATH`, proxies, locale, API keys, the Bend
 //! runtime's own `BEND_*` knobs) always pass. A unit test fails when a Rust
-//! source names a bise variable that is not in [`VARS`].
+//! source names a bise variable that is not in [`VARS`]. The desktop app
+//! starts its children (the core, `bise pty`) with the same rule from a
+//! generated copy of the internal and test names
+//! (`apps/desktop/src/main/env_vars.gen.ts`, pinned by a test here).
 //!
 //! Not covered: the Bend runtime's own children. An agent's bash commands
 //! inherit its REPL's environment as the hub built it (that is how `sb`
@@ -49,17 +52,43 @@ pub struct Var {
     pub kind: Kind,
     /// What it is, in one line.
     pub what: &'static str,
+    /// A test setting that is an input of the cargo test run itself (a
+    /// bench file, the sb-core the tests run), never a place: the test
+    /// home (`test_home::enter`) keeps it, where it unsets the others.
+    pub kept_in_tests: bool,
+    /// A test setting of the voice fake that the desktop app also hands
+    /// its core in an off-screen run outside test mode (childenv.ts, read
+    /// from env_vars.gen.ts), never its terminal shells: so a packed app
+    /// checked off-screen can dictate with the fake voice. The core's own
+    /// rule stays the guard (`voice_of`: --offscreen and an isolated home,
+    /// never the real mic). architect m_22561.
+    pub offscreen_core: bool,
 }
 
 const fn user(name: &'static str, what: &'static str) -> Var {
-    Var { name, kind: Kind::User, what }
+    Var { name, kind: Kind::User, what, kept_in_tests: false, offscreen_core: false }
 }
 const fn internal(name: &'static str, what: &'static str) -> Var {
-    Var { name, kind: Kind::Internal, what }
+    Var { name, kind: Kind::Internal, what, kept_in_tests: false, offscreen_core: false }
 }
 const fn test(name: &'static str, what: &'static str) -> Var {
-    Var { name, kind: Kind::Test, what }
+    Var { name, kind: Kind::Test, what, kept_in_tests: false, offscreen_core: false }
 }
+/// A test setting the test home keeps ([`Var::kept_in_tests`]).
+const fn test_input(name: &'static str, what: &'static str) -> Var {
+    Var { name, kind: Kind::Test, what, kept_in_tests: true, offscreen_core: false }
+}
+/// A voice-fake test setting an off-screen app's core gets ([`Var::offscreen_core`]).
+const fn test_offscreen_core(name: &'static str, what: &'static str) -> Var {
+    Var { name, kind: Kind::Test, what, kept_in_tests: false, offscreen_core: true }
+}
+
+/// The names, not bise's, that the hub sets per agent in its REPL's
+/// environment (its temp folder, switchboard's `tools_env::temp_env`):
+/// the one list of them. They differ from agent to agent and configure
+/// no MCP server, so the plugins' tools cache leaves them out of its key
+/// (bend_plugins::tools_cache).
+pub const PER_CHILD_NAMES: &[&str] = &["TMPDIR", "TMP", "TEMP", "TMUX_TMPDIR"];
 
 /// Every bise variable, sorted by name.
 pub const VARS: &[Var] = &[
@@ -78,10 +107,11 @@ pub const VARS: &[Var] = &[
     internal("BEND_HARNESS_BIN", "the bise binary a REPL starts its plugins bridge with"),
     user("BEND_IMAGE_DIR", "the image store (a Home path)"),
     test("BEND_JSRT_BIN", "the run_typescript engine bise gives its REPLs (the app root's; a test names one when its tree has none)"),
-    user("BEND_MCP_INDEX", "the MCP connector index (a Home path)"),
     user("BEND_MCP_SECRETS", "the MCP OAuth secrets folder"),
     user("BEND_MCP_STATUS", "the MCP status folder"),
+    user("BEND_MEM_LIMIT_MB", "an agent's bash command is killed past this RAM per process (read by the Bend runtime; 0 = no limit)"),
     user("BEND_MODEL", "the model (after BISE_MODEL; `bise --model` sets it)"),
+    user("BEND_OUT_LIMIT_MB", "an agent's bash command is stopped when its own output passes this (read by the Bend runtime; default 2048, 0 = no limit)"),
     user("BEND_PLUGINS_DATA", "the plugins' data (a Home path)"),
     user("BEND_PLUGINS_HOME", "the user's plugins folder (~/.agents/plugins)"),
     user("BEND_PLUGINS_STATE", "the plugins' enable state (a Home path)"),
@@ -90,14 +120,13 @@ pub const VARS: &[Var] = &[
     user("BEND_RUN_DIR", "per-session side channels (a Home path)"),
     user("BEND_SESSIONS_DIR", "the session logs (a Home path)"),
     internal("BEND_SESSION_FILE", "a REPL's session file"),
-    user("BEND_SKILLS_INDEX", "the skills index (a Home path)"),
     user("BEND_THRESHOLD", "when the conversations compact"),
     internal("BEND_TOOLS_NOTE", "whether rg and git are there, told to a REPL once"),
-    internal("BEND_WIRE_DUMP", "a REPL writes each request body there (BISE_DEBUG_REQUESTS)"),
+    internal("BEND_WIRE_DUMP", "the folder of a REPL's request ring (/debug completion)"),
     internal("BEND_WIRE_LOG", "a REPL's event log, read by the hub"),
     internal("BEND_WORKDIR", "an agent's working directory"),
     user("BISE_AGENT_MODEL", "the agents' model"),
-    test("BISE_AMBIENT_FAKE_VOICE", "the ambient core's fake voice: a file of words read at talk_start (harness A, ambient-qa)"),
+    test_offscreen_core("BISE_AMBIENT_FAKE_VOICE", "the ambient core's fake voice: a file of words read at talk_start (harness A, ambient-qa)"),
     user("BISE_APPROVALS", "the approvals mode of this session"),
     internal("BISE_APP_ROOT", "the app root of the hub a TUI or a version switch starts"),
     user("BISE_ASCII", "ASCII-only drawing"),
@@ -111,11 +140,11 @@ pub const VARS: &[Var] = &[
     user("BISE_CTRL_HINTS", "the ctrl key hints"),
     test("BISE_CU_EXTENSION", "the computer-use extension's folder (tests)"),
     test("BISE_CU_HELPER", "the computer-use helper app (tests)"),
-    user("BISE_DEBUG_REQUESTS", "the hub's REPLs dump each request body"),
-    internal("BISE_DESKTOP", "1 when the desktop's rules are on for an agent (projects::desktop_on at its start): its skills scan reads prompts/skills-all"),
     test("BISE_DETECT_KEYCHAIN", "the keychain probe's knob (tests)"),
     user("BISE_DEV", "/log outside the dev build"),
     user("BISE_DIST_URL", "the release channel's download URL"),
+    test("BISE_DIST_URL_DESKTOP", "the desktop app's release channel, where its desktop.json is (tests; the core reads it, so never a BISE_DESKTOP_ name: the app keeps those)"),
+    test("BISE_DIST_URL_DESKTOP_BETA", "the desktop app's beta channel, where its desktop.json is (tests; as BISE_DIST_URL_DESKTOP)"),
     user("BISE_EDITOR", "the editor a file link opens"),
     internal("BISE_EXPORTS_FOR", "the stamp of the exported Home paths"),
     test("BISE_GITHUB_API", "the GitHub API base (tests: a stub server)"),
@@ -126,26 +155,32 @@ pub const VARS: &[Var] = &[
     test("BISE_HOME_WORKSPACE", "bise's home workspace (tests); a hub passes it to its agents"),
     user("BISE_HYPERLINKS", "terminal hyperlinks on or off"),
     user("BISE_IDLE_EXIT", "how long a hub without a UI waits before it quits"),
+    test("BISE_MISTRAL_URL", "Mistral's API base for the connectors' catalog and connect (a fake Mistral in tests)"),
     user("BISE_MODEL", "the main model"),
     internal("BISE_MODELS_FILE", "the merged model catalog, for the REPLs"),
-    user("BISE_NO_MIGRATE", "never move ~/.bend-harness to ~/.bise"),
     user("BISE_NO_UPDATE", "no background update check"),
     internal("BISE_ONESHOT", "a one-shot provider call's request file, for repl-live"),
     user("BISE_OPEN", "the program a link opens with"),
     test("BISE_OPENROUTER_AUTH", "where OpenRouter's login is (tests)"),
+    test("BISE_OPEN_RECORD", "a file the TUI appends `preview <path>` / `reveal <path>` to instead of opening a chip's file (tests)"),
     user("BISE_OPTION_DIGITS", "read Option+digit characters as ⌥0-9 (1) or never (0), over the keyboard layout"),
     internal("BISE_OWNERS", "the agents a process belongs to (BISE-243)"),
     internal("BISE_PAGES_EXPORT", "the public pages' export folder, for the mirror command the hub runs (pages/mirror.rs)"),
     user("BISE_POINTER", "mouse pointer shapes on or off"),
-    test("BISE_PROTO_BLESS", "bise-proto's ts test rewrites apps/desktop/src/proto instead of failing on stale files"),
+    user("BISE_PREFIX", "where bise is installed (install.sh's prefix; the desktop app installs its runtime there)"),
+    test("BISE_PROBATION_SECS", "a version switch's probation, 120 s (tests)"),
+    test_input("BISE_PROTO_BLESS", "the generated TS tests (bise-proto's ts test, bise_home's env table) rewrite their files in apps/desktop instead of failing on stale ones"),
     user("BISE_RECYCLE_TOKENS", "context tokens an agent's REPL reads before the hub restarts it at idle (0: never)"),
     user("BISE_REDUCE_MOTION", "fewer animations"),
     test("BISE_RELEASE_CHECK_SECS", "how often the hub checks for a release (tests)"),
+    test("BISE_RELEASE_LOOK_SECS", "how often a hub reads the machine's release offer, 30 s (tests)"),
     test("BISE_RELEASE_SCRIPT", "the release script the hub runs (tests)"),
+    internal("BISE_RENDER", "repl-live's render mode: the .wire of a ring slot to make another provider's request body of (/debug completion <provider>, no call)"),
+    internal("BISE_RENDER_OUT", "where repl-live's render mode writes the body it made"),
     internal("BISE_ROLE", "main or agent, for a REPL's model"),
-    user("BISE_ROUTE_MODEL", "the model that picks a project for unclear words to bise (unset: no pick, they stay with bise)"),
     user("BISE_SANDBOX", "0: no sandbox for the agents' commands"),
     internal("BISE_SESSION_CHOICE", "an agent's own model and effort file"),
+    internal("BISE_SKILL_ROOTS", "an agent's skill folders, one <scope>=<dir> per line, set by the hub for its REPL's bridge (bend_plugins::skills::Root)"),
     user("BISE_SMALL_MODEL", "the small model"),
     user("BISE_SOUNDS_DIR", "where the voice sounds are written (a dev command)"),
     user("BISE_SOUNDS_LINE", "the voice sounds' line WAV (a dev command)"),
@@ -160,26 +195,30 @@ pub const VARS: &[Var] = &[
     user("BISE_VOICE_BARGE", "1: your voice may cut the reply"),
     user("BISE_VOICE_DEBUG", "the voice mode's debug log"),
     test("BISE_VOICE_FAKE", "the voice mode's fake (tests)"),
-    test("BISE_VOICE_FAKE_HEARD", "what the voice fake hears (tests)"),
+    test_offscreen_core("BISE_VOICE_FAKE_HEARD", "what the voice fake hears (tests)"),
+    test_offscreen_core("BISE_VOICE_FAKE_HEARD_MS", "how long the ambient core's fake listener takes to flush, a batch request's time (the dictation repro)"),
     user("BISE_VOICE_MODEL", "the voice model"),
     internal("SB_AGENT", "an agent's name, for its sb"),
-    test("SB_BENCH_JOURNAL", "a journal to bench (an ignored test)"),
-    test("SB_BENCH_LINES", "the transcript bench's line count"),
-    test("SB_BENCH_TRANSCRIPT", "a transcript to bench (an ignored test)"),
+    test_input("SB_BENCH_JOURNAL", "a journal to bench (an ignored test)"),
+    test_input("SB_BENCH_LINES", "the transcript bench's line count"),
+    test_input("SB_BENCH_TRANSCRIPT", "a transcript to bench (an ignored test)"),
     user("SB_BUILD_DIR", "the versions' build dir (a Home path)"),
-    test("SB_CORE_BIN", "the sb-core of the cargo tests (the gate's cache file)"),
+    test_input("SB_CORE_BIN", "the sb-core of the cargo tests (the gate's cache file)"),
     internal("SB_CORE_PORT", "sb-core's TCP port"),
     test("SB_EVERY_MIN_MS", "the shortest sb every period (tests)"),
     internal("SB_LAUNCH_DIR", "the folder bise was launched from, for the version it re-execs"),
+    test("SB_LOAD_FACTOR", "a file holding the machine's load factor the hub sees, 1 to 8, read each time (tests; switchboard::load)"),
     test("SB_ONBOARDING", "off/on: the onboarding (tests)"),
     internal("SB_PORT_OFFSET", "an agent's dev-server port offset"),
-    test("SB_SEARCH_BENCH", "a folder to bench search on (an ignored test)"),
+    test("SB_PULSE_MS", "the shortest time between two pulse checks, 60 s by default (tests; daemon/pulse.rs)"),
+    test_input("SB_SEARCH_BENCH", "a folder to bench search on (an ignored test)"),
     test("SB_SETUP", "off: no setup card (tests)"),
     test("SB_SLOW_SPAWN", "a file holding the ms each REPL start waits before its spawn (tests)"),
     internal("SB_SOCKET", "the hub's agent.sock, for an agent's sb (never hub.sock, docs/issues/16)"),
     test("SB_STALL_START", "a file that stalls the hub's start once (tests)"),
+    test("SB_START_STILL_MS", "a REPL start's no-progress limit on an idle machine, ms (tests; switchboard::repl_start)"),
     test("SB_STATE_DIR", "the hub's state folder (tests)"),
-    test("SB_STT_WAV", "a WAV for the real speech-to-text test (ignored)"),
+    test_input("SB_STT_WAV", "a WAV for the real speech-to-text test (ignored)"),
     internal("SB_TASK", "an agent's name, for its dev servers"),
     user("SB_TIMING", "a file for start-up timing marks"),
     user("SB_VERSIONS_DIR", "the built versions (a Home path)"),
@@ -190,6 +229,11 @@ pub const VARS: &[Var] = &[
 /// The kind of a registered name, None for another name.
 pub fn kind(name: &str) -> Option<Kind> {
     VARS.iter().find(|v| v.name == name).map(|v| v.kind)
+}
+
+/// Whether the test home keeps `name` ([`Var::kept_in_tests`]).
+pub fn kept_in_tests(name: &str) -> bool {
+    VARS.iter().any(|v| v.name == name && v.kept_in_tests)
 }
 
 /// A test setting from this process's environment (empty = unset): the
@@ -211,6 +255,9 @@ pub enum Child {
     /// His own shell (the desktop's terminal panel, `bise pty`): his
     /// settings only, nothing of bise's internals or of a test run.
     Shell,
+    /// bend-jsrt's script mode (`bise office run`): his settings only,
+    /// like his shell; its scope comes as arguments, never from here.
+    Script,
 }
 
 /// The test settings a hub never gets: `SB_CORE_BIN` is the cargo tests'

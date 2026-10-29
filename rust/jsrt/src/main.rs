@@ -12,8 +12,14 @@
 //     tool and re-runs with the extended results — replay by
 //     re-execution, the same durable-boundary semantics as the in-house
 //     interpreter
+//   - a recorded failure ({"error": text}) rejects that call's promise
+//     with a ToolError: the program can catch it and go on; uncaught, it
+//     fails the program with "program call failed: <text>"
 //   - the final value prints to stdout and exits 0; errors go to stderr
 //     and exit 1 so the model can read them and retry
+//
+// `bend-jsrt script|inspect|check ...` is the script mode of `bise office
+// run` (script.rs, door.rs): another engine setup, never this one's.
 
 use std::sync::mpsc;
 use std::sync::Once;
@@ -28,6 +34,9 @@ use deno_ast::TranspileModuleOptions;
 use deno_ast::TranspileOptions;
 use deno_ast::parse_program;
 use deno_core::v8;
+
+mod door;
+mod script;
 
 static INITIALIZE_V8: Once = Once::new();
 const INITIAL_HEAP_BYTES: usize = 4 * 1024 * 1024;
@@ -56,13 +65,24 @@ fn transpile(code: &str) -> Result<String, String> {
         .map_err(|error| error.to_string())
 }
 
+// a recorded result is the tool's text (a string), or {error: text} for a
+// call that failed: that call's promise rejects with a ToolError carrying
+// the whole text, so try/catch and Promise.allSettled see it and the
+// program goes on. The failure is in the results file: every re-run
+// rejects the same way at the same position (replay stays by position).
 const PRELUDE: &str = r#"
 const __RESULTS = __RESULTS_PLACEHOLDER__;
 let __i = 0;
+class ToolError extends Error {
+  constructor(tool, message) { super(message); this.name = 'ToolError'; this.tool = tool; }
+}
 function __tool(name, args) {
   if (name.startsWith('tools.')) name = name.slice(6);
   if (__i < __RESULTS.length) {
     const r = __RESULTS[__i]; __i++;
+    if (r !== null && typeof r === 'object' && typeof r.error === 'string') {
+      return Promise.reject(new ToolError(name, r.error));
+    }
     try { return JSON.parse(r); } catch (e) { return r; }
   }
   const payload = args === undefined || args === null
@@ -132,7 +152,9 @@ const __finish = (p) => Promise.resolve(p).then(
   (v) => __done(typeof v === 'string' ? v
     : (Array.isArray(v) && v.length > 0 && v.every(__isBlock)) ? __blocks(v)
     : JSON.stringify(v === undefined ? '' : v)),
-  (e) => __fail(JSON.stringify(String((e && e.message) || e)))
+  (e) => __fail(JSON.stringify(e instanceof ToolError
+    ? 'program call failed: ' + e.message
+    : String((e && e.message) || e)))
 );
 __COMPUTER_SDK__
 const __out = (async function () {
@@ -173,7 +195,7 @@ const COMPUTER_TS: &str = include_str!("computer.ts");
 fn computer_loaded() -> bool {
     let var = |k: &str| std::env::var(k).ok().filter(|v| !v.is_empty());
     let run = var("BEND_RUN_DIR")
-        .or_else(|| var("HOME").map(|h| format!("{h}/.bend-harness/run")))
+        .or_else(|| var("HOME").map(|h| format!("{h}/.bise/run")))
         .unwrap_or_default();
     let port = var("BEND_REPL_PORT").unwrap_or_else(|| "0".to_string());
     let index = std::fs::read_to_string(format!("{run}/{port}/plugins/mcp-index.txt")).unwrap_or_default();
@@ -409,11 +431,7 @@ fn run(program: &str, results: &str) -> ! {
         EPILOGUE
     );
 
-    INITIALIZE_V8.call_once(|| {
-        let platform = v8::new_default_platform(0, false).make_shared();
-        v8::V8::initialize_platform(platform);
-        v8::V8::initialize();
-    });
+    init_v8();
 
     let params = v8::CreateParams::default().heap_limits(INITIAL_HEAP_BYTES, MAX_HEAP_BYTES);
     let mut isolate = v8::Isolate::new(params);
@@ -479,8 +497,20 @@ fn run(program: &str, results: &str) -> ! {
     fail("the program ended without returning");
 }
 
+/// V8 once per process, for either mode.
+pub(crate) fn init_v8() {
+    INITIALIZE_V8.call_once(|| {
+        let platform = v8::new_default_platform(0, false).make_shared();
+        v8::V8::initialize_platform(platform);
+        v8::V8::initialize();
+    });
+}
+
 fn main() {
     let args: Vec<String> = std::env::args().collect();
+    if matches!(args.get(1).map(String::as_str), Some("script" | "inspect" | "check")) {
+        script::main(&args[1..]);
+    }
     if args.len() != 3 {
         eprintln!("usage: bend-jsrt <program-file> <results-file>");
         std::process::exit(1);

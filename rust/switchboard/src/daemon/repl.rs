@@ -58,11 +58,24 @@ pub(super) fn busy_at(wire: &Path, offset: u64) -> bool {
     for l in text.lines() {
         if l == "--- idle" {
             busy = false;
-        } else if l.trim_start().starts_with("obs: turn_started") {
+        } else if crate::wire::parse(l) == crate::wire::Wire::TurnStarted {
             busy = true;
         }
     }
     busy
+}
+
+/// How a REPL process ended, as a fact for sb-core (hub/stall.bend
+/// decides what it does to the crash count): by SIGTERM, SIGINT or
+/// SIGHUP, someone asked it to stop (the hub's stop, `sb restart`, a
+/// teardown, a `kill`): `Stopped`. Any other end (a crash signal, a
+/// SIGKILL, an exit code) is `Died`.
+pub(super) fn gone_of(status: &std::process::ExitStatus) -> super::repl_starts::Gone {
+    use std::os::unix::process::ExitStatusExt;
+    match status.signal() {
+        Some(libc::SIGTERM | libc::SIGINT | libc::SIGHUP) => super::repl_starts::Gone::Stopped,
+        _ => super::repl_starts::Gone::Died,
+    }
 }
 
 fn err_tail(err_path: &Path) -> String {
@@ -310,12 +323,32 @@ pub(super) fn supervise(
         Err(e) => e.to_string(),
     };
     log_line(&paths, &format!("repl {} exited: {}", dir, reason));
-    gone(reason);
+    let cause = status.as_ref().map_or(super::repl_starts::Gone::Died, gone_of);
+    let _ = tx.send(Msg::ReplGone { dir: dir.clone(), gen, reason, cause });
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// stop-not-crash (m_48183): a TERM, INT or HUP is a request to stop;
+    /// a crash signal, a KILL or an exit code is not.
+    #[test]
+    fn only_term_int_and_hup_are_a_stop() {
+        use super::super::repl_starts::Gone;
+        use std::os::unix::process::ExitStatusExt;
+        // a wait status: the signal in the low 7 bits, an exit code << 8
+        let by = |raw: i32| gone_of(&std::process::ExitStatus::from_raw(raw));
+        for sig in [libc::SIGTERM, libc::SIGINT, libc::SIGHUP] {
+            assert_eq!(by(sig), Gone::Stopped, "signal {sig}");
+        }
+        for sig in [libc::SIGKILL, libc::SIGSEGV, libc::SIGABRT, libc::SIGBUS] {
+            assert_eq!(by(sig), Gone::Died, "signal {sig}");
+        }
+        assert_eq!(by(0), Gone::Died, "exit 0");
+        assert_eq!(by(1 << 8), Gone::Died, "exit 1");
+        assert_eq!(by(143 << 8), Gone::Died, "exit 143 is a code, not a signal");
+    }
 
     #[test]
     fn a_new_repl_does_not_inherit_the_last_crash_line() {

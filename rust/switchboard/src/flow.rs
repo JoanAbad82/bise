@@ -10,6 +10,15 @@
 //!
 //! flow-hub reads it (`sb land`); flow-prompts detects the flow, asks the
 //! one-time question and saves the answer with [`save_mode`].
+//!
+//! That file is per user and per clone (`.gitignore`). What every checkout
+//! shares is tracked: [`TRACKED`], `bise.toml` at the repo's root, read by
+//! the land from main's tip ([`land_check`], issue 28):
+//!
+//! ```toml
+//! [land]
+//! check = "tests/gate.sh land"   # run with <base> <head> before main moves
+//! ```
 
 use crate::paths::Paths;
 use serde::{Deserialize, Serialize};
@@ -83,7 +92,37 @@ fn toml_str(v: &str) -> String {
 }
 
 fn is_flow_header(l: &str) -> bool {
-    l.split('#').next().unwrap_or("").trim() == "[flow]"
+    is_header(l, "[flow]")
+}
+
+fn is_header(l: &str, name: &str) -> bool {
+    l.split('#').next().unwrap_or("").trim() == name
+}
+
+/// The repo's tracked config, at its root: every checkout has it (the
+/// per-user `.switchboard/` is ignored).
+pub const TRACKED: &str = "bise.toml";
+
+/// `[land] check` of the tracked config's `text`: the command a worktree
+/// land runs on the rebased tree, with `<base> <head>` after it (issue
+/// 28). The land reads it from main's tip, never from the branch it
+/// checks. None: no such key, or empty.
+pub fn land_check(text: &str) -> Option<String> {
+    let mut in_land = false;
+    for raw in text.lines() {
+        let l = raw.trim();
+        if l.starts_with('[') {
+            in_land = is_header(l, "[land]");
+            continue;
+        }
+        let Some((k, v)) = l.split_once('=').filter(|_| in_land) else {
+            continue;
+        };
+        if k.trim() == "check" {
+            return Some(toml_str(v)).filter(|s| !s.trim().is_empty());
+        }
+    }
+    None
 }
 
 impl FlowConfig {
@@ -172,13 +211,6 @@ pub fn land_line(agent: &str, commits: usize, target: &str, sha: &str, pushed: O
     format!("✓ {} landed {} commit{} on {} ({}){}", agent, commits, s, target, sha, push)
 }
 
-/// Main's feed line for a refused land (dev-flow §7): `dark-mode can't
-/// land: login.rs changed on main too. it's rebasing.` (`doing`: what
-/// happens now, without its period).
-pub fn land_refused_line(agent: &str, file: &str, doing: &str) -> String {
-    format!("{} can't land: {} changed on main too. {}.", agent, file, doing)
-}
-
 /// Save the flow the user picked (the one-time question, `/flow`).
 pub fn save_mode(paths: &Paths, mode: FlowMode) -> Result<(), String> {
     let p = paths.config();
@@ -194,6 +226,15 @@ pub fn save_mode(paths: &Paths, mode: FlowMode) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_land_check_is_the_land_sections_check() {
+        let t = "# bise.toml\u{a}[flow]\u{a}check = \"no\"\u{a}[land] # the land\u{a}check = \"tests/gate.sh land\"   # base head\u{a}";
+        assert_eq!(land_check(t).as_deref(), Some("tests/gate.sh land"));
+        assert_eq!(land_check("[flow]\u{a}check = \"x\"\u{a}"), None);
+        assert_eq!(land_check("[land]\u{a}check = \"\"\u{a}"), None);
+        assert_eq!(land_check(""), None);
+    }
 
     #[test]
     fn the_flow_keys() {

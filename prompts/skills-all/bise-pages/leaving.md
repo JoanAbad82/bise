@@ -29,7 +29,7 @@ that isn't on the page is never done.
 
 ## Put it in my drafts
 
-A draft doesn't leave, so it needs no card, but it waits for the user's word like anything else
+A draft doesn't leave, so it needs no notification, but it waits for the user's word like anything else
 (their "put it in my drafts", or their `put it in my drafts` / `send` on the block). Then make
 the draft in the user's tool, only for the blocks they approved, and record where it went on the
 block it came from:

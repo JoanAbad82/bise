@@ -188,13 +188,7 @@ fn git(dir: &Path, args: &[&str]) -> Result<String, String> {
     if !dir.is_dir() {
         return Err(format!("git couldn't read this diff: {} is gone", dir.display()));
     }
-    let out = Command::new("git")
-        .arg("-C")
-        .arg(dir)
-        .args(args)
-        .env("GIT_OPTIONAL_LOCKS", "0")
-        .output()
-        .map_err(|e| e.to_string())?;
+    let out = crate::tools_env::git_command()?.arg("-C").arg(dir).args(args).output().map_err(|e| e.to_string())?;
     if out.status.success() {
         Ok(String::from_utf8_lossy(&out.stdout).to_string())
     } else {
@@ -219,11 +213,8 @@ fn untracked(dir: &Path, only: Option<&[String]>) -> Vec<File> {
         if only.is_some_and(|o| !o.iter().any(|x| x == f)) {
             continue;
         }
-        let text = Command::new("git")
-            .arg("-C")
-            .arg(dir)
-            .args(diff_args(&["--no-index", "--", "/dev/null", f]))
-            .output()
+        let text = crate::tools_env::git_command()
+            .and_then(|mut c| c.arg("-C").arg(dir).args(diff_args(&["--no-index", "--", "/dev/null", f])).output().map_err(|e| e.to_string()))
             .map(|o| String::from_utf8_lossy(&o.stdout).to_string())
             .unwrap_or_default();
         for mut file in parse(&text) {

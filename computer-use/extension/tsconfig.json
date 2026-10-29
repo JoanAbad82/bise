@@ -1,0 +1,18 @@
+{
+  "//": "The extension's code (Chrome loads this folder unpacked, as is): the service worker's ES modules (sw.ts, sw/, lib/) and overlay.ts, the classic script chrome.scripting injects. Each .js is emitted next to its .ts by scripts/ts_emit.ts and committed (the release copies the folder, never runs node). build.js stays JS (bise computer-use rewrites it, browsers.rs sync_extension): build.d.ts types it. typescript and @types/chrome are office/sdk's.",
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "moduleDetection": "auto",
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "typeRoots": ["../../office/sdk/node_modules/@types"],
+    "types": ["chrome"],
+    "strict": true,
+    "alwaysStrict": false,
+    "erasableSyntaxOnly": true,
+    "noEmit": true,
+    "skipLibCheck": true
+  },
+  "include": ["*.ts", "sw/*.ts", "lib/*.ts"]
+}

@@ -7,6 +7,7 @@
 use crate::markdown::md_lines;
 use crate::render::{cut_row, hung_rows};
 use crate::theme::*;
+use bise_proto::words::inbox;
 use ratatui::style::{Modifier, Style};
 use ratatui::text::{Line, Span};
 
@@ -141,12 +142,12 @@ pub(crate) fn answered_lines(agent: &str, question: &str, answer: &str, why: &st
     let has_why = !why.trim().is_empty();
     let opens = has_why || !all;
     use unicode_width::UnicodeWidthStr;
-    let asked = format!("{} asked: {}", agent, question_gist(agent, question));
-    let answered = format!("i answered: {}", answer_gist(answer));
+    let asked = inbox::main_asked(agent, question_gist(agent, question));
+    let answered = inbox::main_answered(answer_gist(answer));
     // only the why behind the fold: it says so
     let mark = match (opens, open, all) {
         (false, ..) => String::new(),
-        (true, o, true) => format!(" {} why", glyph(if o { G_OPEN } else { G_CLOSED })),
+        (true, o, true) => format!(" {} {}", glyph(if o { G_OPEN } else { G_CLOSED }), inbox::why_mark),
         (true, o, false) => format!(" {}", glyph(if o { G_OPEN } else { G_CLOSED })),
     };
     let main = Span::styled(format!(" {} ", G_MAIN), Style::default().fg(accent()).add_modifier(Modifier::BOLD));
@@ -157,7 +158,7 @@ pub(crate) fn answered_lines(agent: &str, question: &str, answer: &str, why: &st
     let mut ls = if open && !all {
         // open on the whole words: the gists would repeat them, the head
         // says who alone
-        let head = fit_row(&format!("i answered {}", agent), inner, &mark, text_st, dim_st);
+        let head = fit_row(&inbox::main_answered_who(agent), inner, &mark, text_st, dim_st);
         let mut row = vec![main];
         row.extend(head.spans);
         vec![Line::from(row)]
@@ -195,11 +196,11 @@ pub(crate) fn answered_lines(agent: &str, question: &str, answer: &str, why: &st
         body.extend(rows);
     };
     if !all {
-        part("asked:", without_name(question, agent), &mut body);
-        part("i answered:", without_name(answer, "main"), &mut body);
+        part(inbox::label_asked, without_name(question, agent), &mut body);
+        part(inbox::label_answered, without_name(answer, "main"), &mut body);
     }
     if has_why {
-        part(if all { "" } else { "why:" }, why, &mut body);
+        part(if all { "" } else { inbox::label_why }, why, &mut body);
     }
     let bar = Span::styled(RAIL, Style::default().fg(rule()));
     ls.extend(hung_rows(&bar, &bar, body, width));

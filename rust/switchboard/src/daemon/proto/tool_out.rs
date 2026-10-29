@@ -12,6 +12,9 @@ use std::path::Path;
 
 /// Transcript lines read after the call for its result.
 const AFTER: usize = 2000;
+/// Lines read after a `tool_started` for its call line (the runtime
+/// writes them together; other agents' lines never come between).
+const START_TO_CALL: usize = 8;
 
 /// Where the logs are: the session logs and their blobs.
 pub(super) struct Logs<'a> {
@@ -20,12 +23,20 @@ pub(super) struct Logs<'a> {
 }
 
 /// The output of the tool call at line `pos` of `transcript` (the agent's
-/// folder `adir` names its session): `(out, cut)`, or why there is none.
-pub(super) fn answer(transcript: &Path, adir: &Path, pos: u64, logs: &Logs) -> Result<(String, bool), String> {
+/// folder `adir` names its session): `(out, cut, total)` (total: the whole
+/// output's bytes, known only when the log answered), or why there is none.
+pub(super) fn answer(transcript: &Path, adir: &Path, pos: u64, logs: &Logs) -> Result<(String, bool, Option<u64>), String> {
     let page = super::super::history::transcript_page(transcript, pos as usize + AFTER + 1, AFTER + 1);
     let mut after = page.into_iter().skip_while(|(p, _, _)| (*p as u64) < pos);
-    let call = after.next().filter(|(p, _, _)| *p as u64 == pos).map(|(_, _, l)| l);
-    let Some(Rec::Tool { id: n, name, .. }) = call.as_deref().map(lines::read) else {
+    let first = after.next().filter(|(p, _, _)| *p as u64 == pos).map(|(_, _, l)| lines::read(&l));
+    // a tool row's pos is its `tool_started` line since client-protocol's
+    // G3 (a row exists from its start, lines::tool_move): its call line
+    // follows; an older row's pos is the call line itself
+    let call = match first {
+        Some(Rec::Obs(lines::Obs::ToolStarted(n))) => after.by_ref().take(START_TO_CALL).map(|(_, _, l)| lines::read(&l)).find(|r| matches!(r, Rec::Tool { id, .. } if *id == n)),
+        r => r,
+    };
+    let Some(Rec::Tool { id: n, name, .. }) = call else {
         return Err(format!("line {pos} is no tool call"));
     };
     let found = after.find_map(|(_, ts, l)| match lines::read(&l) {
@@ -37,8 +48,8 @@ pub(super) fn answer(transcript: &Path, adir: &Path, pos: u64, logs: &Logs) -> R
     let session = super::super::session_log::session_of(adir).unwrap_or_default();
     let q = Query { session: &session, n: u64::from(n), name: &name, ok, at_ms: ts.unwrap_or(0) };
     Ok(match tool_output(logs.sessions, logs.blobs, &q, TOOL_TEXT_CAP, &|full| starts_alike(full, &preview)) {
-        Some(o) => (o.text, o.cut),
-        None => (cap(&preview), true),
+        Some(o) => (o.text, o.cut, Some(o.total as u64)),
+        None => (cap(&preview), true, None),
     })
 }
 

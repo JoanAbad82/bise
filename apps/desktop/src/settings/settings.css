@@ -1,0 +1,132 @@
+/* settings (src/settings, r2-settings): ds tokens only; the route's page and its nav are the ds's
+   .b-settings and .b-snav (ds/css/settings.css) */
+/* a row's controls: a role's model and its efforts wrap between them when the row has no room */
+.settings-row-acts { display: inline-flex; flex-wrap: wrap; align-items: center; gap: var(--s-1); min-width: 0; }
+/* settings › projects (projects.tsx, designer m_41841, m_43851): the rows in a box like every
+   settings group (r 10, a hairline, rows 44 at 0 12, a hairline between them); the name, then its
+   folder short (~/acme); at the right its ⌘N, then the ⋯ whose slot stays (shown on hover, focus or
+   its menu open: nothing moves). 'Add a project…' is a 28 button 12 under the box. A drag lifts
+   the row (--c-raised, --e-2) and a 2 px ink line marks where it lands. */
+.sp-list { display: flex; flex-direction: column; border-radius: var(--r-menu); background: var(--c-raised); box-shadow: inset 0 0 0 1px var(--c-line); }
+.sp-row { box-sizing: border-box; position: relative; display: flex; align-items: center; gap: var(--gap-inline); min-height: var(--h-setting-row); padding: 0 var(--s-3); outline: none; touch-action: none; user-select: none; }
+.sp-row + .sp-row { border-top: 1px solid var(--c-line); }
+.sp-row:first-child { border-radius: var(--r-menu) var(--r-menu) 0 0; }
+.sp-row:last-child { border-radius: 0 0 var(--r-menu) var(--r-menu); }
+.sp-row:only-child { border-radius: var(--r-menu); }
+.sp-row:hover, .sp-row:focus-visible, .sp-row[data-menu] { background: var(--c-hover); }
+.sp-row:focus-visible { box-shadow: inset 0 0 0 1px var(--c-focus); }
+.sp-list[data-drag] .sp-row:not([data-lifted]) { background: none; }
+.sp-row[data-lifted] { z-index: 1; background: linear-gradient(var(--c-raised), var(--c-raised)), var(--c-solid); box-shadow: var(--e-2); cursor: grabbing; }
+.sp-row[data-drop]::before { content: ""; position: absolute; left: var(--pad-row-x); right: var(--pad-row-x); height: 2px; border-radius: 1px; background: var(--c-ink); }
+.sp-row[data-drop="before"]::before { top: -1px; }
+.sp-row[data-drop="after"]::before { bottom: -1px; }
+.sp-name { flex: 1 1 auto; min-width: 0; display: flex; align-items: baseline; gap: var(--s-2); overflow: hidden; white-space: nowrap; }
+.sp-name .b-field { width: 100%; }
+.sp-n { flex: none; font: var(--t-13) var(--font-ui); color: var(--c-text); }
+.sp-path { min-width: 0; overflow: hidden; text-overflow: ellipsis; font: var(--t-12) var(--font-ui); color: var(--c-text-3); }
+.sp-path.err { color: var(--c-err); }
+.sp-end { flex: none; display: inline-flex; align-items: center; gap: var(--gap-inline); }
+.sp-end .b-kbd { color: var(--c-text-3); }
+.sp-more { visibility: hidden; }
+.sp-more .b-ibtn { color: var(--c-text-3); }
+.sp-more .b-ibtn:hover { color: var(--c-text); }
+.sp-row:hover .sp-more, .sp-row:focus-visible .sp-more, .sp-more:focus-within, .sp-row[data-menu] .sp-more { visibility: visible; }
+.sp-row:active { cursor: grabbing; }
+.sp-list[data-drag] .sp-more { visibility: hidden; }
+.sp-menu-err .b-picker-row { color: var(--c-err); }
+.sp-add { display: block; margin: var(--s-3) 0 0; }
+/* the key field and its caption are one block: 4 between them, then the group gap before the next title (designer m_21395) */
+.settings-key { margin: var(--s-3) 0 var(--gap-section); max-width: 420px; }
+.settings-key .b-help { margin-top: var(--gap-tight); }
+/* the add sheet (AddSheet.tsx, shot 19): the path line, the scan's head with its wait or its error,
+   the add's words in the foot before cancel; errors in plain words, red */
+.settings-add-path { display: flex; align-items: center; gap: var(--s-2); margin-bottom: var(--s-3); }
+.settings-add-path .b-field { flex: 1; }
+.settings-add-scan { display: inline-flex; align-items: baseline; gap: var(--s-2); text-transform: none; letter-spacing: normal; }
+.settings-add-scan .err { color: var(--c-err); text-transform: none; letter-spacing: normal; }
+/* options -> foot = 24 (designer m_18973): the sheet body's 16 bottom + the foot's 12 top, less 4 */
+.settings-add-opts { margin-bottom: calc(-1 * var(--s-1)); }
+.settings-add-opts .b-group { margin-bottom: 0; }
+.settings-add-say { margin-right: auto; font-size: var(--t-13); color: var(--c-text-2); }
+.settings-add-say.err { color: var(--c-err); }
+/* computer use's steps (designer via cu-settings m_42955): the mark in a 16 px column on the title's
+   line, the sub lines under the title's text (16 + the 8 gap in); the done check in ink, ? in the
+   accent (it waits on him), · and … in text-3, ▲ red. The ds draws every span of a row's label as
+   its sub (block, 12 px, text-2): the title's spans undo it. */
+.b-gi .l span.settings-cu-t { display: flex; align-items: center; gap: var(--s-2); font-size: inherit; line-height: inherit; color: var(--c-text); }
+.b-gi .l span.settings-cu-st { flex: none; display: inline-flex; align-items: center; justify-content: center; width: var(--w-state); font-size: inherit; color: var(--c-text-3); }
+.b-gi .l span.settings-cu-st.done { color: var(--c-ink); }
+.b-gi .l span.settings-cu-st.waits { color: var(--c-accent); }
+.b-gi .l span.settings-cu-st.failed { color: var(--c-err); }
+.b-gi .l span.settings-cu-sub { padding-left: calc(var(--w-state) + var(--s-2)); }
+/* a failed line under a settings row: the ds's '.b-gi .l span' (every span of a row's label, text-2)
+   would win over one class, so the rule names the row (N1's failed keychain move) */
+.b-gi .l .settings-err { color: var(--c-err); }
+/* a numbered step hangs on the mark column (designer m_43882): its number in text-3 tabular in the
+   16 column (pulled back under the mark), its words wrapping under their own first word */
+.b-gi .l span.settings-cu-help { display: flex; gap: var(--s-2); margin-left: calc(-1 * (var(--w-state) + var(--s-2))); color: var(--c-text-3); }
+.b-gi .l span.settings-cu-n { flex: none; display: inline; width: var(--w-state); text-align: center; font-variant-numeric: tabular-nums; color: var(--c-text-3); }
+.b-gi .l span.settings-cu-w { display: inline; min-width: 0; color: var(--c-text-3); }
+/* a key list row's keys: one keycap per key, a text-3 ' / ' or ' … ' between two (designer m_43941) */
+.settings-caps { display: inline-flex; align-items: center; gap: var(--s-1); flex: none; }
+.settings-caps-sep { font-size: var(--t-12); color: var(--c-text-3); }
+/* a step's button, and under it for 3 s the core's flash in text-2 */
+.settings-cu-act { display: inline-flex; flex-direction: column; align-items: flex-end; gap: var(--s-1); flex: none; }
+.settings-cu-flash { font-size: var(--t-12); color: var(--c-text-2); }
+/* a role's model (V17): the ds Select, as wide as its words up to 240 px */
+.settings-pick { display: inline-flex; width: 240px; max-width: 240px; }
+/* the expired sign-in under way (V14): the waiting line and its two acts */
+.settings-signing { display: flex; align-items: center; gap: var(--s-2); margin-top: var(--s-2); outline: none; }
+/* the approvals page takes the rules' list keys (useListKeys): no focus ring on the page itself */
+.settings-approvals { outline: none; }
+/* a rule's remove asking inline (V8) */
+.settings-ask { color: var(--c-accent); font-size: var(--t-13); }
+/* a never-sent app's bundle id is machine text: mono, text-3 (designer m_22582) */
+.settings-app-id { font-family: var(--font-mono); color: var(--c-text-3); }
+/* settings › general's update group (designer's app-swap v2): the row's words as the mock (the
+   title in ink at the row's size, its shas inline in mono), only the ▲ red; the test app's row in
+   grey (it never shows in his app). The ds draws every span of a row's label as the sub (block,
+   12 px, text-2): the title and the shas undo it here. */
+.settings-update .b-gi .l span.settings-update-t { display: inline; font-size: inherit; color: inherit; }
+.settings-update .b-gi .l span span { display: inline; font-size: inherit; color: inherit; }
+.settings-update .b-gi .l .settings-update-err,
+.settings-update-why .settings-update-err { color: var(--c-err); }
+.settings-sha { font-family: var(--font-mono); }
+.settings-update-acts { display: inline-flex; gap: var(--s-2); flex: none; }
+/* 'up to date' with the line icon check before it, never a ✓ glyph (ui-review m_43805) */
+.settings-update .b-gi .l span.settings-update-ok { display: inline-flex; align-items: center; gap: var(--s-1); }
+
+/* the test app's row: nothing to act on, so its title in text-2 and its sub in text-3 (designer m_24597) */
+.settings-update.is-test .b-gi .l span.settings-update-t { color: var(--c-text-2); }
+.settings-update.is-test .b-gi .l > span:not(.settings-update-t) { color: var(--c-text-3); }
+/* settings › general › Your bim (me.tsx, page bim-pick, designer m_46521): his bim near at the left,
+   the four rows at its right in the group's box; a picked swatch, cut, hat or ready-made look gets
+   an ink ring (never the accent); a hat the hair can't take is greyed */
+.me { margin-bottom: var(--gap-section); }
+.me .b-help { margin-top: var(--s-3); padding-left: var(--s-3); }
+.me-box { display: flex; gap: var(--s-4); align-items: flex-start; padding: var(--s-3); border-radius: var(--r-menu); background: var(--c-raised); box-shadow: inset 0 0 0 1px var(--c-line); }
+.me-big { flex: none; width: 88px; height: 88px; display: grid; place-items: center; }
+/* the label column sizes to its longest label, shared by every row (designer m_48402: 'Accessory
+   colour' on one line): each row is a subgrid of the rows' two columns */
+.me-rows { min-width: 0; display: grid; grid-template-columns: max-content minmax(0, 1fr); row-gap: var(--s-2); column-gap: var(--s-3); }
+.me-row { grid-column: 1 / -1; display: grid; grid-template-columns: subgrid; align-items: center; min-height: var(--s-8); }
+.me-row-n { white-space: nowrap; font: var(--t-13) var(--font-ui); color: var(--c-text); }
+.me-row-c { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-1); }
+.me-dot { width: var(--s-5); height: var(--s-5); border-radius: 50%; background: var(--me-dot); box-shadow: inset 0 0 0 1px var(--c-line-strong); }
+.me-cut, .me-tile { display: grid; place-items: center; border-radius: var(--r-menu); }
+.me-row-c.six { display: grid; grid-template-columns: repeat(6, var(--s-8)); }
+/* a hair swatch: the head only (designer m_46749): the coin's head at its 48 size, drawn in the 32 box
+   with its drawn box's centre on the box's centre (render.ts cutPng, bim-pick-center), so the ring
+   sits even around every cut; no CSS crop (the old one put the head 5 px low) */
+.me-cut { display: block; width: var(--s-8); height: var(--s-8); overflow: hidden; }
+.me-cut .me-pic { display: block; width: var(--s-8); height: var(--s-8); }
+.me-cut:hover, .me-tile:hover, .me-chip:hover:not(:disabled) { background: var(--c-hover); }
+.me-chip { height: var(--s-6); padding: 0 var(--s-2); border-radius: var(--r-menu); font: var(--t-12) var(--font-ui); color: var(--c-text); box-shadow: inset 0 0 0 1px var(--c-line); }
+.me-chip:disabled { color: var(--c-text-3); }
+/* an accessory colour with nothing on the head (designer m_48063): 40 %, no pick */
+.me-dot:disabled { opacity: 0.4; cursor: default; }
+.me-dot.on, .me-cut.on, .me-tile.on, .me-chip.on { box-shadow: 0 0 0 2px var(--c-ink); }
+.me-dot:focus-visible, .me-cut:focus-visible, .me-tile:focus-visible, .me-chip:focus-visible { outline: 2px solid var(--c-focus); outline-offset: 2px; }
+.me-ready { display: grid; grid-template-columns: repeat(6, var(--s-16)); gap: var(--s-2); justify-content: center; margin: var(--s-4) 0 var(--s-2); }
+.me-tile { width: var(--s-16); height: var(--s-16); box-shadow: inset 0 0 0 1px var(--c-line); }
+.me-more { margin: 0 0 var(--s-4); text-align: center; font: var(--t-12) var(--font-ui); color: var(--c-text-3); }

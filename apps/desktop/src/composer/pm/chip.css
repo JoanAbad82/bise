@@ -1,0 +1,57 @@
+/* The inline chip (schema.ts chipDom): in his draft and, the same DOM, in his sent bubble's words
+   (thread/YouBody.tsx). One look for both, so a chip never changes when his message goes. */
+/* a quote, a paste, an artifact: ink in a 1 px line like the image chip, never the accent (designer m_21425) */
+.b-chip.b-inchip.paste,
+.b-chip.b-inchip.quote,
+.b-chip.b-inchip.anchor,
+.b-chip.b-inchip.artifact {
+  height: var(--s-5);
+  padding: 0 var(--s-2);
+  margin: 0 1px;
+  vertical-align: 1px;
+  color: var(--c-text);
+  background: none;
+  border: 1px solid var(--c-line);
+  border-radius: 9px;
+}
+/* an image chip is the sent bubble's (designer m_18135, signed 900f998e): 1 px line, r 9, its
+   number in ink beside its 16 px thumbnail or the faint no-file glyph slot; never the accent */
+/* a file chip is the image chip's look (file-chips, designer m_21765): its system icon or ▯, its number */
+.b-chip.b-inchip.file,
+.b-chip.b-inchip.image {
+  gap: var(--s-1);
+  height: var(--s-5);
+  padding: 0 var(--s-2) 0 var(--s-1);
+  margin: 0 1px;
+  vertical-align: 1px;
+  color: var(--c-text);
+  background: none;
+  border: 1px solid var(--c-line);
+  border-radius: 9px;
+}
+.b-chip.b-inchip.file .thumb,
+.b-chip.b-inchip.image .thumb {
+  width: 16px;
+  height: 16px;
+  border-radius: 3px;
+  object-fit: cover;
+  flex: none;
+}
+.b-chip.b-inchip.file .thumb.file {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--c-text-3);
+  font-size: 13px;
+  line-height: 16px;
+}
+.b-chip.b-inchip.image .thumb.none {
+  display: inline-flex;
+  color: var(--c-text-3);
+  opacity: 0.7;
+}
+/* a chip lit by its row, a hover or the caret after it */
+.b-chip.b-inchip.lit {
+  border-color: var(--c-text-3);
+  background: var(--c-hover);
+}

@@ -1,0 +1,170 @@
+//! The wire rule's law (lib.rs, architect m_14382): what a released bise
+//! wrote still means the same. `fixtures/released/` holds the hub's and
+//! the core's events as v2026.10.2-28 wrote them (its own fixtures, never
+//! edited; v2026.10.2-29's hub events next to them, `_v2026.10.2-29`)
+//! and the entries its fold made of message lines; today's types read
+//! each one and write it back with every released key and value
+//! unchanged (new keys may come on top), so a field, list or enum value
+//! that changes meaning goes red here; a line reads as unknown only when
+//! bise retired its tag (bise_proto::RETIRED). A note's anchor has its own,
+//! `anchor_v1.jsonl` (its first version, office-artifacts).
+
+use bise_proto::core_ev::CoreEv;
+use bise_proto::hub::HubEv;
+use bise_proto::thread::{fold, Ctx};
+use bise_proto::RetiredKind;
+use serde_json::Value;
+use std::path::Path;
+
+fn lines(file: &str) -> Vec<String> {
+    let p = Path::new(env!("CARGO_MANIFEST_DIR")).join("fixtures/released").join(file);
+    std::fs::read_to_string(&p)
+        .unwrap_or_else(|e| panic!("{}: {e}", p.display()))
+        .lines()
+        .filter(|l| !l.trim().is_empty())
+        .map(str::to_string)
+        .collect()
+}
+
+/// Where `now` differs from the released `was` (a key gone, a value
+/// changed), as a path; None: `now` keeps all of `was`.
+fn lost(was: &Value, now: &Value, at: &str) -> Option<String> {
+    match (was, now) {
+        (Value::Object(w), Value::Object(n)) => w.iter().find_map(|(k, v)| match n.get(k) {
+            Some(x) => lost(v, x, &format!("{at}.{k}")),
+            None => Some(format!("{at}.{k} is gone")),
+        }),
+        (Value::Array(w), Value::Array(n)) if w.len() == n.len() => w.iter().zip(n).enumerate().find_map(|(i, (a, b))| lost(a, b, &format!("{at}[{i}]"))),
+        _ if was == now => None,
+        _ => Some(format!("{at}: {was} became {now}")),
+    }
+}
+
+/// `unknown`: the tag of a line read as `Unknown`; `retired`: the kind
+/// whose RETIRED tags may read so (bise_proto::RETIRED, architect
+/// m_48959), then not written back. Any other unknown is red.
+fn check<T>(file: &str, decode: impl Fn(&str) -> Result<T, String>, unknown: impl Fn(&T) -> Option<String>, retired: Option<RetiredKind>, encode: impl Fn(&T) -> Value) {
+    let mut n = 0;
+    for l in lines(file) {
+        let m = decode(&l).unwrap_or_else(|e| panic!("{file}: today's types refuse a released line: {e}\n  {l}"));
+        if let Some(tag) = unknown(&m) {
+            assert!(retired.and_then(|k| bise_proto::retired(k, &tag)).is_some(), "{file}: a released line reads as unknown: {l}");
+            n += 1;
+            continue;
+        }
+        let was: Value = serde_json::from_str(&l).unwrap();
+        if let Some(d) = lost(&was, &encode(&m), "") {
+            panic!("{file}: a released meaning changed ({d}):\n  {l}");
+        }
+        n += 1;
+    }
+    assert!(n > 20, "{file}: {n} lines");
+}
+
+fn ev_unknown(m: &HubEv) -> Option<String> {
+    match m {
+        HubEv::Unknown { tag, .. } => Some(tag.clone()),
+        _ => None,
+    }
+}
+
+/// A released event bise retired since (`confirm`, `dev_servers`) reads
+/// as unknown; every other one keeps its meaning.
+#[test]
+fn released_hub_events_keep_their_meaning() {
+    check("hub_ev.jsonl", HubEv::decode, ev_unknown, Some(RetiredKind::HubEv), HubEv::to_value);
+    // v2026.10.2-29 (cut from main before client-protocol merges, its own
+    // fixture as it wrote it): tool_out, a tool item's id, an answer's
+    // images and files, a scheduled task's name on top of -28's
+    check("hub_ev_v2026.10.2-29.jsonl", HubEv::decode, ev_unknown, Some(RetiredKind::HubEv), HubEv::to_value);
+}
+
+#[test]
+fn released_core_events_keep_their_meaning() {
+    check("core_ev.jsonl", CoreEv::decode, |m| matches!(m, CoreEv::Unknown { .. }).then(String::new), None, |m| serde_json::to_value(m).expect("encodes"));
+}
+
+/// A message line folds to the entry it did in the released fold (G5's
+/// superset, architect m_14424: msg-you stays an agent entry), new facts
+/// on top.
+#[test]
+fn released_message_lines_fold_to_the_same_entries() {
+    let none = |_: &str| None;
+    let ctx = Ctx { open_cards: &[], page: &none, provider: &|_: &str, k: &str| k.to_string(), width: &|s: &str| s.chars().count(), offset: &|_| 0, attached: &bise_proto::thread::Attached::plain };
+    for l in lines("fold.jsonl") {
+        let v: Value = serde_json::from_str(&l).unwrap();
+        let line = v["line"].as_str().unwrap();
+        let e = fold(&[(1, 1001, line.to_string())], &ctx);
+        assert_eq!(e.len(), 1, "{line}: {e:?}");
+        let now = serde_json::to_value(&e[0]).unwrap();
+        if let Some(d) = lost(&v["entry"], &now, "") {
+            panic!("{line}: the released entry changed ({d}): {now}");
+        }
+    }
+}
+
+/// An older desktop's `files` list (`send`, `answer`, `slash`, the app's
+/// `send`; removed from the wire in issue 31). A hub command still
+/// carrying one with paths is refused by name (bise_proto::REMOVED,
+/// architect m_34507): his pasted file is never dropped silently. The same
+/// line with an empty list reads as its command, every other key kept. The
+/// app's `send` (the window's own protocol) still reads, the list ignored.
+#[test]
+fn released_files_lists_are_refused_by_name() {
+    use bise_proto::app_cmd::AppCmd;
+    use bise_proto::hub::HubCmd;
+    let same_without_files = |file: &str, l: &str, now: Value| {
+        let mut was: Value = serde_json::from_str(l).unwrap();
+        assert!(was.as_object_mut().unwrap().remove("files").is_some(), "{file}: a line without files: {l}");
+        assert_eq!(lost(&was, &now, ""), None, "{file}: {l}");
+        assert!(now.get("files").is_none(), "{file}: files written back: {now}");
+    };
+    let hub = lines("hub_cmd_files.jsonl");
+    for l in &hub {
+        let e = HubCmd::decode(l).expect_err(l);
+        assert!(e.starts_with(bise_proto::words::common::removed_field) && e.contains("files removed"), "{l}: {e}");
+        let mut empty: Value = serde_json::from_str(l).unwrap();
+        empty["files"] = Value::Array(Vec::new());
+        let m = HubCmd::from_value(empty.clone()).unwrap_or_else(|e| panic!("an empty files list refused: {e}\n  {l}"));
+        assert!(!matches!(m, HubCmd::Unknown { .. }), "unknown: {l}");
+        same_without_files("hub_cmd_files.jsonl", &empty.to_string(), m.to_value());
+    }
+    let app = lines("app_cmd_files.jsonl");
+    for l in &app {
+        let m = AppCmd::decode(l).unwrap_or_else(|e| panic!("app_cmd_files.jsonl: refused: {e}\n  {l}"));
+        assert!(!matches!(m, AppCmd::Unknown { .. }), "unknown: {l}");
+        same_without_files("app_cmd_files.jsonl", l, serde_json::to_value(&m).unwrap());
+    }
+    assert_eq!((hub.len(), app.len()), (3, 1));
+}
+
+/// A note's anchor (bise_proto::anchor, office-artifacts): its first
+/// version's lines (`anchor_v1.jsonl`, frozen when it was written, never
+/// edited) read as the kind they said, never `Unknown`, and write back with
+/// every key and value unchanged.
+#[test]
+fn released_anchors_keep_their_meaning() {
+    use bise_proto::anchor::Anchor;
+    let mut n = 0;
+    for l in lines("anchor_v1.jsonl") {
+        let was: Value = serde_json::from_str(&l).unwrap();
+        let a: Anchor = serde_json::from_value(was.clone()).unwrap();
+        assert!(!matches!(a, Anchor::Unknown(_)), "a released anchor reads as unknown: {l}");
+        assert_eq!(Some(a.kind()), was["kind"].as_str(), "{l}");
+        if let Some(d) = lost(&was, &serde_json::to_value(&a).unwrap(), "") {
+            panic!("anchor_v1.jsonl: a released meaning changed ({d}):\n  {l}");
+        }
+        n += 1;
+    }
+    assert!(n >= Anchor::KINDS.len(), "{n} lines: one per kind at least");
+}
+
+/// What the `sb` of v2026.10.2-43 and -44 sent (their cli.rs and cli/ are
+/// the same as each other's; `build` over every command's arguments, issue
+/// 27): today's hub reads each request as its command, every key it wrote
+/// kept (an adopted REPL's older `sb` talks to this hub).
+#[test]
+fn released_sb_requests_keep_their_meaning() {
+    use bise_proto::sb::Req;
+    check("sb_req_v2026.10.2-44.jsonl", |l| Req::decode(serde_json::from_str(l).map_err(|e| e.to_string())?), |m| matches!(m, Req::Unknown { .. }).then(String::new), None, Req::to_value);
+}

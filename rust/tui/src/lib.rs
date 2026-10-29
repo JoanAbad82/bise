@@ -41,8 +41,22 @@ use theme::*;
 mod theme_detect;
 mod when;
 mod wire;
+// his message as text + typed parts, and the history's view (msg-parts)
+mod said;
+mod agent_parts;
+mod forwarded;
+// the hub's entries as feed events (client-protocol step 4): the feed
+// from entries (sb/feed_entries.rs) and its parity law
+mod entry_ev;
+// the live reads of a thread's entries (P4d-reads): the feed calls them
+mod entry_reads;
+// client-protocol step 4's before/after numbers (architect m_13977 Q4)
+#[cfg(test)]
+mod bench_first;
 use wire::*;
 mod markdown;
+// the tests' names for markdown's helpers (the code says crate::markdown::)
+#[cfg(test)]
 use markdown::*;
 mod code;
 mod codeblock;
@@ -50,6 +64,7 @@ mod syntax;
 mod mdlive;
 mod sanitize;
 mod render;
+mod livetext;
 mod answered;
 mod toolbox;
 mod toolrow;
@@ -72,13 +87,19 @@ mod skills;
 mod files;
 mod keychain;
 mod plugins;
+mod plugins_add;
+mod plugins_screen;
 mod emoji;
 mod editor;
 mod undo;
 mod clipboard;
 mod attach;
+mod attach_file;
+mod image_gone;
+mod open_file;
 mod quote;
 mod pasted;
+mod paste_link;
 mod usage;
 mod models;
 mod term;
@@ -98,15 +119,28 @@ mod help;
 mod approvals_screen;
 mod logview;
 mod artifacts;
+mod artifacts_lines;
+mod artifacts_pick;
 mod artifacts_screen;
+mod artifacts_tree;
 mod scheduled;
 mod scheduled_screen;
+// running-procs: /processes (/running its alias), its rows, its output and less
+mod running;
+mod running_out;
+mod running_screen;
+mod scheduled_watch;
+mod inbox_list;
+mod inbox_screen;
+mod usage_screen;
 mod diffbranches;
 mod diffquote;
 mod diffview;
+mod diffwire;
 mod computer_use;
 mod keybar;
 mod keycheck;
+mod firstkey;
 pub(crate) mod scan;
 mod onboarding;
 mod hints;
@@ -115,6 +149,8 @@ mod ctrlhint;
 mod optkeys;
 mod reach;
 mod queue;
+mod chips_back;
+mod turns;
 mod layout;
 mod chrome;
 mod topedge;
@@ -127,6 +163,8 @@ pub mod ambient;
 // `bise pty`: the desktop's terminal panel, one shell per process
 pub mod pty;
 #[cfg(test)]
+mod ambient_seam_tests;
+#[cfg(test)]
 mod voice_ui_tests;
 #[cfg(test)]
 mod composer_wrap_tests;
@@ -135,7 +173,7 @@ mod feed_render_tests;
 #[cfg(test)]
 mod quiet_send_tests;
 pub use keyprobe::keyprobe;
-pub use sb::{run_switchboard, setup_main, take_reexec, take_refused};
+pub use sb::{init_line, run_switchboard, setup_main, take_reexec, take_refused};
 pub use keycheck::check_model;
 pub use crash::install as install_crash_hook;
 

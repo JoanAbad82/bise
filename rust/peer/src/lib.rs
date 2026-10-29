@@ -6,7 +6,9 @@
 //! - [`tags`]: the `BISE_OWNERS` variable every agent's process carries,
 //!   its tags `<hub>.<dir>.<ms>` and a hub's id;
 //! - [`table`]: the process table of this user, each process with its
-//!   tags (`ps -E` on macOS, `/proc` on Linux);
+//!   tags (`ps -E` on macOS, `/proc` on Linux), whole ([`table::snapshot`],
+//!   the cleanup sweeps) or only what a judge walks ([`table::around`],
+//!   the hub's sockets, per request);
 //! - [`judge`]: pure, a peer pid and a table in, who it is out
 //!   ([`judge::judge`] for one hub, [`judge::judge_any`] for a
 //!   machine-wide service);

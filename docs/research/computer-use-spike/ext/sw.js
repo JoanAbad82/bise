@@ -1,3 +1,4 @@
+// stays JS: the computer-use spike, a frozen record the design docs cite; never typechecked.
 // Spike service worker: driven from the test harness through CDP
 // (Runtime.evaluate on this worker). In the product, the same calls come
 // from the bise native host over native messaging.

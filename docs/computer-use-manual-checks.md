@@ -4,7 +4,7 @@ The §5 paths of `docs/computer-use-ship.md` run automatically on the real
 stack (headless throwaway Chrome, the extension, this tree's host and
 broker), never on your browser:
 
-    node --max-old-space-size=1024 computer-use/bench/paths.mjs --bise <bise>
+    node --experimental-strip-types --max-old-space-size=1024 computer-use/bench/paths.ts --bise <bise>
 
 (cancel, refused pages, group closed, service worker stopped, two
 browsers then one quits, the helper quits and reopens; ~1.5 min). What

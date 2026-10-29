@@ -9,6 +9,7 @@
 //! order of [`help::TIPS`] (BISE-104, [`TipClock`]).
 
 use crate::{attach, commands, files, help, theme, voice, App};
+use bise_proto::words::composer;
 use ratatui::style::{Modifier, Style};
 use ratatui::text::{Line, Span};
 use std::time::{Duration, Instant};
@@ -32,8 +33,6 @@ pub(crate) enum Mode {
     Quote,
     /// `D` asks before dropping an agent (BISE-43)
     DropAsk,
-    /// a yes / no question in the status row
-    Confirm,
     /// the card view (ctrl+1-9, a click on an inbox row): the composer
     /// answers the card
     Card,
@@ -41,6 +40,8 @@ pub(crate) enum Mode {
     Find,
     /// cmd+k / ctrl+s: the agent palette (BISE-265)
     Palette,
+    /// a row of the queue drawer has the keys (sb/queued.rs)
+    Queued,
     /// an agent is selected in the panel
     Selected,
     /// in an archived agent
@@ -56,61 +57,65 @@ type Pair = (&'static str, &'static str);
 
 /// The way home from an agent's view (book §13, BISE-103): the first
 /// pair there, never dropped.
-const BACK: Pair = ("esc", "back to main");
+const BACK: Pair = ("esc", composer::bar_back_to_main);
+
+/// An empty composer's `↑` with his messages queued (designer m_25146:
+/// the window's words, one phrase in both apps).
+const EDIT_QUEUED: Pair = ("↑", composer::bar_edit_queued);
 
 /// The inbox from the thread while it holds something (book §12): last
 /// at rest, right after `⏎ steer` while the agent works; `ctrl+1 inbox`,
 /// a terminal without ctrl+1-9 (BISE-302, reach.rs): `/inbox`.
-const INBOX: Pair = ("ctrl+1", "inbox");
+const INBOX: Pair = ("ctrl+1", composer::bar_inbox);
 const INBOX_COMMAND: Pair = ("/inbox", "");
 
 /// The first pair while text is selected (BISE-134): the one pair of the
 /// bar in the accent, so you notice you can just type (book §13).
-const ASK: Pair = ("type", "to ask about it");
+const ASK: Pair = ("type", composer::bar_ask);
 
 /// expired-ux: the agent in view waits for the ChatGPT sign-in.
-pub(crate) const SIGN_IN_AGAIN: Pair = ("⏎", "sign in again");
+pub(crate) const SIGN_IN_AGAIN: Pair = ("⏎", composer::bar_sign_in_again);
 
 /// The bar at rest (BISE-303, designer's "less on screen"): the three
 /// characters that start something. `⏎ send`, `? help` (? still opens
 /// it on an empty composer), `⌥0-9 switch` (the panel's numbers say it)
 /// and `ctrl+s find agent` (held ctrl lists it) are gone.
-const REST: [Pair; 3] = [("@", "file"), ("$", "skills"), ("/", "commands")];
+const REST: [Pair; 3] = [("@", composer::bar_file), ("$", composer::bar_skills), ("/", composer::bar_commands)];
 
 impl Mode {
     fn pairs(self) -> &'static [Pair] {
         match self {
             Mode::Terminal => &[
-                ("", "terminal: keys go to the shell"),
-                ("ctrl+`", "hide"),
-                ("wheel/shift+pgup", "scroll"),
-                ("drag", "select"),
-                ("drag the border", "resize"),
+                ("", composer::bar_terminal_keys),
+                ("ctrl+`", composer::bar_hide),
+                ("wheel/shift+pgup", composer::bar_scroll),
+                ("drag", composer::bar_select),
+                ("drag the border", composer::bar_resize),
             ],
             // BISE-222: the chip in the text says recording / transcribing
-            Mode::Recording => &[("any key", "stop"), ("esc", "cancel")],
-            Mode::Transcribing => &[("esc", "cancel")],
+            Mode::Recording => &[("any key", composer::bar_stop), ("esc", composer::bar_cancel)],
+            Mode::Transcribing => &[("esc", composer::bar_cancel)],
             Mode::FilePopup => &[
-                ("⏎/tab", "insert"),
-                ("⏎/tab/→", "open a folder"),
-                ("←", "up"),
-                ("↑↓", "select"),
-                ("esc", "close"),
+                ("⏎/tab", composer::bar_insert),
+                ("⏎/tab/→", composer::bar_open_folder),
+                ("←", composer::bar_up),
+                ("↑↓", composer::bar_select),
+                ("esc", composer::bar_close),
             ],
             // the image key, then the default keys (BISE-108: the bar
             // once lost its keys with an image)
-            Mode::Images => &[("ctrl+v", "paste image"), REST[0], REST[1], REST[2]],
-            Mode::Quote => &[ASK, ("tab", "quote"), ("cmd+c", "copy"), ("esc", "drop")],
-            Mode::DropAsk => &[("y", "archive"), ("n or esc", "keep")],
-            Mode::Confirm => &[("y", "yes"), ("n", "no"), ("esc", "cancel")],
-            Mode::Find => &[("⏎", "older"), ("shift+⏎", "newer"), ("esc", "close")],
-            Mode::Palette => &[("↑↓", "choose"), ("⏎", "open"), ("esc", "close")],
+            Mode::Images => &[("ctrl+v", composer::bar_paste_image), REST[0], REST[1], REST[2]],
+            Mode::Quote => &[ASK, ("tab", composer::bar_quote), ("cmd+c", composer::bar_copy), ("esc", composer::bar_drop)],
+            Mode::DropAsk => &[("y", composer::bar_archive), ("n or esc", composer::bar_keep)],
+            Mode::Find => &[("⏎", composer::bar_older), ("shift+⏎", composer::bar_newer), ("esc", composer::bar_close)],
+            Mode::Palette => &[("↑↓", composer::bar_choose), ("⏎", composer::bar_open), ("esc", composer::bar_close)],
+            Mode::Queued => &[("⏎", composer::bar_send_now), ("e", composer::bar_edit), ("d", composer::bar_delete), ("esc", composer::bar_back)],
             // the view's own keys come from `sb::card_key_pairs` (`1-2 pick`…)
-            Mode::Card => &[("⏎", "answer"), ("ctrl+x", "close"), ("esc", "back")],
-            Mode::Selected => &[("⏎", "enter"), ("space", "preview"), ("D", "archive"), ("esc", "close")],
+            Mode::Card => &[("⏎", composer::bar_answer), ("ctrl+x", composer::bar_close), ("esc", composer::bar_back)],
+            Mode::Selected => &[("⏎", composer::bar_enter), ("space", composer::bar_preview), ("D", composer::bar_archive), ("esc", composer::bar_close)],
             // the placeholder says /restore (designer: once)
             Mode::Archived => &[BACK],
-            Mode::Steer => &[("tab", "queue"), ("⏎", "steer"), ("ctrl+c", "interrupt")],
+            Mode::Steer => &[("tab", composer::bar_queue), ("⏎", composer::bar_steer), ("ctrl+c", composer::bar_interrupt)],
             Mode::Default => &REST,
         }
     }
@@ -122,7 +127,7 @@ impl Mode {
     fn agent_pairs(self) -> Vec<Pair> {
         match self {
             Mode::Default | Mode::Images => std::iter::once(BACK).chain(self.pairs().iter().copied()).collect(),
-            Mode::Steer => vec![BACK, ("tab", "queue"), ("⏎", "steer"), ("ctrl+c", "interrupt")],
+            Mode::Steer => vec![BACK, ("tab", composer::bar_queue), ("⏎", composer::bar_steer), ("ctrl+c", composer::bar_interrupt)],
             m => m.pairs().to_vec(),
         }
     }
@@ -140,6 +145,8 @@ pub(crate) fn mode(app: &App) -> Mode {
         Mode::Palette
     } else if app.find.is_some() {
         Mode::Find
+    } else if app.sb.queue_focus().is_some() {
+        Mode::Queued
     } else if commands::popup_open(app) && files::token(&app.ed.text, app.ed.cursor).is_some() {
         Mode::FilePopup
     } else if (app.feed_sel.is_some() && app.mouse.drag.is_none()) || crate::diffquote::selected(app) {
@@ -157,12 +164,12 @@ const FLASH: Duration = Duration::from_secs(3);
 /// The flash of a switch (designer, §8): the mode word, then its sentence.
 pub(crate) fn flash_words(mode: &str, checker: &str, env: bool) -> (String, String) {
     let what = match mode {
-        "auto" if checker == "off" => "edits run, commands ask you",
-        "auto" => "safe calls run, risky ones ask you",
-        _ => "everything runs, nothing asks",
+        "auto" if checker == "off" => composer::approvals_auto_off,
+        "auto" => composer::approvals_auto,
+        _ => composer::approvals_yolo,
     };
-    let only = if env { " (this session only: BISE_APPROVALS)" } else { "" };
-    (mode.to_string(), format!(" · {what}{only}"))
+    let rest = if env { composer::approvals_flash_env(what) } else { composer::approvals_flash(what) };
+    (mode.to_string(), rest)
 }
 
 /// A switch of mode less than 3 s ago: the key bar says it, the
@@ -175,6 +182,9 @@ pub(crate) fn flashing(a: &crate::sb::Approvals) -> bool {
 /// and the tip of the moment (none in an agent's view); for 3 s after a
 /// switch of approvals mode, the switch's line (the mode itself is on the
 /// divider, after the model: chrome.rs [`crate::chrome::Who`]).
+/// The key bar over an attachment's chip in the history (an image, a file).
+pub(crate) const CHIP_HOVER: [(&str, &str); 2] = [("click", composer::bar_preview), ("⌥ click", composer::bar_show_in_finder)];
+
 pub(crate) fn line(app: &App, width: u16) -> Line<'static> {
     let dimmed = Style::default().fg(theme::dim());
     // the diff panel has the keys (site/m/artifacts D)
@@ -191,9 +201,17 @@ pub(crate) fn line(app: &App, width: u16) -> Line<'static> {
     {
         return Line::from(Span::styled(cut(&words, usize::from(width)), dimmed));
     }
+    // a ψ under the mouse (wt-sign, designer m_24019): what it is
+    if let Some(tip) = app.hover.and_then(|(x, y)| crate::sb::places::psi_tip::at(app, x, y)) {
+        return crate::sb::places::psi_tip::line(&tip, usize::from(width));
+    }
+    // an attachment's chip under the mouse (open_file.rs, designer m_21765)
+    if app.hover.and_then(|(x, y)| crate::links::hit_url(x, y)).is_some_and(|u| crate::open_file::path_of_url(&u).is_some()) {
+        return pairs_line(&CHIP_HOVER, usize::from(width)).0;
+    }
     // a draft with an artifact's chip: how it goes
     if crate::attach::has_artifact(&app.ed.text) && !app.ed.text.trim().is_empty() {
-        let pairs = [("⏎", "send"), ("", "the ↗ chips go as the artifact's link and title, never as @name")];
+        let pairs = [("⏎", composer::bar_send), ("", composer::bar_artifact_chips)];
         return pairs_line(&pairs, usize::from(width)).0;
     }
     let a = &app.sb.approvals;
@@ -227,8 +245,9 @@ fn keys_line(app: &App, width: u16) -> Line<'static> {
     // expired-ux: the sign-in again waits for the browser (the first
     // run's words, designer m_7456)
     if let Some(r) = app.resign.as_ref() {
-        let copy = if r.just_copied() { ("c", "copied") } else { ("c", "copy the link") };
-        let pairs = [("", crate::resign::WAITING), copy, ("esc", "cancel")];
+        let copy = if r.just_copied() { ("c", composer::bar_copied) } else { ("c", composer::bar_copy_link) };
+        let waiting = crate::resign::waiting();
+        let pairs = [("", waiting.as_str()), copy, ("esc", composer::bar_cancel)];
         return pairs_line(&pairs, usize::from(width)).0;
     }
     // expired-ux: the agent in view stopped on the expired ChatGPT
@@ -240,7 +259,8 @@ fn keys_line(app: &App, width: u16) -> Line<'static> {
         pairs.extend(inbox);
         return pairs_line(&pairs, usize::from(width)).0;
     }
-    let bar = Bar { typing, agent, inbox };
+    let queued = !app.sb.queued_for(&app.sb.focus).is_empty();
+    let bar = Bar { typing, agent, inbox, queued };
     // the diff panel open, the composer with the keys: its bar, then
     // `ctrl+g close` (designer m_7291), no tip
     if app.diff.is_some() {
@@ -251,7 +271,7 @@ fn keys_line(app: &App, width: u16) -> Line<'static> {
         if used + close.width() <= usize::from(width) {
             spans.push(Span::raw("   "));
             spans.push(Span::styled("ctrl+g", Style::default().fg(theme::text())));
-            spans.push(Span::styled(" close", Style::default().fg(theme::dim())));
+            spans.push(Span::styled(format!(" {}", composer::bar_close), Style::default().fg(theme::dim())));
         }
         return Line::from(spans);
     }
@@ -385,6 +405,9 @@ struct Bar {
     /// the inbox holds something: its pair (`ctrl+1 inbox`, `/inbox`),
     /// last at rest, after `⏎ steer` while the agent works
     inbox: Option<Pair>,
+    /// his messages wait in the queue drawer: an empty composer's `↑`
+    /// moves into it (designer m_25146, the window's words)
+    queued: bool,
 }
 
 /// The key bar for `mode` in a row `width` columns wide. Pairs that don't
@@ -400,7 +423,7 @@ pub(crate) fn render(mode: Mode, width: u16, typing: bool, agent: bool, tip: Opt
 
 /// [`render`], with the inbox pair ([`Bar`]).
 fn render_with(mode: Mode, width: u16, tip: Option<&str>, bar: Bar) -> Line<'static> {
-    let Bar { typing, agent, inbox } = bar;
+    let Bar { typing, agent, inbox, queued } = bar;
     let width = usize::from(width);
     let dim = Style::default().fg(theme::dim());
     let mut pairs = if agent { mode.agent_pairs() } else { mode.pairs().to_vec() };
@@ -412,11 +435,15 @@ fn render_with(mode: Mode, width: u16, tip: Option<&str>, bar: Bar) -> Line<'sta
     // steer (both do nothing on an empty composer)
     if mode == Mode::Steer && !typing {
         pairs.retain(|p| p.0 != "tab" && p.0 != "⏎");
+        if queued {
+            let at = pairs.iter().position(|p| p.0 == "ctrl+c").unwrap_or(pairs.len());
+            pairs.insert(at, EDIT_QUEUED);
+        }
     }
     let pairs = fit(pairs, width, agent);
     let (Line { mut spans, .. }, used) = pairs_line(&pairs, width);
     if let Some(t) = tip.filter(|_| mode == Mode::Default && !agent && !typing).map(key_text) {
-        let t = if theme::ascii_mode() { format!("tip: {t}") } else { format!("tip · {t}") };
+        let t = if theme::ascii_mode() { composer::tip_ascii(t) } else { composer::tip(t) };
         let tw = t.width();
         if used + 3 + tw <= width {
             spans.push(Span::raw(" ".repeat(width - used - tw)));
@@ -558,6 +585,10 @@ mod tests {
         // main's view and an agent's
         assert_eq!(text(&render(Mode::Steer, 120, true, false, None)), "tab queue   ⏎ steer   ctrl+c interrupt");
         assert_eq!(text(&render(Mode::Steer, 120, false, false, None)), "ctrl+c interrupt");
+        let queued = |typing| text(&render_with(Mode::Steer, 120, None, Bar { typing, queued: true, ..Bar::default() }));
+        assert_eq!(queued(false), "↑ edit queued   ctrl+c interrupt");
+        assert_eq!(queued(true), "tab queue   ⏎ steer   ctrl+c interrupt", "a draft: ↑ moves in it");
+        assert_eq!(text(&render(Mode::Queued, 120, false, false, None)), "⏎ send now   e edit   d delete   esc back");
         assert!(!text(&render(Mode::Default, 100, true, false, Some(TIP))).contains("tip"));
         assert!(!text(&render(Mode::Steer, 100, false, false, Some(TIP))).contains("tip"));
     }

@@ -3,11 +3,12 @@
 //! with its title in it, a row per item numbered for ctrl+1-9; the item
 //! open in place where its row was (raised, the accent bar), the fold of
 //! the last answer on top; the item full screen (ctrl+o) in the
-//! history's place; the divider's label and the key bars.
+//! history's place; the divider's label and the key bars (card_keys.rs).
 
 use super::cards::{cut, glyph_color, kind_look, shape, Card, CardHit, Enter, Fold, Part, Shape};
 use super::*;
 use crate::theme;
+use bise_proto::words::{common, inbox};
 use unicode_width::UnicodeWidthStr;
 
 /// The widest a card's text gets: prose wraps at 88, like the reading
@@ -139,7 +140,7 @@ impl Row {
     }
 }
 
-fn fg(c: Color) -> Style {
+pub(super) fn fg(c: Color) -> Style {
     Style::default().fg(c)
 }
 
@@ -152,11 +153,11 @@ pub(super) fn digits(n: usize) -> &'static str {
 /// A line of the box or of an item, and what a click on its cells does
 /// (from which column, how wide).
 #[derive(Clone)]
-struct Drawn {
-    line: Line<'static>,
-    hits: Vec<(usize, usize, CardHit)>,
+pub(super) struct Drawn {
+    pub(super) line: Line<'static>,
+    pub(super) hits: Vec<(usize, usize, CardHit)>,
     /// a line of the open item: on its tint, after its accent bar
-    item: bool,
+    pub(super) item: bool,
 }
 
 impl Drawn {
@@ -168,7 +169,7 @@ impl Drawn {
         Drawn::plain(Line::from(""))
     }
 
-    fn width(&self) -> usize {
+    pub(super) fn width(&self) -> usize {
         self.line.spans.iter().map(|s| s.content.width()).sum()
     }
 }
@@ -194,7 +195,7 @@ fn lines() -> Lines {
 }
 
 /// An item's age, short (`12s`, `2m`, `3h`, `2d`; `now` under 10 s).
-fn short_age(ms: u64) -> String {
+pub(super) fn short_age(ms: u64) -> String {
     let s = ms / 1000;
     match s {
         0..=9 => "now".into(),
@@ -266,7 +267,7 @@ fn more_row(es: &[Entry], hidden: &[usize], w: usize) -> Drawn {
     let first = es[hidden[0]].first();
     let s = shape(first);
     let (_, glyph, _) = kind_look(&first.kind);
-    let mut t = format!("+ {} more · {} {}", hidden.len(), glyph, row_who(first, &s));
+    let mut t = inbox::more_row(hidden.len(), format!("{} {}", glyph, row_who(first, &s)));
     if !s.summary.is_empty() {
         t.push_str(&format!(" · {}{}", if s.cmd { "$ " } else { "" }, s.summary));
     }
@@ -299,14 +300,28 @@ fn where_line(app: &App, agent: &str) -> Option<String> {
     if sb.agents.iter().any(|a| a.name == agent && a.main) || agent == "main" {
         return None;
     }
-    let role = sb.agents.iter().find(|a| a.name == agent).map(|a| a.role.split_whitespace().collect::<Vec<_>>().join(" ")).unwrap_or_default();
+    let role = sb.agents.iter().find(|a| a.name == agent).map(|a| shown_role(&a.role)).unwrap_or_default();
     let step = last_step(app, agent);
     match (role.is_empty(), step) {
         (true, None) => None,
-        (false, None) => Some(format!("{agent} is {role}")),
-        (true, Some(s)) => Some(format!("{agent}'s last step: {s}")),
-        (false, Some(s)) => Some(format!("{agent} is {role} · its last step: {s}")),
+        (false, None) => Some(inbox::agent_is(agent, role)),
+        (true, Some(s)) => Some(inbox::last_step(agent, s)),
+        (false, Some(s)) => Some(inbox::agent_is_step(agent, role, s)),
     }
+}
+
+/// A role as the box says it, on one line; a tool call in it
+/// (`{{bash: sleep 300}}`) never shows: a role that is only one is none
+/// (designer m_26765).
+pub(crate) fn shown_role(role: &str) -> String {
+    let mut out = String::new();
+    let mut rest = role;
+    while let Some(i) = rest.find("{{") {
+        out.push_str(&rest[..i]);
+        rest = rest[i..].find("}}").map_or("", |j| &rest[i + j + 2..]);
+    }
+    out.push_str(rest);
+    out.split_whitespace().collect::<Vec<_>>().join(" ")
 }
 
 /// The last tool row `agent` finished, in the feed this TUI holds:
@@ -338,16 +353,28 @@ fn last_step(app: &App, agent: &str) -> Option<String> {
 /// its meta).
 fn head_line(sb: &Sb, c: &Card, s: &Shape, w: usize) -> Drawn {
     let (_, glyph, _) = kind_look(&c.kind);
-    let meta = match &s.meta {
-        Some(own) => own.clone(),
+    // the metas from the longest; the notification's number last, never cut:
+    // short of room the age goes first, then the position (notif-id,
+    // designer m_27855). An item of the TUI's own (no hub id): its meta.
+    let metas: Vec<String> = match &s.meta {
+        Some(own) => vec![own.clone()],
+        // the hub closed it while your words were typed (designer m_24087)
+        None if sb.closed_in_view().is_some_and(|g| g.id == c.id) => {
+            vec![inbox::with_id(inbox::closed_age(short_age(c.age_now())), c.id), inbox::card_id(c.id)]
+        }
         None => {
             let ids: Vec<u64> = sb.sorted_cards().iter().map(|c| c.id).collect();
             let pos = ids.iter().position(|x| *x == c.id).unwrap_or(0) + 1;
-            format!("{} of {} · {}", pos, ids.len(), short_age(c.age_now()))
+            vec![
+                inbox::with_id(inbox::pos_of(pos, ids.len(), short_age(c.age_now())), c.id),
+                inbox::with_id(inbox::pos_n(pos, ids.len()), c.id),
+                inbox::card_id(c.id),
+            ]
         }
     };
     let head_w = glyph.width() + 1;
-    let meta = if head_w + s.title.width().min(12) + 2 + meta.width() <= w { meta } else { String::new() };
+    let fits = |m: &String| head_w + s.title.width().min(12) + 2 + m.width() <= w;
+    let meta = metas.iter().find(|m| fits(m)).or(metas.last().filter(|_| s.meta.is_none())).cloned().unwrap_or_default();
     let title = cut(&s.title, w.saturating_sub(head_w + if meta.is_empty() { 0 } else { meta.width() + 2 }));
     let fill = w.saturating_sub(head_w + title.width() + meta.width());
     Drawn::plain(Line::from(vec![
@@ -392,12 +419,12 @@ fn middle_lines(app: &App, c: &Card, s: &Shape, w: usize) -> Vec<Drawn> {
                 }
                 asked = true;
             }
-            // what was allowed already: dim, above the command
-            // the evidence under what it asks (a merge item's facts and
-            // link): dim, right under it
+            // what was allowed already, the evidence under what it asks (a
+            // merge item's facts and link): dim, right under it
             Part::Evidence(t) => plain(&mut main, t, fg(theme::dim())),
             Part::Reason(t) if !asked => plain(&mut main, t, fg(theme::dim())),
             Part::Reason(t) => plain(&mut side, t, fg(theme::dim())),
+            Part::Warn(t) => plain(&mut side, &format!("{} {t}", theme::glyph("▲")), fg(theme::error())),
             Part::Note(t) => plain(&mut side, t, fg(theme::dim()).add_modifier(Modifier::ITALIC)),
         }
     }
@@ -426,13 +453,18 @@ fn picked() -> Style {
 /// don't fit; the one highlighted (`hi`) accent on the ground. `typing`:
 /// the composer answers, the digits dim and no highlight. Then the hint,
 /// faint: `or type why not, ⏎ says no`.
-fn option_lines(s: &Shape, id: u64, w: usize, hi: Option<usize>, typing: bool) -> Vec<Drawn> {
+fn option_lines(c: &Card, s: &Shape, w: usize, hi: Option<usize>, typing: bool, closed: bool) -> Vec<Drawn> {
+    let id = c.id;
     let mut out = Vec::new();
     let num_st = fg(if typing { theme::dim() } else { theme::accent() });
     let label_st = fg(theme::dim());
     let texts: Vec<String> = s.options.iter().enumerate().map(|(i, l)| format!("{} {}", s.num(i), l)).collect();
     let one = texts.iter().map(|t| t.width()).sum::<usize>() + 3 * texts.len().saturating_sub(1);
-    if !texts.is_empty() && one <= w {
+    // the asker's own pick (notif-artifact): one option per line, `my pick` at its end
+    let mine_words = format!("   {}", inbox::my_pick);
+    let mine_words = mine_words.as_str();
+    let mine = super::cards::page_mine(c, s);
+    if !texts.is_empty() && one <= w && mine.is_empty() {
         let mut r = Row::default();
         let mut hits = Vec::new();
         for (i, label) in s.options.iter().enumerate() {
@@ -452,37 +484,47 @@ fn option_lines(s: &Shape, id: u64, w: usize, hi: Option<usize>, typing: bool) -
     } else {
         for (i, label) in s.options.iter().enumerate() {
             let on = !typing && hi == Some(i);
-            let rows = wrap_line(Line::from(label.clone()), w.saturating_sub(2).max(1));
+            let mine = mine.contains(&i);
+            let room = w.saturating_sub(2 + if mine { mine_words.width() } else { 0 }).max(1);
+            let rows = wrap_line(Line::from(label.clone()), room);
+            let last = rows.len().saturating_sub(1);
             for (j, row) in rows.into_iter().enumerate() {
                 let text: String = row.spans.iter().map(|s| s.content.as_ref()).collect();
                 let lead = if j == 0 { format!("{} ", s.num(i)) } else { "  ".to_string() };
-                let line = if on {
+                let mut line = if on {
                     Line::from(Span::styled(format!("{lead}{text}"), picked()))
                 } else {
                     Line::from(vec![Span::styled(lead, num_st), Span::styled(text, label_st)])
                 };
+                if mine && j == last {
+                    line.spans.push(Span::styled(mine_words.to_string(), fg(theme::faint())));
+                }
                 let d = Drawn { line, hits: Vec::new(), item: false };
                 let wd = d.width();
                 out.push(Drawn { hits: vec![(0, wd, CardHit::Pick(id, i))], ..d });
             }
         }
     }
-    if let Some(h) = hint(s) {
-        out.push(Drawn::plain(Line::from(Span::styled(cut(h, w), fg(theme::faint())))));
+    if let Some(h) = hint(c, s).filter(|_| !closed) {
+        out.push(Drawn::plain(Line::from(Span::styled(cut(&h, w), fg(theme::faint())))));
     }
     out
 }
 
-/// The hint under the options: how words answer.
-fn hint(s: &Shape) -> Option<&'static str> {
+/// The hint under the options: how words answer (a page's card: who
+/// reads them, card_page.rs).
+fn hint(c: &Card, s: &Shape) -> Option<String> {
     if !s.keys.is_empty() {
         return None;
     }
+    if let Some(h) = super::cards::page_hint(c, s) {
+        return Some(h);
+    }
     match s.enter {
-        Enter::Deny => Some("or type why not, ⏎ says no"),
-        Enter::Answer if s.words && !s.options.is_empty() => Some("or type your answer, ⏎ sends it"),
-        Enter::Answer if s.words => Some("type your answer, ⏎ sends it"),
-        Enter::Ack => Some("⏎ got it"),
+        Enter::Deny => Some(inbox::hint_why_not.into()),
+        Enter::Answer if s.words && !s.options.is_empty() => Some(inbox::hint_or_answer.into()),
+        Enter::Answer if s.words => Some(inbox::hint_answer.into()),
+        Enter::Ack => Some(format!("⏎ {}", inbox::key_got_it)),
         Enter::Answer => None,
     }
 }
@@ -494,14 +536,18 @@ fn hint(s: &Shape) -> Option<&'static str> {
 /// keeps its first lines, then `… n more lines · ctrl+o full screen`.
 fn item_block(app: &App, c: &Card, w: usize, cap: usize) -> Vec<Drawn> {
     let sb = &app.sb;
-    let s = shape(c);
+    let mut s = shape(c);
     // the bar and its gap on the left, one tinted column on the right:
     // `1 of 4 · 2m` never touches the tint's edge
     let tw = w.saturating_sub(3).max(1);
     let typing = !app.ed.text.is_empty();
+    // the update card's foot (`you're on v… · full notes on GitHub ↗`)
+    // always shows: its changelog gives way first (designer m_46118)
+    let foot = update_foot(c, &mut s, tw);
     let mut middle = middle_lines(app, c, &s, tw);
-    let opts = option_lines(&s, c.id, tw, sb.card.opt, typing);
-    let fixed = 4 + opts.len();
+    let opts = option_lines(c, &s, tw, sb.card.opt, typing, sb.closed_in_view().is_some_and(|g| g.id == c.id));
+    let link = super::cards::page_link_line(c, tw);
+    let fixed = 4 + opts.len() + usize::from(link.is_some()) + foot.len();
     let room = cap.saturating_sub(fixed);
     if middle.len() > room {
         let keep = room.saturating_sub(1);
@@ -514,13 +560,15 @@ fn item_block(app: &App, c: &Card, w: usize, cap: usize) -> Vec<Drawn> {
         let more = more + (keep - middle.len());
         let f = fg(theme::faint());
         middle.push(Drawn::plain(Line::from(vec![
-            Span::styled(format!("{} {} more line{} · ", theme::ellipsis(), more, if more == 1 { "" } else { "s" }), f),
+            Span::styled(format!("{} {} · ", theme::ellipsis(), common::more_lines(more)), f),
             Span::styled("ctrl+o", fg(theme::text())),
-            Span::styled(" full screen", f),
+            Span::styled(format!(" {}", inbox::key_full), f),
         ])));
     }
     let mut out = vec![Drawn::blank(), head_line(sb, c, &s, tw)];
     out.extend(middle);
+    out.extend(foot);
+    out.extend(link);
     if !opts.is_empty() {
         out.push(Drawn::blank());
         out.extend(opts);
@@ -533,6 +581,16 @@ fn item_block(app: &App, c: &Card, w: usize, cap: usize) -> Vec<Drawn> {
     out
 }
 
+/// An update card's last part (its foot, dim), taken out of its shape
+/// and drawn `w` wide; nothing for any other card.
+fn update_foot(c: &Card, s: &mut super::cards::Shape, w: usize) -> Vec<Drawn> {
+    if c.kind != "update" || c.release.is_none() || !matches!(s.parts.last(), Some(Part::Evidence(_))) {
+        return Vec::new();
+    }
+    let Some(Part::Evidence(t)) = s.parts.pop() else { return Vec::new() };
+    wrap_line(Line::from(crate::textlayer::copy_spans(&t, fg(theme::dim()))), w).into_iter().map(Drawn::plain).collect()
+}
+
 /// The box's inner lines, `w` columns, at most `max`; the open item at
 /// most `half` rows. At rest: a row per item (3 at most), `+ n more`;
 /// one row (`+ n` on its right) when `max` is short. An item open: the
@@ -540,7 +598,15 @@ fn item_block(app: &App, c: &Card, w: usize, cap: usize) -> Vec<Drawn> {
 /// where it stood (past the third: in the third's place).
 fn box_lines(app: &App, w: usize, max: usize, half: usize) -> Vec<Drawn> {
     let sb = &app.sb;
-    let es = entries(sb);
+    let mut es = entries(sb);
+    // the card the hub closed while your words were typed stays open on
+    // top; the rows keep their ctrl+N numbers
+    let closed = sb.closed_in_view().filter(|_| !sb.card.full);
+    let off = usize::from(closed.is_some());
+    if let Some(g) = closed {
+        es.insert(0, Entry::One(g));
+    }
+    let num = |i: usize| i + 1 - off;
     if es.is_empty() || max == 0 {
         return Vec::new();
     }
@@ -558,14 +624,14 @@ fn box_lines(app: &App, w: usize, max: usize, half: usize) -> Vec<Drawn> {
         if need > max {
             return vec![box_row(app, &es[0], 1, w, es.len() - 1)];
         }
-        let mut out: Vec<Drawn> = shown.iter().map(|&i| box_row(app, &es[i], i + 1, w, 0)).collect();
+        let mut out: Vec<Drawn> = shown.iter().map(|&i| box_row(app, &es[i], num(i), w, 0)).collect();
         let hidden: Vec<usize> = (shown.len()..es.len()).collect();
         if !hidden.is_empty() {
             out.push(more_row(&es, &hidden, w));
         }
         return out;
     };
-    let Some(c) = sb.card_by_id(id) else { return Vec::new() };
+    let Some(c) = sb.card_by_id(id).or(closed) else { return Vec::new() };
     // the other rows step out when the item would be cramped
     let others = |shown: &[usize]| shown.len() - 1 + usize::from(es.len() > shown.len()) + usize::from(fold.is_some());
     if max.saturating_sub(others(&shown)) < ITEM_MIN {
@@ -580,7 +646,7 @@ fn box_lines(app: &App, w: usize, max: usize, half: usize) -> Vec<Drawn> {
         if i == at {
             out.extend(item_block(app, c, w, cap));
         } else {
-            out.push(box_row(app, &es[i], i + 1, w, 0));
+            out.push(box_row(app, &es[i], num(i), w, 0));
         }
     }
     let hidden: Vec<usize> = (0..es.len()).filter(|i| !shown.contains(i)).collect();
@@ -635,10 +701,10 @@ pub(crate) fn box_height(app: &App, fit: BoxFit, w: u16) -> u16 {
 /// words dim.
 fn opener_label(app: &App, rows: usize) -> (String, &'static str) {
     match crate::reach::opener(app) {
-        crate::reach::Opener::CtrlDigit if rows <= 1 => ("ctrl+1".into(), "open"),
-        crate::reach::Opener::CtrlDigit => (format!("ctrl+1-{}", rows.min(STRIP_ROWS)), "open"),
-        crate::reach::Opener::Click => ("click".into(), "to open"),
-        crate::reach::Opener::Command => ("/inbox".into(), "opens it"),
+        crate::reach::Opener::CtrlDigit if rows <= 1 => ("ctrl+1".into(), inbox::key_open),
+        crate::reach::Opener::CtrlDigit => (format!("ctrl+1-{}", rows.min(STRIP_ROWS)), inbox::key_open),
+        crate::reach::Opener::Click => ("click".into(), inbox::opener_click),
+        crate::reach::Opener::Command => ("/inbox".into(), inbox::opener_command),
     }
 }
 
@@ -653,8 +719,8 @@ fn top_border(app: &App, w: usize) -> Line<'static> {
     let right = format!(" {key} {words} ");
     // the corners and the `─ ` around the title and the right side
     let frame_w = 2 + 1 + 2;
-    let mut title = format!("inbox · {n} waiting for you");
-    for t in [format!("inbox · {n} waiting for you"), format!("inbox · {n} waiting"), "inbox".to_string()] {
+    let mut title = String::new();
+    for t in [format!("{} · {}", inbox::head, common::waiting_for_you(n)), format!("{} · {}", inbox::head, common::count_waiting(n)), inbox::head.to_string()] {
         title = t;
         if frame_w + title.width() + 1 + right.width() <= w {
             break;
@@ -797,9 +863,8 @@ fn tabs_line(sb: &Sb, cur: u64, at: Rect, hits: &mut Vec<(Rect, CardHit)>) -> Li
 /// Where the item is scrolled (none when it fits).
 fn scroll_hint(scroll: usize, max_scroll: usize) -> String {
     match max_scroll.saturating_sub(scroll) {
-        0 => "end · pgup".to_string(),
-        1 => format!("{} 1 more line · pgdn", theme::G_OPEN),
-        n => format!("{} {} more lines · pgdn", theme::G_OPEN, n),
+        0 => inbox::scroll_end.to_string(),
+        n => format!("{} {}", theme::G_OPEN, inbox::scroll_more(n)),
     }
 }
 
@@ -827,7 +892,8 @@ pub(crate) fn draw_view(app: &mut App, frame: &mut Frame, area: Rect) {
     // the body: from 2 rows under the head, scrolled
     let typing = !app.ed.text.is_empty();
     let mut lines = middle_lines(app, &c, &s, tw);
-    let opts = option_lines(&s, c.id, tw, sb.card.opt, typing);
+    lines.extend(super::cards::page_link_line(&c, tw));
+    let opts = option_lines(&c, &s, tw, sb.card.opt, typing, sb.closed_in_view().is_some_and(|g| g.id == c.id));
     if !opts.is_empty() {
         lines.push(Drawn::blank());
         lines.extend(opts);
@@ -903,105 +969,20 @@ fn lines_bar() -> &'static str {
     lines().bar
 }
 
-/// The divider's label while an item is open: `you → ? t3 · your
-/// answer`.
-pub(crate) fn divider_label(app: &App) -> Option<Vec<Span<'static>>> {
-    if !item_open(app) {
-        return None;
-    }
-    let c = app.sb.current_card()?;
-    let arrow = if theme::ascii_mode() { "->" } else { "→" };
-    Some(vec![
-        Span::raw(" "),
-        Span::styled(format!("you {} ", arrow), fg(theme::dim())),
-        Span::styled(format!("{} {}", kind_look(&c.kind).1, c.agent), fg(theme::accent())),
-        Span::styled(" · your answer", fg(theme::dim())),
-        Span::raw(" "),
-    ])
-}
+#[path = "card_keys.rs"]
+mod card_keys;
+pub(crate) use card_keys::{divider_label, fit_pairs, key_pairs};
+#[path = "answer_target.rs"]
+pub(crate) mod answer_target;
 
-/// The key bar while an item is open (designer's round 2): in place
-/// `1-3 answer   ←→ choose   ↑↓ other items   ctrl+o full screen   esc
-/// back to your message` (a hard rule `1 3 answer`; an option
-/// highlighted `⏎ always allow` first); full screen `1-3 answer   ↑↓
-/// other items   pgup pgdn scroll   ctrl+o back in place   esc back to
-/// your message`; text typed `⏎ says no, with your note` (a question
-/// `⏎ sends your answer`). No options: `⏎ got it` (done, overlap).
-pub(crate) fn key_pairs(app: &App) -> Vec<(&'static str, String)> {
-    let sb = &app.sb;
-    let Some(c) = sb.current_card() else { return Vec::new() };
-    let s = shape(c);
-    let n = s.options.len();
-    let more = sb.sorted_cards().len() > 1;
-    let full = sb.card.full;
-    let p = |k: &'static str, l: &str| (k, l.to_string());
-    // an item with its own keys (the connectors key: `paste your key ·
-    // ⏎ save · ctrl+x not now · esc back`)
-    if !s.keys.is_empty() {
-        return s.keys.iter().map(|(k, l)| p(k, l)).collect();
+#[cfg(test)]
+mod role_tests {
+    /// Law: a tool call in a role never shows; a role that is only one is none.
+    #[test]
+    fn a_role_never_shows_a_tool_call() {
+        assert_eq!(super::shown_role("{{bash: sleep 300}}"), "");
+        assert_eq!(super::shown_role("lean installs {{bash: sleep 300}} by default"), "lean installs by default");
+        assert_eq!(super::shown_role("shipping\n  2.5.0"), "shipping 2.5.0");
+        assert_eq!(super::shown_role("half {{open"), "half");
     }
-    let mut v = Vec::new();
-    let back = p("esc", "back to your message");
-    if !app.ed.text.is_empty() {
-        v.push(p("⏎", if s.enter == Enter::Deny { "says no, with your note" } else { "sends your answer" }));
-        v.push(if full { p("ctrl+o", "back in place") } else { p("ctrl+o", "full screen") });
-        v.push(back);
-        return v;
-    }
-    match sb.card.opt.filter(|i| *i < n) {
-        Some(i) => v.push(("⏎", cut(&s.options[i], 32))),
-        // a hard rule's card: 1 allow, 3 no (designer)
-        None if n > 0 && s.nums == [1, 3] => v.push(p("1 3", "answer")),
-        None if n > 0 => v.push(p(digits(n), "answer")),
-        None if s.enter == Enter::Ack => v.push(p("⏎", "got it")),
-        None => {}
-    }
-    if n > 0 && !full {
-        v.push(p("←→", "choose"));
-    }
-    if more {
-        v.push(p("↑↓", "other items"));
-    }
-    if full {
-        v.push(p("pgup pgdn", "scroll"));
-        v.push(p("ctrl+o", "back in place"));
-    } else {
-        v.push(p("ctrl+o", "full screen"));
-    }
-    v.push(back);
-    v
-}
-
-/// The pairs of an open item's key bar that fit in `width`: `ctrl+o`
-/// goes first, then `←→ choose` and `pgup pgdn`, then esc says `back`
-/// (80 columns: `1-3 answer   ↑↓ other items   esc back`); then the
-/// others drop from the right, the first pair last.
-pub(crate) fn fit_pairs(mut v: Vec<(&'static str, String)>, width: usize) -> Vec<(&'static str, String)> {
-    let w = |v: &[(&'static str, String)]| {
-        v.iter().map(|(k, l)| k.width() + l.width() + 1).sum::<usize>() + 3 * v.len().saturating_sub(1)
-    };
-    // the long form needs room to breathe: under 100 columns, the short one
-    let roomy = |v: &[(&'static str, String)]| w(v) <= width && width >= 100;
-    for k in ["ctrl+o", "←→", "pgup pgdn"] {
-        if roomy(&v) {
-            return v;
-        }
-        v.retain(|(key, _)| *key != k);
-    }
-    if w(&v) > width || width < 100 {
-        for (k, l) in v.iter_mut() {
-            if *k == "esc" {
-                *l = "back".into();
-            }
-        }
-    }
-    // then from the right, the first pair (what answers) last
-    while v.len() > 1 && w(&v) > width {
-        if v.len() > 2 {
-            v.remove(v.len() - 2);
-        } else {
-            v.pop();
-        }
-    }
-    v
 }

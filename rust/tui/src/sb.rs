@@ -8,38 +8,44 @@
 //! `Sb::views` and are swapped in on focus change.
 
 use super::*;
-use bise_proto::thread::lines::{self, GateStep, Hub};
+use bise_proto::thread::lines::{GateStep, Hub};
 use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::os::unix::net::UnixStream;
 
 mod versions;
 pub(super) use versions::{version_choices, versions_dev};
-use versions::{parse_versions, VersionItem};
+use versions::VersionItem;
 mod mention;
 pub(crate) mod palette;
 pub(super) use mention::mentions;
 mod cards;
+mod opt_open;
 pub(super) use cards::{card_choices, card_mouse, proves_ctrl_digits};
 pub(crate) use cards::{answer_by_voice, show_heard, voice_question};
 pub(crate) use cards::{ambient_local, ambient_options, ambient_reply, split_choices};
 use cards::{Card, CardView};
 mod card_draw;
-pub(super) use card_draw::{box_height, card_frame, BoxFit, card_view_open, divider_label as card_divider_label, draw_box, draw_view as draw_card_view, fit_pairs as fit_card_pairs, key_pairs as card_key_pairs};
+pub(super) use card_draw::{answer_target, box_height, card_frame, BoxFit, card_view_open, divider_label as card_divider_label, draw_box, draw_view as draw_card_view, fit_pairs as fit_card_pairs, key_pairs as card_key_pairs};
 mod panel;
+pub(crate) mod numbers;
+mod waiting;
+pub(crate) use waiting::{end_short, rule_states as watching_rule, Watch};
 pub(crate) mod places;
 #[cfg(test)]
 mod tour_tests;
 #[cfg(test)]
 mod places_tests;
-pub(super) use panel::PANEL_TITLE;
-pub(super) use panel::{archived_refusal, archived_warn, draw_panel, focus_model, key_mode, panel_mouse, placeholder, split, status_state, viewed_model, viewed_who, viewed_working, workspace};
+pub(super) use panel::{archived_refusal, PANEL_TITLE, archived_warn, draw_panel, focus_model, key_mode, panel_mouse, placeholder_fit, placeholder_parts, split, status_state, viewed_model, viewed_who, viewed_working, workspace};
 #[cfg(test)]
 pub(super) use panel::status_text;
-pub(crate) use panel::{demo_ready, fill_demo, prefill_demo, DEMO, DEMO_READY};
+pub(crate) use panel::{demo_ready, fill_demo, prefill_demo, short_age, DEMO, DEMO_READY};
 use panel::glyph;
 mod feed;
 pub(super) use feed::FeedWindow;
+pub(crate) mod feed_entries;
+#[cfg(test)]
+pub(crate) mod entries_for_tests;
 mod client;
 pub(crate) mod setup;
 mod tune;
@@ -49,12 +55,28 @@ mod keep;
 mod keep_tests;
 pub(crate) mod reload_wait;
 mod keys;
+pub(crate) mod rpc;
+pub(crate) mod inbox;
+pub(crate) mod hub_reads;
+mod state_rows;
+mod reads;
+pub(crate) mod queued;
+pub(crate) mod lead;
+mod send;
+mod theme_cmd;
+use theme_cmd::theme_command;
+pub(crate) use reads::ask_answer;
+#[cfg(test)]
+pub(crate) use client::{hub_event_lines, Printed};
+#[cfg(test)]
+pub(crate) use reads::test_view;
 pub(crate) mod release;
 pub(super) use keys::key;
 pub(crate) use keys::{scene, Scene};
 #[cfg(test)]
 use keys::{nav_key, Nav};
 pub use client::{run_switchboard, take_reexec, take_refused};
+pub use hub_reads::init_line;
 pub use tune::setup_main;
 use client::{follow_hub_exe, follow_reload, HUB_DOWN, HUB_UP};
 #[cfg(test)]
@@ -75,13 +97,16 @@ pub(crate) fn strip_rows(app: &App) -> usize {
 
 /// What the terminal's tab title says (termtitle.rs): the workspace's
 /// folder, the inbox's cards, the new artifacts, the agents at work
-/// (working or waiting on another agent; main and archived left out).
+/// (working, waiting on another agent or on an event; main and archived
+/// left out).
 pub(crate) fn title_status(app: &App) -> crate::termtitle::Status {
     let sb = &app.sb;
     crate::termtitle::Status {
         repo: crate::termtitle::repo_name(&sb.workspace),
         inbox: sb.sorted_cards().len(),
-        running: sb.agents.iter().filter(|a| !a.main && a.busy()).count(),
+        // event-wake: an agent waiting on an event is not idle
+        running: sb.agents.iter().filter(|a| !a.main && (a.busy() || a.waits_event())).count(),
+        paused: sb.paused.is_some(),
     }
 }
 
@@ -94,7 +119,7 @@ pub(crate) fn ctrl_view(app: &App) -> CtrlView {
     }
 }
 use feed::{
-    clear_feed, ingest_at, prepend_page, swap_draft, swap_feed, trim_window, want_older, with_feed, View,
+    clear_feed, swap_draft, swap_feed, trim_window, want_older, with_feed, View,
 };
 
 #[derive(Clone, Default)]
@@ -107,7 +132,13 @@ pub(super) struct Agent {
     branch: Option<String>,
     path: String,
     note: String,
+    /// the agents' messages waiting for its turn to end (the row's
+    /// `msgs_queued`)
     queued: u64,
+    /// issue 23: his messages the hub holds for its turn's end (the row's
+    /// `queued`, oldest first): the queue above the composer and the
+    /// panel's `· N queued` (queue.rs draws them, ↑ takes one back)
+    pub(crate) mine_queued: Vec<bise_proto::draft::Queued>,
     /// BISE-299: main's inbox, the agents' questions waiting for main (a
     /// quiet count on main's row: the user is not asked)
     inbox: u64,
@@ -118,6 +149,11 @@ pub(super) struct Agent {
     /// task: what it did, and about when it stopped).
     report: String,
     report_ms: Option<u64>,
+    /// Since when it has its status, and its title (the hub's row): what
+    /// an archived one's light row carries when it has no report nor
+    /// objective (agents-light, architect m_37220).
+    since_ms: u64,
+    title: String,
     /// What it is doing now, one line (BISE-126): the hub's role line, ""
     /// for main.
     role: String,
@@ -144,6 +180,20 @@ pub(super) struct Agent {
     /// None when the hub does not know (the `± 9 files` door, the live
     /// diff panel)
     changes: Option<(u64, u64, u64)>,
+    /// Its context after its last model call (the divider's gauge, the
+    /// panel row's fill): the hub's row, from its live usage lines; None
+    /// before its first call since the hub started and after a compaction.
+    usage: Option<bise_proto::rows::AgentUsage>,
+    /// event-wake: the events it waits for now (the hub's row,
+    /// `watching`), oldest first: the panel's `…`, the live line
+    watching: Vec<bise_proto::rows::AgentWatch>,
+    /// running-procs: how many processes it left running, and the lowest
+    /// port they listen on (the panel's faint `∿ 2 running · :5173`)
+    procs: u16,
+    procs_port: Option<u16>,
+    /// agent-rank: its place in the hub's one order (main 0), none from
+    /// an older hub (numbers.rs: start order)
+    rank: Option<u32>,
 }
 
 impl Agent {
@@ -153,7 +203,13 @@ impl Agent {
 
     /// When it was last heard of: its last report, else its creation.
     fn last_ms(&self) -> u64 {
-        self.report_ms.unwrap_or(self.created_ms)
+        self.report_ms.or(Some(self.since_ms).filter(|ms| *ms > 0)).unwrap_or(self.created_ms)
+    }
+
+    /// What an archived row says under its name: its report, else its
+    /// objective, else its title (a light row has only that).
+    fn archived_what(&self) -> &str {
+        [&self.report, &self.objective, &self.title].into_iter().find(|s| !s.is_empty()).map_or("", |s| s.as_str())
     }
 
     /// The current turn's age now: the hub's `turn_ms` plus the time
@@ -166,6 +222,17 @@ impl Agent {
     /// In a turn (its feed shows the spinner).
     fn busy(&self) -> bool {
         self.status == "working" || self.status == "waiting"
+    }
+
+    /// agent-waiting-states A: idle and a watch `resumes` it: `…`, the live
+    /// line (an alarm alone: idle; a turn or a state says itself).
+    fn waits_event(&self) -> bool {
+        self.watching.iter().any(|w| w.resumes) && matches!(self.status.as_str(), "idle" | "")
+    }
+
+    /// Since when it pauses (its oldest pause's set, ms).
+    fn wait_since(&self) -> Option<u64> {
+        self.watching.iter().filter(|w| w.resumes).map(|w| w.since_ms).min()
     }
 }
 
@@ -184,14 +251,19 @@ pub(super) struct Sb {
     /// The repo's flow, `pr` or `trunk` ("" until the hub says): the
     /// header's held `lands via PRs` (dev-flow §7).
     flow: String,
+    /// cost-pause: since when the project is paused (the hub's typed
+    /// `paused`); None: it runs. The header and the tab title say it.
+    pub(crate) paused: Option<u64>,
     cards: Vec<Card>,
+    /// msg-parts: the typed parts of the message the composer is sending
+    /// (`attach::expand`), taken by the next line that is their text
+    pub(super) parts_out: Vec<bise_proto::parts::Part>,
     /// dev-flow §5.1: the feature merge item asking `drop it?` once more
     /// (its `3 drop the branch` was picked), by card id.
     feature_drop_ask: Option<u64>,
     /// Index in `nav()` of the highlighted entry of the panel.
     selected: Option<usize>,
     preview: bool,
-    confirm: Option<(u64, String)>,
     /// `/release-bise`'s plan waiting for your y/n (BISE-235).
     release_ask: Option<release::Ask>,
     /// The release running: its tag, since when (the header's item).
@@ -199,10 +271,30 @@ pub(super) struct Sb {
     /// `/update` building HEAD in the dev build (dev-update): its short
     /// hash, since when (the header's item when no release runs).
     updating: Option<(String, std::time::Instant)>,
+    /// A newer bise, as the hub sees it (update-flow, `bise_update`):
+    /// the header's line when nothing else runs.
+    bise_update: Option<bise_proto::rows::BiseUpdate>,
     /// `D` on an agent asks first (book §16): the agent to drop on `y`.
     drop_ask: Option<String>,
     /// The feeds out of view where lines arrived since their last visit.
     activity: std::collections::HashSet<String>,
+    /// What the live reads of entries remember of each thread
+    /// (`crate::entry_reads`).
+    seen: HashMap<String, crate::entry_reads::Seen>,
+    /// Each agent's answer as it streams in (the `thread/partial`
+    /// notification, livetext.rs): memory only.
+    pub(super) lives: HashMap<String, crate::livetext::Live>,
+    /// The threads subscribed on this connection (sb/feed_entries.rs).
+    subscribed: std::collections::HashSet<String>,
+    /// Each agent's last row as the turn edges read it: its turn runs,
+    /// its ended turns (feed_entries::agent_row).
+    turns_seen: HashMap<String, (bool, u64)>,
+    /// issue 23: the queue drawer's view state (sb/queued.rs): the rows
+    /// asked back, the focused row, the last delete for its undo.
+    pub(crate) queue: queued::Drawer,
+    /// The agent whose first page `ready` waits for (the focus at the
+    /// connection, sb/feed_entries.rs `on_ready`): none, it came.
+    ready_page: Option<String>,
     ready: bool,
     /// The version the hub runs (its VERSION id), for the status row.
     version: String,
@@ -238,6 +330,11 @@ pub(super) struct Sb {
     /// The scheduled tasks (sb every), active then a week of ended ones
     /// (the state's `timers`): /scheduled and the panel's ◷ next run.
     pub(crate) timers: Vec<crate::scheduled::Task>,
+    /// agents-light: the hub's archived light list as last sent (an
+    /// agents event without one keeps it), merged into the rows.
+    pub(crate) archived: bise_proto::rows::Archived,
+    /// The JSON-RPC requests waiting for their answer (sb/rpc.rs).
+    rpc: rpc::Calls,
 }
 
 /// What the hub says of approvals: the global mode (`yolo` / `auto`),
@@ -279,20 +376,6 @@ pub(crate) struct Rule {
 }
 
 impl Rule {
-    fn of(v: &Value) -> Rule {
-        Rule {
-            raw: v.clone(),
-            tool: str_of(v, "tool"),
-            pattern: str_of(v, "pattern"),
-            path: str_of(v, "path"),
-            every: str_of(v, "project").is_empty(),
-            // the hub writes ms; a hand-written date is not read
-            added: str_of(v, "added").parse().ok(),
-            from: str_of(v, "from"),
-            outside: v.get("sandbox").and_then(|x| x.as_bool()) == Some(false),
-        }
-    }
-
     /// Its facts for the words (bise_proto::approvals).
     pub(crate) fn facts(&self) -> bise_proto::approvals::RuleFacts<'_> {
         bise_proto::approvals::RuleFacts {
@@ -311,11 +394,6 @@ impl Approvals {
     pub(crate) fn word(&self) -> &str {
         if self.mode.is_empty() { "yolo" } else { &self.mode }
     }
-}
-
-/// The string field `k` of `v` ("" when absent).
-fn str_of(v: &Value, k: &str) -> String {
-    v.get(k).and_then(|x| x.as_str()).unwrap_or("").to_string()
 }
 
 impl Sb {
@@ -340,14 +418,6 @@ impl Sb {
     /// [`Sb::send`] from a shared borrow (a popup asking the hub for
     /// its list while it draws).
     pub(crate) fn send_shared(&self, v: Value) {
-        let mut s = v.to_string();
-        s.push('\n');
-        if let Ok(mut w) = self.writer.lock() {
-            let _ = w.write_all(s.as_bytes());
-        }
-    }
-
-    pub(crate) fn send(&mut self, v: Value) {
         let mut s = v.to_string();
         s.push('\n');
         if let Ok(mut w) = self.writer.lock() {
@@ -469,35 +539,39 @@ impl Sb {
         self.agent(&self.focus).is_some_and(|a| a.archived())
     }
 
-    /// The context usage of an agent's feed (the focused one lives in
-    /// the `App` fields).
-    fn usage_of<'a>(&'a self, app: &'a App, name: &str) -> Option<&'a crate::usage::Usage> {
-        if self.focus == name {
-            return crate::usage::current(&app.events);
-        }
-        crate::usage::current(&self.views.get(name)?.events)
+    /// The context usage of an agent (the hub/agents row's).
+    fn usage_of(&self, name: &str) -> Option<&bise_proto::rows::AgentUsage> {
+        self.agent(name)?.usage.as_ref()
     }
 
-    /// The model of the agent in focus (BISE-150): the one its last
-    /// usage line names, else the one its role starts with (main's or
-    /// the sub-agents', from the catalog's setup).
-    fn focus_model(&self, app: &App) -> String {
+    /// The model of the agent in focus (BISE-150): the one the hub says
+    /// it runs, else the one its last call ran (its usage), else the one
+    /// its role starts with (main's or the sub-agents', from the
+    /// catalog's setup).
+    fn focus_model(&self, _app: &App) -> String {
+        let a = self.agent(&self.focus);
         // the hub says what it runs now (BISE-135: a /model switch)
-        if let Some(m) = self.agent(&self.focus).map(|a| a.model.clone()).filter(|m| !m.is_empty()) {
+        if let Some(m) = a.map(|a| a.model.clone()).filter(|m| !m.is_empty()) {
             return m;
         }
-        let used = app.events.iter().rev().find_map(|e| match e {
-            crate::Ev::Usage(u) if !u.model.is_empty() => Some(u.model.clone()),
-            _ => None,
-        });
-        used.unwrap_or_else(|| {
-            let main = self.agent(&self.focus).is_none_or(|a| a.main);
-            crate::models::model_for(main)
-        })
+        if let Some(m) = a.and_then(|a| a.usage.as_ref()).map(|u| u.model.clone()).filter(|m| !m.is_empty()) {
+            return m;
+        }
+        crate::models::model_for(a.is_none_or(|a| a.main))
     }
 
     fn agent(&self, name: &str) -> Option<&Agent> {
         self.agents.iter().find(|a| a.name == name)
+    }
+
+    /// The agents' names in the panel's order (/running's groups).
+    pub(crate) fn agent_names(&self) -> Vec<String> {
+        self.agents.iter().map(|a| a.name.clone()).collect()
+    }
+
+    /// The agent in view when it is not main (/running opens on its rows).
+    pub(crate) fn focused_task(&self) -> Option<String> {
+        self.agent(&self.focus).filter(|a| !a.main).map(|a| a.name.clone())
     }
 
     /// `name`'s folder (its name but after a rename; its name when the
@@ -525,50 +599,12 @@ impl Sb {
     /// Tell the hub which feed is in focus.
     fn send_focus(&mut self) {
         let focus = self.focus.clone();
-        self.send(json!({"op": "focus", "focus": focus}));
-    }
-
-    /// A line typed to the agent in focus (the hub interprets it).
-    fn send_input(&mut self, text: String) {
-        let focus = self.focus.clone();
-        self.send_input_to(&focus, text);
-    }
-
-    /// What the user typed, for `agent` (in view or not).
-    fn send_input_to(&mut self, agent: &str, text: String) {
-        // computer use (C6, m_3893): a message to an agent you stopped is
-        // its go-ahead; `@name …` is for that agent
-        if !text.starts_with('/') {
-            let to = text.split_whitespace().next().and_then(|w| w.strip_prefix('@')).filter(|n| self.agent(n).is_some());
-            crate::computer_use::resume_if_stopped(to.unwrap_or(agent));
-        }
-        self.send(json!({"op": "input", "focus": agent, "text": text}));
+        self.call("client/focus", json!({"focus": focus}), rpc::Then::Shown);
     }
 }
 
 /// What `ctrl+z` and a typed `/cancel` say (book §13, §17).
-pub(super) const NO_UNDO: &str =
-    "no undo: an agent may already have acted. say the change to main instead (\"no, v1 for docs\").";
-
-/// `/theme [auto|light|dark]`: switch the palette now and keep it for
-/// the next launches (`choose`: `theme_detect::choose`, a fake in tests
-/// so they never write the real home). No argument: say which one is in
-/// use.
-fn theme_command(
-    arg: Option<&str>,
-    choose: impl Fn(crate::theme_detect::Choice) -> (crate::theme::Mode, Result<(), String>),
-) -> Ev {
-    use crate::theme_detect::Choice;
-    let name = |m| if m == crate::theme::Mode::Light { "light" } else { "dark" };
-    match arg.map(Choice::parse) {
-        None => Ev::Info(format!("theme: {}. /theme auto, light or dark to change it.", name(crate::theme::mode()))),
-        Some(Some(c)) => match choose(c) {
-            (m, Ok(())) => Ev::Info(format!("theme: {}.", name(m))),
-            (m, Err(e)) => Ev::Warn(format!("theme: {}, for now: i couldn't save it ({}).", name(m), e)),
-        },
-        Some(None) => Ev::Warn("/theme takes auto, light or dark.".into()),
-    }
-}
+pub(super) const NO_UNDO: &str = bise_proto::words::composer::no_undo;
 
 /// Ctrl+L in the switchboard: the feed in focus is cleared, its lines
 /// stay reachable by scrolling up (`feed::clear_feed`).
@@ -613,6 +649,24 @@ pub(super) fn background_events(app: &App) -> usize {
     app.sb.views.values().map(|v| v.events.len()).sum()
 }
 
+/// update-flow: `/update auto on|off` sets the user's `Update
+/// automatically` (prefs `auto_update`, the hubs read it at their next
+/// look); its answer in the catalog's words. No on/off: what it is now.
+fn auto_update(typed: &str) -> String {
+    use bise_proto::words::settings;
+    let home = bise_home::Home::from_env();
+    let slot = bise_home::prefs::Slot::key(home.prefs_file(), bise_home::prefs::AUTO_UPDATE);
+    let on = match typed.split_whitespace().nth(2) {
+        Some("on") => true,
+        Some("off") => false,
+        _ => slot.get().and_then(|v| v.as_bool()).unwrap_or(false),
+    };
+    if let Err(e) = slot.set(serde_json::Value::Bool(on)) {
+        return format!("couldn't save it: {e}");
+    }
+    (if on { settings::auto_update_on } else { settings::auto_update_off }).to_string()
+}
+
 /// The hub is back (a new connection, `hello` sent): it replays every
 /// feed, so the feeds start empty again. The focus and the drafts stay.
 fn hub_reconnected(app: &mut App) {
@@ -630,10 +684,12 @@ fn hub_reconnected(app: &mut App) {
         v.ed = draft;
     }
     sb.activity.clear();
+    sb.seen.clear();
+    sb.lives.clear();
     sb.ready = false;
-    sb.confirm = None;
     sb.release_ask = None;
     sb.release = None;
+    sb.rpc.forget();
     sb.send_focus();
 }
 
@@ -650,254 +706,39 @@ pub(super) fn dispatch(app: &mut App, raw: &str) {
     let Ok(v) = serde_json::from_str::<Value>(raw) else {
         return;
     };
-    let s = |k: &str| str_of(&v, k);
-    match s("ev").as_str() {
-        "line" => {
-            let pos = v.get("pos").and_then(|x| x.as_u64()).map(|p| p as usize);
-            let ts = v.get("ts").and_then(|x| x.as_u64());
-            ingest_for(app, &s("agent"), s("line"), pos, ts)
+    // a JSON-RPC response (client-protocol step 3): its request's answer;
+    // a notification (step 4): its typed reader
+    if v.get("jsonrpc").is_some() {
+        if hub_reads::init(app, &v) {
+            return;
         }
-        "history" => {
-            let before = v.get("before").and_then(|x| x.as_u64()).unwrap_or(0) as usize;
-            let lines = crate::wire::parse_history(&v);
-            with_feed(app, &s("agent"), |app| prepend_page(app, before, lines));
-        }
-        "state" => apply_state(app, &v),
-        // the hub refused this client (it runs in an agent's process,
-        // docs/issues/16): say why once the terminal is back, and end
-        "refused" => {
-            client::set_refused(s("error"));
-            app.should_quit = true;
-        }
-        // artifacts (site/m/artifacts, docs/artifacts.md): the whole list;
-        // the feed's chips are built again with the new titles
-        "artifacts" => {
-            crate::artifacts::set_from(&v);
-            crate::artifacts_screen::on_list(app);
-            app.cache.iter_mut().for_each(|c| *c = None);
-        }
-        "diff" => crate::diffview::event(app, &v),
-        "branches" => crate::diffbranches::branches_event(&v),
-        // update-card: `/update` with a newer release opens its item here
-        "open_card" => {
-            if let Some(id) = v.get("id").and_then(|x| x.as_u64()) {
-                cards::open_view(app, Some(id));
-            }
-        }
-        "notice" => {
-            // the hub refused an input (it says so in a notice): a queued
-            // message that went will start no turn, so the queue moves on
-            crate::queue::seen(app);
-            for l in s("text").lines() {
-                push_event(&mut app.events, &mut app.cache, Ev::Info(l.to_string()));
-            }
-        }
-        // `/prs` (pr-news, designer): one dim head row, then each PR like
-        // a PR line, its URL dim under it
-        "prs" => {
-            for e in prs_events(&v) {
-                push_event(&mut app.events, &mut app.cache, e);
-            }
-        }
-        "confirm" => {
-            let id = v.get("id").and_then(|x| x.as_u64()).unwrap_or(0);
-            let text = s("text");
-            push_event(&mut app.events, &mut app.cache, Ev::Warn(text.clone()));
-            push_event(
-                &mut app.events,
-                &mut app.cache,
-                Ev::Info("answer y (yes) or n (no), then ⏎".into()),
-            );
-            let sb = &mut app.sb;
-            sb.confirm = Some((id, text));
-            sb.calls += 1;
-        }
-        "release" => release::event(app, &v),
-        "update" => release::update_event(app, &v),
-        "approvals" => approvals_event(app, &v),
-        "focus" => focus(app, &s("focus")),
-        "renamed" => {
-            let (old, new) = (s("old"), s("new"));
-            let sb = &mut app.sb;
-            if let Some(view) = sb.views.remove(&old) {
-                sb.views.insert(new.clone(), view);
-            }
-            if sb.focus == old {
-                sb.focus = new;
-            }
-        }
-        "versions" => {
-            let sb = &mut app.sb;
-            sb.versions = parse_versions(&v);
-            sb.versions_dev = v.get("dev").and_then(|x| x.as_bool());
-        }
-        "hello" => {
-            let sb = &mut app.sb;
-            sb.workspace = s("workspace");
-            crate::artifacts::set_workspace(&sb.workspace);
-            sb.version = v
-                .pointer("/version/id")
-                .and_then(|x| x.as_str())
-                .unwrap_or("")
-                .to_string();
-            // the hub runs another version: this TUI follows it
-            let exe = s("exe");
-            let reload = s("reload");
-            let first = sb.reload_seen.is_none();
-            let reloaded = !first && !reload.is_empty() && sb.reload_seen.as_deref() != Some(reload.as_str());
-            if first {
-                sb.reload_seen = Some(reload);
-            }
-            // a reload (BISE-131) starts the same binary again; both wait
-            // for the keys to stop (sb/reload_wait.rs, run.rs quits); the
-            // drafts, queues and view are written when the UI ends
-            if (!exe.is_empty() && follow_hub_exe(&exe)) || (reloaded && follow_reload()) {
-                app.sb.reload_wait.ask(std::time::Instant::now());
-            }
-        }
-        "ready" => {
-            let sb = &mut app.sb;
-            sb.ready = true;
-            // the queues saved by the TUI before this one (a reload, a
-            // restart): back now that the feeds say who is busy
-            drafts::requeue(app);
-            // the inbox answers and what was open (a reload)
-            keep::apply(app);
-        }
-        _ => {}
-    }
-}
-
-fn ingest_for(app: &mut App, agent: &str, line: String, pos: Option<usize>, ts: Option<u64>) {
-    let sb = &mut app.sb;
-    // BISE-61: the first live message between agents in view
-    let level3 = sb.ready
-        && sb.focus == agent
-        && (line.starts_with("sb msg : ") || line.starts_with("sb msg-in : "));
-    // BISE-15: the first steering the model read (its line turns ✓✓)
-    let steered = sb.ready && sb.focus == agent && line.contains("obs: steered: ");
-    // zen (BISE-121): a live card or message to you, in any feed
-    if sb.ready && (line.starts_with("sb card : ") || line.starts_with("sb msg-you : ") || line.starts_with("sb msg-in : @")) {
-        sb.calls += 1;
-    }
-    if sb.focus != agent {
-        let visible = line.contains("obs: assistant:") || line.starts_with("sb ");
-        if visible && sb.ready {
-            sb.activity.insert(agent.to_string());
-        }
-    }
-    // an answer given here: its fold line is in this feed already
-    let answer_id = line.strip_prefix("sb route : ").and_then(|r| lines::answer_route(&unescape_md(r)).map(|(_, id, _)| id));
-    let folded = answer_id.is_some_and(|id| sb.folded_in(id, agent));
-    // BISE-307: what the item asked, for its line to open on (the
-    // inbox's card while the hub still holds it)
-    let asked = answer_id.and_then(|id| sb.card_by_id(id)).map(|c| c.text.trim().to_string());
-    let mut queued = None;
-    // voice mode: the live messages and turns of this agent (never a replay)
-    let voice = app.voice_mode.is_some() && app.sb.ready;
-    let mut said = Vec::new();
-    with_feed(app, agent, |app| {
-        if folded {
-            let n0 = app.events.len();
-            feed::seen_at(app, pos, n0);
+        if v.get("method").is_none() {
+            rpc::answered(app, v)
         } else {
-            let n0 = app.events.len();
-            ingest_at(app, line, pos, ts);
-            if voice {
-                said.extend(
-                    app.events[n0.min(app.events.len())..]
-                        .iter()
-                        .filter(|e| matches!(e, Ev::Assistant(_) | Ev::Turn | Ev::TurnDone | Ev::Idle))
-                        .cloned(),
-                );
-            }
-            if let Some(id) = answer_id {
-                ask_of(app, n0, id, asked);
-            }
+            hub_reads::read(app, v)
         }
-        trim_window(app);
-        // BISE-89: its turn ended, the oldest queued message goes (and
-        // the next one waits for the turn it starts)
-        queued = crate::queue::next(app);
-        if queued.is_some() {
-            app.pending = true;
-        }
-    });
-    if !said.is_empty() {
-        crate::voicemode::live::on_events(app, agent, &said);
     }
-    if let Some(m) = queued {
-        app.sb.send_input_to(agent, m);
-    }
-    if level3 {
-        crate::hints::once(app, crate::hints::Hint::FirstLevel3);
-    }
-    if steered {
-        crate::hints::once(app, crate::hints::Hint::FirstSteer);
-    }
+    // an older event line: none comes on an initialized connection
 }
 
-/// The answer to card `id` just read (events from `n0`): what the item
+/// The answer to card `id` just read (its events: `at`): what the item
 /// asked, from the inbox (`asked`), else from the card's own line in
 /// this feed (`#12 question @main : …`); unknown, the line opens on the
 /// answer alone (BISE-307).
-fn ask_of(app: &mut App, n0: usize, id: u64, asked: Option<String>) {
-    let head = format!("#{id} ");
+fn ask_of(app: &mut App, at: std::ops::Range<usize>, id: u64, asked: Option<String>) {
+    let n0 = at.start.min(app.events.len());
     let found = asked.or_else(|| {
-        app.events[..n0.min(app.events.len())].iter().rev().find_map(|e| match e {
-            Ev::Card { text, .. } if text.starts_with(&head) => Some(crate::render::card_parts(text).map_or("", |p| p.2).trim().to_string()),
+        app.events[..n0].iter().rev().find_map(|e| match e {
+            Ev::Card { card, .. } if card.id == Some(id) => Some(card.question.trim().to_string()),
             _ => None,
         })
     });
     let Some(q) = found.filter(|q| !q.is_empty()) else { return };
-    for i in n0..app.events.len() {
+    for i in n0..at.end.min(app.events.len()) {
         if let Ev::Approval { asked, .. } = &mut app.events[i] {
             *asked = q.clone();
             if let Some(c) = app.cache.get_mut(i) {
                 *c = None;
-            }
-        }
-    }
-}
-
-/// The hub's `approvals` event (approvals-design.md §8): the mode for the
-/// key bar; `flash`: a switch (the 3-second flash, the first switch to
-/// auto's tip); `show`: `/approvals` asked (its screen opens).
-fn approvals_event(app: &mut App, v: &Value) {
-    let rules: Vec<Rule> = v
-        .get("rules")
-        .and_then(|r| r.as_array())
-        .map(|a| a.iter().map(Rule::of).collect())
-        .unwrap_or_default();
-    let a = &mut app.sb.approvals;
-    let was = a.mode.clone();
-    if was.is_empty() && str_of(v, "mode") == "yolo" {
-        crate::hints::once(app, crate::hints::Hint::FirstYolo);
-    }
-    let a = &mut app.sb.approvals;
-    a.mode = str_of(v, "mode");
-    a.env = v.get("env").and_then(|x| x.as_bool()).unwrap_or(false);
-    a.checker = str_of(v, "checker");
-    a.checker_who = str_of(v, "checker_who");
-    a.checker_model = str_of(v, "checker_model");
-    a.repo = str_of(v, "repo");
-    a.rules = rules;
-    if v.get("flash").and_then(|x| x.as_bool()) == Some(true) {
-        a.flash = Some(std::time::Instant::now());
-        if a.mode == "auto" && was != "auto" && a.checker != "off" {
-            crate::hints::set_auto_text(&a.checker, &str_of(v, "checker_who"));
-            crate::hints::once(app, crate::hints::Hint::FirstAuto);
-        }
-    }
-    // `/approvals`: its screen; a removal the hub refused: why
-    if v.get("show").and_then(|x| x.as_bool()) == Some(true) {
-        app.approvals = Some(crate::approvals_screen::Screen::default());
-    }
-    if let Some(e) = v.get("error").and_then(|x| x.as_str()) {
-        match app.approvals.as_mut() {
-            Some(s) => s.said = Some(e.to_string()),
-            None => {
-                push_event(&mut app.events, &mut app.cache, Ev::Warn(format!("/approvals: {e}")));
             }
         }
     }
@@ -908,130 +749,8 @@ fn approvals_event(app: &mut App, v: &Value) {
 pub(crate) fn toggle_approvals(app: &mut App) {
     // an older hub never said a mode: it has no switch
     if !app.sb.approvals.mode.is_empty() {
-        app.sb.send(serde_json::json!({"op": "approvals", "mode": "toggle"}));
+        app.sb.call("approvals/set", json!({"mode": "toggle"}), rpc::Then::Shown);
     }
-}
-
-fn apply_state(app: &mut App, v: &Value) {
-    let sb = &mut app.sb;
-    let s = str_of;
-    let known: Vec<u64> = sb.cards.iter().map(|c| c.id).collect();
-    sb.agents = v
-        .get("agents")
-        .and_then(|a| a.as_array())
-        .map(|a| {
-            a.iter()
-                .map(|x| Agent {
-                    name: s(x, "name"),
-                    main: x.get("main").and_then(|m| m.as_bool()).unwrap_or(false),
-                    status: s(x, "status"),
-                    objective: s(x, "objective"),
-                    mode: s(x, "mode"),
-                    branch: x.get("branch").and_then(|b| b.as_str()).map(String::from),
-                    path: s(x, "path"),
-                    note: s(x, "note"),
-                    queued: x.get("queued").and_then(|q| q.as_u64()).unwrap_or(0),
-                    inbox: x.get("inbox").and_then(|q| q.as_u64()).unwrap_or(0),
-                    turn_ms: x.get("turn_ms").and_then(|q| q.as_u64()),
-                    turn_seen: Some(std::time::Instant::now()),
-                    report: s(x, "report"),
-                    role: s(x, "role"),
-                    report_ms: x.get("report_ms").and_then(|q| q.as_u64()),
-                    created_ms: x.get("created_ms").and_then(|q| q.as_u64()).unwrap_or(0),
-                    waiting_on: s(x, "waiting_on"),
-                    dir: s(x, "dir"),
-                    place: s(x, "place"),
-                    place_id: s(x, "place_id"),
-                    model: s(x, "model"),
-                    effort: s(x, "effort"),
-                    efforts: x
-                        .get("efforts")
-                        .and_then(|e| e.as_array())
-                        .map(|e| e.iter().filter_map(|w| w.as_str().map(String::from)).collect())
-                        .unwrap_or_default(),
-                    changes: x.get("changes").filter(|c| c.is_object()).map(|c| {
-                        let n = |k: &str| c.get(k).and_then(|x| x.as_u64()).unwrap_or(0);
-                        (n("files"), n("add"), n("del"))
-                    }),
-                })
-                .collect()
-        })
-        .unwrap_or_default();
-    sb.places = places::parse(v);
-    // an open diff panel on an agent follows its changes (site/m/artifacts D)
-    if let Some(crate::diffview::Ask::Agent(name)) = app.diff.as_ref().map(|p| p.ask.clone()) {
-        let changes = app.sb.agents.iter().find(|a| a.name == name).and_then(|a| a.changes);
-        crate::diffview::on_changes(app, &name, changes);
-    }
-    let sb = &mut app.sb;
-    // an older hub has no `timers`: keep none
-    sb.timers = crate::scheduled::from_state(v);
-    sb.flow = s(v, "flow");
-    sb.cards = v
-        .get("cards")
-        .and_then(|a| a.as_array())
-        .map(|a| {
-            a.iter()
-                .map(|x| Card {
-                    id: x.get("id").and_then(|i| i.as_u64()).unwrap_or(0),
-                    kind: s(x, "kind"),
-                    agent: s(x, "agent"),
-                    text: s(x, "text"),
-                    age_ms: x.get("age_ms").and_then(|i| i.as_u64()).unwrap_or(0),
-                    seen_at: std::time::Instant::now(),
-                    note: s(x, "note"),
-                    look: None,
-                    place: x.get("place").and_then(|p| p.as_str()).map(String::from),
-                    pr: x.get("pr").and_then(|n| n.as_u64()),
-                    link: x.get("link").and_then(|p| p.as_str()).map(String::from),
-                    // the drop's second ask stays across snapshots
-                    asking: sb.feature_drop_ask == x.get("id").and_then(|i| i.as_u64()),
-                    waiting: x
-                        .get("waiting")
-                        .and_then(|w| w.as_array())
-                        .map(|w| w.iter().filter_map(|a| a.as_str().map(String::from)).collect())
-                        .unwrap_or_default(),
-                })
-                .collect()
-        })
-        .unwrap_or_default();
-    // the setup cards are the TUI's own: not in the hub's snapshot
-    setup::put_back(sb);
-    // zen (BISE-121): a card that was not there
-    if sb.cards.iter().any(|c| !known.contains(&c.id)) {
-        sb.calls += 1;
-    }
-    cards::sync(app);
-    let sb = &mut app.sb;
-    // the spinner of every feed follows the agent, whoever started the turn
-    let busy: HashMap<String, bool> = sb.agents.iter().map(|a| (a.name.clone(), a.busy())).collect();
-    for (name, view) in sb.views.iter_mut() {
-        view.pending = busy.get(name).copied().unwrap_or(false);
-    }
-    let focus_busy = busy.get(&sb.focus).copied().unwrap_or(false);
-    if let Some(sel) = sb.selected {
-        if sel >= sb.nav().len() {
-            sb.selected = None;
-            sb.preview = false;
-        }
-    }
-    app.pending = focus_busy;
-    if !focus_busy {
-        app.interrupt_requested = false;
-    }
-    // BISE-61: the first agent, the first card (one-time hints)
-    let sb = &app.sb;
-    let (agent, card) = (sb.agents.iter().any(|a| !a.main && !a.archived()), !sb.cards.is_empty());
-    if agent {
-        crate::hints::once(app, crate::hints::Hint::FirstAgent);
-    }
-    if card {
-        crate::hints::once(app, crate::hints::Hint::FirstCard);
-    } else {
-        crate::hints::used(crate::hints::Hint::FirstCard);
-    }
-    // the demo's guided tips (tour.rs)
-    crate::tour::on_state(app);
 }
 
 /// What the demo's tour looks at (tour.rs): the demo agents with their
@@ -1053,8 +772,8 @@ pub(crate) fn tour_snap(app: &App) -> crate::tour::Snap {
     crate::tour::Snap { members, focus: sb.focus.clone(), card, palette: app.palette.is_some(), no_ctrl_digits: !app.ctrl_digits }
 }
 
-/// Change the feed in focus (checkout / return).
-pub(super) fn focus(app: &mut App, name: &str) {
+/// Change the feed in focus (checkout / return; /scheduled's ⏎ on an alarm).
+pub(crate) fn focus(app: &mut App, name: &str) {
     // the card view goes: the thread you go to takes its place
     cards::close_view(app);
     let sb = &mut app.sb;
@@ -1076,6 +795,8 @@ pub(super) fn focus(app: &mut App, name: &str) {
     sb.send_focus();
     swap_feed(app, &mut incoming);
     swap_draft(app, &mut incoming);
+    // its feed from the hub's entries (once per connection)
+    feed_entries::subscribe(app, name);
     // a feed selection belongs to the feed we left
     app.feed_sel = None;
     // `incoming` now holds the feed we left
@@ -1128,24 +849,13 @@ pub(crate) fn handle_input(app: &mut App, v: &str) -> Vec<Ev> {
     drafts::save_now(app);
     app.popup_sel = 0;
     let mut out: Vec<Ev> = Vec::new();
-    let sb = &mut app.sb;
-    if let Some((id, _)) = sb.confirm.clone() {
-        let t = typed.to_lowercase();
-        let yes = matches!(t.as_str(), "y" | "yes" | "o" | "oui");
-        let no = matches!(t.as_str(), "n" | "no" | "non");
-        if yes || no {
-            sb.confirm = None;
-            sb.send(json!({"op": "confirm", "id": id, "yes": yes}));
-            return out;
-        }
-    }
     if release::answer(app, &typed) {
         return out;
     }
-    // the raw session of the agent in view (logview.rs)
-    if typed.split_whitespace().next() == Some("/log") && crate::logview::enabled(app) {
+    // the agent in view: its raw session or a request (logview.rs)
+    if typed.split_whitespace().next() == Some("/debug") && crate::logview::enabled(app) {
         if let Err(e) = crate::logview::open(app, &typed) {
-            out.push(Ev::Warn(format!("/log: {e}")));
+            out.push(Ev::Warn(format!("/debug: {e}")));
         }
         return out;
     }
@@ -1157,6 +867,17 @@ pub(crate) fn handle_input(app: &mut App, v: &str) -> Vec<Ev> {
             crate::scheduled_screen::open(app);
             return out;
         }
+        // running-procs: what the agents left running, full screen
+        // (/processes, designer m_38642; /running its old name, kept)
+        Some("/processes" | "/running") => {
+            crate::running_screen::open(app);
+            return out;
+        }
+        // cost-pause: what the calls cost, full screen
+        Some("/usage") => {
+            crate::usage_screen::open(app);
+            return out;
+        }
         // bise_proto::slash reads it, as the hub reads the window's line
         Some("/artifacts") => {
             use bise_proto::slash::{artifacts, Artifacts, ARTIFACTS_ADD};
@@ -1164,7 +885,7 @@ pub(crate) fn handle_input(app: &mut App, v: &str) -> Vec<Ev> {
                 Some(Artifacts::Usage) => out.push(Ev::Warn(ARTIFACTS_ADD.into())),
                 Some(Artifacts::Add(target)) => {
                     let agent = app.sb.focus.clone();
-                    app.sb.send(json!({"op": "artifacts", "do": "add", "target": target, "agent": agent}));
+                    app.sb.call("artifacts/add", json!({"target": target, "agent": agent}), rpc::Then::Said);
                 }
                 Some(Artifacts::List) | None => crate::artifacts_screen::open(app),
             }
@@ -1188,23 +909,25 @@ pub(crate) fn handle_input(app: &mut App, v: &str) -> Vec<Ev> {
     match first {
         "/quit" | "/exit" => app.should_quit = true,
         "/release-bise" => release::command(sb, &typed),
-        // the hub's version op; one parse with the hub's slash
+        // the open PRs (pr-news): prs/list's rows (rpc.rs's Then::Prs)
+        "/prs" => sb.call("prs/list", json!({}), rpc::Then::Prs),
+        // the hub's version/* methods; one parse with the hub's slash
         // (bise_proto::slash::version). /update: the release channel now
         // (update-card's new-release item)
+        // update-flow: `/update auto on|off`, the user's setting (prefs
+        // `auto_update`, the same as Settings › update's toggle)
+        "/update" if typed.split_whitespace().nth(1) == Some("auto") => out.push(Ev::Info(auto_update(&typed))),
         "/restart" | "/update" | "/version" => {
-            if let Some(v) = bise_proto::slash::version(&typed) {
-                sb.send(match v.op() {
-                    ("list", _) | ("rollback", _) | ("update", _) => json!({"op": "version", "do": v.op().0}),
-                    (what, to) => json!({"op": "version", "do": what, "to": to}),
-                });
+            if let Some((method, params, then)) = bise_proto::slash::version(&typed).as_ref().map(versions::method) {
+                sb.call(method, params, then);
             }
         }
-        "/plugins" => {
-            let ws = std::path::PathBuf::from(&sb.workspace);
+        // the Plugins screen, or a line (plugins.rs)
+        "/plugins" | "/skills" => {
             // one line each: an Info line loses its newlines (designer:
             // the listing read as one paragraph)
-            for l in crate::plugins::command(&typed, &ws).lines() {
-                out.push(Ev::Info(l.to_string()));
+            for l in crate::plugins::slash(app, &typed) {
+                out.push(Ev::Info(l));
             }
         }
         "/clear" => {
@@ -1217,22 +940,16 @@ pub(crate) fn handle_input(app: &mut App, v: &str) -> Vec<Ev> {
         "/archived" => sb.toggle_archived(),
         // the agent palette (BISE-265), on the rest of the line
         "/switch" => palette::open(app, typed.strip_prefix("/switch").unwrap_or("")),
-        // the inbox: its first item in the view (`/cards`: its old name)
-        "/inbox" | "/cards" => {
-            if sb.sorted_cards().is_empty() {
-                out.push(Ev::Info("the inbox is empty: nothing waits for you".into()));
-            } else {
-                cards::open_view(app, None);
-            }
-        }
+        // the inbox: what waits, then his past answers (inbox_screen.rs)
+        "/inbox" => crate::inbox_screen::command(app, &typed),
         "/theme" => out.push(theme_command(typed.split_whitespace().nth(1), crate::theme_detect::choose)),
         "/keychain" => out.extend(crate::keychain::command(&typed)),
         // approvals-design.md §8: the mode, the checker, the rules; or a switch
         // one parse with the hub's slash (bise_proto::slash::approvals)
         "/approvals" => match bise_proto::slash::approvals(&typed) {
-            Some(Ok(Some(bise_proto::rows::ApprovalMode::Yolo))) => sb.send(serde_json::json!({"op": "approvals", "mode": "yolo"})),
-            Some(Ok(Some(bise_proto::rows::ApprovalMode::Auto))) => sb.send(serde_json::json!({"op": "approvals", "mode": "auto"})),
-            Some(Ok(_)) => sb.send(serde_json::json!({"op": "approvals", "mode": ""})),
+            Some(Ok(Some(bise_proto::rows::ApprovalMode::Yolo))) => sb.call("approvals/set", json!({"mode": "yolo"}), rpc::Then::Shown),
+            Some(Ok(Some(bise_proto::rows::ApprovalMode::Auto))) => sb.call("approvals/set", json!({"mode": "auto"}), rpc::Then::Shown),
+            Some(Ok(_)) => sb.call("approvals/set", json!({}), rpc::Then::Approvals),
             Some(Err(words)) => out.push(Ev::Warn(words)),
             None => {}
         },
@@ -1254,7 +971,7 @@ pub(crate) fn handle_input(app: &mut App, v: &str) -> Vec<Ev> {
         "/stop" => match bise_proto::slash::stop(&typed).unwrap_or_else(|| Err(bise_proto::slash::STOP_USAGE.into())) {
             Ok(name) if sb.agent(&name).is_some() => {
                 if sb.agent(&name).is_some_and(|a| a.status == "working") {
-                    sb.send(json!({"op": "interrupt", "agent": name}));
+                    sb.call("turn/interrupt", json!({"agent": name}), rpc::Then::Shown);
                 }
                 // main's feed says it once, from the hub (m_3904)
                 crate::computer_use::stop(&sb.dir_of(&name));
@@ -1293,10 +1010,20 @@ pub(crate) fn handle_input(app: &mut App, v: &str) -> Vec<Ev> {
             out.push(Ev::Warn(archived_warn(&sb.focus)));
         }
         _ => {
-            sb.send_input(typed);
+            // cost-pause (designer m_18932): a paused project holds it; his
+            // row shows dim with why until /resume delivers it (the hub's
+            // `you` line then takes the row's place, push_event)
+            if sb.paused.is_some() && !typed.starts_with('/') {
+                out.push(Ev::Held(typed.clone().into()));
+            }
+            // his words opening with `@<agent>` go there, its view opens (sb/lead.rs)
+            let to = lead::send(sb, typed);
             // BISE-61: a hint goes away after the next user message
             crate::hints::user_message();
             crate::tour::on_sent(app);
+            if let Some(name) = to {
+                focus(app, &name);
+            }
         }
     }
     if recolor {
@@ -1329,14 +1056,14 @@ pub(super) fn draw_sb(app: &mut App, frame: &mut Frame) {
 }
 
 
-/// The feed rows of the hub's `prs` answer to `/prs`:
-/// `{head, rows: [bise-proto rows::Pr]}`; each row's tone is the TUI's
+/// The feed rows of the hub's `prs` event, its answer to `/prs`
+/// (`HubEv::Prs`: `{head, items: [bise-proto rows::Pr]}`); each row's tone is the TUI's
 /// look of what it means ([`pr_tone`]), never a color from the wire.
 pub(super) fn prs_events(v: &serde_json::Value) -> Vec<Ev> {
     // the head at col 1, like every feed row's glyph column (designer)
     let head = format!(" {}", v["head"].as_str().unwrap_or_default());
     let mut out = vec![Ev::Fold { head, text: String::new(), open: false }];
-    for r in v["rows"].as_array().into_iter().flatten() {
+    for r in v["items"].as_array().into_iter().flatten() {
         let Ok(pr) = serde_json::from_value::<bise_proto::rows::Pr>(r.clone()) else { continue };
         out.push(Ev::Pr { tone: pr_tone(&pr).into(), number: pr.number, url: pr.url, text: pr.text, url_row: true });
     }
@@ -1378,7 +1105,7 @@ pub(crate) fn shown_name(name: &str) -> String {
 /// (the tests' entry: `wire::parse_line` calls [`hub_ev`] itself).
 #[cfg(test)]
 pub(super) fn parse_hub_line(rest: &str) -> Option<Ev> {
-    hub_ev(lines::hub(rest))
+    hub_ev(bise_proto::thread::lines::hub(rest))
 }
 
 /// The hub's own lines in a feed as feed events. v1 kinds keep working
@@ -1386,12 +1113,21 @@ pub(super) fn parse_hub_line(rest: &str) -> Option<Ev> {
 /// level 3), `msg-you` (an agent writing to the user, level 2) and
 /// `answered` (main answered an agent for the user, level 2).
 pub(crate) fn hub_ev(h: Hub) -> Option<Ev> {
-    let msg = |from: String, to: String, text: String, level: u8, id: String| Ev::AgentMsg { from, to, text, level, id, open: false, fold: false };
+    let msg = |from: String, to: String, text: String, level: u8, id: String| Ev::AgentMsg { from, to, text, level, id, parts: Vec::new(), open: false, fold: false };
     Some(match h {
-        Hub::You(text) => Ev::You(text, Mark::Sent, false),
-        // S9: the fn context of the 'you' line before it (the window's
-        // thread shows it on his message; the TUI doesn't)
+        Hub::You(text, via) => Ev::You(crate::said::Said::via(text, via.as_deref()), Mark::Sent, false, None),
+        Hub::Routed { name, msg, .. } => Ev::YouWent { msg, name },
+        Hub::Went { to, said, msg } => Ev::You(crate::said::Said::went(said, to), Mark::Sent, false, Some(msg)),
+        // S9: the fn context of the 'you' line before it (the window's thread shows it; the TUI doesn't)
         Hub::Context(_) => return None,
+        // his parts (msg-parts): on his entry by the hub's fold, no row
+        Hub::YouParts(_) | Hub::RouteParts(_) | Hub::MsgParts { .. } | Hub::SentParts { .. } => return None,
+        // his message's id: on his message right before it (no row)
+        Hub::YouId(id) => Ev::YouId(id),
+        // sb-core's receipts: ✓ (received) then ✓✓ (read) on the
+        // messages they name, by id (bise-proto's Mark::Ids, the fold's
+        // rule too); no row
+        h @ (Hub::Steered(_) | Hub::SteerRx(_)) => Ev::MarkYou { mark: bise_proto::thread::lines::mark_of(&bise_proto::thread::lines::Rec::Hub(h))?, or: None },
         // BISE-86
         Hub::Undelivered { to, text } => Ev::Undelivered { name: to, text, open: true },
         // v1: what this feed's owner received (`@{from}`: an old direct
@@ -1404,6 +1140,11 @@ pub(crate) fn hub_ev(h: Hub) -> Option<Ev> {
                     return Some(ev);
                 }
                 if crate::scheduled::is_stop_note(&body) {
+                    return None;
+                }
+                // main's note of an answer to its own card: the route
+                // line's row says it (bise_proto lines, the window's rule)
+                if bise_proto::thread::lines::is_main_answer_note(&body) {
                     return None;
                 }
             }
@@ -1430,7 +1171,7 @@ pub(crate) fn hub_ev(h: Hub) -> Option<Ev> {
         // a gate's card (approvals-design.md §9): the tool row says it
         // waits and the inbox holds it; its fold comes with the answer
         Hub::Card { id: Some(_), kind, .. } if kind == "confirm" => return None,
-        Hub::Card { text, .. } => Ev::Card { text, closed: String::new() },
+        Hub::Card { text, .. } => Ev::Card { card: crate::wire::CardParts::of_line(&text), closed: String::new() },
         // the approvals gate (approvals-design.md §3.1, §10)
         Hub::Gate(GateStep::Check) => Ev::Gate(crate::wire::Gate::Check),
         Hub::Gate(GateStep::Card) => Ev::Gate(crate::wire::Gate::Card),
@@ -1441,14 +1182,16 @@ pub(crate) fn hub_ev(h: Hub) -> Option<Ev> {
         // the sentences are bise_proto's (the hub's fold says the same)
         Hub::Approval { how, who, what, note } => {
             let (ok, text, note) = bise_proto::thread::words::approval(&how, &who, &what, &note);
-            Ev::Approval { ok, text, note, asked: String::new(), open: false }
+            Ev::Approval { ok, text, note, parts: Vec::new(), asked: String::new(), open: false }
         }
         Hub::CardClosed { id, res } => Ev::CardClosed { id, res },
         // an answer to an item: the box's fold line (BISE-305, designer:
-        // one sentence), `✓ you answered flow-prompts: oui`
-        Hub::Route { who, said, .. } => {
-            let (text, note) = cards::answered(&who, &said);
-            Ev::Approval { ok: true, text, note, asked: String::new(), open: false }
+        // one sentence), `✓ you answered flow-prompts: oui`; its quotes,
+        // pastes and images as parts, never tags (msg-parts)
+        Hub::Route { who, said, pick, .. } => {
+            let said = crate::said::Said::from(said);
+            let (text, note) = cards::answered(&who, &pick.unwrap_or_else(|| said.words().trim().to_string()));
+            Ev::Approval { ok: true, text, note, parts: said.parts, asked: String::new(), open: false }
         }
         // pr-news (pr-design §4)
         Hub::Pr { state, number, url, text } => Ev::Pr { tone: pr_look(state).into(), number, url, text, url_row: false },
@@ -1470,6 +1213,15 @@ pub(crate) fn hub_ev(h: Hub) -> Option<Ev> {
         // more and an interrupt reads as on main (architect m_12576); the
         // desktop thread keeps its Stopped entry (bise-proto's fold)
         Hub::Stopped(_) => return None,
+        // event-wake: a watch ended (its JSON, the fold's WakeFold)
+        // another agent's wake in main's thread (its `agent` set): the
+        // terminal keeps showing bise's message to that agent, as before
+        Hub::Wake(json) => {
+            return serde_json::from_str::<bise_proto::thread::WakeFold>(&json).ok().filter(|w| w.agent.is_empty()).map(|w| crate::entry_ev::wake_ev(&w))
+        }
+        // a failed turn's text so far, dim above its failure (the reply's
+        // escape: the same renderer reads it)
+        Hub::Kept(text) => Ev::Kept(text.replace('\n', "\\n")),
         // a known kind's line that doesn't parse, as before
         Hub::Other { kind, text } => match kind.as_str() {
             "card-closed" => Ev::Info(format!("card {} ", text)),
@@ -1504,7 +1256,7 @@ mod hub_line_tests {
             Ev::AgentMsg { from, to, text, level, id, .. } => format!("msg {from}|{to}|{text}|{level}|{id}"),
             Ev::Answered { agent, question, answer, why, .. } => format!("answered {agent}|{question}|{answer}|{why}"),
             Ev::You(t, ..) => format!("you {t}"),
-            Ev::Card { text, .. } => format!("card {text}"),
+            Ev::Card { card, .. } => format!("card {}", card.text()),
             Ev::CardClosed { id, res } => format!("card-closed {id}|{res}"),
             Ev::Info(t) => format!("info {t}"),
             Ev::Warn(t) => format!("warn {t}"),
@@ -1523,7 +1275,7 @@ mod hub_line_tests {
         // no number: an info line, never lost
         assert_eq!(p("pr : plain : x : u : hi"), Some("info hi".into()));
         // `/prs`: a dim head at col 1, each row a PR line with its URL under it
-        let evs = prs_events(&serde_json::json!({"head": "1 PR open", "rows": [
+        let evs = prs_events(&serde_json::json!({"head": "1 PR open", "items": [
             {"number": 415, "url": "https://github.com/o/r/pull/415", "branch": "sb/x", "agents": ["x"], "state": "open", "checks": "fail",
              "failing": ["e2e"], "review": "none", "words": "checks fail: e2e", "text": "sb/x · x · checks fail: e2e"}]}));
         assert!(matches!(&evs[1], Ev::Pr { tone, number: 415, .. } if tone == "red"), "failing checks: red");
@@ -1541,6 +1293,7 @@ mod hub_line_tests {
         let row = |state, checks| Pr {
             number: 1, url: String::new(), branch: String::new(), agents: vec![], state, checks,
             failing: vec![], review: PrReview::None, words: String::new(), text: String::new(),
+            in_review: false, stale_ms: None,
         };
         for state in [PrState::Open, PrState::Draft, PrState::Unknown] {
             for checks in [PrChecks::Pass, PrChecks::Fail, PrChecks::Running, PrChecks::None, PrChecks::Unknown] {
@@ -1577,6 +1330,17 @@ mod hub_line_tests {
         assert_eq!(p("msg : switchboard-ui → main : hi"), Some(msg("switchboard-ui", "main", "hi", 3, "")));
         let rows = draw(&[parse_hub_line("msg : switchboard → answer-line m_9 : timer #48").unwrap()]);
         assert!(rows.contains("bise → answer-line") && !rows.contains("switchboard"), "{rows}");
+    }
+
+    /// ambient-lead m_19783: another agent's wake in main's thread (its
+    /// `agent` set) draws nothing more in the terminal, which keeps bise's
+    /// message to that agent as before; a thread's own wake still draws.
+    #[test]
+    fn another_agents_wake_draws_nothing_more() {
+        let own = r#"wake : {"id":4,"ev":"ended","kind":"bg","what":"cargo test","rc":0,"after_ms":61000,"msg":7}"#;
+        assert!(parse_hub_line(own).is_some(), "its own wake draws");
+        let other = r#"wake : {"id":4,"ev":"ended","kind":"bg","what":"cargo test","rc":0,"after_ms":61000,"msg":7,"agent":"perf"}"#;
+        assert!(parse_hub_line(other).is_none(), "main's copy of perf's wake draws nothing");
     }
 
     /// An old (v1) transcript still parses to what it drew before.
@@ -1724,13 +1488,13 @@ mod nav_key_tests {
     fn images_to_a_model_without_vision_are_refused_before_sending() {
         let mut app = bench::test_app();
         app.sb.agents = vec![agent("main")];
-        let usage = |m: &str| Ev::Usage(crate::usage::Usage { model: m.into(), input: 10, ..Default::default() });
-        app.events.push(usage("mistral/codestral-latest"));
-        app.cache.push(None);
+        // the model its last call ran: the hub's row (its usage)
+        let usage = |m: &str| Some(bise_proto::rows::AgentUsage::of(m, 10, 0, None));
+        app.sb.agents[0].usage = usage("mistral/codestral-latest");
         app.attachments.push(crate::attach::Attachment {
             label: "[Image #1]".into(),
             marker: "<image name=\"[Image #1]\" b64=\"/x.b64\">".into(),
-            info: Default::default(),
+            info: crate::attach::Info { width: 2, height: 3, ..Default::default() },
         });
         app.ed.insert("look at [Image #1]");
         let n = app.events.len();
@@ -1745,8 +1509,7 @@ mod nav_key_tests {
             _ => panic!("no no-vision line"),
         }
         // a model that reads images: sent as before
-        app.events.push(usage("mistral/mistral-medium-latest"));
-        app.cache.push(None);
+        app.sb.agents[0].usage = usage("mistral/mistral-medium-latest");
         crate::input::on_key(&mut app, &KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE));
         assert_eq!(app.ed.text, "");
         assert!(app.attachments.is_empty());
@@ -1821,7 +1584,7 @@ mod nav_key_tests {
         press(&mut app, KeyCode::Char('D'), KeyModifiers::SHIFT);
         assert!(press(&mut app, KeyCode::Char('y'), KeyModifiers::NONE));
         let out = sent();
-        assert!(out.contains(r#""op":"input""#) && out.contains("/archive docs"), "{out}");
+        assert!(out.contains(r#""method":"agent/archive""#) && out.contains(r#""agent":"docs""#), "{out}");
         assert_eq!(app.ed.text, "");
         // main is never asked about
         app.sb.selected = Some(0);
@@ -1851,7 +1614,7 @@ mod nav_key_tests {
         };
         let ev = parse_hub_line("undelivered : fix : d'abord \\: les tests").unwrap();
         assert!(matches!(&ev, Ev::Undelivered { name, text, open: true } if name == "fix" && text == "d'abord : les tests"));
-        push_event(&mut app.events, &mut app.cache, Ev::You("d'abord : les tests".into(), Mark::Sent, false));
+        push_event(&mut app.events, &mut app.cache, Ev::You("d'abord : les tests".into(), Mark::Sent, false, None));
         push_event(&mut app.events, &mut app.cache, ev.clone());
         assert!(matches!(&app.events[0], Ev::You(_, Mark::Failed, ..)));
         let rows = |app: &App| -> Vec<String> {
@@ -1869,11 +1632,11 @@ mod nav_key_tests {
         assert_eq!(sent(), "");
         assert_eq!(rows(&app)[1].trim(), "✗ not delivered: fix stopped.");
         // a second one, from main's view: ⏎ sends it again to @fix
-        push_event(&mut app.events, &mut app.cache, Ev::You("encore".into(), Mark::Sent, false));
+        push_event(&mut app.events, &mut app.cache, Ev::You("encore".into(), Mark::Sent, false, None));
         push_event(&mut app.events, &mut app.cache, parse_hub_line("undelivered : fix : encore").unwrap());
         assert!(press(&mut app, KeyCode::Enter, KeyModifiers::NONE));
         let out = sent();
-        assert!(out.contains(r#""op":"input""#) && out.contains("@fix encore"), "{out}");
+        assert!(out.contains(r#""method":"command/run""#) && out.contains("@fix encore"), "{out}");
         assert!(matches!(app.events.last(), Some(Ev::You(t, Mark::Sent, ..)) if t == "@fix encore"));
         // `@fix encore` is the line the user wrote in main's view: marked
         push_event(&mut app.events, &mut app.cache, parse_hub_line("undelivered : fix : encore").unwrap());

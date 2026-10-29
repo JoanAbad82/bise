@@ -44,6 +44,12 @@ def main():
         c.wait_status("main", "idle", 60)
         c.say('[[bash: sb spawn t1 --objective "stay"]]')
         c.wait(lambda: c.agent("t1") is not None, 60, "t1 exists")
+        # t1's automatic reply in main's thread, and main idle after it:
+        # an idle main and t1 can come before that reply reaches main
+        # (core-r m_19094, red 2 of 3 alone): the say below then steered
+        # main's turn on it and the fake model answered the reply, never
+        # running the sb every line
+        c.wait(lambda: any(r.get("from") == "t1" for r in c.feed("main", "msg-in")), 60, "t1's reply in main")
         c.wait_idle("main", "t1")
         # a one-shot timer for t1, due after the restart: sb-core holds it
         # (core-timers), so it must come back from the journal and fire once
@@ -68,9 +74,15 @@ def main():
             return [l for l in c.lines("t1") if l.startswith("sb msg-in") and "ONE-SHOT after the restart" in l]
         c.wait(lambda: wakes(), 60, "t1's wake after the restart")
         c.wait_idle("main", "t1")
-        journal = [json.loads(l) for l in open(os.path.join(E.state, "journal.jsonl"))]
-        fired = [j for j in journal if j.get("type") == "every_fired" and j.get("id") == 1]
-        stops = [j for j in journal if j.get("type") == "every_stop" and j.get("id") == 1]
+
+        # the fire's journal lines (sb-core writes them in the step that
+        # sent the wake: a client that reads the wake first may be ahead
+        # of the file, so wait for them, never read once)
+        def journal(kind):
+            js = [json.loads(l) for l in open(os.path.join(E.state, "journal.jsonl")) if l.strip()]
+            return [j for j in js if j.get("type") == kind and j.get("id") == 1]
+        c.wait(lambda: journal("every_fired") and journal("every_stop"), 30, "the fire and its stop in the journal")
+        fired, stops = journal("every_fired"), journal("every_stop")
         check(len(wakes()) == 1 and len(fired) == 1, "one wake, one fire: %r %r" % (wakes(), fired))
         check(len(stops) == 1 and stops[0]["why"] == "it ran its times", "then it ran its times: %r" % stops)
         log = open(os.path.join(E.state, "hub.log")).read()
@@ -78,6 +90,9 @@ def main():
         ok = True
         print("PASS core_restart")
     finally:
+        if not ok:
+            # a red run keeps its hub (main's transcript says what ran)
+            os.environ["SB_KEEP"] = "1"
         if not ok and E.hub:
             print(open(os.path.join(E.tmp, "hub.stderr")).read()[-2000:])
         E.close()

@@ -1,6 +1,6 @@
 //! Scheduled tasks (site/m/timers): what `sb every` sets, as the user
-//! reads it. The hub's state carries them (`timers`: the active ones,
-//! then a week of ended ones); the feeds carry their ◷ lines (the hub's
+//! reads it. hub/scheduled carries them (its items, the active ones, then
+//! its ended ones of the week: sb/state_rows.rs, P4c-4b); the feeds carry their ◷ lines (the hub's
 //! `scheduled : <json>` when one is set or ends, and each run, a
 //! `msg-in` from bise whose text is the wake the agent reads). The words
 //! are designer's (site/m/timers 'v1 and the words'): "scheduled task"
@@ -8,16 +8,10 @@
 //! The full screen is `scheduled_screen.rs`.
 
 use crate::wire::Ev;
-use serde_json::Value;
 
 // one parser and one set of words with the hub's thread fold (batch 3b):
 // bise_proto::thread::scheduled; the TUI passes its own clock
 pub(crate) use bise_proto::thread::scheduled::{clip, Task};
-
-/// The state's `timers` (none from an older hub).
-pub(crate) fn from_state(v: &Value) -> Vec<Task> {
-    v["timers"].as_array().map(|a| a.iter().filter_map(Task::of).collect()).unwrap_or_default()
-}
 
 /// A time to come on the real clock: `14:22`, `tomorrow 07:30`.
 pub(crate) fn ahead(ms: u64, now: u64) -> String {
@@ -76,6 +70,7 @@ pub(crate) fn is_stop_note(text: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use bise_proto::words::scheduled;
 
     const NOW: u64 = 1_790_000_000_000;
 
@@ -83,10 +78,11 @@ mod tests {
     /// there): a run and a set line come out as `Ev::Scheduled`.
     #[test]
     fn the_lines_are_the_shared_words() {
-        let run = "timer #48 (every 2m, 2/6, set by answer-line): check the build\n(stop it: sb every --stop 48)";
-        assert!(matches!(run_line(run), Some(Ev::Scheduled { head, words, open: false }) if head == "scheduled #48 · 2 of 6 · check the build" && words == "check the build"));
+        let run = "timer #48 \"build check\" (every 2m, 2/6, set by answer-line): check the build\n(stop it: sb every --stop 48)";
+        assert!(matches!(run_line(run), Some(Ev::Scheduled { head, words, open: false }) if head == format!("build check · {}", scheduled::n_of(2, 6)) && words == "check the build"));
         let set = r#"{"ev":"set","id":3,"agent":"a","by":"a","label":"every 2m","text":"x","next_ms":1790000120000}"#;
-        assert!(matches!(hub_line_at(set, NOW), Some(Ev::Scheduled { head, .. }) if head.starts_with("a scheduled #3 · every 2m · next ")));
+        let want = format!("{} · every 2m · {}", scheduled::set_own("a", "x"), scheduled::next_at(""));
+        assert!(matches!(hub_line_at(set, NOW), Some(Ev::Scheduled { head, .. }) if head.starts_with(&want)));
         assert!(run_line("hello").is_none());
         assert!(is_stop_note("the user stopped timer #3 (x): don't set it again unless they ask"));
     }

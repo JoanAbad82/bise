@@ -1,0 +1,14 @@
+{
+  "tag_name": "desktop-latest",
+  "name": "desktop-v2026.10.1",
+  "draft": false,
+  "prerelease": false,
+  "published_at": "2026-10-12T09:00:00Z",
+  "html_url": "https://github.com/gvergnaud/bise/releases/tag/desktop-latest",
+  "body": "- the first signed build: open it like any Mac app, no Terminal step\n- bise updates itself when you quit it, or while you're away\n- the inbox has its own page: what waits for you, then what you answered\n- drop an image or a PDF on the composer, agents read it\n- `⌘K` opens any agent, live or archived\n- the right bar shows the artifacts and timers of the agent in view\n- pages open next to the thread, with your notes on them\n\n## fixes\n\n- the tab says the folder's name",
+  "assets": [
+    { "name": "desktop.json", "size": 912, "updated_at": "2026-10-12T09:00:00Z", "browser_download_url": "https://github.com/gvergnaud/bise/releases/download/desktop-latest/desktop.json" },
+    { "name": "bise-mac-arm64.dmg", "size": 205312000, "updated_at": "2026-10-12T09:00:00Z", "browser_download_url": "https://github.com/gvergnaud/bise/releases/download/desktop-latest/bise-mac-arm64.dmg" },
+    { "name": "bise-mac-arm64.dmg.sha256", "size": 85, "updated_at": "2026-10-12T09:00:00Z", "browser_download_url": "https://github.com/gvergnaud/bise/releases/download/desktop-latest/bise-mac-arm64.dmg.sha256" }
+  ]
+}

@@ -1,6 +1,8 @@
 ---
-title: install and first run
-description: one command installs bise. the first run asks for one thing, the model, and only when it finds no key.
+title: start with bise terminal
+description: one command installs bise terminal. the first run asks for one thing, the model, and only when it finds no key.
+app: terminal
+other: download for Mac | desktop
 ---
 
 ## install
@@ -29,7 +31,7 @@ the same command works on Linux, x86_64 and arm64. the build needs glibc 2.34 or
 
 it needs `git`, and OpenSSL 3 (`libssl.so.3`, there by default on the systems above) for its HTTPS calls. `bise doctor` shows your distro and what is off on Linux.
 
-on Linux, these are macOS only and stay off: the [sandbox](approvals) of `auto` approvals (auto checks each command instead, and says so once), [voice](voice), [computer use](computer-use) and the desktop app.
+on Linux, these are macOS only and stay off: the [sandbox](approvals) of `auto` approvals (auto checks each command instead, and says so once), [voice](voice), [computer use](computer-use) and [bise desktop](desktop).
 
 ### nixos
 
@@ -54,7 +56,7 @@ it installs bise, then runs `bise setup scan`, which lists what your machine alr
 
 ## first run
 
-go to a repo and start bise:
+bise terminal works in one repo at a time: go to a repo and start it there.
 
 ```sh
 cd your-repo
@@ -93,6 +95,10 @@ in Ghostty, a few keys need one line each in Ghostty's config before they reach 
 bise setup ghostty --dry-run   # shows the change, writes nothing
 bise setup ghostty             # adds the lines, after a backup of the file
 ```
+
+## bise desktop too
+
+bise terminal and [bise desktop](desktop) run the same agents, with the same threads, keys and settings. on a Mac with Apple silicon you can use both at once: `bise` in a folder that is a project of bise desktop opens the same threads.
 
 ## uninstall
 

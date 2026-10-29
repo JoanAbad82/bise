@@ -203,11 +203,6 @@ fn set(s: State) {
     *STATE.lock().unwrap_or_else(|e| e.into_inner()) = s;
 }
 
-/// The list for tests and the designer's captures (nothing fetched).
-pub fn set_for_tests(voices: Vec<Voice>) {
-    set(State::Ready(voices));
-}
-
 /// What `BISE_VOICE_FAKE` lists (and the tests use).
 pub fn fake() -> Vec<Voice> {
     let v = |id: &str, name: &str, l: &str, g: &str| Voice {

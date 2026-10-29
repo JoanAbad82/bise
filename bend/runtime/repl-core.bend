@@ -46,6 +46,8 @@ import ../runtime/selftools.bend as Sf
 import ../runtime/selftools-pure.bend as Sfp
 import ./repl-core-pure.bend as Rcp
 import ../core/ev.bend as Ev
+import ../core/utf8.bend as U8
+import ../core/gen/obs.bend as OG
 
 # what the loops return: keep serving, or stop. The reload path
 # unwinds to main so the process exits 0 — the parent then recompiles
@@ -96,7 +98,7 @@ def repl_reload.busy(out: Pv.Out, +sess: T.Session,
     next: Socket -> T.Session -> IO(Flow)) -> IO(Flow):
   do IO<Flow>:
     out2 : Pv.Out <- Dr.emit(out,
-      Con{"  obs: reload refused: not between turns — finish or interrupt the pending turn first",
+      Con{OG.reload(True{}, "not between turns — finish or interrupt the pending turn first"),
         Con{"--- idle", Nil{}}})
     repl_out(out2, sess, next)
 
@@ -123,21 +125,18 @@ def repl_reload(out: Pv.Out, ok: Bool, +sess: T.Session,
     case True{}:
       do IO<Flow>:
         out2 : Pv.Out <- Dr.emit(out,
-          Con{"  obs: reload: restarting the harness with the latest code",
-            Con{"  obs: reload: the session is preserved — background commands keep running",
+          Con{OG.reload(False{}, "restarting the harness with the latest code"),
+            Con{OG.reload(False{}, "the session is preserved — background commands keep running"),
               Con{"--- idle", Nil{}}}})
         repl_reload.halt(out2, sess)
     case False{}:
       repl_reload.busy(out, sess, next)
 
-# ---- deferred self.reload / self.compact (the agent's own requests) ----
-# A tool result acked "compact: scheduled" / "reload: scheduled" is a
-# request the agent filed mid-turn. It executes HERE, at the turn
-# boundary: compact first (the checkpoint then carries the compacted
-# session into the restarted process), then reload through the same
-# gated path as the /reload command. The request set is computed ONCE
-# — the compaction turn itself is never re-scanned, so a failing
-# compaction cannot loop.
+# ---- deferred self.reload (the agent's own request) ----
+# A tool result acked "reload: scheduled" is a request the agent filed
+# mid-turn. It executes HERE, at the turn boundary, through the same
+# gated path as the /reload command. (self.compact is no longer
+# deferred: the Core compacts inside the turn, which goes on.)
 
 def repl_deferred.reload(+sess: T.Session, out: Pv.Out,
     next: Socket -> T.Session -> IO(Flow)) -> IO(Flow):
@@ -146,8 +145,6 @@ def repl_deferred.reload(+sess: T.Session, out: Pv.Out,
     f : Flow <- repl_reload(out, ok, sess, next)
     IO.pure(Flow, f)
 
-# after the deferred compaction: save, then the reload if it was also
-# requested, else keep serving
 def repl_deferred.reload.only(reload: Bool, +sess2: T.Session, out2: Pv.Out,
     next: Socket -> T.Session -> IO(Flow)) -> IO(Flow):
   match reload:
@@ -155,18 +152,6 @@ def repl_deferred.reload.only(reload: Bool, +sess2: T.Session, out2: Pv.Out,
       repl_deferred.reload(sess2, out2, next)
     case False{}:
       repl_out(out2, sess2, next)
-
-def repl_deferred.compact.after.pick(reload: Bool, +sess3: T.Session,
-    out3: Pv.Out, next: Socket -> T.Session -> IO(Flow)) -> IO(Flow):
-  do IO<Flow>:
-    u : Unit <- P.save(sess3)
-    repl_deferred.reload.only(reload, sess3, out3, next)
-
-def repl_deferred.compact.after(reload: Bool, e: R.RtEnd,
-    next: Socket -> T.Session -> IO(Flow)) -> IO(Flow):
-  match e:
-    case R.REnd{sess3, out3}:
-      repl_deferred.compact.after.pick(reload, sess3, out3, next)
 
 # one run of the runtime loop, from idle. 1M hops: effectively unbounded
 # for a terminal session (the old 100 died mid-turn around ~20 model
@@ -177,31 +162,11 @@ def repl_run(+live: Bool, out: Pv.Out, +sess: T.Session,
   +rt = {Rp.Rt{sess, script, cmds, live} : Rp.Rt}
   R.run(1000000n, out, rt, Rp.JIdle{}, Rp.transition(rt, Rp.JIdle{}))
 
-# the scripted summary a manual compaction pops (scripted mode only)
-def compact_script() -> List<&2, M.Reply>:
-  Con{M.ROk{"<summary>The REPL conversation so far, compacted on request.</summary>", Nil{}},
-    Nil{}}
-
-def repl_deferred.compact(+live: Bool, reload: Bool, +sess2: T.Session, out2: Pv.Out,
-    next: Socket -> T.Session -> IO(Flow)) -> IO(Flow):
-  do IO<Flow>:
-    e : R.RtEnd <- repl_run(live, out2, sess2, compact_script(),
-      Con{T.Compact{""}, Nil{}})
-    repl_deferred.compact.after(reload, e, next)
-
-def repl_deferred.compact.only(+live: Bool, compact: Bool, reload: Bool, +sess2: T.Session,
-    out2: Pv.Out, next: Socket -> T.Session -> IO(Flow)) -> IO(Flow):
-  match compact:
-    case True{}:
-      repl_deferred.compact(live, reload, sess2, out2, next)
-    case False{}:
-      repl_deferred.reload.only(reload, sess2, out2, next)
-
-def repl_deferred(+live: Bool, d: Sfp.Def, +sess2: T.Session, out2: Pv.Out,
+def repl_deferred(d: Sfp.Def, +sess2: T.Session, out2: Pv.Out,
     next: Socket -> T.Session -> IO(Flow)) -> IO(Flow):
   match d:
-    case Sfp.Def{+compact, +reload}:
-      repl_deferred.compact.only(live, compact, reload, sess2, out2, next)
+    case Sfp.Def{_, +reload}:
+      repl_deferred.reload.only(reload, sess2, out2, next)
 
 def repl_end_save.then(+live: Bool, +sess2: T.Session, out2: Pv.Out,
     next: Socket -> T.Session -> IO(Flow)) -> IO(Flow):
@@ -215,7 +180,7 @@ def repl_end_save.then(+live: Bool, +sess2: T.Session, out2: Pv.Out,
     P.save(sess2)
     # the turn asked for nothing: keep serving; else run its requests
     +d : Sfp.Def <- IO.pure(Sfp.Def, Sfp.deferred_of(P.history_of(sess2)))
-    f : Flow <- repl_deferred(live, d, sess2, out2, next)
+    f : Flow <- repl_deferred(d, sess2, out2, next)
     IO.pure(Flow, f)
 
 def repl_end_save(+live: Bool, e: R.RtEnd, next: Socket -> T.Session -> IO(Flow))
@@ -243,7 +208,7 @@ def repl_end_stalled.stalled(+live: Bool, active: Bool, e: R.RtEnd,
         case R.REnd{+sess2, out2}:
           do IO<Flow>:
             out3 : Pv.Out <- Dr.emit(out2,
-              Con{"  obs: turn_stalled: execution budget exhausted",
+              Con{OG.turn_stalled("execution budget exhausted"),
                 Con{"--- idle", Nil{}}})
             P.save(sess2)
             repl_out(out3, sess2, next)
@@ -331,36 +296,58 @@ def repl_lines.go(+live: Bool, +lines: List<&2, String>, s: Socket, +sess: T.Ses
           s2 => sess2 => repl_lines.go(live, rest, s2, sess2, next))
         IO.pure(Flow, f)
 
-# `data`: the line the last chunk left unfinished, then this chunk; the
-# lines a newline ends run, the rest waits for the next chunk (`next`
-# gets it: a message longer than one recv stays one message, BISE-240)
-def repl_data(+live: Bool, closed: Bool, s: Socket, +data: String, +sess: T.Session,
-    next: String -> Socket -> T.Session -> IO(Flow)) -> IO(Flow):
+# `lines`: the commands this chunk's newlines end (after the line the
+# last chunks left unfinished: Rcp.feed); they run, then `next` reads
+# the next chunk (a message longer than one recv stays one message,
+# BISE-240)
+def repl_data(+live: Bool, closed: Bool, s: Socket, +lines: List<&2, String>, +sess: T.Session,
+    next: Socket -> T.Session -> IO(Flow)) -> IO(Flow):
   match closed:
     case True{}:
       do IO<Flow>:
         Socket.close(s)
         IO.pure(Flow, Go{sess})
     case False{}:
-      repl_lines.go(live, Rcp.cmd_whole(data), s, sess,
-        s2 => sess2 => next(Rcp.cmd_tail(data))(s2)(sess2))
+      repl_lines.go(live, lines, s, sess, next)
 
-def repl_after(+live: Bool, rm: Socket & Result<&1, &1, U32 & String, String>,
-    +carry: String, +sess: T.Session, next: String -> Socket -> T.Session -> IO(Flow))
-    -> IO(Flow):
+# one recv's bytes, after the bytes of the char the last recv cut
+# (core/utf8.bend: a char a recv boundary cuts reaches its line whole,
+# issue 36); no bytes: the hub closed the connection. `carry`: the
+# pieces of the unfinished line, newest first (Rcp.feed)
+@unsafe
+def repl_got(+live: Bool, s: Socket, +bs: List<&2, U32>, +carry: List<&2, String>, +pend: List<&2, U32>, +sess: T.Session) -> IO(Flow):
+  repl_decoded(live, List.is_empty(&2, U32, bs), s, U8.decode(pend, bs), carry, sess)
+
+@unsafe
+def repl_fed(+live: Bool, closed: Bool, s: Socket, f: List<&2, String> & List<&2, String>,
+    +pend2: List<&2, U32>, +sess: T.Session) -> IO(Flow):
+  match f:
+    case (+lines, +carry2):
+      repl_data(live, closed, s, lines, sess,
+        s2 => sess2 => repl_conn(live, s2, carry2, pend2, sess2))
+
+@unsafe
+def repl_decoded(+live: Bool, closed: Bool, s: Socket, r: String & List<&2, U32>, +carry: List<&2, String>, +sess: T.Session) -> IO(Flow):
+  match r:
+    case (+text, +pend2):
+      repl_fed(live, closed, s, Rcp.feed(carry, text), pend2, sess)
+
+@unsafe
+def repl_after(+live: Bool, rm: Socket & Result<&1, &1, U32 & String, Maybe<&1, List<&2, U32>>>,
+    +carry: List<&2, String>, +pend: List<&2, U32>, +sess: T.Session) -> IO(Flow):
   match rm:
     case (s, Fail{_}):
       do IO<Flow>:
         Socket.close(s)
         IO.pure(Flow, Go{sess})
-    case (s, Done{+data}):
-      repl_data(live, String.is_empty(data), s, String.append(carry, data), sess, next)
+    case (s, Done{m}):
+      repl_got(live, s, Rcp.recv_bytes(m), carry, pend, sess)
 
 @unsafe
-def repl_conn(+live: Bool, sock: Socket, +carry: String, sess: T.Session) -> IO(Flow):
+def repl_conn(+live: Bool, sock: Socket, +carry: List<&2, String>, +pend: List<&2, U32>, sess: T.Session) -> IO(Flow):
   do IO<Flow>:
-    rm : Socket & Result<&1, &1, U32 & String, String> <- TCP.recv(sock, 4096)
-    repl_after(live, rm, carry, sess, c => s2 => sess2 => repl_conn(live, s2, c, sess2))
+    rm : Socket & Result<&1, &1, U32 & String, Maybe<&1, List<&2, U32>>> <- TCP.recv_bytes(sock, 4096)
+    repl_after(live, rm, carry, pend, sess)
 
 # ---- the accept loop: one connection at a time, session survives ----
 
@@ -373,8 +360,7 @@ def greet_lines(+n: Nat, +history: List<&2, T.Msg>) -> List<&2, String>:
   # no idle marker: the greeting is unsolicited, not a turn's end — an
   # idle here would make clients give up waiting for the first turn
   List.append(&2, String, Rp.replay(history),
-    Con{String.append("  obs: session_restored: ",
-      String.append(Nat.show(n), " messages")), Nil{}})
+    Con{OG.session_restored(n), Nil{}})
 
 # the parent respawned this process after a crash (BEND_CRASH_NOTE =
 # what the dead process said): the user must see it, right after the
@@ -385,7 +371,7 @@ def crash_lines(empty: Bool, +note: String) -> List<&2, String>:
     case True{}:
       Nil{}
     case False{}:
-      Con{String.append("  obs: harness_restarted: ", note), Nil{}}
+      Con{OG.harness_restarted(note), Nil{}}
 
 # `pre`: the session-log configuration facts (core/ev.bend), first on
 # every connection (the writer skips a fact equal to its state)
@@ -438,7 +424,7 @@ def greet_conn(+live: Bool, out: Pv.Out, +sess: T.Session) -> IO(Flow):
       IO.pure(Flow, Go{sess})
     case Pv.ONet{s2}:
       resume_queued(live, List.is_empty(&2, String, S.sess_queued(sess)), s2,
-        sess, s3 => sess3 => repl_conn(live, s3, "", sess3))
+        sess, s3 => sess3 => repl_conn(live, s3, Nil{}, Nil{}, sess3))
 
 
 

@@ -4,12 +4,16 @@
 //! and the try build run in a thread, in line on the land queue (the
 //! feature's lands wait meanwhile; a merge waits for main's line too);
 //! the registry and the facts are shared with those threads; the end
-//! comes back to the hub as `Input::Feature`. The typed `features` rows
+//! comes back to the hub as `Input::Feature`. His answer waits its turn
+//! behind a step already running (an agent's `sb feature` is refused
+//! then); when it fails, the end carries `feature::handoff`'s brief for
+//! main ([`handed`]), never a re-asked item. The typed `features` rows
 //! (bar A.6, `proto_view::features`) read the same registry and facts,
 //! never git, on the loop (`daemon/proto.rs` sends them).
 
 use super::{log_line, write_json, Msg, Shell};
 use crate::core::{FeatureDone, Input, Token};
+use bise_proto::core::Feed;
 use crate::feature::{self, Facts, Registry};
 use crate::flow::{FlowConfig, FlowMode};
 use crate::proto_view;
@@ -24,11 +28,20 @@ struct Inner {
     facts: BTreeMap<String, Facts>,
     /// Try builds running, by feature.
     building: BTreeSet<String>,
-    /// A step running, by feature: one at a time per feature.
-    busy: BTreeSet<String>,
+    /// The steps running or waiting, by feature: an agent's `sb feature`
+    /// is refused while any runs; his answer waits its turn (the
+    /// feature's land turn, which every git step takes).
+    busy: BTreeMap<String, usize>,
     /// The trunk's short name at the last refresh ("" before it).
     main: String,
+    /// When the last refresh began (ms; 0: never).
+    refreshed_ms: u64,
 }
+
+/// The features' facts and the trunk's name are read again at least this
+/// often (the tick), besides after a land: someone may switch the shared
+/// folder's branch or fetch by hand.
+pub(super) const FACTS_EVERY_MS: u64 = 60_000;
 
 /// The registry, the facts and the builds, shared with the threads.
 #[derive(Clone, Default)]
@@ -65,9 +78,28 @@ impl Features {
         proto_view::features(&g.reg.features, &g.facts, &g.building, main, agents, cards)
     }
 
-    /// The views' part (`Hub::feature_lids`, `Hub::trying`), by place id.
-    pub(super) fn views(&self, main: &str, now: u64) -> (BTreeMap<String, String>, BTreeSet<String>) {
+    /// The facts are older than [`FACTS_EVERY_MS`] (the tick refreshes
+    /// them); marks them as being refreshed from `now`.
+    pub(super) fn due(&self, now: u64) -> bool {
+        let mut g = self.lock();
+        let due = now.saturating_sub(g.refreshed_ms) >= FACTS_EVERY_MS;
+        if due {
+            g.refreshed_ms = now;
+        }
+        due
+    }
+
+    /// The trunk's short name the last refresh read ("" before it): no git.
+    pub(super) fn trunk(&self) -> String {
+        self.lock().main.clone()
+    }
+
+    /// The views' part (`Hub::feature_lids`, `Hub::trying`), by place id,
+    /// against the trunk the last refresh read: no git (it ran per
+    /// snapshot, 2-3 subprocesses each, hub-lag-7).
+    pub(super) fn views(&self, now: u64) -> (BTreeMap<String, String>, BTreeSet<String>) {
         let g = self.lock();
+        let main = if g.main.is_empty() { "main" } else { g.main.as_str() };
         let mut lids = BTreeMap::new();
         let mut trying = BTreeSet::new();
         for f in &g.reg.features {
@@ -110,6 +142,8 @@ struct Job {
     shared: PathBuf,
     state: PathBuf,
     scratch: PathBuf,
+    /// The land check's warm tree's root (`scratch::CheckTree`).
+    checks: PathBuf,
     flow: FlowConfig,
     queue: crate::land::Queue,
     features: Features,
@@ -119,16 +153,26 @@ struct Job {
 }
 
 /// A step's end: the agent's answer (ok, text) and the hub's part.
-type Out = Result<(String, FeatureDone), String>;
+type Out = Result<(String, FeatureDone), feature::Failed>;
 
 impl Shell {
     /// `Effect::Feature`: checks on the loop (no git), the step in a thread.
     pub(super) fn feature(&mut self, token: Option<Token>, op: String, name: String, agents: Vec<(String, String)>) {
         let mut stream = token.and_then(|t| self.replies.remove(&t));
         let flow = FlowConfig::load(&self.opts.paths);
-        let refuse = |stream: &mut Option<std::os::unix::net::UnixStream>, e: String| {
-            if let Some(s) = stream.as_mut() {
+        // an agent's refusal is its answer; the user's (an item's number)
+        // is handed to main with a brief, his item closed
+        let tx = self.tx.clone();
+        let (op_, name_, agents_) = (op.clone(), name.clone(), agents.clone());
+        let picked = crate::util::now_ms();
+        let refuse = |stream: &mut Option<std::os::unix::net::UnixStream>, e: String| match stream.as_mut() {
+            Some(s) => {
                 write_json(s, &json!({"ok": false, "error": e}));
+            }
+            None => {
+                let failed = feature::Failed::Other(e);
+                let d = handed(&op_, &name_, &agents_, picked, None, &failed);
+                let _ = tx.send(Msg::input(Input::Feature(d)));
             }
         };
         if op == "list" || (op.is_empty() && name.is_empty()) {
@@ -140,8 +184,8 @@ impl Shell {
             }
             return;
         }
-        if !matches!(op.as_str(), "new" | "sync" | "ready" | "merge" | "drop" | "try" | "diff" | "later" | "keep") {
-            return refuse(&mut stream, "usage: sb feature new|sync|ready|merge|drop|list <name>".into());
+        if !matches!(op.as_str(), "new" | "sync" | "ready" | "merge" | "drop" | "retire" | "try" | "diff" | "later" | "keep") {
+            return refuse(&mut stream, "usage: sb feature new|sync|ready|merge|drop|retire|list <name>".into());
         }
         if name.is_empty() {
             return refuse(&mut stream, format!("usage: sb feature {} <name>", op));
@@ -153,15 +197,17 @@ impl Shell {
         if op == "new" && known {
             return refuse(&mut stream, format!("{} is a feature already: spawn its agents with --feature {}", name, name));
         }
-        if op != "new" && !known {
+        // a retire run again finishes what is left (its step says what)
+        if op != "new" && op != "retire" && !known {
             return refuse(&mut stream, format!("no feature {}: `sb feature` lists them", name));
         }
         {
             let mut g = self.features.lock();
-            if !g.busy.insert(name.clone()) {
+            if stream.is_some() && g.busy.get(&name).is_some_and(|n| *n > 0) {
                 drop(g);
                 return refuse(&mut stream, format!("{} is busy (a sync, a try or a merge runs): try again when it ends", name));
             }
+            *g.busy.entry(name.clone()).or_default() += 1;
             if op == "try" {
                 g.building.insert(name.clone());
             }
@@ -174,6 +220,7 @@ impl Shell {
             shared: self.opts.paths.workspace.clone(),
             state: self.opts.paths.state.clone(),
             scratch: self.opts.paths.worktrees.join(".features"),
+            checks: self.opts.paths.worktrees.clone(),
             flow,
             queue: self.lands.clone(),
             features: self.features.clone(),
@@ -181,13 +228,17 @@ impl Shell {
         };
         log_line(&self.opts.paths, &format!("feature {} {}", job.op, job.name));
         // the Δ at once when a try starts
-        let snap = self.snapshot();
-        self.broadcast(&snap);
+        self.state_now();
         std::thread::spawn(move || {
             let res = step(&job);
             {
                 let mut g = job.features.lock();
-                g.busy.remove(&job.name);
+                if let Some(n) = g.busy.get_mut(&job.name) {
+                    *n = n.saturating_sub(1);
+                    if *n == 0 {
+                        g.busy.remove(&job.name);
+                    }
+                }
                 g.building.remove(&job.name);
             }
             job.features.refresh(&job.shared);
@@ -200,14 +251,19 @@ impl Shell {
                 }
                 Err(e) => {
                     if let Some(s) = stream.as_mut() {
-                        write_json(s, &json!({"ok": false, "error": e}));
+                        write_json(s, &json!({"ok": false, "error": e.to_string()}));
                     }
-                    // the user's answer failed: main hears it, the item waits
-                    let line = (!job.asked).then(|| ("warn".to_string(), format!("{}: {} did not go through: {}", job.name, job.op, e)));
-                    FeatureDone { name: job.name.clone(), line, ..FeatureDone::default() }
+                    if job.asked {
+                        FeatureDone { name: job.name.clone(), ..FeatureDone::default() }
+                    } else {
+                        // the user's answer failed: his item closes, main gets the brief
+                        let mut d = handed(&job.op, &job.name, &job.agents, picked, Some(&job.shared), &e);
+                        d.line = Some(Feed::warn(format!("{}: {} did not go through: {}", job.name, job.op, e)));
+                        d
+                    }
                 }
             };
-            let _ = job.tx.send(Msg::In(Input::Feature(done)));
+            let _ = job.tx.send(Msg::input(Input::Feature(done)));
         });
     }
 
@@ -222,8 +278,7 @@ impl Shell {
 
     /// The views' part, before a snapshot (`Shell::snapshot`).
     pub(super) fn feature_views(&mut self) {
-        let main = crate::trunk::trunk_ref(&self.opts.paths.workspace).unwrap_or_else(|_| "main".into());
-        let (lids, trying) = self.features.views(crate::land::short(&main), crate::util::now_ms());
+        let (lids, trying) = self.features.views(crate::util::now_ms());
         self.hub.feature_lids = lids;
         self.hub.trying = trying;
     }
@@ -240,6 +295,23 @@ impl Shell {
             let _ = tx.send(Msg::Land { line: None });
         });
     }
+}
+
+/// His answer on feature `name`'s item failed (`failed`): the hub closes
+/// the item and hands it to main with [`feature::handoff`]'s brief
+/// (`shared`: the repo, for the tips; None: not read).
+fn handed(op: &str, name: &str, agents: &[(String, String)], picked_ms: u64, shared: Option<&Path>, failed: &feature::Failed) -> FeatureDone {
+    let (trunk, base, tip) = match shared {
+        Some(s) => {
+            let main = crate::trunk::trunk_ref(s).unwrap_or_default();
+            let tip = |r: &str| crate::land::git(s, &["rev-parse", "--verify", r]).map(|t| crate::land::shorten(s, &t)).unwrap_or_default();
+            (main_short(s), tip(&main), tip(&format!("refs/heads/{}", name)))
+        }
+        None => ("main".to_string(), String::new(), String::new()),
+    };
+    let agents: Vec<String> = agents.iter().map(|(a, _)| a.clone()).collect();
+    let h = feature::Handoff { op, name, trunk: &trunk, base: &base, tip: &tip, picked_ms, failed, agents: &agents };
+    FeatureDone { name: name.to_string(), handoff: Some(feature::handoff(&h)), ..FeatureDone::default() }
 }
 
 fn main_short(shared: &Path) -> String {
@@ -323,7 +395,7 @@ fn step(job: &Job) -> Out {
             job.features.update(&job.state, name, |f| f.checked = job.flow.check.as_ref().map(|_| tip.clone()));
             let f = feature::facts(&job.shared, &format!("refs/heads/{}", main), name)?;
             if f.ahead == 0 {
-                return Err(format!("{} has no commit that {} lacks: nothing to try", name, main));
+                return Err(format!("{} has no commit that {} lacks: nothing to try", name, main).into());
             }
             let mut d = done();
             d.open = Some((feature::TRY.into(), feature::try_text(name, &f, &main, job.flow.check.is_some())));
@@ -354,7 +426,7 @@ fn step(job: &Job) -> Out {
             });
             let mut d = done();
             d.open = Some((feature::MERGE.into(), feature::merge_text(name, &f, &main, &tried, checked)));
-            d.line = Some(("info".into(), format!("{} is built to try ({}): in another terminal, {}{}", name, tried.sha, tried.run, synced)));
+            d.line = Some(Feed::info(format!("{} is built to try ({}): in another terminal, {}{}", name, tried.sha, tried.run, synced)));
             Ok((format!("built {}: {}", tried.sha, tried.run), d))
         }
         "diff" => {
@@ -362,17 +434,14 @@ fn step(job: &Job) -> Out {
             feature::write_diff(&job.shared, name, &file)?;
             let f = facts(&job.features).unwrap_or_default();
             let mut d = done();
-            d.line = Some((
-                "info".into(),
-                format!(
-                    "the diff of {}: {} commits, +{} −{} · {}",
-                    name,
-                    f.ahead,
-                    feature::thousands(f.adds),
-                    feature::thousands(f.dels),
-                    feature::home_short(&file.to_string_lossy())
-                ),
-            ));
+            d.line = Some(Feed::info(format!(
+                "the diff of {}: {} commits, +{} −{} · {}",
+                name,
+                f.ahead,
+                feature::thousands(f.adds),
+                feature::thousands(f.dels),
+                feature::home_short(&file.to_string_lossy())
+            )));
             Ok((format!("written to {}", file.display()), d))
         }
         "later" => {
@@ -384,14 +453,14 @@ fn step(job: &Job) -> Out {
             job.features.update(&job.state, name, |f| f.trial = false);
             let mut d = done();
             d.close = Some("keep working".into());
-            d.line = Some(("info".into(), format!("{} stays on its branch: its agents keep working ({}).", name, agents_line(&job.agents))));
+            d.line = Some(Feed::info(format!("{} stays on its branch: its agents keep working ({}).", name, agents_line(&job.agents))));
             Ok(("the trial is over; the branch stays.".into(), d))
         }
         "merge" => {
             let _feat_turn = job.queue.wait_turn(&feature_ref, &place, &mut || {});
             let main_ref = crate::trunk::trunk_ref(&job.shared)?;
-            let _main_turn = job.queue.wait_turn(&main_ref, &place, &mut || {});
-            let m = feature::merge(&job.shared, &job.scratch, name, &job.flow)?;
+            let main_turn = job.queue.wait_turn(&main_ref, &place, &mut || {});
+            let m = feature::merge(&job.shared, &job.scratch, &job.checks, name, &job.flow, &main_turn)?;
             let kept = feature::trash(&job.shared, name, now).unwrap_or_default();
             {
                 let mut g = job.features.lock();
@@ -402,7 +471,7 @@ fn step(job: &Job) -> Out {
             let mut d = done();
             d.close = Some("merged".into());
             d.archive = job.agents.iter().map(|(a, _)| a.clone()).collect();
-            d.line = Some(("info".into(), line.clone()));
+            d.line = Some(Feed::info(line.clone()));
             Ok((format!("{} (the branch's tip kept in {})", line, kept), d))
         }
         "drop" => {
@@ -425,9 +494,92 @@ fn step(job: &Job) -> Out {
             let mut d = done();
             d.close = Some("dropped".into());
             d.archive = job.agents.iter().map(|(a, _)| a.clone()).collect();
-            d.line = Some(("info".into(), line.clone()));
+            d.line = Some(Feed::info(line.clone()));
             Ok((line, d))
         }
-        op => Err(format!("unknown feature step: {}", op)),
+        "retire" => retire(job, &feature_ref, &place, &main),
+        op => Err(format!("unknown feature step: {}", op).into()),
+    }
+}
+
+/// `sb feature retire <name>` (main's): the feature's work is in the
+/// trunk already; its agents stay and land on the trunk from now on.
+/// Unlike merge and drop (git first, then the state), the state goes
+/// first: the check proved the tip is in the trunk, so agents landing
+/// there is right whatever the branch is called; a crash after sb-core's
+/// step leaves a branch still named X and a registry entry with no
+/// agents, both harmless, where git first would leave agents pointing at
+/// a branch that's gone. So: the check, sb-core's step (who moves, their
+/// note, main's line), then the rename (never a delete), then the
+/// registry, all under the feature's land turn: a land queued behind
+/// reads its agent's new place once in line (`land::run`'s `onto_now`)
+/// and goes to the trunk. Run again, it finishes whatever is left.
+fn retire(job: &Job, feature_ref: &str, place: &str, main: &str) -> Out {
+    let name = job.name.as_str();
+    let _turn = job.queue.wait_turn(feature_ref, place, &mut || {});
+    let trunk = crate::trunk::trunk_ref(&job.shared)?;
+    let branch = feature::exists(&job.shared, name);
+    if branch {
+        let missing = feature::missing(&job.shared, &trunk, name)?;
+        if missing > 0 {
+            return Err(feature::retire_refusal(name, main, missing).into());
+        }
+    }
+    let known = job.features.names().iter().any(|n| n == name);
+    let kept = if branch {
+        feature::retired_name(name, &|b| feature::exists(&job.shared, b))
+    } else {
+        feature::last_retired(&job.shared, name).unwrap_or_default()
+    };
+    if !branch && !known && job.agents.is_empty() {
+        return match kept.is_empty() {
+            true => Err(format!("no feature {}: `sb feature` lists them", name).into()),
+            false => {
+                let d = FeatureDone { name: name.to_string(), ..FeatureDone::default() };
+                Ok((format!("{} is retired already (its branch is {}): nothing left to do.", name, kept), d))
+            }
+        };
+    }
+    let mut did = Vec::new();
+    if branch || !job.agents.is_empty() {
+        // sb-core's step, applied before the branch moves
+        let (tx, rx) = std::sync::mpsc::channel();
+        let step = FeatureDone {
+            name: name.to_string(),
+            retire: Some((kept.clone(), main.to_string())),
+            ack: Some(crate::core::feature::Ack(tx)),
+            ..FeatureDone::default()
+        };
+        if job.tx.send(Msg::input(Input::Feature(step))).is_err() || rx.recv().is_err() {
+            return Err(feature::Failed::Other("the hub stopped before the retire: nothing changed; run it again".into()));
+        }
+        did.push(match job.agents.len() {
+            0 => "no live agent to move".to_string(),
+            _ => format!("{} land on {} now", agents_line(&job.agents), main),
+        });
+    }
+    if branch {
+        feature::rename(&job.shared, name, &kept)?;
+        did.push(format!("the branch renamed {}", kept));
+    }
+    if known {
+        let mut g = job.features.lock();
+        g.reg.remove(name);
+        g.reg.save(&job.state)?;
+        did.push("off the feature list".to_string());
+    }
+    let mut d = FeatureDone { name: name.to_string(), ..FeatureDone::default() };
+    d.close = Some("retired".into());
+    Ok((format!("{} retired: {}.", name, did.join(", ")), d))
+}
+
+/// A land's `onto_now` (`land::run`): asks the hub's loop where `agent`
+/// lands now; `was` (the request's) when the hub does not answer.
+pub(super) fn onto_now(tx: &std::sync::mpsc::Sender<Msg>, agent: &str, was: Option<String>) -> impl FnMut() -> Option<String> {
+    let (tx, agent) = (tx.clone(), agent.to_string());
+    move || {
+        let (reply, rx) = std::sync::mpsc::channel();
+        let _ = tx.send(Msg::input(Input::Onto { agent: agent.clone(), reply }));
+        rx.recv().unwrap_or_else(|_| was.clone())
     }
 }

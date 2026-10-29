@@ -9,24 +9,31 @@ use crossterm::event::{
 use std::io;
 use std::time::Duration;
 
-// one wire line into the feed of the app (the focused view)
+// one wire line into the feed of the app (the focused view): the TUI's
+// own fold of a thread's lines, the reference the parity law
+// (entry_ev_tests.rs) and the line-fed tests read since P4d-feed's
+// switch (the feeds come from the hub's entries, sb/feed_entries.rs)
+#[cfg(test)]
 pub(crate) fn ingest_line(app: &mut App, line: String, ts: Option<u64>) {
     if line == "--- idle" {
         app.pending = false;
         app.interrupt_requested = false;
     }
-    // a turn of this feed started or ended: the queued message that went
-    // has its turn, so the next one may go at a turn's end (queue.rs)
-    if line.starts_with("  obs: turn_started") || line.starts_with("  obs: turn_done:") {
-        crate::queue::seen(app);
-    }
-    // thinking duration: the model's reply arrives one batch after the
-    // previous wire line (bise-proto's words::thought_ms, the hub's fold
-    // makes the same; ms since the epoch, when each line arrived)
+    // the gap since the previous wire line arrived (ms since the epoch):
+    // a hub that doesn't give the line's time marks a pause by it
     let now = crate::when::now_ms();
-    let ms = u128::from(bise_proto::thread::words::thought_ms(app.last_line_at, now));
+    let arrived = u128::from(bise_proto::thread::words::thought_ms(app.last_line_at, now));
     app.last_line_at = now;
     let (line, replayed) = strip_history(&line);
+    // thinking duration: the model's reply comes one batch after the
+    // previous line (G2: bise-proto's words::thought_ms over the lines'
+    // own times, the ms the hub wrote them, as the hub's fold; a hub
+    // that doesn't say: when they arrived)
+    let ms = match (ts, app.last_ts) {
+        (Some(t), Some(prev)) if !replayed => u128::from(bise_proto::thread::words::thought_ms(prev, t)),
+        (Some(_), None) => 0,
+        _ => arrived,
+    };
     // a line after a pause: a time mark first (BISE-14, book §10). The
     // hub's time says the pause, replayed feeds included (BISE-271); a
     // hub without it, the time the line arrived. A line the REPL
@@ -41,12 +48,12 @@ pub(crate) fn ingest_line(app: &mut App, line: String, ts: Option<u64>) {
             app.last_ts = Some(t);
         }
         None if !replayed => {
-            crate::feed::pause_mark(&mut app.events, &mut app.cache, ms, crate::feed::local_hhmm);
+            crate::feed::pause_mark(&mut app.events, &mut app.cache, arrived, crate::feed::local_hhmm);
         }
         None => {}
     }
     // the end of a turn keeps its time (BISE-271: its hover)
-    let ended = (line.starts_with("  obs: turn_done: ") && !replayed).then(|| ts.unwrap_or_else(crate::when::now_ms));
+    let ended = (!replayed && matches!(bise_proto::thread::lines::read(line), bise_proto::thread::lines::Rec::Obs(bise_proto::thread::lines::Obs::TurnDone(_)))).then(|| ts.unwrap_or_else(crate::when::now_ms));
     // a replayed reasoning section has no duration
     let ms = if replayed { 0 } else { ms };
     let parsed = if replayed {
@@ -591,7 +598,6 @@ mod zen_tests {
     use ratatui::backend::TestBackend;
     use ratatui::buffer::Buffer;
     use ratatui::Terminal;
-    use serde_json::json;
     use std::time::Instant;
 
     /// One event through the loop's handlers and zen, at `now`.
@@ -622,13 +628,9 @@ mod zen_tests {
 
     fn app_with_agents() -> App {
         let mut app = crate::sb::bench::test_app();
-        let state = json!({"ev": "state", "agents": [
-            {"name": "main", "main": true, "status": "idle"},
-            {"name": "docs", "status": "working", "objective": "write the docs"},
-        ], "cards": []});
-        sb::dispatch(&mut app, &state.to_string());
-        sb::dispatch(&mut app, &json!({"ev": "ready"}).to_string());
-        sb::dispatch(&mut app, &json!({"ev": "line", "agent": "main", "line": "sb you : ship it"}).to_string());
+        crate::sb::hub_reads::rows_for_tests::apply(&mut app, vec![crate::sb::hub_reads::rows_for_tests::agent("main", "idle", ""), crate::sb::hub_reads::rows_for_tests::agent("docs", "working", "write the docs")], vec![]);
+        crate::sb::hub_reads::ready(&mut app);
+        crate::sb::entries_for_tests::lines(&mut app, "main", &["sb you : ship it"]);
         app
     }
 
@@ -766,13 +768,10 @@ mod zen_tests {
     fn enter_and_every_ui_shortcut_leave_zen() {
         let t = Instant::now();
         let (n, s, a, c) = (KeyModifiers::NONE, KeyModifiers::SHIFT, KeyModifiers::ALT, KeyModifiers::CONTROL);
-        let card = json!({"ev": "state", "agents": [
-            {"name": "main", "main": true, "status": "idle"},
-            {"name": "docs", "status": "working", "objective": "write the docs"},
-        ], "cards": [
-            {"id": 7, "kind": "question", "agent": "docs", "text": "v1 or v2?", "age_ms": 0},
-            {"id": 8, "kind": "question", "agent": "docs", "text": "ship?", "age_ms": 0},
-        ]});
+        let card = crate::sb::hub_reads::rows_for_tests::lines(
+            vec![crate::sb::hub_reads::rows_for_tests::agent("main", "idle", ""), crate::sb::hub_reads::rows_for_tests::agent("docs", "working", "write the docs")],
+            vec![crate::sb::hub_reads::rows_for_tests::card(7, "question", "docs", "v1 or v2?"), crate::sb::hub_reads::rows_for_tests::card(8, "question", "docs", "ship?")],
+        );
         // (what, the key, set up the app once in zen, composer empty or not)
         type Setup = fn(&mut App);
         let none: Setup = |_| {};
@@ -805,10 +804,10 @@ mod zen_tests {
             ("esc back to main", KeyCode::Esc, n, false, false, in_docs),
             ("esc draft away", KeyCode::Esc, n, false, true, none),
             ("ctrl+2 another inbox item", KeyCode::Char('2'), c, true, true, none),
-            ("ctrl+n next card", KeyCode::Char('n'), c, true, true, none),
-            ("ctrl+p previous card", KeyCode::Char('p'), c, true, true, none),
-            ("ctrl+x close the card", KeyCode::Char('x'), c, true, true, none),
-            ("pgup the card", KeyCode::PageUp, n, true, true, none),
+            ("ctrl+n next notification", KeyCode::Char('n'), c, true, true, none),
+            ("ctrl+p previous notification", KeyCode::Char('p'), c, true, true, none),
+            ("ctrl+x close the notification", KeyCode::Char('x'), c, true, true, none),
+            ("pgup the notification", KeyCode::PageUp, n, true, true, none),
             ("ctrl+o open everything", KeyCode::Char('o'), c, false, true, none),
             ("pgup the feed", KeyCode::PageUp, n, false, true, none),
             ("pgdn the feed", KeyCode::PageDown, n, false, true, scrolled),
@@ -825,7 +824,9 @@ mod zen_tests {
         for (what, code, m, cards, text, setup) in cases {
             let mut app = app_with_agents();
             if cards {
-                sb::dispatch(&mut app, &card.to_string());
+                for l in &card {
+                    sb::dispatch(&mut app, l);
+                }
                 let calls = app.sb.calls();
                 app.zen.calls(calls, t);
                 on_key(&mut app, &KeyEvent::new(KeyCode::Char('1'), c));
@@ -864,19 +865,21 @@ mod zen_tests {
         calls(&mut app);
         assert!(app.zen.active(t), "nothing new");
         // a new card
-        let state = json!({"ev": "state", "agents": [{"name": "main", "main": true, "status": "idle"}],
-            "cards": [{"id": 7, "kind": "question", "agent": "docs", "text": "v1 or v2?", "age_ms": 0}]});
-        sb::dispatch(&mut app, &state.to_string());
+        let state = crate::sb::hub_reads::rows_for_tests::lines(vec![crate::sb::hub_reads::rows_for_tests::agent("main", "idle", "")], vec![crate::sb::hub_reads::rows_for_tests::card(7, "question", "docs", "v1 or v2?")]);
+        for l in &state {
+            sb::dispatch(&mut app, l);
+        }
         calls(&mut app);
         assert!(!app.zen.active(t));
         // the same card again: zen holds
         event(&mut app, key(KeyCode::Char('e')), t);
-        sb::dispatch(&mut app, &state.to_string());
+        for l in &state {
+            sb::dispatch(&mut app, l);
+        }
         calls(&mut app);
         assert!(app.zen.active(t));
         // a message to you, in a feed out of view
-        let l = json!({"ev": "line", "agent": "docs", "line": "sb msg-you : docs : la v2 est prête"});
-        sb::dispatch(&mut app, &l.to_string());
+        crate::sb::entries_for_tests::lines(&mut app, "docs", &["sb msg-you : docs : la v2 est prête"]);
         calls(&mut app);
         assert!(!app.zen.active(t));
     }
@@ -955,7 +958,6 @@ mod paint_tests {
     use ratatui::backend::TestBackend;
     use ratatui::style::Color;
     use ratatui::Terminal;
-    use serde_json::json;
 
     fn resets(app: &mut App) -> Vec<(u16, u16)> {
         let mut t = Terminal::new(TestBackend::new(120, 36)).unwrap();
@@ -974,16 +976,12 @@ mod paint_tests {
     }
 
     fn with_agents_and_a_card(app: &mut App) {
-        let state = json!({"ev": "state", "agents": [
-            {"name": "main", "main": true, "status": "idle"},
-            {"name": "docs", "status": "working", "objective": "write the docs"},
-        ], "cards": [
-            {"id": 1, "kind": "question", "agent": "docs", "text": "v1 or v2 for the api docs?", "age_ms": 0},
-        ]});
-        sb::dispatch(app, &state.to_string());
-        for l in ["sb you : ship it", "sb msg : docs → main : found it", "sb card : #1 question @docs : v1 or v2?"] {
-            sb::dispatch(app, &json!({"ev": "line", "agent": "main", "line": l}).to_string());
-        }
+        crate::sb::hub_reads::rows_for_tests::apply(
+            app,
+            vec![crate::sb::hub_reads::rows_for_tests::agent("main", "idle", ""), crate::sb::hub_reads::rows_for_tests::agent("docs", "working", "write the docs")],
+            vec![crate::sb::hub_reads::rows_for_tests::card(1, "question", "docs", "v1 or v2 for the api docs?")],
+        );
+        crate::sb::entries_for_tests::lines(app, "main", &["sb you : ship it", "sb msg : docs → main : found it", "sb card : #1 question @docs : v1 or v2?"]);
     }
 
     #[test]
@@ -1002,7 +1000,6 @@ mod paint_tests {
             assert_eq!(resets(&mut app), vec![], "popup, {mode:?}");
             app.ed.text.clear();
             app.ed.cursor = 0;
-            // /help
             sb::handle_input(&mut app, "/help");
             assert!(app.help.is_some());
             assert_eq!(resets(&mut app), vec![], "help, {mode:?}");

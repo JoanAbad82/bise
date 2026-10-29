@@ -12,21 +12,29 @@
 //!   the place also changed is refused (main decides).
 //! - plain, from a worktree: its own files first (with the message), then
 //!   the branch is rebased on main (the worktree must be clean: every
-//!   agent landed its files), the repo's check runs if main had moved,
-//!   main moves to the branch (fast-forward); in trunk flow with `push`,
-//!   main is pushed. From the shared folder: `--here`, then the push.
+//!   agent landed its files); if main had moved, the land check
+//!   (`bise.toml` at main's tip, [`crate::land_check`], issue 28) and the
+//!   user's own check run on the rebased tree, then main moves to the
+//!   branch (fast-forward); in trunk flow with `push`, main is pushed.
+//!   From the shared folder: `--here`, then the push; `--here` is not
+//!   checked, and its line says so when the repo has a land check.
 //!   main is the repo's default branch (`trunk::trunk_ref`, issue #8),
 //!   not the shared folder's branch: its files move only when it has
 //!   main checked out ([`move_main`]).
 //! - One land at a time per target ref ([`Queue`]): the others wait in
 //!   line, and the views say so (`waits to land · 2nd`).
+//! - The revert guard ([`crate::land_revert`]) before a shared ref moves
+//!   (a worktree's plain land after its rebase, a `--here` from the
+//!   shared folder): a land that puts back old copies of what another
+//!   agent landed since it started is refused, its files and that agent
+//!   named. The daemon writes each land's record
+//!   ([`crate::land_record`]) from the [`Outcome`]'s range.
 
 use crate::flow::{FlowConfig, FlowMode};
 pub use crate::land_pick::left_out_note;
 use crate::land_pick::{pick, Change, Claims, Picked};
-use std::collections::BTreeMap;
+pub use crate::land_queue::{Queue, Turn};
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, Condvar, Mutex};
 
 /// What the hub knows when an agent asks to land (core.rs builds it from
 /// the state; the daemon adds the repo's flow).
@@ -56,6 +64,12 @@ pub struct Job {
     /// use`): a plain land from its worktree moves it, never main, and is
     /// never pushed. None: main.
     pub onto: Option<String>,
+    /// The project's worktrees, the root of the land check's warm tree
+    /// (`scratch::CheckTree`; the daemon sets it, like `flow`).
+    pub checks: PathBuf,
+    /// The hub's land records (`Paths::lands`, the daemon sets it): the
+    /// revert guard's "whose land was it" ([`crate::land_revert`]).
+    pub lands: PathBuf,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -71,91 +85,14 @@ pub struct Outcome {
     /// New files of the place that no agent claimed, made since the agent
     /// started: not landed, named in the answer ([`left_out_note`]).
     pub left_out: Vec<String>,
-}
-
-// ---- the queue: one land at a time per target ref ----
-
-#[derive(Default)]
-struct Line {
-    /// (ticket, target ref, place id), the first one landing.
-    waiting: Vec<(u64, String, String)>,
-    next: u64,
-}
-
-/// The land queue, shared by the daemon's land threads.
-#[derive(Clone, Default)]
-pub struct Queue {
-    inner: Arc<(Mutex<Line>, Condvar)>,
-}
-
-/// A place in line; dropping it leaves the line.
-pub struct Turn {
-    q: Queue,
-    ticket: u64,
-}
-
-impl Drop for Turn {
-    fn drop(&mut self) {
-        let (m, cv) = &*self.q.inner;
-        let mut l = m.lock().unwrap_or_else(|e| e.into_inner());
-        l.waiting.retain(|(t, _, _)| *t != self.ticket);
-        cv.notify_all();
-    }
-}
-
-fn ordinal(n: usize) -> String {
-    let suffix = match (n % 10, n % 100) {
-        (1, x) if x != 11 => "st",
-        (2, x) if x != 12 => "nd",
-        (3, x) if x != 13 => "rd",
-        _ => "th",
-    };
-    format!("{}{}", n, suffix)
-}
-
-impl Queue {
-    /// Join the line for `target` and wait until first. `joined`: called
-    /// once in line (the views refresh: the lid says it waits).
-    pub fn wait_turn(&self, target: &str, place: &str, joined: &mut dyn FnMut()) -> Turn {
-        let (m, cv) = &*self.inner;
-        let ticket = {
-            let mut l = m.lock().unwrap_or_else(|e| e.into_inner());
-            l.next += 1;
-            let t = l.next;
-            l.waiting.push((t, target.to_string(), place.to_string()));
-            t
-        };
-        joined();
-        let mut l = m.lock().unwrap_or_else(|e| e.into_inner());
-        while l.waiting.iter().find(|(_, r, _)| r == target).map(|(t, _, _)| *t) != Some(ticket) {
-            l = cv.wait(l).unwrap_or_else(|e| e.into_inner());
-        }
-        Turn {
-            q: self.clone(),
-            ticket,
-        }
-    }
-
-    /// The held line of each place in line (pr-design §4.1, the lid):
-    /// `landing` for the first, `waits to land · 2nd` for the next.
-    pub fn lids(&self) -> BTreeMap<String, String> {
-        let (m, _) = &*self.inner;
-        let l = m.lock().unwrap_or_else(|e| e.into_inner());
-        let mut out = BTreeMap::new();
-        let mut rank: BTreeMap<&str, usize> = BTreeMap::new();
-        for (_, r, p) in &l.waiting {
-            let n = rank.entry(r.as_str()).or_insert(0);
-            let lid = if *n == 0 { "landing".to_string() } else { format!("waits to land · {}", ordinal(*n + 1)) };
-            out.entry(p.clone()).or_insert(lid);
-            *n += 1;
-        }
-        out
-    }
+    /// The range the target moved over, full shas (the land record's).
+    pub base: String,
+    pub tip: String,
 }
 
 // ---- git ----
 
-fn git_in(dir: &Path, args: &[&str], index: Option<&Path>) -> Result<String, String> {
+pub(crate) fn git_in(dir: &Path, args: &[&str], index: Option<&Path>) -> Result<String, String> {
     let mut cmd = crate::tools_env::git_command()?;
     cmd.arg("-C").arg(dir).args(args);
     if let Some(i) = index {
@@ -249,7 +186,7 @@ pub(crate) fn short(r: &str) -> &str {
 /// A private index path no other land of this process shares: two lands
 /// in the same millisecond (two agents of one hub, parallel tests) once
 /// shared one file, and one's read-tree emptied the other's tree.
-fn tmp_index(tag: &str) -> PathBuf {
+pub(crate) fn tmp_index(tag: &str) -> PathBuf {
     static SEQ: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
     let seq = SEQ.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
     std::env::temp_dir().join(format!("sb-land-{}-{}-{}-{}", tag, std::process::id(), crate::util::now_ms(), seq))
@@ -258,13 +195,16 @@ fn tmp_index(tag: &str) -> PathBuf {
 /// Commit `files` (relative to `dir`, as they are in it) on `target`
 /// through a private index built from its tip, then move it with a
 /// compare-and-swap: a tip moved meanwhile (someone else committed)
-/// rebuilds from the new one, so nothing of theirs is lost. `after_read`:
-/// tests only (a commit lands between the read and the swap).
+/// rebuilds from the new one, so nothing of theirs is lost. `verify(old
+/// tip, new commit)`: before the swap (the land check of a `--here` onto
+/// the trunk); an Err moves nothing. `after_read`: tests only (a commit
+/// lands between the read and the swap).
 pub fn commit_files(
     dir: &Path,
     target: &str,
     files: &[String],
     message: &str,
+    verify: &mut dyn FnMut(&str, &str) -> Result<(), String>,
     after_read: &mut dyn FnMut(),
 ) -> Result<String, String> {
     let sign = signs(dir);
@@ -291,6 +231,7 @@ pub fn commit_files(
         })();
         let _ = std::fs::remove_file(&idx);
         let new = res?;
+        verify(&old, &new)?;
         after_read();
         if git(dir, &["update-ref", target, &new, &old]).is_ok() {
             sync_index(dir, target, files);
@@ -336,6 +277,17 @@ fn changes(dir: &Path, since_ms: u64) -> Result<Vec<Change>, String> {
         all.push(Change { path: path.to_string(), from, recent: ms.is_none_or(|ms| ms >= since_ms) });
     }
     Ok(all)
+}
+
+/// The claims over in the folder `dir` ([`crate::land_pick::clean_claims`]):
+/// of `claims` (as the hub keeps them), the ones on a file with no change
+/// there now. The shell sends them to sb-core (`claims_clean`) after a
+/// land in the shared folder and at the hub's boot.
+pub fn claims_over(dir: &Path, claims: &[String]) -> Result<Vec<String>, String> {
+    if claims.is_empty() {
+        return Ok(Vec::new());
+    }
+    Ok(crate::land_pick::clean_claims(&changes(dir, 0)?, claims, |f| relative(dir, f)))
 }
 
 /// What the land takes and names ([`crate::land_pick::pick`]): the
@@ -420,6 +372,13 @@ fn pushed(job: &Job, target: &str, main: &str) -> (Option<bool>, Option<String>)
 
 /// `sb land` for `job`, in line on `queue`. `joined`: the views refresh.
 pub fn run(job: &Job, queue: &Queue, joined: &mut dyn FnMut()) -> Result<Outcome, String> {
+    run_onto(job, queue, joined, &mut || job.onto.clone())
+}
+
+/// [`run`], with `onto_now`: where the agent lands now (the hub's state,
+/// `core::feature::onto`), read again once in line on a feature: a
+/// retire may have ended it meanwhile, and its agents land on the trunk.
+pub fn run_onto(job: &Job, queue: &Queue, joined: &mut dyn FnMut(), onto_now: &mut dyn FnMut() -> Option<String>) -> Result<Outcome, String> {
     let main = crate::trunk::trunk_ref(&job.shared)?;
     if !job.here && job.worktree && job.flow.mode == Some(FlowMode::Pr) {
         return Err("this repo ships through pull requests: commit with `sb land --here`, then open a PR".into());
@@ -433,7 +392,8 @@ pub fn run(job: &Job, queue: &Queue, joined: &mut dyn FnMut()) -> Result<Outcome
     if !job.here && job.worktree {
         // a feature's agent lands on the feature (dev-flow §5.1)
         let onto = job.onto.clone().unwrap_or_else(|| main.clone());
-        return land_branch(job, queue, joined, &onto, &main, &mine, left_out);
+        let line = Line { queue, joined, onto_now };
+        return land_branch(job, line, &onto, &main, &mine, left_out);
     }
     if mine.is_empty() {
         let note = left_out_note(&left_out);
@@ -444,17 +404,33 @@ pub fn run(job: &Job, queue: &Queue, joined: &mut dyn FnMut()) -> Result<Outcome
         return Err("sb land needs a commit message: sb land [--here] \"<message>\"".into());
     }
     let target = head_ref(&job.dir)?;
-    let _turn = queue.wait_turn(&target, &job.place, joined);
-    let new = commit_files(&job.dir, &target, &mine, &job.message, &mut || {})?;
+    let turn = queue.wait_turn(&target, &job.place, joined);
+    // onto the trunk: the land check on the new commit, in the warm check
+    // tree, before the swap (issue 28 part 2); a CAS miss checks again
+    // from the shared folder (a branch every agent lands on), the revert
+    // guard first; a worktree's own branch is guarded at its plain land
+    let via = crate::land_check::Via::Here;
+    let mut verify = |old: &str, new: &str| {
+        if !job.worktree {
+            revert_guard(job, &target, old, new)?;
+        }
+        if crate::land_check::checked(via, target == main, false) {
+            crate::land_check::in_check_tree(&job.shared, &job.checks, old, new, via, &turn)
+        } else {
+            Ok(())
+        }
+    };
+    let new = commit_files(&job.dir, &target, &mine, &job.message, &mut verify, &mut || {})?;
+    let base = git(&job.dir, &["rev-parse", &format!("{}^", new)])?;
     let (pushed, push_error) = pushed(job, &target, &main);
-    Ok(Outcome {
-        target: short(&target).to_string(),
-        sha: shorten(&job.dir, &new),
-        commits: 1,
-        pushed,
-        push_error,
-        left_out,
-    })
+    let sha = shorten(&job.dir, &new);
+    Ok(Outcome { target: short(&target).to_string(), sha, commits: 1, pushed, push_error, left_out, base, tip: new })
+}
+
+/// [`crate::land_revert::guard`] for `job`'s land onto `target`.
+fn revert_guard(job: &Job, target: &str, base: &str, tip: &str) -> Result<(), String> {
+    let records = crate::land_record::read(&job.lands);
+    crate::land_revert::guard(&job.dir, target, base, tip, job.since_ms, &job.agent, &records)
 }
 
 /// Move `main` (a ref) from `base` to `tip`, a fast-forward: in the
@@ -471,24 +447,25 @@ pub(crate) fn move_main(shared: &Path, main: &str, base: &str, tip: &str) -> Res
     }
 }
 
+/// A land's place in line: the queue, the views' refresh, and where its
+/// agent lands now ([`run`]'s `onto_now`).
+struct Line<'a> {
+    queue: &'a Queue,
+    joined: &'a mut dyn FnMut(),
+    onto_now: &'a mut dyn FnMut() -> Option<String>,
+}
+
 /// A worktree's branch onto `main` (the default branch, or the agent's
 /// feature: `real_main` says which is pushed): its agent's files first,
 /// then rebase, check, fast-forward.
-fn land_branch(
-    job: &Job,
-    queue: &Queue,
-    joined: &mut dyn FnMut(),
-    main: &str,
-    real_main: &str,
-    mine: &[String],
-    left_out: Vec<String>,
-) -> Result<Outcome, String> {
+fn land_branch(job: &Job, l: Line, main: &str, real_main: &str, mine: &[String], left_out: Vec<String>) -> Result<Outcome, String> {
+    let Line { queue, joined, onto_now } = l;
     let branch = head_ref(&job.dir)?;
     if !mine.is_empty() {
         if job.message.trim().is_empty() {
             return Err("you have changes not committed: give a message (sb land \"<message>\"), or commit them with sb land --here first".into());
         }
-        commit_files(&job.dir, &branch, mine, &job.message, &mut || {})?;
+        commit_files(&job.dir, &branch, mine, &job.message, &mut |_, _| Ok(()), &mut || {})?;
     }
     let dirty = git(&job.dir, &["status", "--porcelain", "--untracked-files=no"])?;
     if !dirty.is_empty() {
@@ -498,7 +475,21 @@ fn land_branch(
             files.join(", ")
         ));
     }
-    let _turn = queue.wait_turn(main, &job.place, joined);
+    let mut turn = queue.wait_turn(main, &job.place, joined);
+    // in line on a feature: a retire ahead of it may have ended it (the
+    // agent lands on the trunk now): its line there, then the trunk's
+    let now;
+    let main = if main != real_main {
+        now = onto_now().unwrap_or_else(|| real_main.to_string());
+        if now != main {
+            drop(turn);
+            turn = queue.wait_turn(&now, &job.place, joined);
+        }
+        now.as_str()
+    } else {
+        main
+    };
+    let _turn = turn;
     let base = git(&job.shared, &["rev-parse", "--verify", main])?;
     let tip = git(&job.dir, &["rev-parse", "HEAD"])?;
     if git(&job.dir, &["merge-base", "--is-ancestor", &tip, &base]).is_ok() {
@@ -527,6 +518,22 @@ fn land_branch(
         }
     }
     let tip = git(&job.dir, &["rev-parse", "HEAD"])?;
+    // never put back old copies of what another agent just landed (the
+    // native-mac incident: a fast-forward, no conflict to see it)
+    revert_guard(job, main, &base, &tip)?;
+    // the repo's land check on the tree main will point at, in this turn
+    // (land N is checked on top of N-1): onto the trunk, moved or not
+    // in the agent's worktree when it is clean at the tip, else (a file
+    // git shows could make the check pass or fail) in the check tree
+    let via = crate::land_check::Via::Worktree;
+    if crate::land_check::checked(via, main == real_main, moved) {
+        let clean = git(&job.dir, &["status", "--porcelain", "--untracked-files=all"])?.is_empty();
+        if !clean && main == real_main {
+            crate::land_check::in_check_tree(&job.shared, &job.checks, &base, &tip, via, &_turn)?;
+        } else if let Some(check) = crate::land_check::command(&job.dir, &base) {
+            crate::land_check::run(&job.dir, &check, &base, &tip, via)?;
+        }
+    }
     let commits = git(&job.dir, &["rev-list", "--count", &format!("{}..{}", base, tip)])?
         .parse::<usize>()
         .unwrap_or(0);
@@ -540,6 +547,8 @@ fn land_branch(
         pushed,
         push_error,
         left_out,
+        base,
+        tip,
     })
 }
 
@@ -560,7 +569,7 @@ mod tests {
         std::fs::create_dir_all(&ws).unwrap();
         sh(
             &ws,
-            "git init -q -b main && git config user.email t@t && git config user.name t && git config commit.gpgsign false && echo a > a && echo b > b && echo c > c && git add . && git commit -qm init",
+            "git init -q -b main && git config user.email t@t && git config user.name t && git config commit.gpgsign false && echo a > a && echo b > b && echo c > c && git add . && GIT_COMMITTER_DATE=2000-01-01T00:00:00Z git commit -qm init",
         );
         ws.canonicalize().unwrap()
     }
@@ -583,6 +592,8 @@ mod tests {
             since_ms: 0,
             flow: FlowConfig::default(),
             onto: None,
+            checks: shared.parent().unwrap_or(shared).join("worktrees"),
+            lands: shared.parent().unwrap_or(shared).join("lands.jsonl"),
         }
     }
 
@@ -647,7 +658,7 @@ mod tests {
                 sh(&w, "git worktree add -q ../other main 2>/dev/null || git worktree add -q --detach ../other main; cd ../other && echo b2 > b && git -c commit.gpgsign=false commit -qam other && git update-ref refs/heads/main HEAD");
             }
         };
-        let new = commit_files(&ws, "refs/heads/main", &["a".into()], "mine", &mut race).unwrap();
+        let new = commit_files(&ws, "refs/heads/main", &["a".into()], "mine", &mut |_, _| Ok(()), &mut race).unwrap();
         assert_eq!(git(&ws, &["rev-parse", "main"]).unwrap(), new);
         assert_eq!(log(&ws), lines(&["mine", "other", "init"]), "rebuilt on the moved tip");
         assert_eq!(git(&ws, &["show", "main:b"]).unwrap(), "b2", "their commit is kept");
@@ -712,7 +723,9 @@ mod tests {
         let other = q.wait_turn("refs/heads/sb/c", "wt:c", &mut || {});
         std::thread::sleep(std::time::Duration::from_millis(100));
         assert!(rx.try_recv().is_err(), "b waits while a lands");
-        let lids = q.lids();
+        let ranks = q.ranks();
+        assert_eq!((ranks["wt:a"], ranks["wt:b"], ranks["wt:c"]), (1, 2, 1));
+        let lids = crate::land_queue::lids(&ranks);
         assert_eq!(lids["wt:a"], "landing");
         assert_eq!(lids["wt:b"], "waits to land · 2nd");
         assert_eq!(lids["wt:c"], "landing");
@@ -720,9 +733,9 @@ mod tests {
         rx.recv_timeout(std::time::Duration::from_secs(5)).expect("b's turn");
         h.join().unwrap();
         drop(other);
-        assert!(q.lids().is_empty());
-        assert_eq!(ordinal(3), "3rd");
-        assert_eq!(ordinal(11), "11th");
+        assert!(q.ranks().is_empty());
+        assert_eq!(crate::land_queue::ordinal(3), "3rd");
+        assert_eq!(crate::land_queue::ordinal(11), "11th");
     }
 
     #[test]

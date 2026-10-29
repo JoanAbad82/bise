@@ -1,9 +1,8 @@
 //! The projects registry (bise desktop, S1): the workspaces the user
 //! works in, for the window's sidebar, `bise project` and bise's routing.
 //!
-//! One file, `<root>/projects.json` (bise layout only: in the legacy
-//! layout the list is the home workspace alone and every write says to
-//! run bise once), `{"v":1,"projects":[{path,name,order,added_ms}]}`.
+//! One file, `<root>/projects.json`,
+//! `{"v":1,"projects":[{path,name,order,added_ms}]}`.
 //! User config, not hub state: no hub id (it is [`crate::hub_id`] of the
 //! path), no facts about the hub (those are the hub's `view.json`).
 //!
@@ -19,12 +18,10 @@ use std::path::{Path, PathBuf};
 
 use serde_json::{json, Value};
 
-use crate::{Home, Layout};
+use crate::Home;
 
 /// The file, in `Home::root`.
 pub const FILE: &str = "projects.json";
-/// What every write says in the legacy layout.
-pub const LEGACY: &str = "the projects list needs ~/.bise: run bise once to move there";
 
 /// One registered workspace.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -257,12 +254,9 @@ pub fn render(list: &[Project]) -> String {
     serde_json::to_string_pretty(&json!({"v": 1, "projects": rows})).unwrap_or_default() + "\n"
 }
 
-/// The registered projects (the file's; none in the legacy layout).
+/// The registered projects (the file's).
 pub fn read(home: &Home) -> Vec<Project> {
-    match home.projects_file() {
-        Some(f) => std::fs::read_to_string(f).map(|t| parse(&t)).unwrap_or_default(),
-        None => Vec::new(),
-    }
+    std::fs::read_to_string(home.projects_file()).map(|t| parse(&t)).unwrap_or_default()
 }
 
 /// Every row: the home workspace first, then the projects by order.
@@ -302,7 +296,7 @@ pub fn target(rows: &[Row], name: &str, own: &str) -> Result<String, String> {
 /// error writes nothing. A file a newer bise wrote (`v` > 1) is never
 /// written over.
 pub fn update<T>(home: &Home, f: impl FnOnce(&mut Vec<Project>) -> Result<T, String>) -> Result<T, String> {
-    let file = home.projects_file().ok_or_else(|| LEGACY.to_string())?;
+    let file = home.projects_file();
     std::fs::create_dir_all(home.root()).map_err(|e| format!("{}: {e}", home.root().display()))?;
     let _lock = lock(&file.with_extension("json.lock"))?;
     let text = std::fs::read_to_string(&file).unwrap_or_default();
@@ -321,7 +315,7 @@ pub fn update<T>(home: &Home, f: impl FnOnce(&mut Vec<Project>) -> Result<T, Str
 }
 
 /// An exclusive flock on `path`, held until the file is dropped.
-fn lock(path: &Path) -> Result<std::fs::File, String> {
+pub(crate) fn lock(path: &Path) -> Result<std::fs::File, String> {
     use std::os::unix::io::AsRawFd;
     let f = std::fs::OpenOptions::new()
         .create(true)
@@ -350,9 +344,9 @@ pub fn add_path(home: &Home, home_ws: &Path, path: &Path, name: Option<&str>, no
 }
 
 impl Home {
-    /// `projects.json` (bise layout only).
-    pub fn projects_file(&self) -> Option<PathBuf> {
-        (self.layout == Layout::Bise).then(|| self.root.join(FILE))
+    /// `projects.json`.
+    pub fn projects_file(&self) -> PathBuf {
+        self.root.join(FILE)
     }
 }
 

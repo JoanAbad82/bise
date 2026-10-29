@@ -3,17 +3,18 @@
 //! task, and the `sb list` answer. All built without an LLM, from the
 //! state alone.
 //!
-//! The hub rebuilds every agent's context at each input, and the
-//! snapshot at each change: what they share is built once per input
-//! ([`Waiting`]: one pass over the messages; [`Group`]: the roster's
-//! rows), never once per agent. Per agent, a long-lived hub (470 agents,
-//! 14,500 messages) spent its whole loop there and a client's hello
-//! never got its turn.
+//! The contexts are built here and kept by contexts.rs, which rebuilds
+//! only those whose inputs changed; the snapshot is built at each change.
+//! What they share is built once ([`Waiting`]: one pass over the
+//! messages; [`Group`]: the roster's rows), never once per agent. Per
+//! agent, a long-lived hub (470 agents, 14,500 messages) spent its whole
+//! loop there and a client's hello never got its turn.
 
-use crate::model::{Agent, Mode, Msg, State, Status, MAIN, USER};
+use crate::model::{Agent, Lifecycle, Mode, Msg, State, Status, MAIN, USER};
 use crate::prompts::relation;
 use crate::util::{age, clip, one_line};
-use std::collections::BTreeMap;
+use std::cmp::Reverse;
+use std::collections::{BTreeMap, BTreeSet};
 
 /// Each agent's model (issue #4), by name: its short tag (`opus·hi`, the
 /// TUI panel's) for `sb list` and the roster, and its `model:` line for
@@ -40,9 +41,9 @@ pub fn task_line(a: &Agent, now: u64) -> String {
         clip(&a.description(), 70),
         ws_label(a)
     );
-    if let Some((_, note)) = &a.declared {
-        if !note.is_empty() {
-            s.push_str(&format!("  note: {}", clip(&one_line(note), 80)));
+    if let Some(d) = a.declared() {
+        if !d.note.is_empty() {
+            s.push_str(&format!("  note: {}", clip(&one_line(&d.note), 80)));
         }
     }
     if let Some(r) = &a.last_report {
@@ -70,46 +71,34 @@ pub fn task_line(a: &Agent, now: u64) -> String {
     s
 }
 
-/// `/agents`: the board of the agents the user reads, then the open cards.
+/// `/agents`: the board of the live agents the user reads (an archived
+/// one stays under `/archived`, with one line that says how many), then
+/// the open notifications.
 pub fn user_board(st: &State, now: u64) -> String {
-    let mut lines: Vec<String> = st.tasks().map(|a| task_line(a, now)).collect();
+    let (live, archived): (Vec<&Agent>, Vec<&Agent>) =
+        st.tasks().partition(|a| a.lifecycle != Lifecycle::Archived);
+    let mut lines: Vec<String> = live.iter().map(|a| task_line(a, now)).collect();
     if lines.is_empty() {
-        lines.push("no agents yet".into());
+        lines.push(if archived.is_empty() { "no agents yet" } else { "no live agents" }.into());
+    }
+    if !archived.is_empty() {
+        lines.push(format!("{} archived: /archived", archived.len()));
     }
     lines.extend(st.open_cards().map(|c| {
-        format!("card #{} {} @{}: {}", c.id, c.kind, c.agent, clip(&one_line(&c.text), 100))
+        format!("notification #{} {} @{}: {}", c.id, c.kind, c.agent, clip(&one_line(&c.text), 100))
     }));
     lines.join("\n")
 }
 
 /// Threads between agents that the user is not part of, most recent
-/// first (RFC 0003 §9).
+/// first (RFC 0003 §9): the `limit` newest of [`Threads`], rendered.
 pub fn agent_threads(st: &State, limit: usize) -> Vec<String> {
-    let mut threads: BTreeMap<u64, Vec<&crate::model::Msg>> = BTreeMap::new();
-    for m in st.msgs.values() {
-        threads.entry(m.thread).or_default().push(m);
-    }
-    let mut shown: Vec<(u64, u64, Vec<&crate::model::Msg>, Vec<&str>)> = threads
-        .into_iter()
-        .filter(|(_, ms)| !ms.iter().any(|m| m.from == USER || m.to == USER || m.plain))
-        .map(|(t, ms)| {
+    st.threads()
+        .newest(limit)
+        .map(|(t, ids)| {
+            let ms: Vec<&Msg> = ids.iter().filter_map(|id| st.msgs().get(id)).collect();
             let parties = parties_of(&ms);
-            let last = ms.last().map(|m| m.created_ms).unwrap_or(0);
-            (last, t, ms, parties)
-        })
-        // main's own conversations are already in its thread
-        .filter(|(_, _, _, p)| !(p.contains(&MAIN) && p.len() == 2))
-        .collect();
-    // stable: equal times keep the thread order; only the shown ones
-    // are rendered
-    shown.sort_by_key(|x| std::cmp::Reverse(x.0));
-    shown
-        .into_iter()
-        .take(limit)
-        .map(|(_, t, ms, parties)| {
-            let open = ms
-                .iter()
-                .any(|m| m.expect_reply && !st.settled.contains(&m.id));
+            let open = ms.iter().any(|m| m.expect_reply && !st.settled().contains(&m.id));
             format!(
                 "t_{} {}  {} message{}  {}  \"{}\"",
                 t,
@@ -124,6 +113,67 @@ pub fn agent_threads(st: &State, limit: usize) -> Vec<String> {
         .collect()
 }
 
+/// The threads of main's `<agent_threads>`, kept as the messages arrive
+/// (issue 21, hot-view sha 2a): [`State::put_msg`] calls [`Threads::put`]
+/// with each message, so [`agent_threads`] reads the newest few instead
+/// of grouping every message at each build (31.6 ms per user line on his
+/// journal copy: 19,474 messages in 16,243 threads).
+///
+/// A thread is shown when no message of it is the user's (from or to) or
+/// plain, and its parties are not just main and one other (main's own
+/// conversations are in its thread already); newest first by its last
+/// message's time, equal times by thread id.
+#[derive(Clone, Debug, Default)]
+pub struct Threads {
+    /// each thread's message ids, oldest first
+    ids: BTreeMap<u64, Vec<u64>>,
+    /// the shown threads, newest first
+    shown: BTreeSet<(Reverse<u64>, u64)>,
+    /// a shown thread's place in `shown`
+    key: BTreeMap<u64, Reverse<u64>>,
+}
+
+impl Threads {
+    /// Message `id` of `thread` was written (`msgs`: every message, it
+    /// included): the thread is judged again from its messages.
+    pub fn put(&mut self, msgs: &BTreeMap<u64, Msg>, thread: u64, id: u64) {
+        let ids = self.ids.entry(thread).or_default();
+        if let Err(at) = ids.binary_search(&id) {
+            ids.insert(at, id);
+        }
+        self.judge(msgs, thread);
+    }
+
+    /// Message `id` left `thread` (a row rewritten with another thread).
+    pub fn take(&mut self, msgs: &BTreeMap<u64, Msg>, thread: u64, id: u64) {
+        if let Some(ids) = self.ids.get_mut(&thread) {
+            ids.retain(|x| *x != id);
+        }
+        self.judge(msgs, thread);
+    }
+
+    fn judge(&mut self, msgs: &BTreeMap<u64, Msg>, thread: u64) {
+        if let Some(k) = self.key.remove(&thread) {
+            self.shown.remove(&(k, thread));
+        }
+        let ms: Vec<&Msg> = self.ids.get(&thread).into_iter().flatten().filter_map(|id| msgs.get(id)).collect();
+        let Some(last) = ms.last() else { return };
+        let users = ms.iter().any(|m| m.from == USER || m.to == USER || m.plain);
+        let parties = parties_of(&ms);
+        if users || (parties.contains(&MAIN) && parties.len() == 2) {
+            return;
+        }
+        let k = Reverse(last.created_ms);
+        self.shown.insert((k, thread));
+        self.key.insert(thread, k);
+    }
+
+    /// The `limit` newest shown threads: (thread, its message ids).
+    pub fn newest(&self, limit: usize) -> impl Iterator<Item = (u64, &[u64])> + '_ {
+        self.shown.iter().take(limit).map(|(_, t)| (*t, self.ids[t].as_slice()))
+    }
+}
+
 /// The senders and recipients of a thread, in order of appearance.
 fn parties_of<'a>(ms: &[&'a crate::model::Msg]) -> Vec<&'a str> {
     let mut p: Vec<&str> = Vec::new();
@@ -136,9 +186,13 @@ fn parties_of<'a>(ms: &[&'a crate::model::Msg]) -> Vec<&'a str> {
 }
 
 /// The block appended to every model request of main.
-pub fn main_context(st: &State, now: u64, waiting: &Waiting) -> String {
-    let mut s = String::from(
-        "<bise_state>\nLive state injected by bise before this call (not a user message).\n<task_board>\n",
+/// `threads`: [`agent_threads`]`(st, 8)`; `questions`: [`questions_for`]
+/// main's unanswered messages (both built from the messages alone, so
+/// contexts.rs keeps them until the messages change).
+pub fn main_context(st: &State, now: u64, threads: &[String], questions: &[String]) -> String {
+    let mut s = format!(
+        "<{}>\nLive state injected by bise before this call (not a user message).\n<task_board>\n",
+        bise_proto::envelope::BISE_STATE
     );
     let tasks: Vec<&Agent> = st
         .tasks()
@@ -163,7 +217,7 @@ pub fn main_context(st: &State, now: u64, waiting: &Waiting) -> String {
         ));
     }
     s.push_str("</task_board>\n");
-    push_block(&mut s, "agent_threads", &agent_threads(st, 8));
+    push_block(&mut s, "agent_threads", threads);
     let cards: Vec<String> = st
         .open_cards()
         .map(|c| {
@@ -181,9 +235,9 @@ pub fn main_context(st: &State, now: u64, waiting: &Waiting) -> String {
             )
         })
         .collect();
-    push_block(&mut s, "open_cards", &cards);
-    push_block(&mut s, "questions_for_you", &questions_for(waiting.unanswered(MAIN)));
-    s.push_str("</bise_state>");
+    push_block(&mut s, "open_notifications", &cards);
+    push_block(&mut s, "questions_for_you", questions);
+    s.push_str(&format!("</{}>", bise_proto::envelope::BISE_STATE));
     s
 }
 
@@ -271,7 +325,7 @@ pub fn tasks_detail(st: &State, now: u64, models: &Models) -> String {
             clip(&one_line(&a.brief.objective), 300)
         ));
         if let Some(t) = a
-            .turn_started_ms
+            .turn_ms
             .filter(|_| matches!(a.status(), Status::Working | Status::Waiting))
         {
             b.push(format!("current turn: started {} ago", age(t, now)));
@@ -283,14 +337,14 @@ pub fn tasks_detail(st: &State, now: u64, models: &Models) -> String {
                 clip(&one_line(what), 200)
             ));
         }
-        if let Some((d, note)) = &a.declared {
+        if let Some(d) = a.declared() {
             b.push(format!(
                 "declared: {:?}{}",
-                d,
-                if note.is_empty() {
+                d.status,
+                if d.note.is_empty() {
                     String::new()
                 } else {
-                    format!(" — {}", clip(&one_line(note), 200))
+                    format!(" — {}", clip(&one_line(&d.note), 200))
                 }
             ));
         }
@@ -322,9 +376,9 @@ pub fn tasks_detail(st: &State, now: u64, models: &Models) -> String {
             ));
         }
         for m in st
-            .msgs
+            .msgs()
             .values()
-            .filter(|m| m.from == a.name && m.expect_reply && !st.settled.contains(&m.id))
+            .filter(|m| m.from == a.name && m.expect_reply && !st.settled().contains(&m.id))
         {
             b.push(format!(
                 "waits for a reply from {} (m_{}): \"{}\"",
@@ -346,7 +400,7 @@ pub fn tasks_detail(st: &State, now: u64, models: &Models) -> String {
         }
         for c in st.open_cards().filter(|c| c.agent == a.name) {
             b.push(format!(
-                "open card #{} {}: {}",
+                "open notification #{} {}: {}",
                 c.id,
                 c.kind,
                 clip(&one_line(&c.text), 150)
@@ -386,10 +440,9 @@ impl<'a> Group<'a> {
             .filter(|a| a.status() != Status::Archived)
             .map(|a| {
                 let note = a
-                    .declared
-                    .as_ref()
-                    .filter(|(_, n)| !n.is_empty())
-                    .map(|(_, n)| format!(" — {}", clip(&one_line(n), 60)))
+                    .declared()
+                    .filter(|d| !d.note.is_empty())
+                    .map(|d| format!(" — {}", clip(&one_line(&d.note), 60)))
                     .unwrap_or_default();
                 // its model's tag, a column of its own (issue #4): as wide as
                 // the longest tag (at most 18), a name never cut mid-word
@@ -406,6 +459,12 @@ impl<'a> Group<'a> {
             })
             .collect();
         Group { st, rows }
+    }
+
+    /// What [`Group::seen_by`] reads besides the viewer: each row's
+    /// agent, its parent and its row (two equal lists, equal rosters).
+    pub fn rows(&self) -> Vec<(String, Option<String>, String)> {
+        self.rows.iter().map(|(a, rest)| (a.name.clone(), a.parent.clone(), rest.clone())).collect()
     }
 
     /// The roster as `viewer` sees it: who is itself, its parent, its
@@ -431,9 +490,11 @@ impl<'a> Group<'a> {
 }
 
 /// The block appended to every model request of a task.
-pub fn task_context(name: &str, group: &Group, waiting: &Waiting) -> String {
+/// `questions`: [`questions_for`] its unanswered messages.
+pub fn task_context(name: &str, group: &Group, questions: &[String]) -> String {
     let mut s = format!(
-        "<bise_state>\nLive state injected by bise before this call (not a user message). You are `{}`.\n<group>\n",
+        "<{}>\nLive state injected by bise before this call (not a user message). You are `{}`.\n<group>\n",
+        bise_proto::envelope::BISE_STATE,
         name
     );
     for l in group.seen_by(name) {
@@ -441,8 +502,8 @@ pub fn task_context(name: &str, group: &Group, waiting: &Waiting) -> String {
         s.push('\n');
     }
     s.push_str("</group>\n");
-    push_block(&mut s, "questions_for_you", &questions_for(waiting.unanswered(name)));
-    s.push_str("</bise_state>");
+    push_block(&mut s, "questions_for_you", questions);
+    s.push_str(&format!("</{}>", bise_proto::envelope::BISE_STATE));
     s
 }
 
@@ -460,7 +521,7 @@ fn push_block(s: &mut String, tag: &str, lines: &[String]) {
 }
 
 /// The delivered messages still waiting for their recipient's reply.
-fn questions_for(unanswered: &[&Msg]) -> Vec<String> {
+pub fn questions_for(unanswered: &[&Msg]) -> Vec<String> {
     unanswered
         .iter()
         .map(|m| format!("m_{} from {}: \"{}\"", m.id, m.from, clip(&one_line(&m.text), 80)))
@@ -469,12 +530,12 @@ fn questions_for(unanswered: &[&Msg]) -> Vec<String> {
 
 /// Queued messages, for the board shown to the user.
 pub fn queued_count(st: &State, name: &str) -> usize {
-    st.msgs.values().filter(|m| m.to == name && st.is_queued(m)).count()
+    st.hot().filter(|(m, h)| h.queued && m.to == name).count()
 }
 
-/// What waits for each agent, from one pass over the messages: those
-/// queued for it, and the delivered ones it owes a reply to. Oldest
-/// first, as in `st.msgs`.
+/// What waits for each agent, from one pass over the hot messages (what
+/// sb-core's view says of each, `State::hot`): those queued for it, and
+/// the delivered ones it owes a reply to. Oldest first, as in `st.msgs()`.
 pub struct Waiting<'a> {
     queued: BTreeMap<&'a str, Vec<&'a Msg>>,
     unanswered: BTreeMap<&'a str, Vec<&'a Msg>>,
@@ -483,11 +544,11 @@ pub struct Waiting<'a> {
 impl<'a> Waiting<'a> {
     pub fn of(st: &'a State) -> Waiting<'a> {
         let mut w = Waiting { queued: BTreeMap::new(), unanswered: BTreeMap::new() };
-        for m in st.msgs.values() {
-            if st.is_queued(m) {
+        for (m, h) in st.hot() {
+            if h.queued {
                 w.queued.entry(m.to.as_str()).or_default().push(m);
             }
-            if st.owes_reply(m) {
+            if h.owes {
                 w.unanswered.entry(m.to.as_str()).or_default().push(m);
             }
         }
@@ -503,13 +564,14 @@ impl<'a> Waiting<'a> {
     /// (the window's "send queued"), oldest first: `{id, text,
     /// created_ms}` each, the snapshot's `queued_inputs` (bise-proto's
     /// `Agent.queued`).
-    pub fn queued_inputs(&self, name: &str) -> Vec<serde_json::Value> {
+    pub fn queued_inputs(&self, name: &str) -> Vec<bise_proto::draft::Queued> {
         self.queued
             .get(name)
             .into_iter()
             .flatten()
             .filter(|m| m.queued && m.from == USER)
-            .map(|m| serde_json::json!({"id": m.id, "text": m.text, "created_ms": m.created_ms}))
+            // his parts (msg-parts): a client edits it back from them
+            .map(|m| bise_proto::draft::Queued { id: m.id, text: m.text.clone(), created_ms: m.created_ms, parts: m.parts_list() })
             .collect()
     }
 
@@ -517,6 +579,12 @@ impl<'a> Waiting<'a> {
     /// given (`State::unanswered_for`).
     pub fn unanswered(&self, name: &str) -> &[&'a Msg] {
         self.unanswered.get(name).map_or(&[], Vec::as_slice)
+    }
+
+    /// Each agent's `<questions_for_you>` lines ([`questions_for`]), for
+    /// every agent that owes a reply.
+    pub fn questions(&self) -> BTreeMap<String, Vec<String>> {
+        self.unanswered.iter().map(|(n, ms)| (n.to_string(), questions_for(ms))).collect()
     }
 }
 
@@ -536,10 +604,36 @@ mod tests {
         st
     }
 
+    /// issue 23: his queued row carries his parts (msg-parts), so a client
+    /// edits it back with its chips; a message with none has no `parts`.
+    #[test]
+    fn a_queued_row_carries_his_parts() {
+        let mut st = state();
+        let parts = r#"[{"kind":"paste","n":1,"text":"long"},{"kind":"text","text":" why?"}]"#;
+        let m = |id: u64, parts: &str| Msg {
+            id,
+            thread: id,
+            from: USER.into(),
+            to: "docs".into(),
+            text: format!("m{id}"),
+            created_ms: id,
+            plain: true,
+            queued: true,
+            parts: parts.into(),
+            ..Default::default()
+        };
+        let busy = || Some(MsgState::Queued { reason: "busy".into() });
+        st.put_msg_judged(m(1, parts), busy(), false);
+        st.put_msg_judged(m(2, ""), busy(), false);
+        let rows = Waiting::of(&st).queued_inputs("docs");
+        assert_eq!(serde_json::to_value(&rows[0].parts).unwrap(), serde_json::from_str::<serde_json::Value>(parts).unwrap());
+        assert!(rows[1].parts.is_empty(), "{:?}", rows[1]);
+    }
+
     #[test]
     fn the_board_lists_every_live_task() {
         let st = state();
-        let c = main_context(&st, 12 * 60_000, &Waiting::of(&st));
+        let c = main_context(&st, 12 * 60_000, &agent_threads(&st, 8), &[]);
         assert!(c.contains("auth-fix"), "{}", c);
         assert!(c.contains("\"Doc API v2\""), "{}", c);
         assert!(c.contains("12m"), "{}", c);
@@ -547,30 +641,43 @@ mod tests {
     }
 
     #[test]
+    fn user_board_lists_live_agents_only() {
+        use crate::model::{Declaration, Declared, Lifecycle};
+        let mut st = state();
+        st.test_task("old", "Ancienne tâche");
+        st.test_task("kid", "Sous-tâche vivante");
+        st.agents.get_mut("old").unwrap().lifecycle = Lifecycle::Archived;
+        st.agents.get_mut("kid").unwrap().parent = Some("old".into());
+        st.agents.get_mut("docs").unwrap().declared = Some(Declaration { status: Declared::Done, note: String::new() });
+        let b = user_board(&st, 60_000);
+        assert!(!b.contains("old ") && !b.contains("Ancienne"), "{}", b);
+        assert!(b.contains("auth-fix") && b.contains("docs") && b.contains("kid"), "{}", b);
+        assert!(b.contains("1 archived: /archived"), "{}", b);
+        // only archived ones: none live, the count still says where they are
+        for n in ["auth-fix", "docs", "kid"] {
+            st.agents.get_mut(n).unwrap().lifecycle = Lifecycle::Archived;
+        }
+        let b = user_board(&st, 60_000);
+        assert!(b.starts_with("no live agents\n4 archived: /archived"), "{}", b);
+        assert_eq!(user_board(&State::new("/w"), 0), "no agents yet");
+    }
+
+    #[test]
     fn peer_threads_are_summarized_for_main() {
         let mut st = state();
-        st.msg_state.insert(
-            1,
-            MsgState::Queued {
-                reason: "new".into(),
-            },
-        );
-        st.msgs.insert(
-            1,
+        st.put_msg_judged(
             Msg {
                 id: 1,
                 thread: 1,
                 from: "docs".into(),
                 to: "auth-fix".into(),
-                reply_to: None,
                 expect_reply: true,
-                auto: false,
                 text: "v1 ou v2 ?".into(),
                 created_ms: 1,
-                plain: false,
-                queued: false,
-                via: None,
+                ..Default::default()
             },
+            Some(MsgState::Queued { reason: "new".into() }),
+            false,
         );
         let t = agent_threads(&st, 8);
         assert_eq!(t.len(), 1);
@@ -587,15 +694,81 @@ mod tests {
             thread: id,
             from: from.into(),
             to: to.into(),
-            reply_to: None,
             expect_reply,
-            auto: false,
             text: format!("m{id}"),
             created_ms: id,
-            plain: false,
             queued,
-            via: None,
+            ..Default::default()
         }
+    }
+
+    /// The walk agent_threads made before [`Threads`]: every message
+    /// grouped by thread at each call (the reference the index equals).
+    fn threads_walk(st: &State, limit: usize) -> Vec<(u64, Vec<u64>)> {
+        let mut threads: BTreeMap<u64, Vec<&Msg>> = BTreeMap::new();
+        for m in st.msgs().values() {
+            threads.entry(m.thread).or_default().push(m);
+        }
+        let mut shown: Vec<(u64, u64, Vec<u64>)> = threads
+            .into_iter()
+            .filter(|(_, ms)| !ms.iter().any(|m| m.from == USER || m.to == USER || m.plain))
+            .filter(|(_, ms)| {
+                let p = parties_of(ms);
+                !(p.contains(&MAIN) && p.len() == 2)
+            })
+            .map(|(t, ms)| (ms.last().unwrap().created_ms, t, ms.iter().map(|m| m.id).collect()))
+            .collect();
+        shown.sort_by_key(|x| std::cmp::Reverse(x.0));
+        shown.into_iter().take(limit).map(|(_, t, ids)| (t, ids)).collect()
+    }
+
+    /// hot-view sha 2a: the kept threads are the full walk's, message by
+    /// message: agents' threads, the user's and plain ones (never shown),
+    /// main's own pairs (never shown), a third party joining main's pair
+    /// (shown), equal times (thread order), a question settled by a reply
+    /// re-sent with the reply (`reply_to`), a row re-sent unchanged, and a
+    /// clear (a full view).
+    #[test]
+    fn the_kept_threads_are_the_full_walk() {
+        let mut st = state();
+        let names = [MAIN, "auth-fix", "docs", "perf"];
+        let check = |st: &State| {
+            for limit in [0, 1, 3, 8, 100] {
+                let kept: Vec<(u64, Vec<u64>)> = st.threads().newest(limit).map(|(t, ids)| (t, ids.to_vec())).collect();
+                assert_eq!(kept, threads_walk(st, limit), "limit {limit}");
+            }
+        };
+        for id in 1..=120u64 {
+            let (from, mut to) = (names[(id % 4) as usize], names[((id * 3 + 1) % 4) as usize]);
+            if id % 23 == 0 {
+                to = USER;
+            }
+            let mut m = msg(id, from, to, id % 3 == 0, false);
+            m.thread = id % 17 + 1;
+            m.created_ms = id / 4; // equal times
+            m.plain = id % 29 == 0;
+            m.reply_to = (id > 10 && id % 7 == 0).then(|| id - 7);
+            st.put_msg_judged(m.clone(), Some(MsgState::Delivered), false);
+            if let Some(q) = m.reply_to {
+                // the view re-sends the question a reply settled
+                let q = st.msgs()[&q].clone();
+                st.put_msg_judged(q, None, true);
+            }
+            if id % 11 == 0 {
+                st.put_msg_judged(m, None, false);
+            }
+            check(&st);
+        }
+        assert!(st.threads().newest(100).count() > 3, "some threads are shown");
+        assert!(st.threads().newest(100).count() < 17, "some are not");
+        // a row rewritten with another thread leaves the old one
+        let mut m = st.msgs()[&40].clone();
+        m.thread = 99;
+        st.put_msg_judged(m, None, false);
+        check(&st);
+        st.clear_msgs();
+        assert_eq!(st.threads().newest(8).count(), 0);
+        check(&st);
     }
 
     #[test]
@@ -609,20 +782,18 @@ mod tests {
         let names = [MAIN, "auth-fix", "docs", USER];
         for id in 1..=60u64 {
             let (from, to) = (names[(id % 4) as usize], names[((id + 1) % 4) as usize]);
-            st.msgs.insert(id, msg(id, from, to, id % 2 == 0, id % 5 == 0));
-            st.msg_state.insert(id, states[(id % 3) as usize].clone());
+            st.put_msg_judged(msg(id, from, to, id % 2 == 0, id % 5 == 0), Some(states[(id % 3) as usize].clone()), id == 4);
         }
-        st.settled.insert(4);
         let w = Waiting::of(&st);
         for n in names {
             assert_eq!(w.queued_count(n), queued_count(&st, n), "{n}");
             let ids = |ms: &[&Msg]| ms.iter().map(|m| m.id).collect::<Vec<_>>();
             assert_eq!(ids(w.unanswered(n)), ids(&st.unanswered_for(n)), "{n}");
-            let inputs: Vec<serde_json::Value> = st
-                .msgs
+            let inputs: Vec<bise_proto::draft::Queued> = st
+                .msgs()
                 .values()
                 .filter(|m| m.to == n && m.queued && m.from == USER && st.is_queued(m))
-                .map(|m| serde_json::json!({"id": m.id, "text": m.text, "created_ms": m.created_ms}))
+                .map(|m| bise_proto::draft::Queued { id: m.id, text: m.text.clone(), created_ms: m.created_ms, parts: Vec::new() })
                 .collect();
             assert_eq!(w.queued_inputs(n), inputs, "{n}");
         }
@@ -635,9 +806,8 @@ mod tests {
     #[test]
     fn a_task_context_has_the_roster_it_sees_and_its_questions() {
         let mut st = state();
-        st.msgs.insert(1, msg(1, "auth-fix", "docs", true, false));
-        st.msg_state.insert(1, MsgState::Delivered);
-        let c = task_context("docs", &Group::of(&st, 0, &Models::new()), &Waiting::of(&st));
+        st.put_msg_judged(msg(1, "auth-fix", "docs", true, false), Some(MsgState::Delivered), false);
+        let c = task_context("docs", &Group::of(&st, 0, &Models::new()), &questions_for(Waiting::of(&st).unanswered("docs")));
         let mut want = String::from("<group>\n");
         for l in roster(&st, "docs", 0, &Models::new()) {
             want.push_str(&l);

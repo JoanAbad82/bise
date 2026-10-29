@@ -12,8 +12,8 @@
 //! a stopped hub starts it on its own, so routing takes no hold.
 
 use bise_home::projects::Row;
-use bise_proto::draft::{ProjectRow, ProjectView};
-use bise_proto::rows::Status;
+use bise_proto::app_rows::ProjectRow;
+use bise_proto::draft::ProjectView;
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 
@@ -113,12 +113,17 @@ pub fn row(f: &Facts, order: u32, c: &Checkout) -> ProjectRow {
         home: f.row.home,
         order,
         agents: agents.len() as u32,
-        working: agents.iter().filter(|a| a.status == Status::Working).count() as u32,
+        working: agents.iter().filter(|a| a.status.working()).count() as u32,
         waits: f.view.as_ref().map_or(0, |v| v.cards.len() as u32),
         running: f.running,
         missing: f.missing,
         cards: f.view.as_ref().map(|v| v.cards.clone()).unwrap_or_default(),
         web,
+        // the core's own fact (its connection), set by core/hubs.rs
+        down: None,
+        // its view.json's (a stopped hub's last); a held hub's own event
+        // replaces it (core/hubs.rs)
+        pulse: f.view.as_ref().and_then(|v| v.pulse.clone()),
     }
 }
 
@@ -132,6 +137,7 @@ pub fn read_view(hub_dir: &Path) -> Option<ProjectView> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use bise_proto::rows::Status;
     use bise_proto::rows::Agent;
 
     fn r(name: &str, path: &str, home: bool) -> Row {
@@ -143,6 +149,7 @@ mod tests {
             name: name.into(),
             main,
             status,
+            phase: None,
             archived,
             title: String::new(),
             purpose: String::new(),
@@ -150,17 +157,37 @@ mod tests {
             waits: 0,
             parent: None,
             branch: None,
+            checkout_branch: None,
             worktree: None,
             turn_ms: None,
             report: None,
             queued: vec![],
-            dir: None,
+            dir: name.into(),
             aliases: vec![],
             model: None,
             vision: None,
             effort: None,
             usage: None,
             waiting_on: None,
+            watching: vec![],
+            doing: None,
+            mode: None,
+            path: String::new(),
+            objective: String::new(),
+            note: String::new(),
+            role: String::new(),
+            msgs_queued: 0,
+            inbox: 0,
+            created_ms: None,
+            place: None,
+            place_id: String::new(),
+            efforts: vec![],
+            changes: None,
+            last_pos: None,
+            turns: 0,
+            procs: 0,
+            procs_port: None,
+            rank: None,
         }
     }
 
@@ -199,6 +226,8 @@ mod tests {
             artifacts: vec![],
             artifacts_total: 0,
             scheduled: vec![],
+            growth: None,
+            pulse: None,
         };
         let v2 = view.clone();
         let f = facts(
@@ -239,7 +268,7 @@ mod tests {
         assert_eq!(read_view(&d), None);
         std::fs::write(d.join("view.json"), "{not json").unwrap();
         assert_eq!(read_view(&d), None);
-        let v = ProjectView { v: 1, project: "x-1".into(), written_ms: 1, stopped_ms: None, last_activity_ms: 1, agents: vec![], cards: vec![], artifacts: vec![], artifacts_total: 0, scheduled: vec![] };
+        let v = ProjectView { v: 1, project: "x-1".into(), written_ms: 1, stopped_ms: None, last_activity_ms: 1, agents: vec![], cards: vec![], artifacts: vec![], artifacts_total: 0, scheduled: vec![], growth: None, pulse: None };
         std::fs::write(d.join("view.json"), serde_json::to_string(&v).unwrap()).unwrap();
         assert_eq!(read_view(&d), Some(v.clone()));
         std::fs::write(d.join("view.json"), serde_json::to_string(&ProjectView { v: 2, ..v }).unwrap()).unwrap();

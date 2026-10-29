@@ -1,0 +1,269 @@
+# The desktop app's own release (apps/desktop), apart from the terminal's
+# (release.yml, v* tags, latest.json): desktop-on-main, architect m_19472;
+# signed, notarized and on two channels per the page desktop-dist (his go).
+#
+# OFF until the user says: every job runs only when the repository
+# variable DESKTOP_RELEASE is 'on' (Settings > Secrets and variables >
+# Actions > Variables). Unset: a run does nothing.
+#
+# What runs:
+#   - a desktop-vYYYY.M.N tag (or Actions > desktop-release > action
+#     'build', tag): in one job, one approval (page fast-release), the
+#     build, signed with his Developer ID, notarized and stapled, its DRAFT
+#     release (bise-mac-arm64.dmg and .zip + .sha256, desktop.json, VERSION;
+#     its body the annotated tag's message), then the draft on beta;
+#   - action 'dry-run': the same build ad hoc, no secret, no release: the
+#     DMG and zip as a run artifact;
+#   - action 'publish' (tag, channel beta|stable), 'pause', 'resume'
+#     (channel): the channels (scripts/desktop_publish.py); stable stays its
+#     own dispatch, after beta;
+#   - a push on main that changes the native helper's sources: the helper
+#     built once and cached on main (tags read main's caches, never another
+#     tag's), so a release on unchanged sources takes it (job warm).
+# Signing, notarizing and every publish run in the protected environment
+# desktop-release: he approves each run; its secrets: MAC_CERT_P12_BASE64,
+# MAC_CERT_PASSWORD, APPLE_API_KEY_P8, APPLE_API_KEY_ID, APPLE_API_ISSUER,
+# APPLE_TEAM_ID.
+#
+# Its rules (scripts/desktop_feed.py, desktop_publish.py; pinned by
+# tests/release_split_test.py and tests/desktop_release_test.py): a desktop
+# release is never GitHub's 'latest' (--latest=false on every create and
+# edit: 'latest' is every terminal's bise update channel); it never uploads
+# the terminal's files; a build goes to desktop-beta first, desktop-latest
+# never ahead of it, no channel ever goes back. The app carries a published
+# terminal release (the v* tag on its commit, or input runtime).
+name: desktop-release
+
+on:
+  push:
+    tags: ["desktop-v*"]
+    branches: [main]
+    paths: ["apps/desktop/native/mac/**"]
+  workflow_dispatch:
+    inputs:
+      action:
+        description: "dry-run: build ad hoc, no release. build: signed + draft. publish: the tag on a channel. pause / resume: a channel's offers"
+        type: choice
+        options: [dry-run, build, publish, pause, resume]
+        default: dry-run
+      tag:
+        description: "desktop-vYYYY.M.N (build, publish)"
+        type: string
+        default: ""
+      channel:
+        description: "publish, pause, resume"
+        type: choice
+        options: [beta, stable]
+        default: beta
+      runtime:
+        description: "the terminal release it carries (default: the v* tag on the commit)"
+        type: string
+        default: ""
+
+permissions:
+  contents: read
+
+concurrency:
+  # a warm run never queues a release behind it
+  group: ${{ github.workflow }}${{ github.event_name == 'push' && github.ref_type == 'branch' && '-warm' || '' }}
+  cancel-in-progress: false
+
+env:
+  ACTION: ${{ github.event_name == 'push' && (github.ref_type == 'tag' && 'build' || 'warm') || inputs.action }}
+  TAG: ${{ github.event_name == 'push' && github.ref_type == 'tag' && github.ref_name || inputs.tag }}
+  CHANNEL: ${{ inputs.channel }}
+  RUNTIME: ${{ inputs.runtime }}
+  GH_REPO: ${{ github.repository }}
+
+jobs:
+  build:
+    name: build the desktop app
+    if: ${{ vars.DESKTOP_RELEASE == 'on' && ((github.event_name == 'push' && github.ref_type == 'tag') || inputs.action == 'build' || inputs.action == 'dry-run') }}
+    runs-on: macos-15
+    timeout-minutes: 120
+    # the secrets only for a signed build; a dry run asks for nothing
+    environment: ${{ ((github.event_name == 'push' && github.ref_type == 'tag') || inputs.action == 'build') && 'desktop-release' || '' }}
+    # the draft and beta from this job (they had their own runner: ~30 s and
+    # a 310 MB artifact round trip); a dry run writes nothing
+    permissions:
+      contents: write
+    steps:
+      - name: The tag
+        run: |
+          case "$ACTION" in
+            build) [[ "$TAG" =~ ^desktop-v[0-9]{4}\.[0-9]{1,2}\.[0-9]{1,4}$ ]] || { echo "a build needs a tag desktop-vYYYY.M.N (got '$TAG')"; exit 1; } ;;
+            dry-run) [ -z "$TAG" ] || { echo "a dry run takes no tag"; exit 1; } ;;
+          esac
+
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'push' && github.ref || (inputs.tag != '' && format('refs/tags/{0}', inputs.tag) || github.ref) }}
+          fetch-depth: 0
+
+      # the tag was cut by scripts/desktop_tag.py: annotated, its message
+      # carries 'nightly-desktop: green|owned-reds N <its commit>' (the
+      # desktop app's full end-to-end, scripts/nightly_desktop.sh, on that
+      # exact sha on his Mac: green, or every red owned in tests/known_reds.txt
+      # at that sha; fast-try p7, architect m_29670, main m_30399). The line
+      # is printed in the log. A hand 'git tag' stops here.
+      # The tag object fetched again as pushed: checkout can leave a
+      # lightweight copy of the ref it checked out.
+      - name: The tag's nightly desktop green
+        if: ${{ env.ACTION == 'build' }}
+        run: |
+          git fetch --force --no-tags origin "refs/tags/$TAG:refs/tags/$TAG"
+          python3 -B scripts/desktop_tag.py check "$TAG"
+
+      - uses: pnpm/action-setup@v4
+        with:
+          package_json_file: apps/desktop/package.json
+
+      # no pnpm cache: a tag's save was scoped to that tag and never read
+      # again (10.3, 10.4: a miss, then 8-12 s to save it)
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      # the native helper by its sources' hash (its swift sources and
+      # build.sh; MACOS_TARGET 14.0 in desktop_release.py), the same key in
+      # its 4 cache steps (hashFiles is not allowed in env): saved on main
+      # (job warm, or a dry run there), read by tags
+      - name: The native helper (cached)
+        id: helper
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ runner.temp }}/helper
+          key: desktop-helper-macos15-arm64-${{ hashFiles('apps/desktop/native/mac/**') }}
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: dmgbuild (pinned)
+        run: |
+          python3 -m venv "$RUNNER_TEMP/py"
+          "$RUNNER_TEMP/py/bin/pip" install --quiet dmgbuild==1.6.7
+          echo "PY=$RUNNER_TEMP/py/bin/python" >> "$GITHUB_ENV"
+
+      - name: The runtime (a published terminal release)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          dry=(); [ "$ACTION" = dry-run ] && dry=(--dry-run)
+          root="$("$PY" -B scripts/desktop_release.py runtime --out "$RUNNER_TEMP/desk" ${RUNTIME:+--tag "$RUNTIME"} "${dry[@]}")"
+          echo "RUNTIME_ROOT=$root" >> "$GITHUB_ENV"
+          cat "$root/VERSION"
+
+      # his Developer ID in a throwaway keychain, the API key in a 0600 file
+      # (.github/actions/mac-signing, the terminal release's too); both gone
+      # in the last step, whatever happened
+      - name: The signing keychain
+        if: ${{ env.ACTION == 'build' }}
+        uses: ./.github/actions/mac-signing
+        with:
+          cert-p12-base64: ${{ secrets.MAC_CERT_P12_BASE64 }}
+          cert-password: ${{ secrets.MAC_CERT_PASSWORD }}
+          api-key-p8: ${{ secrets.APPLE_API_KEY_P8 }}
+          team-id: ${{ secrets.APPLE_TEAM_ID }}
+
+      - name: Build, sign${{ env.ACTION == 'build' && ', notarize, staple' || ' (ad hoc)' }}
+        env:
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+        run: |
+          args=(--out "$RUNNER_TEMP/desk" --runtime-root "$RUNTIME_ROOT" --repo "$GH_REPO")
+          if [ -x "$RUNNER_TEMP/helper/bise-mac-helper" ]; then
+            args+=(--helper "$RUNNER_TEMP/helper/bise-mac-helper")
+          fi
+          if [ "$ACTION" = build ]; then
+            args+=(--tag "$TAG" --identity "$SIGN_ID" --keychain "$SIGN_KEYCHAIN" --notarize)
+          fi
+          "$PY" -B scripts/desktop_release.py build "${args[@]}"
+          ls -la "$RUNNER_TEMP/desk/release"
+
+      - name: Keep the helper for the next build
+        if: ${{ steps.helper.outputs.cache-hit != 'true' && github.ref == 'refs/heads/main' }}
+        run: mkdir -p "$RUNNER_TEMP/helper" && cp "$RUNNER_TEMP/desk/helper/bise-mac-helper" "$RUNNER_TEMP/helper/"
+
+      - name: Save the helper
+        if: ${{ steps.helper.outputs.cache-hit != 'true' && github.ref == 'refs/heads/main' }}
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ runner.temp }}/helper
+          key: desktop-helper-macos15-arm64-${{ hashFiles('apps/desktop/native/mac/**') }}
+
+      # the draft (nothing reads a draft), then beta: the run he approved
+      - name: Draft release, then beta
+        if: ${{ env.ACTION == 'build' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git fetch --force --no-tags origin "refs/tags/$TAG:refs/tags/$TAG"
+          python3 -B scripts/desktop_publish.py draft "$TAG" "$RUNNER_TEMP/desk/release"
+          python3 -B scripts/desktop_publish.py publish "$TAG" beta
+
+      - name: Upload the build
+        if: ${{ env.ACTION == 'dry-run' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-${{ env.ACTION }}
+          path: ${{ runner.temp }}/desk/release/
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Forget the keychain and the key
+        if: ${{ always() }}
+        run: |
+          if [ -n "${SIGN_KEYCHAIN:-}" ]; then security delete-keychain "$SIGN_KEYCHAIN" || true; fi
+          rm -f "$RUNNER_TEMP/AuthKey.p8" "$RUNNER_TEMP/cert.p12"
+
+  # the helper's cache on main when its sources change: a release reads it
+  warm:
+    name: cache the native helper
+    if: ${{ vars.DESKTOP_RELEASE == 'on' && (github.event_name == 'push' && github.ref == 'refs/heads/main') }}
+    runs-on: macos-15
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cached already?
+        id: helper
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ runner.temp }}/helper
+          key: desktop-helper-macos15-arm64-${{ hashFiles('apps/desktop/native/mac/**') }}
+          lookup-only: true
+
+      - name: Build the helper
+        if: ${{ steps.helper.outputs.cache-hit != 'true' }}
+        env:
+          MACOSX_DEPLOYMENT_TARGET: "14.0"
+        run: apps/desktop/native/mac/build.sh "$RUNNER_TEMP/helper/bise-mac-helper"
+
+      - name: Save the helper
+        if: ${{ steps.helper.outputs.cache-hit != 'true' }}
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ runner.temp }}/helper
+          key: desktop-helper-macos15-arm64-${{ hashFiles('apps/desktop/native/mac/**') }}
+
+  # the channels: his approval on every run (the environment's reviewers)
+  publish:
+    name: ${{ inputs.action }} ${{ inputs.channel }}
+    if: ${{ vars.DESKTOP_RELEASE == 'on' && (github.event_name == 'workflow_dispatch' && (inputs.action == 'publish' || inputs.action == 'pause' || inputs.action == 'resume')) }}
+    runs-on: ubuntu-latest
+    environment: desktop-release
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: ${{ inputs.action }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ "$ACTION" = publish ]; then
+            python3 -B scripts/desktop_publish.py publish "$TAG" "$CHANNEL"
+          else
+            python3 -B scripts/desktop_publish.py "$ACTION" "$CHANNEL"
+          fi

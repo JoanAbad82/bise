@@ -17,6 +17,7 @@
 <meta property="og:description" content="AGENTS.md tells every agent how your repo works. skills are instructions an agent loads only when a task needs them.">
 <meta property="og:image" content="https://bise.dev/og.png?v=paper">
 <meta name="twitter:card" content="summary_large_image">
+<script>{ const q = location.search; let a = /[?&]terminal\b/.test(q) ? 'terminal' : /[?&]desktop\b/.test(q) ? 'desktop' : null; try { if (a) localStorage.setItem('bise-docs-app', a); else a = localStorage.getItem('bise-docs-app'); } catch {} document.documentElement.classList.add('app-' + (a === 'terminal' ? 'terminal' : 'desktop')); }</script>
 <script>{ const q = location.search; let d = null; try { d = localStorage.getItem('bise-theme'); } catch {} if (/[?&]dark\b/.test(q) || (!/[?&]light\b/.test(q) && (d ?? (matchMedia('(prefers-color-scheme: dark)').matches ? '1' : '0')) === '1')) document.documentElement.classList.add('pd'); }</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,600;1,6..72,400&family=Caveat:wght@500;700&display=swap" rel="stylesheet">
@@ -38,9 +39,11 @@
 </header>
 <div class="wrap">
   <aside class="side"><nav aria-label="the docs">
+<div class="appswitch" role="group" aria-label="your app"><button type="button" data-app="desktop" aria-pressed="false">desktop</button><button type="button" data-app="terminal" aria-pressed="false">terminal</button></div>
 <div class="grp">get started</div><ul>
 <li><a href="/docs">what bise is</a></li>
-<li><a href="/docs/install">install and first run</a></li>
+<li><a href="/docs/desktop" data-app="desktop">start with bise desktop</a></li>
+<li><a href="/docs/install" data-app="terminal">start with bise terminal</a></li>
 </ul>
 <div class="grp">models</div><ul>
 <li><a href="/docs/providers">providers and keys</a></li>
@@ -50,9 +53,10 @@
 </ul>
 <div class="grp">using bise</div><ul>
 <li><a href="/docs/agents">main and the agents</a></li>
+<li><a href="/docs/window" data-app="desktop">the desktop window <span class="tag">desktop</span></a></li>
 <li><a href="/docs/approvals">approvals</a></li>
 <li><a href="/docs/flow">landing work</a></li>
-<li><a href="/docs/voice">voice</a></li>
+<li><a href="/docs/voice">voice and fn</a></li>
 <li><a href="/docs/computer-use">computer use</a></li>
 </ul>
 <div class="grp">extend</div><ul>
@@ -60,9 +64,11 @@
 <li><a href="/docs/skills" class="here" aria-current="page">instructions and skills</a></li>
 </ul>
 <div class="grp">reference</div><ul>
+<li><a href="/docs/settings" data-app="desktop">settings <span class="tag">desktop</span></a></li>
 <li><a href="/docs/config">config.toml</a></li>
-<li><a href="/docs/cli">the bise command</a></li>
-<li><a href="/docs/keys">keys and commands</a></li>
+<li><a href="/docs/desktop-keys" data-app="desktop">keys and menus <span class="tag">desktop</span></a></li>
+<li><a href="/docs/keys" data-app="terminal">keys and commands <span class="tag">terminal</span></a></li>
+<li><a href="/docs/cli" data-app="terminal">the bise command <span class="tag">terminal</span></a></li>
 <li><a href="/docs/troubleshooting">troubleshooting</a></li>
 <li><a href="/docs/updates">updates</a></li>
 </ul>
@@ -74,6 +80,7 @@
         <button class="copymd" type="button" data-md="/docs/skills.md">copy as markdown</button>
       </div>
       <p class="lede">AGENTS.md tells every agent how your repo works. skills are instructions an agent loads only when a task needs them.</p>
+
 <h2 id="agentsmd"><a class="anchor" href="#agentsmd" aria-hidden="true">#</a>AGENTS.md</h2>
 <p>every agent reads the instructions files when it starts, the way Codex does:</p>
 <ol><li>yours, for every repo: <code>~/.bise/AGENTS.override.md</code>, else <code>~/.bise/AGENTS.md</code>.</li><li>the repo's: in each folder from the repo's root down to the folder you work in, the first of <code>AGENTS.override.md</code> and <code>AGENTS.md</code>.</li></ol>
@@ -96,7 +103,7 @@ read the diff with `gh pr diff`. check the tests first...</code></pre><button cl
 <p>type <code>$</code> in the composer to see them; <code>$review-pr</code> in your message points the agent at that skill. a skill you add or edit shows up without a restart.</p>
 <p>Claude Code's skills in <code>~/.claude/skills</code> are the same format: link or copy them into <code>~/.agents/skills</code>. the <a href="https://bise.dev/setup.md" rel="noopener">setup prompt</a> offers to do it.</p>
     </article>
-    <nav class="pn"><a class="prev" href="/docs/plugins"><span>previous</span>plugins and MCP</a><a class="next" href="/docs/config"><span>next</span>config.toml</a></nav>
+    <nav class="pn"><a class="prev" href="/docs/plugins"><span>previous</span>plugins and MCP</a><a class="next" href="/docs/settings"><span>next</span>settings</a></nav>
     <footer>
       <p>for agents: <a href="/docs/skills.md">bise.dev/docs/skills.md</a></p>
       <p><a href="https://github.com/gvergnaud/bise/blob/main/site/docs/skills.md">edit this page on GitHub</a></p>

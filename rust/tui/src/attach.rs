@@ -1,16 +1,19 @@
-//! Image attachments in the composer (docs/images.md).
+//! Image attachments in the composer (docs/images.md), and every chip's
+//! drawing (images, quotes, pastes, files, artifacts).
 //!
 //! The composer shows `[Image #N]`; the app keeps what each label
 //! stands for. On send, every label still in the text becomes its
 //! marker (`<image name=… b64=…>`, see the `bend-images` crate) and the
-//! attachments start over. Sources: a picked `@` image, a paste that is
-//! only image paths (a file dragged into the terminal, iTerm2's "save to
-//! temp file and paste path"), Ctrl+V, Cmd+V passed through and an empty
-//! paste (the clipboard image, see `input::on_paste`). Nothing here
-//! panics on any input.
+//! attachments start over. Sources: a picked `@` image and a paste of
+//! paths (attach_file.rs: an image there, any other file a file chip),
+//! Ctrl+V, Cmd+V passed through and an empty paste (the clipboard image,
+//! see `input::on_paste`). In the history an image's chip is a link: a
+//! click previews it, ⌥ click shows it in Finder (open_file.rs). Nothing
+//! here panics on any input.
 
 use crate::app::App;
-use crate::theme::{accent, dim, error, glyph, text, G_FAILED, G_IMAGE, G_PASTE, G_QUOTE};
+use bise_proto::words::composer;
+use crate::theme::{accent, dim, error, glyph, G_FAILED, G_IMAGE, G_PASTE};
 use ratatui::style::Style;
 use ratatui::text::{Line, Span};
 use std::cell::RefCell;
@@ -43,6 +46,13 @@ pub(crate) struct Info {
 /// The label of image `n`.
 pub(crate) fn label(n: usize) -> String {
     format!("[Image #{n}]")
+}
+
+/// An image chip, the only attachment that sends an image: quotes,
+/// pastes and artifact chips are text. Its label says it, not its size:
+/// the store keeps an image whose header it cannot read with a 0x0 size.
+pub(crate) fn is_image(a: &Attachment) -> bool {
+    a.label.starts_with("[Image #")
 }
 
 /// The number of a chip label: 3 for `[Image #3]`, `[Quote #3]`,
@@ -147,89 +157,51 @@ pub(crate) fn attach_clipboard(app: &mut App) -> Result<String, String> {
     Ok(add(app, &source, CLIPBOARD, original, &stored))
 }
 
-/// A paste that is only image paths (drag-and-drop): attach them all.
-/// None when the paste is something else (it stays text).
-pub(crate) fn on_paste(app: &mut App, text: &str) -> Option<Result<Vec<String>, String>> {
-    let paths = bend_images::pasted_images(text)?;
-    let mut labels = Vec::new();
-    for p in &paths {
-        match attach_file(app, p, &p.to_string_lossy()) {
-            Ok(l) => labels.push(l),
-            Err(e) => return Some(Err(e)),
-        }
-    }
-    Some(Ok(labels))
-}
-
-/// The text to send: each image label still present becomes its
-/// marker; each quote label leaves the text and its tag goes in front,
-/// one per line, in text order (quote.rs); the attachments start over.
-pub(crate) fn expand(app: &mut App, text: &str) -> String {
+/// The message to send as typed parts (msg-parts): each chip still in the
+/// text is its part where it was, a quote with its number (his m_22231,
+/// as the window's composer); the attachments start over.
+pub(crate) fn expand(app: &mut App, text: &str) -> crate::said::Said {
+    use bise_proto::parts::Part;
     let atts = std::mem::take(&mut app.attachments);
-    let mut out = text.to_string();
-    let mut quotes: Vec<(usize, &Attachment)> = Vec::new();
-    for a in &atts {
-        if crate::quote::is_quote(&a.label) {
-            if let Some(at) = text.find(&a.label) {
-                quotes.push((at, a));
-            }
-            // the label and one space after it (else before it) go
-            for pat in [format!("{} ", a.label), format!(" {}", a.label), a.label.clone()] {
-                out = out.replace(&pat, "");
-            }
-        } else {
-            out = out.replace(&a.label, &a.marker);
+    let mut parts: Vec<Part> = Vec::new();
+    let mut rest = text;
+    while let Some((at, a)) = atts.iter().filter_map(|a| rest.find(&a.label).map(|at| (at, a))).min_by_key(|(at, _)| *at) {
+        if at > 0 {
+            parts.push(Part::Text { text: rest[..at].to_string() });
         }
+        parts.push(part_of(a));
+        rest = &rest[at + a.label.len()..];
+        // the chip's own space goes before a mark ('❝ 1, which?', NO_SPACE_BEFORE, architect m_22426)
+        rest = rest.strip_prefix(' ').filter(|t| t.starts_with(bise_proto::parts::NO_SPACE_BEFORE)).unwrap_or(rest);
     }
-    if quotes.is_empty() {
-        return out;
-    }
-    quotes.sort_by_key(|(at, _)| *at);
-    let mut head: Vec<&str> = quotes.iter().map(|(_, a)| a.marker.as_str()).collect();
-    let rest = out.trim();
     if !rest.is_empty() {
-        head.push(rest);
+        parts.push(Part::Text { text: rest.to_string() });
     }
-    head.join("\n")
+    crate::said::Said::of_parts(parts)
 }
 
-/// The picked `@` entry is an image file: attach it (the `@token` goes).
-/// Returns the label, or None when it is not an image.
-pub(crate) fn pick_image(app: &mut App, rel: &str) -> Option<Result<String, String>> {
-    if !bend_images::has_image_ext(rel) {
-        return None;
-    }
-    let (start, _) = crate::files::token(&app.ed.text, app.ed.cursor)?;
-    let cursor = app.ed.cursor;
-    // the root the `@` popup searched (commands::at_items)
-    let root = crate::sb::workspace(app)
-        .map(std::path::PathBuf::from)
-        .or_else(|| std::env::current_dir().ok())
-        .unwrap_or_default();
-    let path = root.join(rel);
-    if !path.is_file() {
-        return None;
-    }
-    // drop the `@token`, then attach at its place
-    let chars: Vec<char> = app.ed.text.chars().collect();
-    let cursor = cursor.min(chars.len());
-    let start = start.min(cursor);
-    let head: String = chars.get(..start).unwrap_or(&[]).iter().collect();
-    let tail: String = chars.get(cursor..).unwrap_or(&[]).iter().collect();
-    let tail = tail.strip_prefix(' ').map(str::to_string).unwrap_or(tail);
-    let at = head.chars().count();
-    let before = app.ed.text.clone();
-    app.ed.set(&format!("{head}{tail}"), at);
-    match attach_file(app, &path, rel) {
-        Ok(l) => Some(Ok(l)),
-        Err(e) => {
-            app.ed.set(&before, cursor);
-            Some(Err(e))
+/// The part an attachment's marker holds (a quote with its chip's
+/// number, a paste, an image); a marker that isn't one part (an
+/// artifact's link) stays its text.
+fn part_of(a: &Attachment) -> bise_proto::parts::Part {
+    use bise_proto::parts::Part;
+    match bise_proto::parts::parse(&a.marker).as_slice() {
+        [Part::Quote { from, text, file, new, old, .. }] => {
+            let n = chip_parts(&a.label).1.parse::<u32>().ok();
+            Part::Quote { from: from.clone(), text: text.clone(), file: file.clone(), new: new.clone(), old: old.clone(), n }
         }
+        [p] if !matches!(p, Part::Text { .. }) => p.clone(),
+        _ => Part::Text { text: a.marker.clone() },
     }
 }
 
 // ---- chips (book §14): `▣ 1` in the composer, `▣ login.png` in the history ----
+
+// how a chip is drawn in the composer and the strip (its pill, its words)
+#[path = "attach_pill.rs"]
+mod pill;
+pub(crate) use pill::{chip_name, chip_pill, chip_text, chip_width, is_voice};
+use pill::{chip_parts, chip_pill_as, chip_text_as};
 
 /// What a clipboard image is called in the strip and the history.
 const CLIPBOARD: &str = "clipboard";
@@ -240,6 +212,7 @@ const CLIPBOARD: &str = "clipboard";
 /// as one chip, the cursor steps over it, a delete takes it whole.
 pub(crate) fn chips(text: &str) -> Vec<(usize, usize, usize)> {
     let mut v = image_chips(text);
+    v.extend(crate::attach_file::chips(text));
     v.extend(crate::quote::chips(text));
     v.extend(crate::pasted::chips(text));
     v.extend(find_labels(text, crate::voice::chip::OPEN));
@@ -262,7 +235,7 @@ thread_local! {
 }
 
 /// The title an artifact chip shows.
-fn artifact_title(label: &str) -> Option<String> {
+pub(super) fn artifact_title(label: &str) -> Option<String> {
     label.starts_with(ARTIFACT_OPEN).then(|| ARTIFACT_TITLES.with(|t| t.borrow().get(label).cloned()).unwrap_or_default())
 }
 
@@ -331,85 +304,6 @@ pub(crate) fn chip_widen(text: &str, a: usize, b: usize) -> (usize, usize) {
     })
 }
 
-/// A chip's glyph (`▣`, `❝` or `▤`) and number, from its label
-/// `[Image #N]`, `[Quote #N]` or `[Paste #N]`.
-fn chip_parts(label: &str) -> (&'static str, &str) {
-    if let Some(n) = label.strip_prefix(crate::quote::OPEN) {
-        return (glyph(G_QUOTE), n.trim_end_matches(']'));
-    }
-    if let Some(n) = label.strip_prefix(crate::pasted::OPEN) {
-        return (glyph(G_PASTE), n.trim_end_matches(']'));
-    }
-    (G_IMAGE, label.trim_start_matches("[Image #").trim_end_matches(']'))
-}
-
-/// A chip named in a sentence (the flash): `▣ 1`, `❝ 1`.
-pub(crate) fn chip_name(label: &str) -> String {
-    if let Some(t) = artifact_title(label) {
-        return format!("↗ {t}");
-    }
-    let (g, n) = chip_parts(label);
-    format!("{g} {n}")
-}
-
-/// How the composer and the strip draw a chip (BISE-205): a pill
-/// ` ❝ 1 ` (one padding cell each side, on the `pill` tint), or, with no
-/// tint (`NO_COLOR`, `BISE_ASCII=1`), `[❝ 1]`. Same width both ways.
-pub(crate) fn chip_text(label: &str) -> String {
-    if let Some(t) = artifact_title(label) {
-        return match crate::render::chip_form() {
-            crate::render::ChipForm::Tinted => format!(" ↗ {t} "),
-            crate::render::ChipForm::Bracketed => format!("[↗ {t}]"),
-        };
-    }
-    let (g, n) = chip_parts(label);
-    match crate::render::chip_form() {
-        crate::render::ChipForm::Tinted => format!(" {g} {n} "),
-        crate::render::ChipForm::Bracketed => format!("[{g} {n}]"),
-    }
-}
-
-/// The columns the chip `label` takes in `inner` columns of text.
-pub(crate) fn chip_width(label: &str, inner: usize) -> usize {
-    use unicode_width::UnicodeWidthStr;
-    if is_voice(label) {
-        crate::voice::chip::width(inner)
-    } else {
-        chip_text(label).width()
-    }
-}
-
-/// `label` is the voice chip.
-pub(crate) fn is_voice(label: &str) -> bool {
-    label.starts_with(crate::voice::chip::OPEN)
-}
-
-/// The spans of [`chip_text`]: the glyph accent, the number in the text
-/// color, all on the pill tint (the brackets dim); `over` is patched on
-/// every span (the selection's background, the cursor's REVERSED), so
-/// the whole pill takes it.
-pub(crate) fn chip_pill(label: &str, over: Style) -> Vec<Span<'static>> {
-    let artifact = artifact_title(label);
-    let (g, n) = match &artifact {
-        Some(t) => ("↗", t.as_str()),
-        None => chip_parts(label),
-    };
-    let (open, close, bg) = match crate::render::chip_form() {
-        crate::render::ChipForm::Tinted => (" ", " ", Some(crate::theme::pill_bg())),
-        crate::render::ChipForm::Bracketed => ("[", "]", None),
-    };
-    let st = |fg| {
-        let s = Style::default().fg(fg);
-        bg.map_or(s, |b| s.bg(b)).patch(over)
-    };
-    vec![
-        Span::styled(open.to_string(), st(dim())),
-        Span::styled(g.to_string(), st(accent())),
-        Span::styled(format!(" {n}"), st(text())),
-        Span::styled(close.to_string(), st(dim())),
-    ]
-}
-
 /// The style of a chip in the history: accent (the background stays the
 /// terminal's).
 pub(crate) fn chip_style() -> Style {
@@ -459,6 +353,18 @@ fn marker_size(m: &bend_images::Marker) -> Option<(u32, u32)> {
     size
 }
 
+/// The file a click on an image's chip opens: where he took it from, else
+/// (gone, a clipboard image) the store's copy beside its `.b64`.
+fn image_file(m: &bend_images::Marker) -> String {
+    if Path::new(&m.path).is_absolute() && Path::new(&m.path).is_file() {
+        return m.path.clone();
+    }
+    match bend_images::Kind::from_mime(&m.mime) {
+        Some(k) => Path::new(&m.b64).with_extension(k.ext()).to_string_lossy().into_owned(),
+        None => m.path.clone(),
+    }
+}
+
 fn wxh((w, h): (u32, u32)) -> String {
     format!("{w}×{h}")
 }
@@ -466,6 +372,21 @@ fn wxh((w, h): (u32, u32)) -> String {
 /// `text` as spans in `style`, each image marker an accent chip
 /// `▣ login.png` (a user line of the history; one line, no `\n`).
 pub(crate) fn chip_spans(text: &str, style: Style) -> Vec<Span<'static>> {
+    // his words about an open artifact (the desktop's composer, about-chip):
+    // `about [title](url): …` draws its link as the artifact's chip, never the
+    // link or its path; its title alone when the list has no such artifact
+    if let Some((a, b, title, id)) = about_lead(text) {
+        let mut out = chip_spans(&text[..a], style);
+        match id {
+            Some(id) => {
+                let gone = crate::artifacts::get(&id).is_some_and(|x| x.gone);
+                out.extend(crate::render::artifact_chip(&title, gone, &crate::artifacts::url_of(&id, None)));
+            }
+            None => out.push(Span::styled(title, style)),
+        }
+        out.extend(chip_spans(&text[b..], style));
+        return out.into_iter().filter(|s| !s.content.is_empty()).collect();
+    }
     // an artifact's chip as sent, `[pricing page](artifact:pricing-page)`:
     // the same chip as in the composer and in replies (site/m/artifacts E)
     if let Some((a, b, title, url)) = artifact_link(text) {
@@ -475,7 +396,14 @@ pub(crate) fn chip_spans(text: &str, style: Style) -> Vec<Span<'static>> {
         out.extend(chip_spans(&text[b..], style));
         return out.into_iter().filter(|s| !s.content.is_empty()).collect();
     }
-    // a paste's chip mark (pasted::fold): `▤ 1`, accent
+    // a file chip as sent (file-chips): `▯ deck.pptx`, a link
+    if let Some((a, b, path, missing)) = crate::attach_file::first_marker(text) {
+        let mut out = chip_spans(&text[..a], style);
+        out.extend(crate::attach_file::spans(&path, missing));
+        out.extend(chip_spans(&text[b..], style));
+        return out.into_iter().filter(|s| !s.content.is_empty()).collect();
+    }
+    // a paste's chip mark (said::view): `▤ 1`, accent
     let marks = crate::pasted::marks(text);
     if marks.is_empty() {
         return image_spans(text, style);
@@ -496,6 +424,24 @@ pub(crate) fn chip_spans(text: &str, style: Style) -> Vec<Span<'static>> {
         out.extend(image_spans(rest, style));
     }
     out
+}
+
+/// The `about [title](url): ` lead at the start of `text` (the desktop's
+/// aboutText): the byte range of its `[title](url)`, the title, and the
+/// artifact the url names. The url ends at the lead's own `): ` (a path
+/// may hold spaces and parens).
+fn about_lead(text: &str) -> Option<(usize, usize, String, Option<String>)> {
+    const HEAD: &str = "about [";
+    let rest = text.strip_prefix(HEAD)?;
+    let close = rest.find("](")?;
+    let title = &rest[..close];
+    if title.contains(['[', ']']) {
+        return None;
+    }
+    let after = &rest[close + 2..];
+    let (end, _) = after.match_indices("):").find(|(i, _)| matches!(after[i + 2..].chars().next(), None | Some(' ') | Some('\t')))?;
+    let b = HEAD.len() + close + 2 + end + 1;
+    Some(("about ".len(), b, title.to_string(), crate::artifacts::of_lead_url(&after[..end])))
 }
 
 /// The first `[title](artifact:id)` in `text`: its byte range, its title
@@ -527,7 +473,12 @@ fn image_spans(text: &str, style: Style) -> Vec<Span<'static>> {
         if !before.is_empty() {
             out.push(Span::styled(before.to_string(), style));
         }
-        out.push(Span::styled(format!("{G_IMAGE} {}", short_name(&m.path)), chip_style()));
+        // a link (main m_21751): a click previews the image, ⌥ click
+        // shows it in Finder (open_file.rs)
+        let tag = crate::links::add(&crate::open_file::chip_url(&image_file(&m)));
+        let st = chip_style();
+        let st = Style { add_modifier: crate::links::with_tag(st.add_modifier, tag), ..st };
+        out.extend(crate::image_gone::chip(format!("{G_IMAGE} {}", short_name(&m.path)), &image_file(&m), st, chip_style()));
         last = m.end;
     }
     let rest = text.get(last..).unwrap_or("");
@@ -602,7 +553,7 @@ pub(crate) fn set_model(model: &str) {
 /// list: None (the provider decides).
 pub(crate) fn refused_images(app: &App) -> Option<String> {
     let text = app.ed.text.trim_start();
-    if text.starts_with('/') || !app.attachments.iter().any(|a| text.contains(&a.label)) {
+    if text.starts_with('/') || !app.attachments.iter().any(|a| is_image(a) && text.contains(&a.label)) {
         return None;
     }
     let model = crate::sb::focus_model(app);
@@ -648,17 +599,14 @@ pub(crate) fn no_vision(err: &str) -> Option<Vec<Span<'static>>> {
         return None;
     }
     let model = MODEL.with(|m| m.borrow().clone());
-    Some(no_vision_spans(if model.is_empty() { "this model" } else { &model }))
+    Some(no_vision_spans(if model.is_empty() { composer::this_model } else { &model }))
 }
 
 fn no_vision_spans(model: &str) -> Vec<Span<'static>> {
     vec![
         Span::styled(format!("  {G_FAILED} "), Style::default().fg(error())),
-        Span::styled(format!("{model} can't read images."), Style::default().fg(error())),
-        Span::styled(
-            " pick a model that can (/model), or describe the screen in words.".to_string(),
-            Style::default().fg(dim()),
-        ),
+        Span::styled(composer::no_vision(model), Style::default().fg(error())),
+        Span::styled(format!(" {}", composer::no_vision_how), Style::default().fg(dim())),
     ]
 }
 
@@ -682,15 +630,15 @@ pub(crate) fn strip_row(n: usize, info: &Info) -> (String, String) {
     let left = format!("{G_IMAGE} {n} {}", file_name(&info.source));
     let mut right = format!("{} · {}", wxh((info.width, info.height)), size_text(info.bytes));
     if info.resized {
-        right.push_str(&format!(" → resized to fit {}", bend_images::MAX_DIMENSION));
+        right.push_str(&format!(" {}", composer::image_resized(bend_images::MAX_DIMENSION)));
     }
     (left, right)
 }
 
 /// The box's title, in its top border (book §13 "The attachments box").
-pub(crate) const BOX_TITLE: &str = "attached";
+pub(crate) const BOX_TITLE: &str = composer::box_title;
 /// The box's tip, in its bottom border on the right.
-pub(crate) const BOX_TIP: &str = "backspace on a chip removes it";
+pub(crate) const BOX_TIP: &str = composer::box_tip;
 /// The box's width bounds: as wide as its longest row, at least 44
 /// columns, at most the reading width (full width when narrower).
 const BOX_MIN: usize = 44;
@@ -729,7 +677,7 @@ fn shown_quotes(app: &App) -> Vec<(usize, crate::quote::Quote)> {
 /// How many rows the attachments box takes (0: nothing attached): its
 /// two borders and one row per attachment.
 pub(crate) fn strip_height(app: &App) -> u16 {
-    match shown_quotes(app).len() + shown(app).len() + shown_pastes(app).len() {
+    match shown_quotes(app).len() + shown(app).len() + shown_pastes(app).len() + crate::attach_file::shown(app).len() {
         0 => 0,
         n => n as u16 + 2,
     }
@@ -829,6 +777,11 @@ fn box_rows(app: &App) -> Vec<BoxRow> {
         let (_, source) = strip_row(n, &a.info);
         (n, BoxRow { label: a.label.clone(), preview: Preview::File(file_name(&a.info.source).to_string()), source, place: false })
     }));
+    // a file: `▯ 2  deck.pptx  2.1 MB  ~/Desktop` (designer m_21765)
+    rows.extend(crate::attach_file::shown(app).into_iter().map(|(n, a)| {
+        let source = crate::attach_file::strip_source(a);
+        (n, BoxRow { label: a.label.clone(), preview: Preview::File(file_name(&a.info.source).to_string()), source, place: false })
+    }));
     // a paste: its first words like a quote's, `240 lines · 9.8 kB`
     rows.extend(shown_pastes(app).into_iter().map(|p| {
         let source = crate::pasted::about(&p.text);
@@ -844,7 +797,7 @@ fn box_rows(app: &App) -> Vec<BoxRow> {
 /// preview takes the whole row.
 fn box_row(r: &BoxRow, iw: usize) -> Vec<Span<'static>> {
     use unicode_width::UnicodeWidthStr;
-    let chip = chip_text(&r.label).width() + 1;
+    let chip = chip_text_as(&r.label, false).width() + 1;
     let natural = r.preview.natural();
     let with_source = iw.saturating_sub(chip + ROW_GAP + r.source.width());
     let (preview, source) = if natural.width() <= with_source {
@@ -855,7 +808,7 @@ fn box_row(r: &BoxRow, iw: usize) -> Vec<Span<'static>> {
         (r.preview.cut(iw.saturating_sub(chip)), String::new())
     };
     let pad = iw.saturating_sub(chip + preview.width() + source.width());
-    let mut spans = chip_pill(&r.label, Style::default());
+    let mut spans = chip_pill_as(&r.label, Style::default(), false);
     spans.extend([
         Span::styled(format!(" {preview}"), Style::default().fg(dim())),
         Span::raw(" ".repeat(pad)),
@@ -871,7 +824,7 @@ fn box_width(rows: &[BoxRow], room: usize) -> usize {
     use unicode_width::UnicodeWidthStr;
     let longest = rows
         .iter()
-        .map(|r| chip_text(&r.label).width() + 1 + r.preview.natural().width() + ROW_GAP + r.source.width())
+        .map(|r| chip_text_as(&r.label, false).width() + 1 + r.preview.natural().width() + ROW_GAP + r.source.width())
         .max()
         .unwrap_or(0);
     (longest + 6).clamp(BOX_MIN, BOX_MAX).min(room)
@@ -938,7 +891,7 @@ mod tests {
     use super::*;
 
     fn att(n: usize, m: &str) -> Attachment {
-        Attachment { label: label(n), marker: m.into(), info: Info::default() }
+        Attachment { label: label(n), marker: m.into(), info: Info { width: 1, ..Default::default() } }
     }
 
     /// The clipboard holds an image until the next read.
@@ -1281,7 +1234,9 @@ mod tests {
         let spans = chip_spans(&t, Style::default());
         let s: String = spans.iter().map(|s| s.content.as_ref()).collect();
         assert_eq!(s, "compare ▣ login-mobile.png with ▣ y.png, off");
-        assert_eq!(spans[1].style, chip_style());
+        // the chip's color, and a link (a click previews it, main m_21751)
+        assert_eq!(spans[1].style.fg, chip_style().fg);
+        assert!(crate::links::tag_of(spans[1].style.add_modifier) > 0);
         assert_eq!(sizes_line(&t).as_deref(), Some("▣ login-mobile.png 390×844 · ▣ y.png 390×844"));
         assert_eq!(sizes_line("plain"), None);
         assert_eq!(chip_spans("plain", Style::default()).len(), 1);
@@ -1294,6 +1249,63 @@ mod tests {
         let gone = t.replace("abc.b64", "zzz.b64");
         assert_eq!(sizes_line(&gone).as_deref(), Some("▣ login-mobile.png · ▣ y.png"));
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// The agent in view runs `model`, as the hub's agents row says it
+    /// (`focus_model` reads the row since client-protocol F1, not the
+    /// feed's usage events).
+    fn on_model(app: &mut App, model: &str) {
+        let mut main = crate::sb::hub_reads::rows_for_tests::agent("main", "idle", "");
+        main.model = Some(model.into());
+        crate::sb::hub_reads::rows_for_tests::apply(app, vec![main], vec![]);
+        crate::sb::test_view(app, "main");
+    }
+
+    /// A quote, a paste and an artifact chip are attachments but not
+    /// images: none of them ever had a width, so a model the catalog
+    /// lists without vision must not refuse the message.
+    #[test]
+    fn quotes_pastes_and_artifacts_are_not_images() {
+        let mut app = composer("", 0);
+        on_model(&mut app, "mistral/codestral-latest");
+        app.attachments.push(Attachment {
+            label: crate::quote::label(1),
+            marker: "<selection from=\"main\">q</selection>".into(),
+            info: Default::default(),
+        });
+        app.attachments.push(Attachment {
+            label: crate::pasted::label(2),
+            marker: "<pasted n=\"2\" lines=\"12\">p</pasted>".into(),
+            info: Default::default(),
+        });
+        let artifact = format!("{ARTIFACT_OPEN}3]");
+        app.attachments.push(Attachment {
+            label: artifact.clone(),
+            marker: "[deck](artifact:d)".into(),
+            info: Default::default(),
+        });
+        app.ed.insert(&format!(
+            "{} fix this {} and {artifact}",
+            crate::quote::label(1),
+            crate::pasted::label(2),
+        ));
+        assert_eq!(refused_images(&app), None, "a quote, a paste and an artifact are not images");
+        // a real image chip still refuses
+        app.attachments.push(att(1, "<image name=\"[Image #1]\" b64=\"/x.b64\">"));
+        app.ed.insert(" look at [Image #1]");
+        assert_eq!(refused_images(&app), Some("mistral/codestral-latest".into()));
+    }
+
+    /// An image whose header the store could not read is kept with a
+    /// 0x0 size (bend_images::store_bytes): it is still an image, and a
+    /// model the catalog lists without vision still refuses it.
+    #[test]
+    fn an_image_of_unknown_size_is_still_an_image() {
+        let mut app = composer("", 0);
+        on_model(&mut app, "mistral/codestral-latest");
+        app.attachments.push(Attachment { info: Info::default(), ..att(1, "<image name=\"[Image #1]\" b64=\"/x.b64\">") });
+        app.ed.insert("look at [Image #1]");
+        assert_eq!(refused_images(&app), Some("mistral/codestral-latest".into()));
     }
 
     #[test]

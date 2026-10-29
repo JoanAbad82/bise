@@ -405,7 +405,7 @@ fn a_write_his_word_triggers_is_an_action_block() {
     );
     has(
         &errs(r#"<section data-kit="prose" data-id="p" data-do="close OPS-12"><p>x</p></section>"#),
-        "p: data-do is not a kit attribute here: only an action block takes it",
+        "p: data-do is not a kit attribute here: only an action or a plan block takes it",
     );
     // code work is never an action (pm's C, lead m_6217)
     let act = |d: &str| format!(r#"<section data-kit="action" data-id="a1" data-do="{d}"><p>x</p></section>"#);
@@ -418,23 +418,32 @@ fn a_write_his_word_triggers_is_an_action_block() {
 }
 
 #[test]
-fn a_page_only_question_takes_data_card_none_and_promises_and_meetings_need_it() {
+fn a_page_only_question_takes_data_notify_none_and_promises_and_meetings_need_it() {
     let q = |a: &str| format!(r#"<section data-kit="question" data-id="q-cc"{a}><p>which address for Lélio?</p><ol><li>lelio@acme.test</li><li>without the cc</li></ol></section>"#);
-    ok(&q(r#" data-card="none""#));
+    ok(&q(r#" data-notify="none""#));
     ok(&q(""));
-    has(&errs(&q(r#" data-card="all""#)), "q-cc: data-card=\"all\" is not a card setting");
+    has(&errs(&q(r#" data-notify="all""#)), "q-cc: data-notify=\"all\" is not a setting");
     has(
-        &errs(r#"<section data-kit="prose" data-id="p" data-card="none"><p>x</p></section>"#),
-        "p: data-card is not a kit attribute here: only a question block takes it",
+        &errs(r#"<section data-kit="prose" data-id="p" data-notify="none"><p>x</p></section>"#),
+        "p: data-notify is not a kit attribute here: only a question block or a ui block with a pick takes it",
     );
-    // the page's id: promises and meeting pages never make cards
+    // notif-rename (architect m_24654): the old name is read in stored pages, never written again
+    has(&errs(&q(r#" data-card="none""#)), "q-cc: data-card is now data-notify");
+    // the page's id: promises and meeting pages never make notifications
     let page = |id: &str, a: &str| crate::pages::lint::lint_page(id, &q(a));
-    assert!(page("promises-2026-w41", r#" data-card="none""#).is_ok());
-    assert!(page("buy-domain", "").is_ok(), "a plan's question makes its card");
+    assert!(page("promises-2026-w41", r#" data-notify="none""#).is_ok());
+    assert!(page("buy-domain", "").is_ok(), "a plan's question makes its notification");
     for id in ["promises-2026-w41", "meeting-q3-renewal-2026-05-19"] {
         let e = page(id, "").unwrap_err();
-        assert!(e[0].starts_with("q-cc: a question on this page never makes a card"), "{e:?}");
+        assert!(e[0].starts_with("q-cc: a question on this page never makes a notification") && e[0].contains("data-notify=\"none\""), "{e:?}");
     }
+    // notif-artifact: a ui block's drawn pick notifies like a question, with the same opt-out
+    let pick = |a: &str| format!(r#"<section data-kit="ui" data-id="look"{a}><div class="k-pick" data-ui="pick"><div class="k-option" data-pick="a"><h3>A</h3><p>x</p></div><div class="k-option" data-pick="b"><h3>B</h3><p>y</p></div></div></section>"#);
+    ok(&pick(r#" data-notify="none""#));
+    has(&errs(&pick(r#" data-notify="all""#)), "look: data-notify=\"all\" is not a setting");
+    assert!(crate::pages::lint::lint_page("promises-2026-w41", &pick(r#" data-notify="none""#)).is_ok());
+    let e = crate::pages::lint::lint_page("meeting-q3", &pick("")).unwrap_err();
+    assert!(e[0].starts_with("look: a pick on this page never makes a notification"), "{e:?}");
 }
 
 #[test]
@@ -634,4 +643,29 @@ fn an_item_names_the_agent_working_on_it() {
         ),
         "c: data-agent is not a kit attribute",
     );
+}
+
+/// plan-ok: a plan an agent proposes is one plan block (a name, a gist,
+/// its parts, who runs it, its verb) and its other ways a compare with
+/// data-for; one plan a page; each other way says its verb.
+#[test]
+fn a_plan_is_one_block_and_its_other_ways() {
+    let plan = include_str!("../../../../kit/examples/lean-plan.html");
+    let kits: Vec<String> = ok(plan).into_iter().map(|b| b.kit).collect();
+    assert!(kits.contains(&"plan".to_string()) && kits.contains(&"compare".to_string()));
+    // started: data-started on the plan or on one of its other ways
+    ok(&plan.replace("data-do=\"start the plan\">", "data-do=\"start the plan\" data-started=\"11:42\">"));
+    ok(&plan.replace("data-id=\"arm64\"", "data-id=\"arm64\" data-started=\"11:50\""));
+    has(&errs(&plan.replace(" data-agent=\"lean-install\"", "")), "plan: a plan block needs data-agent");
+    has(&errs(&plan.replace(" data-agent=\"lean-install\"", " data-agent=\"Lean Install\"")), "is not an agent name");
+    has(&errs(&plan.replace(" data-do=\"start the plan\"", "")), "plan: a plan block needs data-do");
+    has(&errs(&plan.replace("<h3>make installs lean by default</h3>", "")), "plan: a plan block needs its name as <h3>");
+    has(&errs(&plan.replace("data-id=\"p2\"", "")), "a plan item without data-id");
+    has(&errs(&plan.replace(" data-do=\"start it, but keep win32\"", "")), "an other way of a plan needs data-do");
+    has(&errs(&plan.replace("data-for=\"plan\"", "data-for=\"nope\"")), "others: data-for=\"nope\" names no plan block");
+    has(&errs(&plan.replace("data-id=\"others\" data-for=\"plan\"", "data-id=\"others\"")), "others: data-do is not a kit attribute");
+    let second = plan.replace("data-id=\"plan\"", "data-id=\"plan2\"").replace("data-id=\"title\"", "data-id=\"t2\"").replace("data-id=\"others\"", "data-id=\"o2\"").replace("data-id=\"measures\"", "data-id=\"m2\"");
+    has(&errs(&format!("{plan}{second}")), "plan2: a second plan block");
+    has(&errs("<section data-kit=\"prose\" data-id=\"p\" data-agent=\"x\"><p>a</p></section>"), "data-agent is not a kit attribute here");
+    has(&errs("<section data-kit=\"compare\" data-id=\"c\" data-for=\"plan\" data-started=\"1\"><ol><li data-id=\"a\" data-do=\"x\">a</li></ol></section>"), "data-started is not a kit attribute here");
 }

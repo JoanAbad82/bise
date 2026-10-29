@@ -2,9 +2,9 @@
 //! a fake world behind the Setup port, no HOME, no browser, no key store.
 
 use super::*;
-use crate::ambient::setup::{CuPorts, Done, Entry, RegistryOp, SetupPorts};
+use crate::ambient::setup::{CuPorts, Done, Entry, KeychainPort, RegistryOp, SetupPorts};
 use bise_home::projects::Row;
-use bise_proto::draft::{Account, Plugin, PluginLogin, RoleRow};
+use bise_proto::app_rows::{Account, LoginState, PartKind, Plugin, PluginKind, PluginPart, PluginScope, PluginState, RoleRow};
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -36,6 +36,34 @@ struct World {
     /// S.6: the release channel's reads (the channel of the last one)
     manifest_reads: usize,
     manifest: Option<std::sync::mpsc::Sender<Done>>,
+    /// the channel each read asked for (stable or beta, from his prefs)
+    channels: Vec<bise_home::release::DesktopChannel>,
+    /// N1: where the fake keeps the secrets ('file' at start), the moves asked (true: to the
+    /// keychain) and the running move's channel, to end it from the test
+    keychain: Option<String>,
+    keychain_moves: Vec<bool>,
+    keychain_tx: Option<std::sync::mpsc::Sender<Done>>,
+    /// the add menu: the staging's channel (to end it from the test), the
+    /// marketplaces read, and where a confirmed add installs (a temp dir)
+    staging: Option<std::sync::mpsc::Sender<Done>>,
+    markets: Vec<String>,
+    /// the projects each signals read asked for (the test ends it with
+    /// its own `Done::Signals`)
+    signals: Vec<Vec<(PathBuf, String)>>,
+    signaling: Option<std::sync::mpsc::Sender<Done>>,
+    /// a connect's channel, and the pending names each rows call saw
+    connecting: Option<std::sync::mpsc::Sender<Done>>,
+    pending_seen: Vec<Vec<String>>,
+    add_root: PathBuf,
+    /// the plugins whose servers were tried after a confirm, and the
+    /// last try's channel
+    tries: Vec<PathBuf>,
+    trying: Option<std::sync::mpsc::Sender<Done>>,
+}
+
+/// Where the add menu reads and writes in a test: all under `root`.
+fn add_ctx(root: &Path) -> bend_plugins::add::Ctx {
+    bend_plugins::add::Ctx::under(root)
 }
 
 fn rows() -> Vec<Row> {
@@ -50,6 +78,9 @@ fn setup(t: &mut T) -> Rc<RefCell<World>> {
     let (n, o, q, r, u, v) = (w.clone(), w.clone(), w.clone(), w.clone(), w.clone(), w.clone());
     let (x, y, z) = (w.clone(), w.clone(), w.clone());
     let mf = w.clone();
+    let sg = w.clone();
+    let (ad, am, ac, pc) = (w.clone(), w.clone(), w.clone(), w.clone());
+    let (kn, ks, pt) = (w.clone(), w.clone(), w.clone());
     t.core.set_setup(SetupPorts {
         prefs: Box::new(move || a.borrow().prefs.clone()),
         write_prefs: Box::new(move |v| {
@@ -65,14 +96,26 @@ fn setup(t: &mut T) -> Rc<RefCell<World>> {
                 kind: "key".into(),
                 state: if keyed { "signed_in" } else { "signed_out" }.into(),
                 who: None,
+                from: None,
+                keys_url: String::new(),
+                coding: false,
+                needs_url: false,
             }]
         }),
-        key_set: Box::new(move |id, key| {
-            if key.trim().is_empty() {
-                return Err("an empty key".into());
-            }
-            d.borrow_mut().keys.push((id.into(), key.into()));
-            Ok(())
+        claude_plan: Box::new(|| true),
+        // the live port checks on a thread (firstkey.rs); this one answers
+        // at once: "sk-bad…" is refused, nothing saved; any other key works
+        provider_use: Box::new(move |id, key, _base_url, seq, tx| {
+            let k = key.clone().unwrap_or_default();
+            let res = if k.starts_with("sk-bad") || k.trim().is_empty() {
+                Err(crate::firstkey::Failed { why: bise_proto::app_rows::CheckWhy::WrongKey, said: "invalid api key".into(), url: Some("https://keys.test".into()) })
+            } else {
+                d.borrow_mut().keys.push((id.into(), k));
+                Ok(crate::firstkey::Works { answer: "Hi!".into(), main: "anthropic/claude-opus-5-5".into(), lines: vec!["main uses anthropic/claude-opus-5-5.".into()] })
+            };
+            let used = crate::firstkey::Used { id: id.into(), name: "Anthropic".into(), model: "anthropic/claude-opus-5-5".into(), pasted: key.is_some(), res };
+            let _ = tx.send(Done::Used { seq, used });
+            ("Anthropic".into(), "anthropic/claude-opus-5-5".into())
         }),
         key_remove: Box::new(move |id| {
             e.borrow_mut().keys.retain(|(k, _)| k != id);
@@ -115,10 +158,42 @@ fn setup(t: &mut T) -> Rc<RefCell<World>> {
             Ok(())
         }),
         plugins: Box::new(move |ws, pending| {
+            j.borrow_mut().pending_seen.push(pending.to_vec());
             let off = j.borrow().plugin_sets.iter().rev().find(|(n, _)| n == "computer").is_none_or(|(_, on)| !on);
-            let login = |name: &str| PluginLogin { name: name.into(), host: "mcp.linear.app".into(), state: if pending.iter().any(|p| p == name) { "pending" } else { "needs" }.into(), tools: None };
-            let p = |name: &str, state: &str, logins| Plugin { name: name.into(), state: state.into(), scope: "user".into(), what: Some(ws.to_string_lossy().into_owned()), logins };
-            vec![p("linear", "loaded", vec![login("linear")]), p("computer", if off { "disabled" } else { "loaded" }, vec![])]
+            let login = |name: &str| PluginPart {
+                id: format!("{name}#mcp:{name}"),
+                kind: PartKind::Mcp,
+                name: name.into(),
+                what: Some("mcp.linear.app".into()),
+                on: true,
+                status: None,
+                login: Some(if pending.iter().any(|p| p == name) { LoginState::Pending } else { LoginState::Needs }),
+                error: None,
+                tools: vec![],
+                tool_count: None,
+                path: None,
+            };
+            let p = |name: &str, on: bool, parts: Vec<PluginPart>| Plugin {
+                id: name.into(),
+                name: name.into(),
+                kind: PluginKind::Plugin,
+                scope: PluginScope::User,
+                title: name.into(),
+                what: Some(ws.to_string_lossy().into_owned()),
+                icon: None,
+                version: None,
+                path: None,
+                state: if on { PluginState::Loaded } else { PluginState::Disabled },
+                on,
+                locked: false,
+                action: None,
+                login: None,
+                prompts: vec![],
+                logins: vec![],
+                parts,
+            };
+            let notion = Plugin { id: "mistral:notion".into(), name: "mistral:notion".into(), kind: PluginKind::Mistral, state: PluginState::Available, on: false, ..p("notion", false, vec![]) };
+            vec![p("linear", true, vec![login("linear")]), p("computer", !off, vec![]), notion]
         }),
         plugin_set: Box::new(move |name, on| {
             if name == "nope" {
@@ -137,6 +212,33 @@ fn setup(t: &mut T) -> Rc<RefCell<World>> {
             m.borrow_mut().plugin_logouts.push((ws.into(), name.into()));
             Ok(())
         }),
+        // the add menu: nothing staged nor cloned here; the test ends
+        // each job itself (Done::Staged / Done::Market)
+        plugin_stage: Box::new(move |_req, tx| ad.borrow_mut().staging = Some(tx)),
+        plugin_market: Box::new(move |url, tx| {
+            let mut w = am.borrow_mut();
+            w.markets.push(url);
+            w.staging = Some(tx);
+        }),
+        signals: Box::new(move |projects, tx| {
+            let mut w = sg.borrow_mut();
+            w.signals.push(projects);
+            w.signaling = Some(tx);
+        }),
+        add_ctx: Box::new(move || add_ctx(&ac.borrow().add_root)),
+        // no server runs here: the test ends the try itself (Done::Tried)
+        plugin_try: Box::new(move |dir, _ctx, tx| {
+            let mut w = pt.borrow_mut();
+            w.tries.push(dir);
+            w.trying = Some(tx);
+        }),
+        // a connect never runs here (his browser); a refresh ends at once
+        plugin_connect: Box::new(move |_id, _project, tx| {
+            pc.borrow_mut().connecting = Some(tx);
+            Ok(())
+        }),
+        plugins_refresh: Box::new(|project, tx| drop(tx.send(Done::Refreshed { project, res: Err("no key".into()) }))),
+        connectors_problem: Box::new(|| Some(bise_proto::app_rows::ConnectorsProblem::Locked)),
         cu: CuPorts {
             is_on: Box::new(move || n.borrow().cu_on),
             set_on: Box::new(move |on| o.borrow_mut().cu_on = on),
@@ -167,11 +269,21 @@ fn setup(t: &mut T) -> Rc<RefCell<World>> {
             y.borrow_mut().role_sets.push((role.into(), model.map(String::from), effort.map(String::from)));
             Ok(())
         }),
-        manifest: Box::new(move |tx| {
+        own_built: Box::new(String::new),
+        manifest: Box::new(move |channel, tx| {
             let mut w = mf.borrow_mut();
             w.manifest_reads += 1;
+            w.channels.push(channel);
             w.manifest = Some(tx);
         }),
+        keychain: KeychainPort {
+            now: Box::new(move || kn.borrow().keychain.clone().unwrap_or_else(|| "file".into())),
+            switch: Box::new(move |on, tx| {
+                let mut w = ks.borrow_mut();
+                w.keychain_moves.push(on);
+                w.keychain_tx = Some(tx);
+            }),
+        },
     });
     w
 }
@@ -201,6 +313,8 @@ fn the_window_gets_prefs_and_accounts_and_sets_a_known_pref() {
     assert_eq!(prefs.len(), 1);
     assert!(prefs[0]["prefs"]["excluded_apps"].as_array().is_some_and(|a| a.contains(&json!("com.apple.MobileSMS"))), "the seed");
     assert_eq!(evs(&out, "accounts")[0]["items"][0]["state"], "signed_out");
+    // Claude Code's plan seen: the first run points at its API credits
+    assert_eq!(evs(&out, "accounts")[0]["claude_plan"], true);
 
     app(&mut t, r#"{"cmd":"prefs_set","key":"quiet.call","value":false}"#);
     assert_eq!(w.borrow().prefs, Some(json!({"quiet": {"call": false}})));
@@ -221,16 +335,53 @@ fn the_window_gets_prefs_and_accounts_and_sets_a_known_pref() {
 }
 
 #[test]
-fn a_key_set_shows_in_accounts_and_never_in_an_event() {
+fn a_provider_use_checks_then_saves_and_never_says_the_key() {
     let mut t = T::new();
     let w = setup(&mut t);
-    app(&mut t, r#"{"cmd":"key_set","id":"anthropic","key":"sk-fake-secret"}"#);
-    assert_eq!(w.borrow().keys, vec![("anthropic".to_string(), "sk-fake-secret".to_string())]);
+    // a refused key: checking, then failed with its fix; nothing saved
+    app(&mut t, r#"{"cmd":"provider_use","id":"anthropic","key":"sk-bad-0000"}"#);
+    let c = t.take();
+    assert_eq!(evs(&c, "provider_check")[0]["state"], "checking");
+    assert_eq!(evs(&c, "provider_check")[0]["model"], "anthropic/claude-opus-5-5");
+    t.until(|o| !evs(o, "provider_check").is_empty());
     let out = t.take();
+    let f = evs(&out, "provider_check")[0];
+    assert_eq!((f["state"].as_str(), f["why"].as_str(), f["url"].as_str()), (Some("failed"), Some("wrong_key"), Some("https://keys.test")));
+    assert!(evs(&out, "accounts").is_empty() && w.borrow().keys.is_empty(), "a failed key is never written");
+    // a good one: works, with the answer and main's model, then the accounts
+    app(&mut t, r#"{"cmd":"provider_use","id":"anthropic","key":"sk-fake-secret"}"#);
+    t.until(|o| evs(o, "provider_check").iter().any(|e| e["state"] == "works"));
+    let out = t.take();
+    let ok = evs(&out, "provider_check").into_iter().find(|e| e["state"] == "works").unwrap();
+    assert_eq!((ok["answer"].as_str(), ok["main"].as_str()), (Some("Hi!"), Some("anthropic/claude-opus-5-5")));
+    assert_eq!(w.borrow().keys, vec![("anthropic".to_string(), "sk-fake-secret".to_string())]);
     assert_eq!(evs(&out, "accounts")[0]["items"][0]["state"], "signed_in");
     assert!(!serde_json::to_string(&out).unwrap().contains("sk-fake-secret"));
-    app(&mut t, r#"{"cmd":"key_set","id":"anthropic","key":" "}"#);
-    assert_eq!(evs(&t.take(), "error")[0]["cmd"], "key_set");
+}
+
+/// architect m_28532: one check in flight per provider; a newer one's
+/// answer is the one that counts, the older's end is dropped.
+#[test]
+fn a_newer_provider_use_drops_the_older_answer() {
+    let mut t = T::new();
+    let _w = setup(&mut t);
+    // the fake answers at once: both ends wait on the channel, the bad
+    // one's first, with its older seq
+    app(&mut t, r#"{"cmd":"provider_use","id":"anthropic","key":"sk-bad-1"}"#);
+    app(&mut t, r#"{"cmd":"provider_use","id":"anthropic","key":"sk-good-2"}"#);
+    t.until(|o| evs(o, "provider_check").iter().any(|e| e["state"] == "works"));
+    t.core.tick(std::time::Instant::now());
+    t.out.extend(t.core.take_out());
+    let out = t.take();
+    let ends: Vec<&str> = evs(&out, "provider_check").iter().filter_map(|e| e["state"].as_str()).filter(|s| *s != "checking").collect();
+    assert_eq!(ends, vec!["works"], "only the newest answer");
+}
+
+#[test]
+fn a_key_removed_shows_signed_out() {
+    let mut t = T::new();
+    let w = setup(&mut t);
+    w.borrow_mut().keys.push(("anthropic".into(), "sk-1".into()));
     app(&mut t, r#"{"cmd":"key_remove","id":"anthropic"}"#);
     assert_eq!(evs(&t.take(), "accounts")[0]["items"][0]["state"], "signed_out");
 }
@@ -344,8 +495,8 @@ fn setup_lines_parse_as_the_cores_and_hub_commands_stay_typed() {
     assert!(matches!(Cmd::parse(r#"{"cmd":"found_scan","dir":"/x"}"#), Ok(Cmd::App(_))));
     assert!(matches!(Cmd::parse(r#"{"cmd":"project_rename","project":"a","name":"b"}"#), Ok(Cmd::App(_))));
     assert!(matches!(Cmd::parse(r#"{"cmd":"send","project":"a","agent":"main","text":"x","mode":"now"}"#), Ok(Cmd::Typed(_))));
-    let e = Cmd::parse(r#"{"cmd":"key_set","id":"a"}"#).err().unwrap();
-    assert!(e.starts_with("key_set"), "{e}");
+    let e = Cmd::parse(r#"{"cmd":"provider_use"}"#).err().unwrap();
+    assert!(e.starts_with("provider_use"), "{e}");
 }
 
 /// P.1: the plugins of bise's home or of a project, a toggle through the
@@ -382,7 +533,7 @@ fn the_window_lists_toggles_and_logs_in_to_plugins() {
 
     app(&mut t, r#"{"cmd":"plugin_login","name":"linear"}"#);
     let out = t.take();
-    assert_eq!(evs(&out, "plugins")[0]["items"][0]["logins"][0]["state"], "pending");
+    assert_eq!(evs(&out, "plugins")[0]["items"][0]["parts"][0]["login"], "pending");
     app(&mut t, r#"{"cmd":"plugin_login","name":"linear"}"#);
     assert!(evs(&t.take(), "error")[0]["text"].as_str().is_some_and(|e| e.contains("still open")));
     assert_eq!(w.borrow().plugin_logins.len(), 1, "one login at a time");
@@ -392,7 +543,174 @@ fn the_window_lists_toggles_and_logs_in_to_plugins() {
     t.until(|o| !evs(o, "plugins").is_empty());
     let out = t.take();
     assert!(evs(&out, "error")[0]["text"].as_str().is_some_and(|e| e.contains("linear: the browser closed")));
-    assert_eq!(evs(&out, "plugins")[0]["items"][0]["logins"][0]["state"], "needs", "no longer pending");
+    assert_eq!(evs(&out, "plugins")[0]["items"][0]["parts"][0]["login"], "needs", "no longer pending");
+}
+
+/// The band's whys (architect m_41049): his projects (never home) are read
+/// off the loop, once until [`SIGNALS_EVERY`]; their end ranks and says
+/// the summary again, a connector seen in a project first with where.
+#[test]
+fn the_projects_signals_are_read_once_off_the_loop_then_say_why() {
+    let mut t = T::new();
+    let w = setup(&mut t);
+    app(&mut t, r#"{"cmd":"plugins"}"#);
+    let out = t.take();
+    let mistral = |out: &[Value]| -> Value {
+        let s = &evs(out, "plugins_summary")[0]["summary"]["suggest"];
+        s.as_array().unwrap().iter().find(|x| x["kind"] == "mistral").cloned().unwrap()
+    };
+    assert_eq!(mistral(&out)["whys"][0]["source"], "generic");
+    app(&mut t, r#"{"cmd":"plugins"}"#);
+    t.take();
+    let asked = w.borrow().signals.clone();
+    assert_eq!(asked, vec![vec![(PathBuf::from("/p/shop"), "shop".to_string()), (PathBuf::from("/p/docs"), "docs".to_string())]], "once, home left out");
+    let tx = w.borrow_mut().signaling.take().unwrap();
+    let shop = bend_plugins::signals::Inputs { project: "shop".into(), env_keys: vec!["NOTION_TOKEN".into()], ..Default::default() };
+    tx.send(Done::Signals { inputs: vec![shop] }).unwrap();
+    t.until(|o| !evs(o, "plugins_summary").is_empty());
+    let out = t.take();
+    let s = &mistral(&out);
+    assert_eq!(s["ids"][0], "mistral:notion");
+    assert_eq!(s["whys"][0]["text"], bise_proto::words::settings::plugins_why_seen_one("NOTION_TOKEN"));
+    assert_eq!(s["whys"][0]["where"][0], "shop");
+}
+
+/// The add menu (plug-add's add::Held in the core): an item staged off
+/// the loop, its preview, his click installs it (once), a marketplace
+/// read into `browse`; the Mistral connectors not connected go to
+/// `browse` too, never into `plugins`.
+#[test]
+fn the_add_menu_previews_then_installs_on_his_click() {
+    let mut t = T::new();
+    let w = setup(&mut t);
+    let root = std::env::temp_dir().join(format!("amb-add-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&root);
+    let src = root.join("src/hello");
+    std::fs::create_dir_all(&src).unwrap();
+    std::fs::write(src.join("plugin.json"), format!("{{\"$schema\":\"{}\",\"name\":\"hello\"}}", bend_plugins::resolve::PLUGIN_SCHEMA)).unwrap();
+    w.borrow_mut().add_root = root.clone();
+
+    app(&mut t, r#"{"cmd":"plugins"}"#);
+    let out = t.take();
+    assert_eq!(evs(&out, "browse")[0]["source"], "mistral");
+    // the connectors' problem, typed, on both events (the fake: a locked keychain)
+    assert_eq!(evs(&out, "plugins")[0]["connectors"]["kind"], "locked");
+    assert_eq!(evs(&out, "browse")[0]["connectors"]["kind"], "locked");
+    assert!(evs(&out, "plugins")[0]["items"].as_array().unwrap().iter().all(|r| r["state"] != "available"));
+    assert_eq!(evs(&out, "browse")[0]["items"][0]["id"], "mistral:notion");
+
+    app(&mut t, &format!(r#"{{"cmd":"plugin_add","add":{{"kind":"folder","path":"{}"}}}}"#, src.display()));
+    assert!(t.take().iter().all(|e| e["ev"] != "error"));
+    let tx = w.borrow_mut().staging.take().expect("staged off the loop");
+    let staged = bend_plugins::add::stage(&bend_plugins::add::Request::Folder { path: src.clone() }, &add_ctx(&root)).unwrap();
+    tx.send(Done::Staged { res: Ok(crate::ambient::setup::StagedPlugin(staged)) }).unwrap();
+    t.until(|o| !evs(o, "plugin_preview").is_empty());
+    let token = evs(&t.take(), "plugin_preview")[0]["token"].as_str().unwrap().to_string();
+    assert!(!root.join("plugins/hello").exists(), "nothing installed before his click");
+    assert!(w.borrow().tries.is_empty(), "nothing tried before his click");
+
+    app(&mut t, &format!(r#"{{"cmd":"plugin_add_confirm","token":"{token}"}}"#));
+    let out = t.take();
+    assert!(root.join("plugins/hello/plugin.json").exists(), "installed on his click");
+    assert_eq!(evs(&out, "plugins").len(), 1, "the list again");
+    // its servers tried once right after, the list again at the try's end
+    assert_eq!(w.borrow().tries, vec![root.join("plugins/hello")]);
+    let tx = w.borrow_mut().trying.take().expect("tried after the confirm");
+    tx.send(Done::Tried).unwrap();
+    t.until(|o| !evs(o, "plugins").is_empty());
+    t.take();
+    app(&mut t, &format!(r#"{{"cmd":"plugin_add_confirm","token":"{token}"}}"#));
+    assert_eq!(evs(&t.take(), "error")[0]["cmd"], "plugin_add_confirm", "a token works once");
+
+    // a connect: its id is pending in the rows until its end (the fake port
+    // never runs it); the end, the list again without it
+    app(&mut t, r#"{"cmd":"plugin_connect","id":"mistral:notion"}"#);
+    assert_eq!(w.borrow().pending_seen.last().cloned().unwrap_or_default(), vec!["mistral:notion".to_string()]);
+    t.take();
+    let tx = w.borrow_mut().connecting.take().expect("its connect started");
+    tx.send(Done::Connecting { id: "mistral:notion".into(), project: None, said: None, res: Some(Ok(())) }).unwrap();
+    t.until(|o| !evs(o, "plugins").is_empty());
+    t.take();
+    assert!(w.borrow().pending_seen.last().is_some_and(|p| p.is_empty()), "no longer pending");
+
+    app(&mut t, r#"{"cmd":"plugin_add","add":{"kind":"marketplace","url":"openai/plugins"}}"#);
+    assert_eq!(w.borrow().markets, vec!["openai/plugins".to_string()]);
+    let tx = w.borrow_mut().staging.take().unwrap();
+    tx.send(Done::Market { source: "openai/plugins".into(), res: Ok(vec![]) }).unwrap();
+    t.until(|o| !evs(o, "browse").is_empty());
+    assert_eq!(evs(&t.take(), "browse")[0]["source"], "openai/plugins");
+    let _ = std::fs::remove_dir_all(&root);
+}
+
+/// architect m_39446 (the merge checklist): a secret value he types for
+/// an MCP server goes through the core into the secrets store only: no
+/// event, no other file under the test home holds it.
+#[test]
+fn a_typed_secret_reaches_the_secrets_store_only() {
+    let mut t = T::new();
+    let w = setup(&mut t);
+    let root = std::env::temp_dir().join(format!("amb-secret-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&root);
+    std::fs::create_dir_all(&root).unwrap();
+    w.borrow_mut().add_root = root.clone();
+    const PLANTED: &str = "PLANTED-pg-pass-7f3a";
+    let add = r#"{"kind":"mcp","name":"pg","command":"sh -c true","secrets":["DATABASE_URL"]}"#;
+    app(&mut t, &format!(r#"{{"cmd":"plugin_add","add":{add}}}"#));
+    let tx = w.borrow_mut().staging.take().expect("staged off the loop");
+    let kind: bise_proto::app_cmd::PluginAddKind = serde_json::from_str(add).unwrap();
+    let req = bend_plugins::add::Request::from_wire(&kind).unwrap();
+    let staged = bend_plugins::add::stage(&req, &add_ctx(&root)).unwrap();
+    tx.send(Done::Staged { res: Ok(crate::ambient::setup::StagedPlugin(staged)) }).unwrap();
+    t.until(|o| !evs(o, "plugin_preview").is_empty());
+    let token = evs(&t.take(), "plugin_preview")[0]["token"].as_str().unwrap().to_string();
+    app(&mut t, &format!(r#"{{"cmd":"plugin_add_confirm","token":"{token}","secrets":[{{"name":"DATABASE_URL","value":"{PLANTED}"}}]}}"#));
+    let out = t.take();
+    assert!(evs(&out, "error").is_empty(), "{out:?}");
+    assert!(!format!("{out:?}").contains(PLANTED), "an event holds it");
+    let mut holders = Vec::new();
+    let mut stack = vec![root.clone(), bise_home::Home::from_env().root().to_path_buf()];
+    while let Some(d) = stack.pop() {
+        for e in std::fs::read_dir(&d).into_iter().flatten().flatten() {
+            let p = e.path();
+            if p.is_dir() {
+                stack.push(p);
+            } else if std::fs::read(&p).is_ok_and(|b| b.windows(PLANTED.len()).any(|x| x == PLANTED.as_bytes())) {
+                holders.push(p);
+            }
+        }
+    }
+    let store = bend_plugins::secrets::path(&root.join("secrets"), &bend_plugins::id::PluginId::plugin("pg"));
+    assert_eq!(holders, vec![store], "the value is in the secrets store and nowhere else");
+    let mcp = std::fs::read_to_string(root.join("plugins/pg/mcp.json")).unwrap();
+    assert!(mcp.contains("${DATABASE_URL}"), "{mcp}");
+    let _ = std::fs::remove_dir_all(&root);
+}
+
+/// `plugin_remove`: a plugin of his folder goes with its secrets, the
+/// list again; a connector is refused as an error, nothing touched.
+#[test]
+fn plugin_remove_takes_his_plugin_and_its_secrets_and_refuses_a_connector() {
+    let mut t = T::new();
+    let w = setup(&mut t);
+    let root = std::env::temp_dir().join(format!("amb-remove-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&root);
+    std::fs::create_dir_all(root.join("plugins/pay")).unwrap();
+    w.borrow_mut().add_root = root.clone();
+    let manifest = format!(r#"{{"$schema": "{}", "name": "pay"}}"#, bend_plugins::resolve::PLUGIN_SCHEMA);
+    std::fs::write(root.join("plugins/pay/plugin.json"), manifest).unwrap();
+    let pay = bend_plugins::id::PluginId::plugin("pay");
+    bend_plugins::secrets::write(&root.join("secrets"), &pay, &[("KEY".into(), "v".into())]).unwrap();
+
+    app(&mut t, r#"{"cmd":"plugin_remove","name":"mistral:gmail"}"#);
+    let out = t.take();
+    assert_eq!(evs(&out, "error")[0]["cmd"], "plugin_remove");
+    app(&mut t, r#"{"cmd":"plugin_remove","name":"pay"}"#);
+    let out = t.take();
+    assert!(evs(&out, "error").is_empty(), "{out:?}");
+    assert_eq!(evs(&out, "plugins").len(), 1, "the list again");
+    assert!(!root.join("plugins/pay").exists());
+    assert!(!bend_plugins::secrets::path(&root.join("secrets"), &pay).exists());
+    let _ = std::fs::remove_dir_all(&root);
 }
 
 /// P.2: computer use's page polls only while open (check), its rows are
@@ -461,7 +779,7 @@ fn computer_use_polls_while_its_page_is_open_and_fixes_on_his_act() {
 fn check_again_reads_prefs_accounts_and_projects_fresh() {
     let mut t = T::new();
     let w = setup(&mut t);
-    app(&mut t, r#"{"cmd":"key_set","id":"anthropic","key":"sk-1"}"#);
+    w.borrow_mut().keys.push(("anthropic".into(), "sk-1".into()));
     t.take();
     w.borrow_mut().keys.clear();
     app(&mut t, r#"{"cmd":"setup_check"}"#);
@@ -534,7 +852,7 @@ fn app_version_reads_the_channel_and_a_newer_app_is_said_once_per_asking() {
     let w = setup(&mut t);
     let sha = "ab".repeat(32);
     let feed = |id: &str, built: &str| {
-        format!(r#"{{"desktop":{{"darwin-arm64":{{"version":"v-{id}","id":"{id}","url":"bise-desktop.zip","sha256":"{sha}","built":"{built}"}}}}}}"#)
+        format!(r#"{{"kind":"desktop","targets":{{"darwin-arm64":{{"version":"v-{id}","id":"{id}","url":"bise-desktop.zip","sha256":"{sha}","built":"{built}"}}}}}}"#)
     };
     app(&mut t, r#"{"cmd":"app_version","id":"d25","built":"2026-10-07T10:00:00Z"}"#);
     app(&mut t, r#"{"cmd":"app_version","id":"d25","built":"2026-10-07T10:00:00Z"}"#);
@@ -570,4 +888,101 @@ fn app_version_reads_the_channel_and_a_newer_app_is_said_once_per_asking() {
     t.until(|o| !evs(o, "commands").is_empty());
     assert!(evs(&t.take(), "app_update").is_empty());
     assert_eq!(w.borrow().manifest_reads, 4);
+    assert!(w.borrow().channels.iter().all(|c| *c == bise_home::release::DesktopChannel::Stable), "no pref: stable");
+}
+
+/// desktop-dist v7 (his pick: stable + beta): the channel is his pref,
+/// read at each check; turning beta on reads the channel at once (no
+/// waiting for the next hour), on beta's own tag.
+#[test]
+fn turning_beta_on_reads_the_beta_channel_at_once() {
+    use bise_home::release::DesktopChannel;
+    let mut t = T::new();
+    let w = setup(&mut t);
+    app(&mut t, r#"{"cmd":"app_version","id":"d25","built":"2026-10-07T10:00:00Z"}"#);
+    assert_eq!(w.borrow().channels, [DesktopChannel::Stable]);
+    let tx = w.borrow().manifest.clone().unwrap();
+    tx.send(Done::Manifest { text: Err("offline".into()), base: "file:///feed".into(), target: "darwin-arm64".into() }).unwrap();
+    t.until(|_| true);
+    app(&mut t, r#"{"cmd":"prefs_set","key":"desktop_channel","value":"beta"}"#);
+    t.until(|o| !evs(o, "prefs").is_empty());
+    assert_eq!(w.borrow().channels, [DesktopChannel::Stable, DesktopChannel::Beta], "read again at once, on beta");
+    // another pref: no read
+    app(&mut t, r#"{"cmd":"prefs_set","key":"theme","value":"dark"}"#);
+    t.until(|o| !evs(o, "prefs").is_empty());
+    assert_eq!(w.borrow().manifest_reads, 2);
+}
+
+/// N1: the fake move ends: where the secrets are now, and its lines.
+fn keychain_ends(t: &mut T, w: &Rc<RefCell<World>>, store: &str, lines: &[&str], failed: bool) {
+    let tx = w.borrow_mut().keychain_tx.take().expect("a move runs");
+    if !failed {
+        w.borrow_mut().keychain = Some(store.into());
+    }
+    // what came before the move's end stays with the caller's earlier take
+    let _ = t.take();
+    tx.send(Done::Keychain { lines: lines.iter().map(|l| (*l).to_string()).collect(), failed }).unwrap();
+    t.until(|o| evs(o, "keychain").iter().any(|e| e["moving"] == false));
+}
+
+#[test]
+fn keychain_says_where_the_secrets_are_at_start_and_on_ask() {
+    let mut t = T::new();
+    let _w = setup(&mut t);
+    t.core.app_start();
+    t.out.extend(t.core.take_out());
+    let o = t.take();
+    let k = evs(&o, "keychain");
+    assert_eq!(k.len(), 1, "once at start: {o:?}");
+    assert_eq!(k[0]["store"], "file");
+    assert_eq!(k[0]["moving"], false);
+    app(&mut t, r#"{"cmd":"keychain"}"#);
+    let o = t.take();
+    assert_eq!(evs(&o, "keychain").len(), 1, "a bare keychain asks: {o:?}");
+}
+
+#[test]
+fn keychain_on_moves_the_secrets_on_its_thread_and_says_the_lines_at_its_end() {
+    let mut t = T::new();
+    let w = setup(&mut t);
+    app(&mut t, r#"{"cmd":"keychain","to":"on"}"#);
+    assert_eq!(w.borrow().keychain_moves, vec![true], "the port moves them to the keychain");
+    let o = t.take();
+    let k = evs(&o, "keychain");
+    assert_eq!(k.last().unwrap()["moving"], true, "moving while it runs: {o:?}");
+    // a second move while one runs is refused, never queued
+    app(&mut t, r#"{"cmd":"keychain","to":"off"}"#);
+    assert_eq!(w.borrow().keychain_moves, vec![true], "never queued");
+    let o = t.take();
+    assert!(evs(&o, "error").iter().any(|e| e["cmd"] == "keychain"), "refused with a line: {o:?}");
+    keychain_ends(&mut t, &w, "keychain", &["moved 3 items to the macOS keychain"], false);
+    let o = t.take();
+    let k = evs(&o, "keychain");
+    let last = k.last().unwrap();
+    assert_eq!(last["store"], "keychain");
+    assert_eq!(last["moving"], false);
+    assert_eq!(last["lines"][0], "moved 3 items to the macOS keychain");
+    assert!(last.get("failed").is_none());
+    // and back
+    app(&mut t, r#"{"cmd":"keychain","to":"off"}"#);
+    assert_eq!(w.borrow().keychain_moves, vec![true, false]);
+    keychain_ends(&mut t, &w, "file", &["moved 3 items back to files in ~/.bise"], false);
+    let o = t.take();
+    assert_eq!(evs(&o, "keychain").last().unwrap()["store"], "file");
+}
+
+#[test]
+fn a_failed_keychain_move_says_it_and_another_word_is_refused() {
+    let mut t = T::new();
+    let w = setup(&mut t);
+    app(&mut t, r#"{"cmd":"keychain","to":"on"}"#);
+    keychain_ends(&mut t, &w, "file", &["the keychain is locked: nothing moved"], true);
+    let o = t.take();
+    let last = evs(&o, "keychain").last().copied().unwrap().clone();
+    assert_eq!(last["store"], "file");
+    assert_eq!(last["failed"], true);
+    app(&mut t, r#"{"cmd":"keychain","to":"maybe"}"#);
+    let o = t.take();
+    assert!(evs(&o, "error").iter().any(|e| e["cmd"] == "keychain" && e["text"].as_str().unwrap_or("").contains("on or off")), "{o:?}");
+    assert_eq!(w.borrow().keychain_moves, vec![true], "no move for a wrong word");
 }

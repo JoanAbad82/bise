@@ -1,0 +1,76 @@
+{
+  "name": "bise-desktop",
+  "private": true,
+  "version": "0.0.0",
+  "description": "bise desktop: Electron + React + TypeScript, on top of bise ambient-core",
+  "main": "out/main/index.js",
+  "packageManager": "pnpm@10.26.1",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "electron-vite dev",
+    "build": "electron-vite build",
+    "start": "electron-vite preview",
+    "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json && tsc --noEmit -p tests/harness/tsconfig.electron.json && NODE_OPTIONS='--experimental-strip-types --disable-warning=ExperimentalWarning' node ../../scripts/ts_emit.ts tests/harness/tsconfig.electron.json --check",
+    "lint": "eslint --max-warnings 0 .",
+    "check": "python3 ../../tests/conflict_markers.py && pnpm typecheck && pnpm lint && pnpm test && pnpm build",
+    "test:land": "NODE_OPTIONS='--experimental-strip-types --disable-warning=ExperimentalWarning' node tests/harness/land.mts",
+    "smoke": "NODE_OPTIONS='--experimental-strip-types --disable-warning=ExperimentalWarning' node scripts/smoke.mts",
+    "test:e2e": "playwright test -c tests/harness/playwright.config.ts",
+    "test": "vitest run",
+    "gallery": "vite src/ds/gallery",
+    "hero": "vite -c hero.vite.config.ts",
+    "build:hero": "vite build -c hero.vite.config.ts",
+    "sprites:home": "NODE_OPTIONS='--experimental-strip-types --disable-warning=ExperimentalWarning' node scripts/bims-sprites.mts",
+    "dist": "electron-builder --config electron-builder.mjs --mac --dir"
+  },
+  "dependencies": {
+    "@radix-ui/react-dialog": "^1.2.0",
+    "@tanstack/react-virtual": "3.14.13",
+    "@tiptap/core": "3.31.4",
+    "@tiptap/extensions": "3.31.4",
+    "@tiptap/pm": "3.31.4",
+    "@xterm/addon-fit": "0.11.0",
+    "@xterm/xterm": "6.0.0",
+    "prism-react-renderer": "2.4.1",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "react-markdown": "10.1.0",
+    "react-virtuoso": "4.18.16",
+    "remark-gfm": "4.0.1",
+    "three": "0.186.1"
+  },
+  "devDependencies": {
+    "@electron/fuses": "1.8.0",
+    "@eslint/js": "9.39.5",
+    "@playwright/test": "1.63.0",
+    "@testing-library/dom": "10.4.2",
+    "@testing-library/react": "16.3.3",
+    "@types/node": "22.20.5",
+    "@types/pngjs": "6.0.5",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "@types/three": "0.186.0",
+    "@vitejs/plugin-react": "5.2.0",
+    "electron": "44.5.1",
+    "electron-builder": "26.17.0",
+    "electron-vite": "5.0.0",
+    "eslint": "9.39.5",
+    "eslint-plugin-react-hooks": "7.1.1",
+    "globals": "16.5.0",
+    "happy-dom": "20.14.5",
+    "jsdom": "30.1.2",
+    "pngjs": "7.0.0",
+    "typescript": "5.9.3",
+    "typescript-eslint": "8.71.0",
+    "vite": "7.3.6",
+    "vitest": "3.2.7"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "electron",
+      "esbuild"
+    ]
+  }
+}

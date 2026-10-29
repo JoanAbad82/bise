@@ -84,6 +84,7 @@ dependencies = [
  "bise-catalog",
  "bise-computer-use",
  "bise-home",
+ "bise-proto",
  "bise-session",
  "serde_json",
  "switchboard",
@@ -102,11 +103,13 @@ version = "0.1.0"
 dependencies = [
  "base64",
  "bise-home",
+ "bise-proto",
  "bise-secrets",
  "libc",
  "ring",
  "rustls",
  "serde_json",
+ "toml",
  "webpki-roots 0.26.11",
 ]
 
@@ -127,6 +130,7 @@ dependencies = [
  "cpal",
  "crossterm",
  "ignore",
+ "libc",
  "memchr",
  "nucleo-matcher",
  "portable-pty",
@@ -166,6 +170,7 @@ dependencies = [
  "base64",
  "bend-plugins",
  "bise-home",
+ "bise-proto",
  "bise-secrets",
  "libc",
  "ring",
@@ -220,6 +225,8 @@ dependencies = [
 name = "bise-session"
 version = "0.1.0"
 dependencies = [
+ "bend-images",
+ "bise-proto",
  "bise-secrets",
  "libc",
  "ring",

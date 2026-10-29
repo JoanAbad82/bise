@@ -371,7 +371,7 @@ pub(crate) fn arm(app: &mut App) {
 pub(crate) fn pump(app: &mut App) {
     if app.sb.ready {
         if let Some(v) = app.sb.setup.launch.take() {
-            let root = tune::repo_root(&workspace_dir(app), Duration::from_millis(1500));
+            let root = tune::repo_root(&workspace_dir(app), tune::GIT_WAIT);
             if let Some(scope) = due(&v, root.as_deref()) {
                 app.sb.setup.vars = Some(v);
                 app.sb.setup.add(What::Ask(scope));
@@ -496,7 +496,7 @@ pub(crate) fn start(app: &mut App, scope: Scope) {
 /// `/setup`.
 pub(crate) fn command(app: &mut App) {
     let v = app.sb.setup.vars();
-    let root = tune::repo_root(&workspace_dir(app), Duration::from_millis(1500));
+    let root = tune::repo_root(&workspace_dir(app), tune::GIT_WAIT);
     remember(&v, root.as_deref());
     start(app, Scope::All);
 }
@@ -514,7 +514,7 @@ fn row(app: &mut App, ok: bool, text: String) {
 /// that is not a key; the card stays.
 pub(super) fn valid(app: &mut App, id: u64, reply: &str) -> bool {
     let key_card = matches!(app.sb.setup.what(id), Some(What::Key { .. }));
-    if key_card && crate::onboarding::clean_key(reply).is_none() {
+    if key_card && crate::firstkey::clean_key(reply).is_none() {
         push_event(&mut app.events, &mut app.cache, Ev::Warn("that doesn't look like a key: nothing saved".into()));
         return false;
     }
@@ -529,7 +529,7 @@ pub(super) fn answer(app: &mut App, id: u64, reply: &str) {
     let v = app.sb.setup.vars();
     match w {
         What::Ask(scope) => {
-            let root = tune::repo_root(&workspace_dir(app), Duration::from_millis(1500));
+            let root = tune::repo_root(&workspace_dir(app), tune::GIT_WAIT);
             remember(&v, root.as_deref());
             if yes {
                 start(app, scope);
@@ -553,11 +553,11 @@ pub(super) fn answer(app: &mut App, id: u64, reply: &str) {
         },
         What::Agents { .. } => row(app, false, "no AGENTS.md · type /setup whenever you want".into()),
         What::Key { provider, env } => {
-            let key = crate::onboarding::clean_key(reply).unwrap_or_default();
+            let key = crate::firstkey::clean_key(reply).unwrap_or_default();
             let e = lookup(&v);
             let home = crate::onboarding::home_of(&e);
             let setup = crate::onboarding::setup_of(&e, &home);
-            let paths = crate::onboarding::auth_paths(&home);
+            let paths = bise_catalog::auth_cli::Paths::of(&home);
             let r = match setup.catalog.provider(&provider) {
                 Some(p) => bise_catalog::auth_cli::login(&paths, p, &key, &e).map(|_| ()),
                 None => Err(format!("unknown provider {provider}")),

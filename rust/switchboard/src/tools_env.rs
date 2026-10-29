@@ -6,12 +6,17 @@
 //!   hub's own PATH (the TUI that started it), the user's login-shell
 //!   PATH, then the standard dirs; deduplicated. A hub started from a
 //!   thin environment (an IDE task, launchd, `env -i`) still finds
-//!   Homebrew tools.
+//!   Homebrew tools. The last login PATH read is kept in the hub's state
+//!   (`Paths::login_path_file`): a probe that fails (too slow under
+//!   load) gives the agents the kept one.
 //! - `git` on a fresh Mac is `/usr/bin/git`, a shim that opens the
 //!   "install the Command Line Tools" dialog and fails. It is never run
 //!   while `xcode-select -p` names no developer dir: the hub would pop
 //!   the dialog at every git call.
 //! - `rg` is not shipped: agents use it when it is on PATH, else grep.
+//! - The hub's `bin` dir holds `sb` and `bise`, links to the hub's own
+//!   executable (`write_agent_links`): the office skills' `bise office
+//!   run` is the hub's version, with or without the CLI installed.
 
 use std::io::Read;
 use std::path::{Path, PathBuf};
@@ -95,9 +100,32 @@ pub fn agent_path(bin_dir: &Path, inherited: &str, login: Option<&str>) -> Strin
 }
 
 /// The agents' PATH for this hub process (the login shell is asked
-/// once per process).
-pub fn hub_agent_path(bin_dir: &Path) -> String {
-    agent_path(bin_dir, &std::env::var("PATH").unwrap_or_default(), login_path())
+/// once per process; its last good answer is kept in the hub's state).
+pub fn hub_agent_path(paths: &crate::paths::Paths) -> String {
+    agent_path_for(paths, &std::env::var("PATH").unwrap_or_default(), login_path())
+}
+
+/// [`agent_path`] with the login PATH [`remembered_login`] gives.
+pub fn agent_path_for(paths: &crate::paths::Paths, inherited: &str, probed: Option<&str>) -> String {
+    let login = remembered_login(probed, &paths.login_path_file());
+    agent_path(&paths.bin_dir(), inherited, login.as_deref())
+}
+
+/// The login PATH the agents get: this probe's when it read one (kept
+/// in `saved` for the next hub), else the last one kept there. A probe
+/// too slow under load (a switch restarts every hub at once; 3 s cap)
+/// left a hub's agents without the user's node, pnpm, volta... for the
+/// hub's whole life (the 2026-10-27 switch to ac98b858b).
+pub fn remembered_login(probed: Option<&str>, saved: &Path) -> Option<String> {
+    let kept = std::fs::read_to_string(saved).ok().map(|s| s.trim().to_string()).filter(|s| !s.is_empty());
+    let Some(p) = probed else { return kept };
+    if kept.as_deref() != Some(p) {
+        let tmp = saved.with_extension(format!("{}.tmp", std::process::id()));
+        if std::fs::write(&tmp, p).and_then(|_| std::fs::rename(&tmp, saved)).is_err() {
+            let _ = std::fs::remove_file(&tmp);
+        }
+    }
+    Some(p.to_string())
 }
 
 /// The PATH the hub itself finds git on: its own PATH + the standard
@@ -275,10 +303,19 @@ pub fn git() -> Git {
     g
 }
 
-/// A `git` command on the probed binary, or why git cannot be used.
+/// A `git` command on the probed binary, or why git cannot be used: the
+/// hub's one way to run git (law `the_hub_runs_git_only_here`).
+/// `GIT_OPTIONAL_LOCKS=0`: git takes no lock it doesn't need, so the
+/// hub's reads (a `status` refreshes the index under `index.lock`) never
+/// make a land's rebase or commit in that worktree fail on the lock
+/// (feature_retire_e2e under load); a write still takes its own lock.
 pub fn git_command() -> Result<Command, String> {
     match git() {
-        Git::Works { bin, .. } => Ok(Command::new(bin)),
+        Git::Works { bin, .. } => {
+            let mut c = Command::new(bin);
+            c.env("GIT_OPTIONAL_LOCKS", "0");
+            Ok(c)
+        }
         g => Err(g.problem().unwrap_or_default()),
     }
 }
@@ -333,10 +370,23 @@ pub fn tools_note_for(path: &str) -> String {
 /// for [`plugins_note`]: built-in, user and workspace ones, the enable
 /// state applied (`bend_plugins::resolve`).
 pub fn loaded_plugins(workspace: &Path) -> Vec<(String, String, Vec<String>)> {
-    let res = bend_plugins::resolve::resolve(&bend_plugins::resolve::Roots::standard(Some(workspace)));
+    loaded_plugins_in(&bend_plugins::resolve::Roots::standard(Some(workspace)))
+}
+
+fn loaded_plugins_in(roots: &bend_plugins::resolve::Roots) -> Vec<(String, String, Vec<String>)> {
+    loaded_plugins_of(&bend_plugins::resolve::resolve(roots))
+}
+
+/// The plugins on in a resolution, each with its skills on (the
+/// resolver leaves a plugin off or a skill off out of `loaded()` and
+/// `skills`): what [`plugins_note`] lists. A server, a tool or a Mistral
+/// connector is never in it, so turning one off leaves the note as is.
+pub fn loaded_plugins_of(res: &bend_plugins::resolve::Resolution) -> Vec<(String, String, Vec<String>)> {
     res.loaded()
         .map(|p| {
-            let skills = p.skills.iter().map(|s| format!("{}:{}", p.namespace, s.name)).collect();
+            // a plugin skill's name is already `<namespace>:<name>`, the
+            // one `<available-skills>` and the skill tool take
+            let skills = p.skills.iter().map(|s| s.name.clone()).collect();
             (p.name.clone(), p.description.clone().unwrap_or_default(), skills)
         })
         .collect()
@@ -394,13 +444,16 @@ pub fn session_note(path: &str, workspace: &Path) -> String {
 /// `TMUX_TMPDIR` only when a tmux socket fits there: tmux puts it at
 /// `<realpath>/tmux-<uid>/<name>` and a unix socket path is at most 103
 /// bytes on macOS; a folder too deep leaves tmux on /tmp, as before.
+/// The four names are `bise_home::env::PER_CHILD_NAMES`, the one list of
+/// them (the plugins' tools cache leaves them out of its key).
 pub fn temp_env(tmp: &Path, run: &Path) -> Vec<(&'static str, PathBuf)> {
-    let mut keys = vec!["TMPDIR", "TMP", "TEMP"];
-    if tmux_fits(tmp) {
-        keys.push("TMUX_TMPDIR");
-    }
-    let mut v: Vec<(&'static str, PathBuf)> = keys.into_iter().map(|k| (k, tmp.to_path_buf())).collect();
-    v.push(("BEND_BG_DIR", tmp.join("bg")));
+    let fits = tmux_fits(tmp);
+    let mut v: Vec<(&'static str, PathBuf)> = bise_home::env::PER_CHILD_NAMES
+        .iter()
+        .filter(|k| fits || **k != "TMUX_TMPDIR")
+        .map(|k| (*k, tmp.to_path_buf()))
+        .collect();
+    v.push(("BEND_BG_DIR", bise_home::hub_state::bg_dir_of_tmp(tmp)));
     v.push(("BEND_AGENT_RUN", run.to_path_buf()));
     v
 }
@@ -426,6 +479,44 @@ done
 if [ -n "${TMPDIR:-}" ] && [ -d "$TMPDIR" ]; then exec /usr/bin/mktemp -p "$TMPDIR" "$@"; fi
 exec /usr/bin/mktemp "$@"
 "#;
+
+/// The links in `bin_dir` to the hub's executable: `sb` (it runs `sb`
+/// when called by that name, busybox style) and `bise`, so an agent's
+/// `bise office run` (the office skills) is the hub's own version, whose
+/// office.js and bend-jsrt match the skills it loaded, even for a desktop
+/// user with no CLI on PATH. Nothing new for agents: a client command
+/// they could misuse is refused by hub.sock's peer judge (issue 17).
+pub const AGENT_LINKS: [&str; 2] = ["sb", "bise"];
+
+/// Write the [`AGENT_LINKS`]. Each replaced in one rename: an agent of
+/// the previous hub calling `sb` meanwhile finds the old one or the new
+/// one, never none.
+pub fn write_agent_links(bin_dir: &Path, exe: &Path) -> std::io::Result<()> {
+    std::fs::create_dir_all(bin_dir)?;
+    let exe = std::fs::canonicalize(exe).unwrap_or_else(|_| exe.to_path_buf());
+    for name in AGENT_LINKS {
+        let tmp = bin_dir.join(format!(".{}.{}.tmp", name, std::process::id()));
+        let _ = std::fs::remove_file(&tmp);
+        std::os::unix::fs::symlink(&exe, &tmp)?;
+        std::fs::rename(&tmp, bin_dir.join(name)).inspect_err(|_| {
+            let _ = std::fs::remove_file(&tmp);
+        })?;
+    }
+    Ok(())
+}
+
+/// Before a hub of another version starts: a hub older than the links
+/// writes its `sb` script with a plain write, which would go through the
+/// link into this executable. Without them, it writes a new file. Only a
+/// link is dropped.
+pub fn drop_agent_links(bin_dir: &Path) {
+    for name in AGENT_LINKS {
+        let p = bin_dir.join(name);
+        if p.symlink_metadata().is_ok_and(|m| m.file_type().is_symlink()) {
+            let _ = std::fs::remove_file(p);
+        }
+    }
+}
 
 /// Write the mktemp shim in `bin_dir` (macOS only: GNU mktemp reads
 /// TMPDIR), in one rename.
@@ -479,6 +570,36 @@ mod tests {
     use super::*;
     use std::os::unix::fs::PermissionsExt;
 
+    /// `bin/sb` and `bin/bise`: links to the exe, the old sb script
+    /// replaced, in one rename (no temp file left); only a link is
+    /// dropped for an older version's hub.
+    #[test]
+    fn the_agent_links_replace_the_script() {
+        let d = std::env::temp_dir().join(format!("sb-link-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&d);
+        let bin = d.join("bin");
+        std::fs::create_dir_all(&bin).unwrap();
+        let exe = d.join("bise");
+        std::fs::write(&exe, "exe").unwrap();
+        std::fs::write(bin.join("sb"), "#!/bin/sh\nexec old sb \"$@\"\n").unwrap();
+        write_agent_links(&bin, &exe).unwrap();
+        write_agent_links(&bin, &exe).unwrap();
+        let (sb, bise) = (bin.join("sb"), bin.join("bise"));
+        for l in [&sb, &bise] {
+            assert!(l.symlink_metadata().unwrap().file_type().is_symlink());
+            assert_eq!(std::fs::read_link(l).unwrap(), std::fs::canonicalize(&exe).unwrap());
+        }
+        let mut names: Vec<_> = std::fs::read_dir(&bin).unwrap().map(|e| e.unwrap().file_name()).collect();
+        names.sort();
+        assert_eq!(names, vec![std::ffi::OsString::from("bise"), std::ffi::OsString::from("sb")]);
+        drop_agent_links(&bin);
+        assert!(!sb.exists() && !bise.exists() && std::fs::read_to_string(&exe).unwrap() == "exe");
+        std::fs::write(&sb, "a file").unwrap();
+        drop_agent_links(&bin);
+        assert!(sb.exists());
+        let _ = std::fs::remove_dir_all(&d);
+    }
+
     /// mktemp, python's tempfile and tmux read TMPDIR/TMP/TEMP and
     /// TMUX_TMPDIR: all four name the agent's tmp/; the runtime gets
     /// run/ and tmp/bg.
@@ -495,6 +616,14 @@ mod tests {
         assert_eq!(get("TMUX_TMPDIR"), tmux_fits(&t).then(|| t.clone()));
         assert_eq!(get("BEND_BG_DIR"), Some(t.join("bg")));
         assert_eq!(get("BEND_AGENT_RUN"), Some(r.clone()));
+        // per agent and not bise's: only PER_CHILD_NAMES (the tools
+        // cache's key leaves exactly those out); the rest are registered
+        for (k, _) in &env {
+            assert!(
+                bise_home::env::PER_CHILD_NAMES.contains(k) || bise_home::env::kind(k) == Some(bise_home::env::Kind::Internal),
+                "{k} is set per agent but is neither in PER_CHILD_NAMES nor an internal bise name"
+            );
+        }
         let _ = std::fs::remove_dir_all(&d);
     }
 
@@ -587,6 +716,31 @@ mod tests {
             agent_path(Path::new("/s/bin"), "", None),
             "/s/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
         );
+    }
+
+    /// A hub whose login-shell probe fails (too slow under a switch's
+    /// load) still gives its agents the user's dirs: the last PATH a
+    /// probe read, kept in the hub's state (2026-10-27: node and pnpm
+    /// gone from every agent of the switched hub).
+    #[test]
+    fn a_failed_login_probe_keeps_the_last_login_path() {
+        let d = tmp("login-kept");
+        let paths = crate::paths::Paths { workspace: d.join("ws"), state: d.join("hub"), worktrees: d.join("wt") };
+        std::fs::create_dir_all(&paths.state).unwrap();
+        let volta = format!("{}/home/.volta/bin", d.display());
+        let login = format!("{}:/usr/bin", volta);
+        let has = |p: &str| p.split(':').any(|e| e == volta);
+        // never read on this hub: the thin PATH, nothing invented
+        assert!(!has(&agent_path_for(&paths, "/usr/bin:/bin", None)));
+        // a probe reads it: the agents get it, and it is kept
+        assert!(has(&agent_path_for(&paths, "/usr/bin:/bin", Some(&login))));
+        // the next hub's probe fails: the kept one, after the hub's PATH
+        let p = agent_path_for(&paths, "/usr/bin:/bin", None);
+        assert!(p.starts_with(&format!("{}:/usr/bin:/bin:{}", paths.bin_dir().display(), volta)), "{}", p);
+        // a later probe's answer replaces it
+        assert!(!has(&agent_path_for(&paths, "", Some("/other/bin"))));
+        assert!(!has(&agent_path_for(&paths, "", None)));
+        assert!(agent_path_for(&paths, "", None).contains("/other/bin"));
     }
 
     #[test]
@@ -697,6 +851,29 @@ mod tests {
         }
     }
 
+    /// The repo's built-in plugins as a fresh install loads them: the
+    /// office ones on by default, each skill named as `<available-skills>`
+    /// and the skill tool name it (`slides:slides`; the note said
+    /// `slides:slides:slides`, a name the skill tool refuses).
+    #[test]
+    fn the_built_in_office_plugins_are_noted_with_their_skill_names() {
+        let builtin = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../plugins");
+        let roots = bend_plugins::resolve::Roots {
+            builtin: Some(builtin),
+            user: None,
+            workspace: None,
+            data: std::env::temp_dir(),
+            state: Default::default(),
+        };
+        let note = plugins_note(&loaded_plugins_in(&roots)).unwrap();
+        for (p, kind) in [("slides", "pptx"), ("sheets", "xlsx"), ("docs", "docx")] {
+            let line = note.lines().find(|l| l.starts_with(&format!("- `{}`", p))).unwrap_or_else(|| panic!("{}", note));
+            assert!(line.contains(kind) && line.ends_with(&format!("(skills: `{p}:{p}`)")), "{}", line);
+        }
+        // computer is opt-in: off on a fresh install
+        assert!(!note.contains("`computer`"), "{}", note);
+    }
+
     #[test]
     fn git_missing_is_said_in_english_with_the_fix() {
         let d = tmp("nogit");
@@ -743,5 +920,42 @@ mod tests {
         assert_eq!(g, Git::Works { bin: bin.clone(), version: "git version 9.9.9".into() });
         assert_eq!(g.problem(), None);
         assert_eq!(g.describe(), format!("git version 9.9.9 ({})", bin.display()));
+    }
+
+    /// The hub's git takes no optional lock: a `status` poll never holds
+    /// the `index.lock` a land's rebase needs (feature_retire_e2e).
+    #[test]
+    fn the_hubs_git_takes_no_optional_lock() {
+        let Ok(c) = git_command() else { return };
+        let envs: Vec<_> = c.get_envs().collect();
+        assert!(envs.contains(&(std::ffi::OsStr::new("GIT_OPTIONAL_LOCKS"), Some(std::ffi::OsStr::new("0")))), "{envs:?}");
+    }
+
+    /// One owner for the hub's git: no `Command::new("git")` in the
+    /// crate's sources but here (a test module or a tests file aside).
+    #[test]
+    fn the_hub_runs_git_only_here() {
+        fn walk(dir: &Path, out: &mut Vec<PathBuf>) {
+            for e in std::fs::read_dir(dir).unwrap().flatten() {
+                let p = e.path();
+                if p.is_dir() {
+                    walk(&p, out);
+                } else if p.extension().is_some_and(|x| x == "rs") {
+                    out.push(p);
+                }
+            }
+        }
+        let mut files = Vec::new();
+        walk(&Path::new(env!("CARGO_MANIFEST_DIR")).join("src"), &mut files);
+        let needle = ["Command::new(", "\"git\")"].concat();
+        for f in files {
+            let name = f.file_name().unwrap().to_string_lossy().to_string();
+            if name == "tools_env.rs" || name.ends_with("_tests.rs") || f.components().any(|c| c.as_os_str() == "tests") {
+                continue;
+            }
+            let text = std::fs::read_to_string(&f).unwrap();
+            let code = text.split("#[cfg(test)]").next().unwrap_or("");
+            assert!(!code.contains(&needle), "{}: runs git without tools_env::git_command (GIT_OPTIONAL_LOCKS=0)", f.display());
+        }
     }
 }

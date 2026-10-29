@@ -1,5 +1,5 @@
 //! bise — the single-executable entry point (BISE-165: the command was
-//! `bend-harness`; a `bend-harness` link to it is kept for one release).
+//! `bend-harness`; its link went, debt-t3).
 //!
 //! The TUI is Switchboard's (`bise` alone, or `bise switchboard`): the hub
 //! (`sbd`) runs the agents' REPLs. There is no single-agent TUI any more
@@ -16,7 +16,7 @@
 //! Usage: see USAGE below (`bise help`).
 //!
 //! BEND_SESSIONS_DIR overrides the sessions directory (default
-//! ~/.bend-harness/sessions) - the ONLY thing the programmatic client
+//! ~/.bise/sessions) - the ONLY thing the programmatic client
 //! changes, so its test sessions never become the user's --continue.
 //!
 //! /reload (sent by the client, between turns) exits the Bend REPL
@@ -40,6 +40,7 @@ mod doctor;
 mod project_cli;
 mod session_cli;
 mod info;
+mod office;
 mod update;
 mod version;
 
@@ -155,13 +156,7 @@ fn list_sessions(sessions_dir: &str) {
 // ---- API keys (BISE-143, bise_catalog::auth) ----
 
 fn auth_paths() -> bise_catalog::auth_cli::Paths {
-    let h = bise_home::Home::from_env();
-    bise_catalog::auth_cli::Paths {
-        auth_file: h.auth_file(),
-        config: h.config_file(),
-        env_files: h.env_files(),
-        home: Some(h.user_home().to_path_buf()),
-    }
+    bise_catalog::auth_cli::Paths::of(&bise_home::Home::from_env())
 }
 
 /// The first run's live key check (BISE-266), for `login --check` and
@@ -237,7 +232,7 @@ fn env_for_spawn() -> Vec<(String, Option<String>)> {
     let url_env = |k: &str| bise_catalog::with_files(&env, &files, k);
     let mut out = match Store::read(&paths.auth_file) {
         Ok(store) => {
-            let setup = bise_catalog::Setup::from_parts(std::fs::read_to_string(&paths.config).ok().as_deref(), &|k| std::env::var(k).ok(), &url_env);
+            let setup = bise_catalog::Setup::from_parts(std::fs::read_to_string(&paths.config).ok().as_deref(), &[], &|k| std::env::var(k).ok(), &url_env);
             Keys { env: &env, store: &store, files: &files }
                 .resolve(&setup.catalog)
                 .spawn_env(&setup.catalog, &ours)
@@ -291,25 +286,6 @@ fn app_root_or_exit(repl: &str) -> std::path::PathBuf {
     })
 }
 
-/// The V8 engine the runtime runs `run_typescript` with, handed to the
-/// REPLs as BEND_JSRT_BIN: `bend-jsrt` in the app root (a version dir, a
-/// bundle), else the dev tree's debug build (./run.sh builds it), else its
-/// release build; else the test setting BEND_JSRT_BIN (a test's tree has
-/// none built). Never an engine of another version when the root has one.
-fn jsrt_bin(root: &std::path::Path) -> Option<std::path::PathBuf> {
-    let found = [
-        "bend-jsrt",
-        "rust/jsrt/target/debug/bend-jsrt",
-        "rust/jsrt/target/release/bend-jsrt",
-    ]
-    .iter()
-    .map(|rel| root.join(rel))
-    .find(|p| p.exists());
-    found
-        .map(|p| std::path::absolute(&p).unwrap_or(p))
-        .or_else(|| bise_home::env::test_setting("BEND_JSRT_BIN").map(std::path::PathBuf::from))
-}
-
 /// The workspace a switchboard command is about: --workspace, else the
 /// directory the user launched from (run.sh exports it before its cd).
 fn sb_workspace(args: &[String]) -> std::path::PathBuf {
@@ -331,12 +307,12 @@ fn sb_workspace(args: &[String]) -> std::path::PathBuf {
 fn run_sbd(args: &[String]) -> std::io::Result<()> {
     let paths = switchboard::paths::Paths::for_workspace(&sb_workspace(args));
     let root = live_app_root_or_exit();
-    // the agents' REPLs load their MCP index like a normal session: its
-    // path came with bise_home's exports (main)
+    bise_catalog::live_fetch::spawn_refresher(auth_paths(), cache_dir(), |l| eprintln!("sbd: {l}"));
+    // the REPLs load their MCP index like a session (bise_home's exports)
     switchboard::daemon::run(switchboard::daemon::Opts {
         paths,
         core_bin: core_bin_of(&root),
-        jsrt_bin: jsrt_bin(&root),
+        jsrt_bin: approot::jsrt_bin(&root),
         repl_bin: root.join("repl-live"),
         app_root: root,
         exe: std::env::current_exe()?,
@@ -382,13 +358,15 @@ fn run_switchboard(args: &[String], debug: bool) -> std::io::Result<()> {
         return Ok(());
     }
     let root = live_app_root_or_exit();
-    let exe = std::env::current_exe()?;
+    let (exe, hub_root) = update::hub_of(&root).map_err(std::io::Error::other)?;
     // an installed bise newer than the hub it opens (`bise update`, the
     // daily check): the hub moves to it first (BISE-255), agents kept
     switchboard::switch::follow_install(&paths, &root, &|s| eprintln!("{}", s));
     bend_tui::timing::mark("start (connecting)");
-    let stream = switchboard::client::connect(&paths, &exe, &root)?;
-    bend_tui::timing::mark("connected, hello sent");
+    // the terminal's first line: initialize (its answer holds the hub's state)
+    let mut stream = switchboard::client::open(&paths, &exe, &hub_root)?;
+    std::io::Write::write_all(&mut stream, bend_tui::init_line().as_bytes())?;
+    bend_tui::timing::mark("connected, initialize sent");
     bend_tui::run_switchboard(
         stream,
         tui_socket(&paths),
@@ -435,18 +413,6 @@ fn run_switchboard(args: &[String], debug: bool) -> std::io::Result<()> {
     Ok(())
 }
 
-/// Once: the old places (~/.bend-harness, ~/.local/state/switchboard) to
-/// ~/.bise; every start: the hubs that stopped since (bise_home::migrate).
-/// What happened goes in ~/.bise/migrated.json; a failure never stops a start.
-fn migrate_home() {
-    let env = |k: &str| std::env::var(k).ok().filter(|v| !v.is_empty());
-    if !bise_home::migrate::wanted(&env) {
-        return;
-    }
-    let user = bise_home::Home::from_env().user_home().to_path_buf();
-    let _ = bise_home::migrate(&user, &switchboard::switch::hub_busy);
-}
-
 /// `bise help`: (section, [(command, what it does)]); `{cmd}` is the
 /// name it was called by.
 const HELP: &[(&str, &[(&str, &str)])] = &[
@@ -480,6 +446,7 @@ const HELP: &[(&str, &[(&str, &str)])] = &[
         ("{cmd} --headless", "one session without a TUI: --scripted, --model NAME, --port N,"),
         ("", "--continue, --resume ID (an id prefix works)"),
         ("{cmd} sb <command> ...", "the agents' tool; `sb` is a link to this binary (sb help)"),
+        ("{cmd} office run <script.ts>", "run a script on xlsx, pptx, docx files (@bise/office); also inspect|check <file>"),
         ("internal:", "sbd, sbswitch, keyprobe"),
     ]),
 ];
@@ -543,15 +510,9 @@ fn run_main() -> std::io::Result<()> {
     bend_tui::install_crash_hook();
     {
         let args: Vec<String> = cli_args();
-        // the move to ~/.bise (BISE-161): by the commands that open a hub
-        // or a session, before any path is computed; never by `sb` (an
-        // agent's tool) nor the switcher (mid-switch). login/logout too:
-        // a key stored on a fresh HOME goes straight to ~/.bise (qa C)
+        // the commands that open a hub or a session
         let opens = matches!(args.first().map(String::as_str), None | Some("switchboard" | "sbd"))
             || args.iter().any(|a| a == "--headless");
-        if opens || matches!(args.first().map(String::as_str), Some("login" | "logout")) {
-            migrate_home();
-        }
         // every state path, decided once (bise_home) and exported before any
         // thread or child: the Bend runtime, the hub, the agents and older
         // versions read these variables instead of computing their own
@@ -605,12 +566,14 @@ fn run_main() -> std::io::Result<()> {
                     .unwrap_or(switchboard::switch::PROBATION);
                 let restart = rest.iter().any(|a| a == "--restart");
                 let reload = rest.iter().any(|a| a == "--reload");
+                let release = rest.iter().any(|a| a == "--release");
                 std::process::exit(switchboard::switch::run(
                     &paths,
                     std::path::Path::new(&to),
                     period,
                     restart,
                     reload,
+                    release,
                 ));
             }
             Some("--version" | "-V" | "version") => {
@@ -621,6 +584,7 @@ fn run_main() -> std::io::Result<()> {
             Some("doctor") => std::process::exit(doctor::main(&args[1..])),
             // the session logs (BISE-199)
             Some("session") => std::process::exit(session_cli::main(&args[1..])),
+            Some("office") => std::process::exit(office::main(&args[1..])),
             // the projects registry (bise desktop): never starts a hub
             Some("project" | "projects") => std::process::exit(project_cli::main(&args[1..])),
             // an installed bise (install.sh, BISE-170/171)
@@ -698,7 +662,7 @@ fn run_main() -> std::io::Result<()> {
     let repl_name = if scripted { "repl-scripted" } else { "repl-live" };
     let root = app_root_or_exit(repl_name);
     std::env::set_current_dir(&root)?;
-    let jsrt = jsrt_bin(&root);
+    let jsrt = approot::jsrt_bin(&root);
     let repl_bin = root.join(repl_name);
 
     // REPL port: forced, or pick a free one (bind 0, drop, hand over)
@@ -711,20 +675,13 @@ fn run_main() -> std::io::Result<()> {
     };
 
     // session persistence, codex-style: every fresh run checkpoints to
-    // its OWN file (~/.bend-harness/sessions/<id>.txt, id = UTC timestamp
-    // + pid), --continue resumes the file with the LATEST mtime (the
-    // session that received the last message), --resume <id> one exact
-    // session (a unique id prefix is accepted). The single fixed file
-    // of the old scheme is the fallback when no per-session file exists
-    // yet (back-compat with the pre-sessions checkpoint).
+    // its OWN file (~/.bise/sessions/<id>.txt, id = UTC timestamp + pid),
+    // --continue resumes the file with the LATEST mtime (the session that
+    // received the last message), --resume <id> one exact session (a
+    // unique id prefix is accepted).
     let home = bise_home::Home::from_env();
     let sessions_dir = home.sessions_dir().to_string_lossy().into_owned();
     let _ = std::fs::create_dir_all(&sessions_dir);
-    let legacy_file = home
-        .root()
-        .join(format!("session-{}.txt", repl_name))
-        .to_string_lossy()
-        .into_owned();
     let session_file = if let Some(id) = &resume_id {
         match resolve_session(&sessions_dir, id) {
             Ok(path) => path,
@@ -736,13 +693,8 @@ fn run_main() -> std::io::Result<()> {
         }
     } else if resume {
         latest_session(&sessions_dir).unwrap_or_else(|| {
-            if std::path::Path::new(&legacy_file).exists() {
-                eprintln!("--continue: no named session, resuming the legacy checkpoint");
-                legacy_file.clone()
-            } else {
-                eprintln!("--continue: no session to resume, new session");
-                new_session_path(&sessions_dir)
-            }
+            eprintln!("--continue: no session to resume, new session");
+            new_session_path(&sessions_dir)
         })
     } else {
         new_session_path(&sessions_dir)
@@ -779,14 +731,6 @@ fn run_main() -> std::io::Result<()> {
     );
     // the next spawn restores the checkpointed session (BEND_CONTINUE)
     let mut cont = resume || resume_id.is_some();
-
-    // MCP connector index: the live REPL bootstraps the connector catalog
-    // here at startup; search_mcp_tools/call_mcp_tool read it
-    let mcp_index = home.mcp_index();
-    if let Some(dir) = mcp_index.parent() {
-        let _ = std::fs::create_dir_all(dir);
-    }
-    std::env::set_var("BEND_MCP_INDEX", &mcp_index);
 
     // child REPL log, out of the client's way. Recreated per spawn, so
     // the reload-exit marker of one generation never leaks to the next.
@@ -1206,6 +1150,8 @@ mod tests {
         let hub = paths.proc_hub();
         let tui = switchboard::procs::hub_id(&tui_socket(&paths));
         assert_eq!(key(&tui, "docs"), key(&hub, "docs"));
+        // the desktop core's (S29: its computer_live rows' projects, its acts)
+        assert_eq!(bend_tui::ambient::peer_hub(&state), hub);
         assert_eq!(split(&key(&hub, "docs")), (Some(hub.as_str()), "docs"));
         assert_ne!(hub, "tmp-x-ee85d2ab", "the tag id, not the folder's");
     }

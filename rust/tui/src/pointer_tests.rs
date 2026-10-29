@@ -153,7 +153,7 @@ fn a_row_a_click_opens_has_the_hand() {
     // your long message: only its `▸ n more lines` row folds it
     let mut app = crate::sb::bench::test_app();
     let long: Vec<String> = (0..40).map(|k| format!("line {k} of the spec")).collect();
-    app.events.push(Ev::You(long.join("\n"), crate::wire::Mark::Read, false));
+    app.events.push(Ev::You(long.join("\n").into(), crate::wire::Mark::Read, false, None));
     let mut s = Screen::new(app);
     let (fx, fy) = s.find("more lines");
     assert_eq!(s.hover(fx, fy), POINTER);
@@ -177,11 +177,7 @@ fn the_composer_has_the_text_cursor() {
 #[test]
 fn the_panel_rows_have_the_hand() {
     let mut app = crate::sb::bench::test_app();
-    let state = serde_json::json!({"ev": "state", "agents": [
-        {"name": "main", "main": true, "status": "idle"},
-        {"name": "docs", "status": "working", "objective": "write the docs"},
-    ], "cards": []});
-    crate::sb::dispatch(&mut app, &state.to_string());
+    crate::sb::hub_reads::rows_for_tests::apply(&mut app, vec![crate::sb::hub_reads::rows_for_tests::agent("main", "idle", ""), crate::sb::hub_reads::rows_for_tests::agent("docs", "working", "write the docs")], vec![]);
     let mut s = Screen::new(app);
     let (x, y) = s.find("docs");
     assert_eq!(s.hover(x, y), POINTER);
@@ -248,4 +244,32 @@ fn off_nothing_is_written() {
     s.term.backend_mut().set_pointer(Shape::Default).unwrap();
     assert_eq!(osc22s(&s.term.backend().take_output()), "");
     OFF.with(|c| c.set(false));
+}
+
+/// tui_turn_time_tmux (min-tests, BISE-271): the mouse over a reply puts
+/// when its turn ended at the row's right end; off the history it goes,
+/// and the reply's words never move.
+#[test]
+fn the_mouse_over_a_reply_says_when_its_turn_ended() {
+    let mut app = crate::sb::bench::test_app();
+    let t = crate::when::now_ms() - 60_000;
+    app.events.push(Ev::You("ship it".into(), crate::wire::Mark::Sent, false, None));
+    app.events.push(Ev::Assistant("shipped the signup page".into()));
+    app.events.push(Ev::Ended(t));
+    let label = crate::when::ended_now(t);
+    let mut s = Screen::new(app);
+    let (x, y) = s.find("shipped the signup");
+    let row = |s: &mut Screen| {
+        let mut term = Terminal::new(TestBackend::new(120, 36)).unwrap();
+        term.draw(|f| draw_frame(&mut s.app, f)).unwrap();
+        let buf = term.backend().buffer().clone();
+        (0..120u16).map(|cx| buf[(cx, y)].symbol().to_string()).collect::<String>()
+    };
+    assert!(!row(&mut s).contains(&label), "no time before the hover");
+    s.hover(x + 2, y);
+    let hovered = row(&mut s);
+    assert!(hovered.contains(&label), "{label:?} in {hovered:?}");
+    assert_eq!(hovered.find("shipped the signup").map(|i| hovered[..i].chars().count() as u16), Some(x), "the words stay");
+    s.hover(119, 35);
+    assert!(!row(&mut s).contains(&label), "off the reply: gone");
 }

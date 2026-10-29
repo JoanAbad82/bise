@@ -15,7 +15,8 @@ pub struct RuleFacts<'a> {
     pub tool: &'a str,
     pub pattern: &'a str,
     pub path: &'a str,
-    /// `card #12, api-v2`, or the file's own words
+    /// `notification #12, api-v2` (`card #12, …` in rules saved before
+    /// notif-rename), or the file's own words
     pub from: &'a str,
     /// no project: it applies in every repo
     pub every: bool,
@@ -57,10 +58,10 @@ pub fn source(from: &str) -> String {
     let mut parts = from.split(", ").filter(|p| !p.is_empty());
     match parts.next() {
         None => String::new(),
-        Some(first) if first.starts_with("card") => {
+        Some(first) if first.starts_with("notification #") || first.starts_with("card") => {
             let names: Vec<&str> = parts.collect();
             match names.len() {
-                0 => "from a card".into(),
+                0 => "from a notification".into(),
                 1 => format!("from {}", names[0]),
                 n => format!("{n} agents"),
             }
@@ -110,8 +111,11 @@ mod tests {
         assert_eq!(age(Some(9)), "9 days ago");
         assert_eq!(age(Some(21)), "3 weeks ago");
         assert_eq!(age(None), "");
+        assert_eq!(source("notification #3, web"), "from web");
+        // a rule saved before notif-rename, read for good
         assert_eq!(source("card #3, web"), "from web");
-        assert_eq!(source("card"), "from a card");
+        assert_eq!(source("notification #3"), "from a notification");
+        assert_eq!(source("card"), "from a notification");
         assert_eq!(source("card #3, a, b, c"), "3 agents");
         assert_eq!(source("me, by hand"), "from me, by hand");
         let bash = RuleFacts { tool: "bash", pattern: "cargo test *", ..Default::default() };

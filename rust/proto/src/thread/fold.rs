@@ -2,12 +2,14 @@
 //! entries (consecutive tool calls are one `tools` entry at the first
 //! call's pos; a message on several lines is one entry).
 
-use super::lines::{self, Hub, Obs, Rec};
+use super::lines::{self, Delivered, Hub, Mark, Obs, Rec, ToolMove};
 use super::scheduled;
 use super::words::{self, one_line, summary};
-use super::{Answered, ApprovalFold, Ctx, Entry, EntryCard, EntryKind, Landed, Line, Made, NotDelivered, Notice, PageRef, PrNews, ReportRef, Scheduled, Thinking, ToolItem, ToolKind, Tools};
-use super::{cap, FileCount, ToolState, TurnFailed};
+use super::{Answered, ApprovalFold, Ctx, Entry, EntryCard, EntryKind, Landed, Line, Made, NotDelivered, Notice, PageRef, PrNews, ReportRef, Scheduled, Thinking, ToolItem, ToolKind, Tools, WakeFold};
+use super::{cap, Delivery, FileCount, GateWait, RetryEnd, ToolGate, ToolState, TurnFailed};
+use crate::Pos;
 use crate::context::FnContext;
+use crate::parts::Part;
 use crate::rows::question;
 
 struct Fold<'a> {
@@ -19,35 +21,90 @@ struct Fold<'a> {
     /// the 'you' entry the previous line pushed: the only one a context
     /// line may attach to
     you: Option<usize>,
+    /// the 'you' entry whose context line the previous line was: its
+    /// you-id line may still come (the hub writes the context line right
+    /// after the 'you' line sb-core wrote, before its id); no second
+    /// context attaches through it
+    ctx_you: Option<usize>,
+    /// the 'you' entry whose you-id the previous line was: its you-parts
+    /// line comes right after (msg-parts, sb-core's same step)
+    id_you: Option<usize>,
+    /// the entry the previous line, a route line, made: its route-parts
+    /// line comes right after
+    route: Option<usize>,
     /// the previous line's time (0: a replay), for a thinking's duration
     last_ms: u64,
+    /// the first entry of the current turn (its `turn_started`'s marks)
+    turn: usize,
+    /// a `turn_started` line came: the next entry pushed starts a turn
+    starting: bool,
+    /// the calls its `tool_result` ended (no `tool_finished` yet): their
+    /// finish completes that item, never a row of its own
+    by_result: Vec<u32>,
+    /// event-wake: the ids of bise's messages a `wake` entry already
+    /// says (its `msg`): their msg-in line makes no entry
+    woke: Vec<u64>,
+    /// inbox picks: the ids of the messages an answer's route line
+    /// already says (its `msg`): their msg-in line makes no entry
+    answered: Vec<u64>,
     ctx: &'a Ctx<'a>,
 }
 
+/// The newest message ids a fold keeps to drop their later msg-in (an
+/// answer's route line, inbox picks): the msg-in comes in the same step
+/// or the next lines, never far.
+const ANSWERED_MAX: usize = 64;
+
+/// `v` with `m` last, at most [`ANSWERED_MAX`] ids.
+fn bounded_push(v: &mut Vec<u64>, m: u64) {
+    v.push(m);
+    if v.len() > ANSWERED_MAX {
+        v.remove(0);
+    }
+}
+
 impl Fold<'_> {
-    fn push(&mut self, e: Entry) -> usize {
+    /// An agent's message parts (send-parts) on the newest `kind` entry
+    /// of message `id`; none, or JSON that doesn't read: nothing.
+    fn agent_parts(&mut self, kind: EntryKind, id: u64, raw: &str) {
+        let Ok(p) = serde_json::from_str::<Vec<Part>>(raw) else { return };
+        if let Some(e) = self.out.iter_mut().rev().find(|e| e.kind == kind && e.msg == Some(id)) {
+            e.parts = p;
+        }
+    }
+
+    fn push(&mut self, mut e: Entry) -> usize {
+        e.turn_start = std::mem::take(&mut self.starting);
+        // H9 (architect m_19836): what ends a run of retries says how it
+        // ended, on the run's entry (sent again at its pos)
+        let end = match e.kind {
+            EntryKind::Agent | EntryKind::Thinking | EntryKind::Tools => Some(RetryEnd::Recovered),
+            EntryKind::TurnFailed => Some(RetryEnd::Failed),
+            _ => None,
+        };
+        if let Some(end) = end.filter(|_| !e.turn_start) {
+            self.end_retries(end);
+        }
         self.out.push(e);
         self.out.len() - 1
     }
 
-    fn tool(&mut self, pos: u64, ms: u64, id: u32, name: &str, args: &str) {
-        let args = lines::unescape(args);
-        if name == "bash" {
-            if let Some((kind, text)) = lines::report_in(&args) {
-                let mut e = Entry::new(pos, ms, EntryKind::Report, text);
-                e.report = Some(ReportRef { kind });
-                self.push(e);
-                return;
-            }
-            if let Some(id) = lines::publish_in(&args) {
-                let page = (self.ctx.page)(&id).unwrap_or(PageRef { id: id.clone(), title: id.replace('-', " "), v: None, url: String::new() });
-                let v = page.v.map(|v| format!(" v{v}")).unwrap_or_default();
-                let mut e = Entry::new(pos, ms, EntryKind::Page, format!("{}{v}", page.title));
-                e.page = Some(page);
-                self.push(e);
-                return;
-            }
+    /// One line's tool move (G3, [`lines::tool_move`]: the TUI's rule, a
+    /// row exists from `tool_started`).
+    fn tool_move(&mut self, pos: u64, ms: u64, m: ToolMove) {
+        match m {
+            ToolMove::Start(id) => self.start(pos, ms, id, ToolState::Run),
+            ToolMove::Info { id, name, args } => self.info(pos, ms, id, &name, &args),
+            ToolMove::Intent { id, text } => self.intent(id, &text),
+            ToolMove::Code { id, code } => self.code(id, &code),
+            ToolMove::Result { id, ok, preview } => self.result(id, ok, &preview, ms),
+            ToolMove::Finish { id, ok } => self.finish(pos, ms, id, ok),
         }
+    }
+
+    /// `tool_started`: a running item, in the tools entry it continues
+    /// (or a new one at this line).
+    fn start(&mut self, pos: u64, ms: u64, id: u32, state: ToolState) {
         let e = match self.out.last() {
             Some(e) if e.kind == EntryKind::Tools => self.out.len() - 1,
             _ => {
@@ -60,10 +117,14 @@ impl Fold<'_> {
             pos,
             id: u64::from(id),
             at_ms: ms,
-            text: format!("{name}: {}", one_line(&args.replace("\\N", "\n"), 100)),
-            kind: ToolKind::of(name),
-            land: name == "bash" && args.contains("sb land"),
-            state: ToolState::Run,
+            name: String::new(),
+            args: String::new(),
+            intent: None,
+            text: String::new(),
+            kind: ToolKind::Other,
+            land: false,
+            state,
+            gate: None,
             ms: None,
             exit: None,
             err: None,
@@ -75,7 +136,114 @@ impl Fold<'_> {
         items.push(item);
         let i = items.len() - 1;
         self.tools.push((id, e, i));
+        self.by_result.retain(|&t| t != id);
         self.sum(e);
+    }
+
+    /// `tool #<id> <name> : <args>`: the call's name and args on its
+    /// item; a bash `sb report` or `sb page publish` is a report or a page
+    /// entry instead (its item leaves).
+    fn info(&mut self, pos: u64, ms: u64, id: u32, name: &str, args: &str) {
+        let args = lines::unescape(args);
+        if name == "bash" {
+            if let Some((kind, text)) = lines::report_in(&args) {
+                self.unstart(id);
+                let mut e = Entry::new(pos, ms, EntryKind::Report, text);
+                e.report = Some(ReportRef { kind });
+                self.push(e);
+                return;
+            }
+            if let Some(id_) = lines::publish_in(&args) {
+                self.unstart(id);
+                let page = (self.ctx.page)(&id_).unwrap_or(PageRef { id: id_.clone(), title: id_.replace('-', " "), v: None, url: String::new() });
+                let v = page.v.map(|v| format!(" v{v}")).unwrap_or_default();
+                let mut e = Entry::new(pos, ms, EntryKind::Page, format!("{}{v}", page.title));
+                e.page = Some(page);
+                self.push(e);
+                return;
+            }
+        }
+        let Some(&(_, e, _)) = self.tools.iter().rev().find(|(t, _, _)| *t == id) else { return };
+        let Some(item) = self.item(id) else { return };
+        item.text = item.intent.clone().unwrap_or_else(|| format!("{name}: {}", one_line(&args.replace("\\N", "\n"), 100)));
+        item.kind = ToolKind::of(name);
+        item.land = name == "bash" && args.contains("sb land");
+        item.name = name.to_string();
+        item.args = cap(&args);
+        self.sum(e);
+    }
+
+    /// The item of call `id` leaves (a report's or a page's call): its
+    /// tools entry too when it was its only one.
+    fn unstart(&mut self, id: u32) {
+        let Some(k) = self.tools.iter().rposition(|(t, _, _)| *t == id) else { return };
+        let (_, e, i) = self.tools.remove(k);
+        let Some(t) = self.out[e].tools.as_mut() else { return };
+        t.items.remove(i);
+        for r in self.tools.iter_mut().filter(|r| r.1 == e && r.2 > i) {
+            r.2 -= 1;
+        }
+        if !t.items.is_empty() {
+            self.sum(e);
+            return;
+        }
+        let gone = self.out.remove(e);
+        // its turn's start and end stay on the entries around it
+        if gone.turn_start {
+            match self.out.get_mut(e) {
+                Some(next) => next.turn_start = true,
+                None => self.starting = true,
+            }
+        }
+        if let (Some(t), Some(before)) = (gone.turn_end_ms, e.checked_sub(1).and_then(|b| self.out.get_mut(b))) {
+            before.turn_end_ms.get_or_insert(t);
+        }
+        self.tools.retain(|r| r.1 != e);
+        let shift = |x: usize| if x > e { x - 1 } else { x };
+        for r in self.tools.iter_mut() {
+            r.1 = shift(r.1);
+        }
+        self.cont = self.cont.filter(|&c| c != e).map(shift);
+        self.you = self.you.filter(|&c| c != e).map(shift);
+        self.ctx_you = self.ctx_you.filter(|&c| c != e).map(shift);
+        self.id_you = self.id_you.filter(|&c| c != e).map(shift);
+        self.route = self.route.filter(|&c| c != e).map(shift);
+        self.turn = shift(self.turn);
+    }
+
+    /// `tool_finished`: the running item of call `id` ends, its duration
+    /// from its start ([`words::tool_ms`]), as does the item its
+    /// `tool_result` (the line before it) ended; none: an ended item of
+    /// its own (the TUI's row).
+    fn finish(&mut self, pos: u64, ms: u64, id: u32, ok: bool) {
+        let state = if ok { ToolState::Ok } else { ToolState::Err };
+        let ended = self.by_result.contains(&id);
+        self.by_result.retain(|&t| t != id);
+        match self.item(id) {
+            Some(item) if item.state == ToolState::Run || ended => {
+                item.state = state;
+                item.gate = None;
+                item.ms = words::tool_ms(item.at_ms, ms);
+            }
+            _ => self.start(pos, ms, id, state),
+        }
+    }
+
+    /// `sb gate : check|card|done <n>`: the gate holds the running call
+    /// (the newest; the TUI's rule), or lets it go.
+    fn gate(&mut self, ms: u64, step: lines::GateStep) {
+        let gate = match step {
+            lines::GateStep::Check => Some(ToolGate { wait: GateWait::Check, at_ms: ms }),
+            lines::GateStep::Card => Some(ToolGate { wait: GateWait::Card, at_ms: ms }),
+            lines::GateStep::Done => None,
+        };
+        let out = &mut self.out;
+        let running = self.tools.iter().rev().filter_map(|&(_, e, i)| out[e].tools.as_ref().map(|t| (e, i, t.items[i].state)));
+        if let Some((e, i, _)) = running.into_iter().find(|&(_, _, s)| s == ToolState::Run) {
+            if let Some(t) = out[e].tools.as_mut() {
+                t.items[i].gate = gate;
+            }
+        }
     }
 
     /// The call's item, by its tool id (the last one with that id).
@@ -98,24 +266,35 @@ impl Fold<'_> {
         item.code = Some(cap(&code));
     }
 
-    /// `tool_result`: ok or err, its duration (`ms` 0: a replay, none), a
-    /// failed bash's exit code and its first error line, its output.
+    /// `tool_result`: a failed bash's exit code and its first error line,
+    /// its output. Its state and duration are `tool_finished`'s, the line
+    /// before it; a call still running without one (an older transcript)
+    /// ends here (`ms` 0: a replay, no duration).
     fn result(&mut self, id: u32, ok: bool, preview: &str, ms: u64) {
         let Some(item) = self.item(id) else { return };
         let out = lines::wire_decode(preview);
-        item.state = if ok { ToolState::Ok } else { ToolState::Err };
-        item.ms = words::tool_ms(item.at_ms, ms);
+        let ends = item.state == ToolState::Run;
+        if ends {
+            item.state = if ok { ToolState::Ok } else { ToolState::Err };
+            item.gate = None;
+            item.ms = words::tool_ms(item.at_ms, ms);
+        }
         if !ok {
             item.exit = lines::exit_code(&out);
             item.err = lines::error_line(&out);
         }
         item.out = Some(cap(&out)).filter(|o| !o.is_empty());
+        if ends {
+            self.by_result.push(id);
+        }
     }
 
     fn intent(&mut self, id: u32, text: &str) {
         let Some(&(_, e, i)) = self.tools.iter().rev().find(|(t, _, _)| *t == id) else { return };
-        if let Some(t) = self.out[e].tools.as_mut() {
-            t.items[i].text = one_line(&lines::unescape(text), 120);
+        let intent = one_line(&lines::unescape(text), 120);
+        if let (Some(t), false) = (self.out[e].tools.as_mut(), intent.is_empty()) {
+            t.items[i].text = intent.clone();
+            t.items[i].intent = Some(intent);
         }
         self.sum(e);
     }
@@ -135,25 +314,66 @@ impl Fold<'_> {
             Some(l) => (l, true),
             None => (line, false),
         };
-        let prev = std::mem::replace(&mut self.last_ms, if replayed { 0 } else { ms });
-        let you = self.you.take();
         let rec = lines::read(line);
+        // a thinking counts from the previous line the feed shows (his
+        // line, the turn's start, a tool's lines): a hidden one (the usage
+        // the runtime writes just before the reply, F3) moves nothing
+        let prev = match lines::is_hidden(&rec) {
+            true => self.last_ms,
+            false => std::mem::replace(&mut self.last_ms, if replayed { 0 } else { ms }),
+        };
+        let you = self.you.take();
+        let ctx_you = self.ctx_you.take();
+        let id_you = self.id_you.take();
+        let route = self.route.take();
         match rec {
-            Rec::Empty | Rec::Idle | Rec::Fact => return,
+            // a partial is live only (the hub's memory), never an entry
+            Rec::Empty | Rec::Idle | Rec::Fact | Rec::Partial { .. } => return,
             Rec::Raw(_) => {}
             _ => self.cont = None,
         }
+        // his messages' marks (G1, the TUI's rule): a turn's start reads
+        // what he sent since the last one
+        match lines::mark_of(&rec) {
+            Some(m @ Mark::Turn) => {
+                let turn = self.turn.min(self.out.len());
+                lines::deliver(&mut self.out[turn..], &m);
+                self.turn = self.out.len();
+                self.starting = true;
+            }
+            Some(m) => {
+                lines::deliver(&mut self.out, &m);
+            }
+            None => {}
+        }
+        if let Some(m) = lines::tool_move(&rec) {
+            return self.tool_move(pos, if replayed { 0 } else { ms }, m);
+        }
+        // BISE-271: a turn's end keeps its time (a replay's has none)
+        let ended = matches!(rec, Rec::Obs(Obs::TurnDone(_))) && !replayed && ms > 0;
         match rec {
             Rec::Obs(o) => self.obs(pos, ms, o, if replayed { 0 } else { prev }),
-            Rec::Tool { id, name, args } => self.tool(pos, ms, id, &name, &args),
-            Rec::ToolIntent { id, text } => self.intent(id, &text),
-            Rec::ToolCode { id, code } => self.code(id, &code),
-            Rec::ToolResult { id, ok, preview } => self.result(id, ok, &preview, if replayed { 0 } else { ms }),
             Rec::Rejected(r) => self.notice(pos, ms, words::rejected(&r)),
-            Rec::Hub(h) => self.hub(pos, ms, h, you),
+            Rec::Hub(h) => self.hub(pos, ms, h, [you, ctx_you, id_you, route]),
             // a message's next line
             Rec::Raw(line) => self.more(&line),
             _ => {}
+        }
+        if ended {
+            self.end_turn(ms);
+        }
+    }
+
+    /// The turn ended at `ms`: on the newest entry, unless it carries an
+    /// earlier turn's end (this turn drew nothing of its own) or a turn
+    /// starts after it (a start with no entry yet).
+    fn end_turn(&mut self, ms: u64) {
+        if self.starting {
+            self.starting = false;
+            return;
+        }
+        if let Some(e) = self.out.last_mut().filter(|e| e.turn_end_ms.is_none()) {
+            e.turn_end_ms = Some(ms);
         }
     }
 
@@ -201,9 +421,9 @@ impl Fold<'_> {
         }
     }
 
-    fn approval(&mut self, pos: u64, ms: u64, ok: bool, text: String, note: String) {
-        let mut e = Entry::new(pos, ms, EntryKind::Approval, text.clone());
-        e.approval = Some(ApprovalFold { ok, text, note, images: Vec::new(), files: Vec::new() });
+    fn approval(&mut self, pos: u64, ms: u64, a: ApprovalFold) {
+        let mut e = Entry::new(pos, ms, EntryKind::Approval, a.text.clone());
+        e.approval = Some(a);
         self.push(e);
     }
 
@@ -213,35 +433,148 @@ impl Fold<'_> {
         self.push(e);
     }
 
+    /// H9: the newest run of retries (the notices at the end of the
+    /// thread), if it has not ended yet, ends with `end`.
+    fn end_retries(&mut self, end: RetryEnd) {
+        let open = self
+            .out
+            .iter_mut()
+            .rev()
+            .take_while(|l| l.kind == EntryKind::Notice)
+            .filter_map(|l| l.notice.as_mut().and_then(|n| n.retry.as_mut()))
+            .next()
+            .filter(|r| r.end.is_none());
+        if let Some(r) = open {
+            r.end = Some(end);
+        }
+    }
+
+    /// A notice; a retry in the same run as the newest entry (itself a
+    /// retry) takes that entry's place at its pos (H9: one row per call's
+    /// retries, [`lines::is_same_retry_run`]).
     fn notice(&mut self, pos: u64, ms: u64, n: Notice) {
+        if n.retry.is_some() {
+            let prev = self.out.last().filter(|l| l.kind == EntryKind::Notice).and_then(|l| l.notice.as_ref()).and_then(|n| n.retry.as_ref());
+            if lines::is_same_retry_run(prev, self.starting) {
+                if let Some(last) = self.out.last_mut() {
+                    last.text = n.text.clone();
+                    last.notice = Some(n);
+                    return;
+                }
+            }
+        }
         let mut e = Entry::new(pos, ms, EntryKind::Notice, n.text.clone());
         e.notice = Some(n);
         self.push(e);
     }
 
-    fn hub(&mut self, pos: u64, ms: u64, h: Hub, you: Option<usize>) {
+    /// `cur`: the cursors the previous line left: the 'you' entry it
+    /// pushed, the one whose context it was, the one whose id it was, the
+    /// entry its route line made.
+    fn hub(&mut self, pos: u64, ms: u64, h: Hub, cur: [Option<usize>; 4]) {
+        let [you, ctx_you, id_you, route] = cur;
         match h {
-            Hub::You(text) => {
-                let i = self.push(Entry::new(pos, ms, EntryKind::You, text));
+            // the approvals gate holds the running call (§3.1)
+            Hub::Gate(step) => self.gate(ms, step),
+            // his message: its parts read back from its text (an old
+            // journal, an older client); a you-parts line after it, the
+            // parts he sent, replaces them
+            Hub::You(text, via) => {
+                let mut e = Entry::new(pos, ms, EntryKind::You, text);
+                e.parts = read_parts(&e.text);
+                e.via = via;
+                let i = self.push(e);
                 (self.cont, self.you) = (Some(i), Some(i));
             }
             // his fn context: on the 'you' line right before it, else
-            // dropped (a stray one never lands on another entry)
+            // dropped (a stray one never lands on another entry); its
+            // you-id may still follow (the hub writes the context line
+            // right after the 'you' line sb-core wrote, before its id)
             Hub::Context(raw) => {
                 if let (Some(i), Ok(c)) = (you, serde_json::from_str::<FnContext>(&raw)) {
                     self.out[i].context = Some(c);
                 }
+                self.ctx_you = you;
             }
+            // his message's id: on the 'you' line right before it (sb-core
+            // writes both in one step; his context line may sit between),
+            // else nothing (no entry of its own)
+            Hub::YouId(id) => {
+                if let Some(i) = you.or(ctx_you) {
+                    self.out[i].msg_id = Some(id);
+                }
+                self.id_you = you.or(ctx_you);
+            }
+            // his parts (msg-parts): on the 'you' entry whose id the line
+            // before was, or the entry the route line before made; a
+            // stray or unreadable one is dropped (the entry keeps the
+            // parts its text reads as)
+            Hub::YouParts(raw) => {
+                if let (Some(i), Ok(p)) = (id_you, serde_json::from_str::<Vec<Part>>(&raw)) {
+                    self.out[i].parts = crate::parts::typed_page_notes(p);
+                }
+            }
+            // bise's home hub: his words went to a project, not to main:
+            // on his entry by its id (never by the line before it); no
+            // delivery mark, main never got them
+            Hub::Routed { to, name, msg, .. } => {
+                if let Some(e) = self.out.iter_mut().rev().find(|e| e.kind == EntryKind::You && e.msg_id == Some(msg)) {
+                    e.went = Some(crate::thread::Went { to, name, agent: false });
+                    e.delivery = None;
+                }
+            }
+            // at-start: his words typed here went to the agent `to`: his
+            // entry with that message's id, 'sent to <to>' (went), its
+            // parts from the route-parts line right after it
+            Hub::Went { to, said, msg } => {
+                let mut e = Entry::new(pos, ms, EntryKind::You, said);
+                e.msg_id = Some(msg);
+                e.went = Some(crate::thread::Went { name: to.clone(), to, agent: true });
+                let i = self.push(e);
+                self.route = Some(i);
+            }
+            Hub::RouteParts(raw) => {
+                if let (Some(i), Ok(p)) = (route, serde_json::from_str::<Vec<Part>>(&raw)) {
+                    self.out[i].parts = crate::parts::typed_page_notes(p);
+                }
+            }
+            // an agent's message with parts (send-parts): on the entry of
+            // that message id, received or sent, the newest first (the
+            // order of lines is not guaranteed: architect m_23962); none
+            // or unreadable: dropped, the entry stays its text
+            Hub::MsgParts { id, raw } => self.agent_parts(EntryKind::FromAgent, id, &raw),
+            Hub::SentParts { id, raw } => self.agent_parts(EntryKind::ToAgent, id, &raw),
+            // the agent read these steered messages here, mid-turn: each
+            // entry they name (his by msg_id, an agent's by msg) gets this
+            // line's pos once; it makes no entry of its own
+            Hub::Steered(ids) => mark_steered(&mut self.out, &ids, pos),
+            // the runtime received these steered messages: their ✓ (the
+            // mark above, Mark::Ids), no entry of its own
+            Hub::SteerRx(_) => {}
             // a scheduled task's run reads as its line; the note of a
             // stop is for the agent only (site/m/timers, the TUI's rule)
+            // main's note of an answer to its own card: its route line
+            // (the "you answered" row) says it, his answer whole
+            Hub::MsgIn { from, body, .. } if lines::is_hub_sender(&from) && lines::is_main_answer_note(&body) => {}
             Hub::MsgIn { from, body, .. } if lines::is_hub_sender(&from) && (scheduled::run_line(&body).is_some() || lines::is_stop_note(&body)) => {
                 if let Some(s) = scheduled::run_line(&body) {
                     self.scheduled(pos, ms, s);
                 }
             }
-            Hub::MsgIn { from, body, .. } => {
+            // event-wake: the wake a `wake` entry says (by its id, never
+            // its words): the agent read it, the thread shows the entry
+            Hub::MsgIn { from, id, .. }
+                if lines::is_hub_sender(&from) && id.strip_prefix("m_").and_then(|n| n.parse().ok()).is_some_and(|n: u64| self.woke.contains(&n)) => {}
+            // inbox picks: the message his answer became, which its route
+            // line already says (the "you answered" row)
+            Hub::MsgIn { id, .. } if id.strip_prefix("m_").and_then(|n| n.parse().ok()).is_some_and(|n: u64| self.answered.contains(&n)) => {}
+            // G4: its message id; G5: an old direct reply (`@from`) was
+            // written to him
+            Hub::MsgIn { from, id, body } => {
                 let mut e = Entry::new(pos, ms, EntryKind::FromAgent, body);
+                e.to_you = from.starts_with('@');
                 e.from = Some(from.trim_start_matches('@').to_string());
+                e.msg = id.strip_prefix("m_").and_then(|n| n.parse().ok());
                 self.cont = Some(self.push(e));
             }
             // what this task sent (sb-core's `sent` line)
@@ -256,6 +589,39 @@ impl Fold<'_> {
             Hub::Stopped(text) => {
                 self.push(Entry::new(pos, ms, EntryKind::Stopped, text));
             }
+            // event-wake: a watch ended (the hub's line, in the step of
+            // its end); a line that doesn't read makes nothing
+            Hub::Wake(json) => {
+                if let Ok(w) = serde_json::from_str::<WakeFold>(&json) {
+                    if let Some(m) = w.msg {
+                        self.woke.push(m);
+                    }
+                    let text = words::wake_head(&w).into_iter().map(|(t, _)| t).collect::<Vec<_>>().join(" · ");
+                    // an idle agent reads the wake at once: its msg-in line
+                    // came first. That entry becomes this one, at its pos
+                    // (a client replaces it: same pos), the agent's turn
+                    // after it as before
+                    let read = w.msg.and_then(|m| {
+                        self.out.iter().rposition(|e| e.kind == EntryKind::FromAgent && e.msg == Some(m) && e.from.as_deref().is_some_and(lines::is_hub_sender))
+                    });
+                    match read {
+                        Some(i) => {
+                            let mut e = Entry::new(self.out[i].pos, self.out[i].at_ms, EntryKind::Wake, text);
+                            e.turn_start = self.out[i].turn_start;
+                            e.wake = Some(w);
+                            self.out[i] = e;
+                            if self.cont == Some(i) {
+                                self.cont = None;
+                            }
+                        }
+                        None => {
+                            let mut e = Entry::new(pos, ms, EntryKind::Wake, text);
+                            e.wake = Some(w);
+                            self.push(e);
+                        }
+                    }
+                }
+            }
             // BISE-86: his message didn't reach `to`; no cid here (the
             // hub's error to his window carries it, architect m_10348)
             Hub::Undelivered { to, text } => {
@@ -263,13 +629,22 @@ impl Fold<'_> {
                 e.not_delivered = Some(NotDelivered { to, text });
                 self.push(e);
             }
-            Hub::MsgYou { body, .. } => {
-                self.cont = Some(self.push(Entry::new(pos, ms, EntryKind::Agent, body)));
+            // G5: an agent writing to him (level 2 in the TUI): the agent
+            // entry it always was, now saying who and to him
+            Hub::MsgYou { from, body } => {
+                let mut e = Entry::new(pos, ms, EntryKind::Agent, body);
+                e.to_you = true;
+                e.from = Some(lines::shown_name(&from));
+                self.cont = Some(self.push(e));
             }
             // `#3 question @docs : text`; a gate's confirm is the tool row's
-            Hub::Card { id: Some(id), kind, body, .. } if kind != "confirm" => {
+            Hub::Card { id: Some(id), kind, body, text } if kind != "confirm" => {
                 let (q, options) = question(&body);
-                let card = EntryCard { id, question: q.clone(), options, answered: !self.ctx.open_cards.contains(&id) };
+                // `#3 question @docs : …`: who asked, the head's third word
+                let head = text.split_once(" : ").map_or(text.as_str(), |(h, _)| h);
+                let agent = head.split_whitespace().nth(2).and_then(|w| w.strip_prefix('@')).map(str::to_string);
+                let answered = !self.ctx.open_cards.contains(&id);
+                let card = EntryCard { id, question: q.clone(), options, answered, kind: Some(kind), agent, closed: None };
                 let mut e = Entry::new(pos, ms, EntryKind::Card, q);
                 e.card = Some(card);
                 self.cont = Some(self.push(e));
@@ -316,20 +691,62 @@ impl Fold<'_> {
             // a gate's card answered, folded (approvals-design.md §9)
             Hub::Approval { how, who, what, note } => {
                 let (ok, text, note) = words::approval(&how, &who, &what, &note);
-                self.approval(pos, ms, ok, text, note);
+                self.approval(pos, ms, ApprovalFold { ok, text, note, card: None, to: None });
             }
-            // an answer to an item, its fold line (BISE-305/307)
+            // an answer to an item, its fold line (BISE-305/307); the item
+            // it answers, so a client that folded it itself skips it.
             // His answer as written, with his pasted files rendered in (R41,
             // designer m_14030 red a): the words fold, the images and files
             // ride apart, never a marker in the row
-            Hub::Route { who, said, .. } => {
+            Hub::Route { who, card, said, msg, pick } => {
                 let a = (self.ctx.attached)(&said);
-                let (text, note) = words::answered_split(&who, &a.words, self.ctx.width);
-                self.approval(pos, ms, true, text, note);
-                if let Some(f) = self.out.last_mut().and_then(|e| e.approval.as_mut()) {
-                    (f.images, f.files) = (a.images, a.files);
+                // with parts, the row's words are his words alone: no
+                // quote or paste tag in the head or its note
+                let parts = read_parts(&said);
+                let said_words = match parts.is_empty() {
+                    true => a.words,
+                    false => crate::parts::words(&parts).trim().to_string(),
+                };
+                // inbox picks: an option picked by its number reads as
+                // that option's words ('2' -> 'only at checkout')
+                let said_words = pick.unwrap_or(said_words);
+                let (text, note) = words::answered_split(&who, &said_words, self.ctx.width);
+                // the asker's thread: the message his answer became came
+                // first (sb-core sends it, then writes this line). That
+                // from_agent entry becomes this row, at its pos (a client
+                // replaces it: same pos); the line first, its later
+                // msg-in makes no entry (architect m_22417, wake's rule)
+                if let Some(m) = msg {
+                    bounded_push(&mut self.answered, m);
                 }
+                let read = msg.and_then(|m| self.out.iter().rposition(|e| e.kind == EntryKind::FromAgent && e.msg == Some(m)));
+                let i = match read {
+                    Some(i) => {
+                        let mut e = Entry::new(self.out[i].pos, self.out[i].at_ms, EntryKind::Approval, text.clone());
+                        e.turn_start = self.out[i].turn_start;
+                        e.msg = msg;
+                        e.approval = Some(ApprovalFold { ok: true, text, note, card: Some(card), to: Some(who.clone()) });
+                        self.out[i] = e;
+                        if self.cont == Some(i) {
+                            self.cont = None;
+                        }
+                        i
+                    }
+                    None => {
+                        self.approval(pos, ms, ApprovalFold { ok: true, text, note, card: Some(card), to: Some(who.clone()) });
+                        self.out.len() - 1
+                    }
+                };
+                // his images and files ride in Entry.parts (msg-parts):
+                // the window draws the answer's chips from them
+                self.out[i].parts = parts;
+                self.route = Some(i);
             }
+            // another agent's wake in main's thread (ambient-lead m_19783):
+            // its typed `wake` line came first and took this message's
+            // place (by its id); the message itself makes nothing
+            Hub::Msg { from, id, .. }
+                if lines::is_hub_sender(&from) && id.strip_prefix("m_").and_then(|n| n.parse().ok()).is_some_and(|n: u64| self.woke.contains(&n)) => {}
             // agent to agent in main's thread (the window groups the run);
             // the hub's own timer wakes and stop notes are the agents'
             Hub::Msg { from, to, id, body } => {
@@ -342,10 +759,38 @@ impl Fold<'_> {
                 e.msg = id.strip_prefix("m_").and_then(|n| n.parse().ok());
                 self.cont = Some(self.push(e));
             }
+            // BISE-31: the hub closed a card (`card-closed : #3 answered`):
+            // its entry (the newest card with that id) carries the word and
+            // is sent again; a card this thread never showed: nothing, as
+            // the TUI's line path
+            Hub::CardClosed { id, res } => {
+                let card = self.out.iter_mut().rev().filter_map(|e| e.card.as_mut()).find(|c| c.id == id);
+                if let Some(c) = card {
+                    c.closed = Some(res);
+                    c.answered = true;
+                }
+            }
+            // the answer he read as it streamed in, its turn failed
+            // before it came: a reply, cut (drawn dim)
+            Hub::Kept(text) => {
+                let mut e = Entry::new(pos, ms, EntryKind::Agent, text.trim().to_string());
+                e.cut = true;
+                self.push(e);
+            }
             // a warning, a spawn, computer use, a direct message
             h => {
+                // a message he routed by hand (`you → @docs : …`): its
+                // route-parts line may follow; until then its text read back
+                let routed = match &h {
+                    Hub::Other { kind, text } if kind == "route" => text.split_once(" : ").map(|(_, said)| read_parts(said)),
+                    _ => None,
+                };
                 if let Some(n) = words::hub_notice(&h) {
                     self.notice(pos, ms, n);
+                    if let (Some(parts), Some(e)) = (routed, self.out.last_mut()) {
+                        e.parts = parts;
+                        self.route = self.out.len().checked_sub(1);
+                    }
                 }
             }
         }
@@ -364,15 +809,149 @@ impl Fold<'_> {
     }
 }
 
+/// His messages' marks, by [`lines::deliver`] (G1).
+impl Delivered for Entry {
+    fn yours(&self) -> Option<(&str, Delivery)> {
+        (self.kind == EntryKind::You).then_some(())?;
+        Some((self.text.as_str(), self.delivery?))
+    }
+
+    fn set_mark(&mut self, to: Delivery) {
+        if self.kind == EntryKind::You {
+            self.delivery = Some(to);
+        }
+    }
+
+    fn msg_id(&self) -> Option<u64> {
+        (self.kind == EntryKind::You).then_some(self.msg_id)?
+    }
+}
+
+/// His message's parts read back from the text the model got
+/// (`parts::parse`, once, at the entry's creation): only when it holds
+/// more than his words (a quote, a paste, an image, a file), so a plain
+/// message stays drawn from its text and the wire carries nothing more.
+fn read_parts(text: &str) -> Vec<Part> {
+    crate::parts::of_text(text)
+}
+
 /// An agent's transcript lines as entries, oldest first.
 pub fn fold(lines: &[Line], ctx: &Ctx) -> Vec<Entry> {
-    let mut f = Fold { out: Vec::new(), cont: None, tools: Vec::new(), you: None, last_ms: 0, ctx };
+    let mut f = Fold {
+        out: Vec::new(),
+        cont: None,
+        tools: Vec::new(),
+        you: None,
+        ctx_you: None,
+        id_you: None,
+        route: None,
+        last_ms: 0,
+        turn: 0,
+        starting: false,
+        by_result: Vec::new(),
+        woke: Vec::new(),
+        answered: Vec::new(),
+        ctx,
+    };
     for (pos, ms, l) in lines {
         f.line(*pos, *ms, l);
     }
     f.out
 }
 
+/// Where a live tail of `lines` may start so it folds `entries` from
+/// `entries[want]` on as the whole did (the hub's live fold keeps a few
+/// entries' lines, `proto_view::Live`): that entry's pos, or an earlier
+/// entry's while a call started before the cut has a line at or after it,
+/// or may still get one (no `tool_finished` and no turn end yet). Folded
+/// without its start, such a line (its result, its finish) would be a
+/// row of its own (tui-parity R1: a lone `#2 ✓ 0.0s` a turn later).
+/// A steered receipt at `pos`: each entry it names that has no mark yet
+/// (his by msg_id, an agent's by msg) gets `steered_at = pos`.
+pub(super) fn mark_steered(out: &mut [Entry], ids: &[u64], pos: Pos) {
+    for e in out.iter_mut().filter(|e| e.steered_at.is_none()) {
+        let id = match e.kind {
+            EntryKind::You => e.msg_id,
+            EntryKind::FromAgent => e.msg,
+            _ => None,
+        };
+        if id.is_some_and(|id| ids.contains(&id)) {
+            e.steered_at = Some(pos);
+        }
+    }
+}
+
+/// The receipts after a page (architect m_16543): `ahead` is the
+/// transcript's lines after the page's last one. A message is read in the
+/// turn it was delivered in, so its receipt comes before that turn's end:
+/// the receipts up to the first turn end mark the page's entries, and
+/// nothing after it can name one of them.
+pub fn mark_ahead(entries: &mut [Entry], ahead: &[Line]) {
+    for (pos, _, l) in ahead {
+        let rec = lines::read(l);
+        // the receipts' delivery marks too (✓ steer-rx, ✓✓ steered)
+        if let Some(m @ Mark::Ids { .. }) = lines::mark_of(&rec) {
+            lines::deliver(entries, &m);
+        }
+        match rec {
+            Rec::Hub(Hub::Steered(ids)) => mark_steered(entries, &ids, *pos),
+            Rec::Obs(Obs::TurnDone(_)) => break,
+            _ => {}
+        }
+    }
+}
+
+pub fn tail_start(lines: &[Line], entries: &[Entry], want: usize) -> Pos {
+    let Some(first) = entries.get(want) else { return entries.first().map_or(0, |e| e.pos) };
+    // each call: its start's pos and its last line's (MAX: still open)
+    let mut calls: Vec<(Pos, Pos)> = Vec::new();
+    let mut last: Vec<(u32, usize)> = Vec::new();
+    for (pos, _, l) in lines {
+        let rec = lines::read(l.strip_prefix("history ").unwrap_or(l));
+        if matches!(rec, Rec::Obs(Obs::TurnDone(_))) {
+            for c in calls.iter_mut().filter(|c| c.1 == Pos::MAX) {
+                c.1 = *pos;
+            }
+            last.clear();
+            continue;
+        }
+        let Some(m) = lines::tool_move(&rec) else { continue };
+        let id = match &m {
+            ToolMove::Start(id) | ToolMove::Info { id, .. } | ToolMove::Intent { id, .. } | ToolMove::Code { id, .. } | ToolMove::Result { id, .. } | ToolMove::Finish { id, .. } => *id,
+        };
+        if let ToolMove::Start(_) = m {
+            last.retain(|&(i, _)| i != id);
+            last.push((id, calls.len()));
+            calls.push((*pos, Pos::MAX));
+            continue;
+        }
+        let Some(&(_, k)) = last.iter().find(|&&(i, _)| i == id) else { continue };
+        calls[k].1 = match m {
+            ToolMove::Finish { .. } => *pos,
+            _ if calls[k].1 == Pos::MAX => Pos::MAX,
+            _ => calls[k].1.max(*pos),
+        };
+    }
+    let mut cut = first.pos;
+    while let Some(&(start, _)) = calls.iter().find(|&&(start, end)| start < cut && end >= cut) {
+        // the entry the call's row is in: the newest at or before its start
+        cut = entries.iter().rev().find(|e| e.pos <= start).map_or(start, |e| e.pos);
+    }
+    cut
+}
+
 #[cfg(test)]
 #[path = "fold_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "fold_page_tests.rs"]
+mod page_tests;
+
+#[cfg(test)]
+#[path = "fold_pick_tests.rs"]
+mod pick_tests;
+
+#[cfg(test)]
+#[path = "fold_attach_tests.rs"]
+mod attach_tests;

@@ -1,0 +1,210 @@
+/* src/ds · bise's ':*' (mark.tsx; designer's bise-presence v10, page blocks v8-kiss, v8-team):
+   currentColor, the star in the accent when something waits on him (the eyes stay ink); the two
+   kisses once per new wait; the star breathes while bise works (his pick #5, page
+   bise-s-mark-25-variations; asks wins over it); the eyes follow his voice; the star beats with
+   the answer; at rest the presence blinks and sways; the wink on hover. The window away
+   (<html data-still>): the loops hold where they are. Under reduced motion: the colour and the
+   still shapes only. */
+.b-bise {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  color: inherit;
+}
+.b-bise svg {
+  display: block;
+  overflow: visible;
+}
+.b-bise-eye {
+  fill: currentColor;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+.b-bise.listening .b-bise-eye {
+  transition: transform 60ms linear;
+}
+.b-bise-arm,
+.b-bise-wink {
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+}
+.b-bise.waits .b-bise-arm,
+.b-bise-arm.wait {
+  stroke: var(--c-accent);
+}
+.b-bise-star,
+.b-bise-beat,
+.b-bise-kiss {
+  transform-box: view-box;
+  transform-origin: 64px 56px;
+}
+.b-bise-wink {
+  opacity: 0;
+}
+/* the two kisses: two beats of 140 ms, 120 ms apart, once (a new `kiss` key restarts it) */
+.b-bise.waits .b-bise-kiss {
+  animation: b-bise-kiss 400ms ease-out 1;
+}
+/* bise answers: one beat per chunk (a new `beat` key restarts it) */
+.b-bise-beat {
+  animation: b-bise-beat 220ms ease-out 1;
+}
+/* bise works: the star breathes (his pick #5, bise-s-mark-25-variations): it shrinks to .72 and
+   grows back over 2.64 s, two of the rows' breaths, no turn. Asks wins: while something waits on
+   him the pink star holds still with its kisses */
+.b-bise.working:not(.waits) .b-bise-star {
+  animation: b-bise-breathe 2.64s ease-in-out infinite;
+}
+/* the presence at rest: it blinks, the star sways */
+.b-bise.live:not(.listening) .b-bise-eye {
+  animation: b-bise-blink 4s ease-in-out infinite;
+}
+.b-bise.live:not(.working, .listening) .b-bise-star {
+  animation: b-bise-sway 3s ease-in-out infinite alternate;
+}
+/* the wink: ';*' once for 200 ms, each time the pointer comes on it */
+.b-bise.winks:hover .b-bise-wink {
+  animation: b-bise-wink 200ms steps(1, end) 1;
+}
+@keyframes b-bise-kiss {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  17.5% {
+    transform: scale(1.25);
+  }
+  35%,
+  65% {
+    transform: scale(1);
+  }
+  82.5% {
+    transform: scale(1.25);
+  }
+}
+@keyframes b-bise-beat {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  40% {
+    transform: scale(1.12);
+  }
+}
+/* visibility (unchanged, not compositable) keeps the breath on the main thread: a composited
+   transform is a resampled layer, the 14 px star goes soft (designer m_25795) */
+@keyframes b-bise-breathe {
+  0%,
+  100% {
+    transform: scale(1);
+    visibility: visible;
+  }
+  50% {
+    transform: scale(0.72);
+    visibility: visible;
+  }
+}
+@keyframes b-bise-blink {
+  0%,
+  90%,
+  100% {
+    transform: scaleY(1);
+  }
+  93% {
+    transform: scaleY(0.12);
+  }
+  96% {
+    transform: scaleY(1);
+  }
+}
+@keyframes b-bise-sway {
+  from {
+    transform: rotate(-7deg);
+  }
+  to {
+    transform: rotate(7deg);
+  }
+}
+@keyframes b-bise-wink {
+  0% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+/* the window away (App.tsx's useStill sets <html data-still>): the mark holds where it is */
+:root[data-still] .b-bise .b-bise-star,
+:root[data-still] .b-bise .b-bise-eye {
+  animation-play-state: paused;
+}
+/* !important: the states' rules above (.b-bise.working:not(.waits) …) are more specific */
+@media (prefers-reduced-motion: reduce) {
+  .b-bise .b-bise-star,
+  .b-bise .b-bise-eye,
+  .b-bise .b-bise-beat,
+  .b-bise .b-bise-kiss,
+  .b-bise.winks:hover .b-bise-wink {
+    animation: none !important;
+    transition: none !important;
+  }
+  .b-bise.listening .b-bise-eye {
+    transform: none !important;
+  }
+}
+/* bise's ':*' typed (mark.tsx Kiss, desktop-onboarding v4): the mono font always (his taste rule),
+   ':' in ink, '*' in the accent, nothing around it. pop: the ':' fades in (300 ms), then the '*'
+   pops once (1 s); its parts' classes are their own (an Onb's .s is its line); turn: then one step (60°, the mono star's six arms) every 8 s. */
+.b-kiss {
+  display: inline-flex;
+  align-items: baseline;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  letter-spacing: 0;
+  line-height: 1;
+  white-space: nowrap;
+}
+.b-kiss-c {
+  color: var(--c-ink);
+}
+.b-kiss-s {
+  display: inline-block;
+  color: var(--c-accent);
+  transform-origin: 50% 42%;
+}
+.b-kiss.pop .b-kiss-c {
+  animation: b-kiss-in 300ms ease-out both;
+}
+.b-kiss.pop .b-kiss-s {
+  animation: b-kiss-pop 1s ease-out 300ms both;
+}
+.b-kiss.pop.turn .b-kiss-s {
+  animation: b-kiss-pop 1s ease-out 300ms both, b-kiss-turn 8s ease-in-out 1.3s infinite;
+}
+.b-kiss.turn:not(.pop) .b-kiss-s {
+  animation: b-kiss-turn 8s ease-in-out infinite;
+}
+@keyframes b-kiss-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes b-kiss-pop {
+  0% { transform: scale(0.4) rotate(-10deg); opacity: 0; }
+  35% { transform: scale(1.4) rotate(-4deg); opacity: 1; }
+  100% { transform: scale(1) rotate(0); opacity: 1; }
+}
+@keyframes b-kiss-turn {
+  0%, 92.5% { transform: rotate(0); }
+  100% { transform: rotate(60deg); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .b-kiss-c,
+  .b-kiss-s,
+  .b-kiss.pop .b-kiss-s,
+  .b-kiss.pop.turn .b-kiss-s,
+  .b-kiss.turn:not(.pop) .b-kiss-s {
+    animation: none;
+  }
+}

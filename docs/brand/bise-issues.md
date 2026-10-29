@@ -1567,7 +1567,7 @@ Index:
     @{name}? {n} changed files and {m} unpushed commits will be saved
     (/restore) [y/N]`; `drop of @{name} cancelled`; `main → @{name}
     stopped: {reason}`; `recipient_unavailable: @{name} is {status} (its
-    worktree was deleted: /restore)`; `unknown command: {cmd} (see /help)`;
+    worktree was deleted: /restore)`; `unknown command: {cmd} · see /help`;
     `empty message for @{name}`; `--with-changes only works with -w`; the
     usage lines; `no agents yet` on /agents.
 

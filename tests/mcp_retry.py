@@ -86,11 +86,15 @@ def call(exe, tmp, url, tool, args):
     dbg = os.path.join(tmp, "debug")
     os.makedirs(home, exist_ok=True)
     os.makedirs(dbg, exist_ok=True)
-    index = os.path.join(tmp, "index.txt")
+    # the session's index, where its plugins bridge writes it
+    # ($BEND_RUN_DIR/<port>/plugins/mcp-index.txt)
+    run = os.path.join(tmp, "run")
+    index = os.path.join(run, "0", "plugins", "mcp-index.txt")
+    os.makedirs(os.path.dirname(index), exist_ok=True)
     with open(index, "w") as f:
         for t in ("echo", "nope"):
             f.write("%s fake %s : #%s\n" % (url, t, t))
-    env = {"PATH": os.environ.get("PATH", ""), "HOME": home, "BEND_MCP_INDEX": index,
+    env = {"PATH": os.environ.get("PATH", ""), "HOME": home, "BEND_RUN_DIR": run, "BEND_REPL_PORT": "0",
            "BEND_DEBUG_DIR": dbg, "PROBE_TOOL": tool, "PROBE_ARGS": json.dumps(args)}
     t0 = time.time()
     out = subprocess.run([exe], env=env, capture_output=True, text=True, timeout=120).stdout
@@ -142,7 +146,7 @@ def run(exe, tmp, port):
     got, seen = rpcs(port, seen)
     check(st == "err", "answer lost: an error %r" % st)
     check(got.count("tools/call") == 1, "answer lost: tools/call sent once %r" % got)
-    want5 = re.compile(r"^mcp call failed: fake\.echo \(127\.0\.0\.1:%d\), tools/call: (connection to 127\.0\.0\.1:%d lost while reading \(read .*\)|garbled response from 127\.0\.0\.1:%d)"
+    want5 = re.compile(r"^mcp call failed \(network\): fake\.echo \(127\.0\.0\.1:%d\), tools/call: (connection to 127\.0\.0\.1:%d lost while reading \(read .*\)|garbled response from 127\.0\.0\.1:%d)"
                        r".* not retried: the call may have run on the server, check before calling it again \(safe if the tool only reads\)\.$" % (port, port, port))
     check(bool(want5.match(text)), "answer lost: the text %r" % text)
 
@@ -153,7 +157,7 @@ def run(exe, tmp, port):
     control(port, "fail_init", count=0)
     check(st == "err" and got.count("initialize") == 3 and "tools/call" not in got,
           "initialize always dropped: 3 tries, no call %r %r" % (st, got))
-    want6 = re.compile(r"^mcp call failed: fake\.echo \(127\.0\.0\.1:%d\), initialize: .*127\.0\.0\.1:%d.*\. "
+    want6 = re.compile(r"^mcp call failed \(network\): fake\.echo \(127\.0\.0\.1:%d\), initialize: .*127\.0\.0\.1:%d.*\. "
                        r"bise reconnected and retried 2 times\. the call never reached the server: safe to call again\.$" % (port, port))
     check(bool(want6.match(text)), "initialize always dropped: the text %r" % text)
     check(took >= 2.5, "initialize always dropped: paused 1 s then 2 s (%.1f s)" % took)
@@ -162,7 +166,7 @@ def run(exe, tmp, port):
     # 7. nothing listens
     dead = free_port()
     st, text, _ = call(exe, tmp, "http://127.0.0.1:%d/mcp" % dead, "fake.echo", {"text": "f"})
-    want7 = ("mcp call failed: fake.echo (127.0.0.1:%d), initialize: cannot reach 127.0.0.1:%d (connect " % (dead, dead))
+    want7 = ("mcp call failed (network): fake.echo (127.0.0.1:%d), initialize: cannot reach 127.0.0.1:%d (connect " % (dead, dead))
     check(st == "err" and text.startswith(want7) and text.endswith(
         "bise reconnected and retried 2 times. the call never reached the server: safe to call again."),
         "nothing listens: the text %r" % text)
@@ -171,9 +175,17 @@ def run(exe, tmp, port):
     st, text, _ = call(exe, tmp, url, "fake.nope", {})
     got, seen = rpcs(port, seen)
     check(st == "err" and got.count("tools/call") == 1, "rpc error: an error, sent once %r %r" % (st, got))
-    check(text == "mcp call failed: fake.nope (127.0.0.1:%d), tools/call: 127.0.0.1:%d answered an error: no such tool. "
+    check(text == "mcp call failed (not found): fake.nope (127.0.0.1:%d), tools/call: 127.0.0.1:%d answered an error (code -32602): no such tool. "
           "not retried: the call may have run on the server, check before calling it again (safe if the tool only reads)." % (port, port),
           "rpc error: the text %r" % text)
+
+    # 9. a Mistral connector (not a loopback URL) with no key: said at
+    # once, nothing sent (an empty bearer came back as 'HTTP 401: Invalid
+    # API Key', read as a revoked key; the probe passes an empty key)
+    st, text, took = call(exe, tmp, "c0ffee-connector", "fake.echo", {"text": "k"})
+    check(st == "err" and text == "no Mistral key for connectors: run bise login mistral",
+          "no key: the text %r %r" % (st, text))
+    check(took < 5, "no key: no network, no retry (%.1f s)" % took)
 
     print("PASS mcp_retry" if not FAILS else "FAIL mcp_retry (%d)" % len(FAILS))
     return 1 if FAILS else 0

@@ -42,9 +42,9 @@ experimental, risky or big work (several agents, several days) goes on a local f
 4. it stays alive until the merge: it answers review comments, fixes red checks, and rebases when the base moves.
 5. it never merges, approves, closes, or comments on GitHub unless you allowed it.
 
-when the PR is merged, bise archives its agents and removes the worktree. `↑` in the panel marks an agent with a PR.
+when the PR is merged, bise archives its agents and removes the worktree. in bise terminal, `↑` in the panel marks an agent with a PR.
 
-PR flow needs the GitHub CLI logged in: `gh auth login`. `bise doctor` checks it.
+PR flow needs the GitHub CLI logged in: `gh auth login`. `bise doctor` checks it from a terminal.
 
 ## the check
 

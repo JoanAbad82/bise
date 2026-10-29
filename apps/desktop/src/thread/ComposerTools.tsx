@@ -1,0 +1,145 @@
+// The composer box's tool row (bise fait mac, mockup 1: 40 high): what he changes about where his
+// words go. Left: '+' 28 (attach files, macOS's panel through window.bise.pickFiles) and the
+// approvals mode menu, 28 ('yolo' in text-2 like the model: pink and red are only for what waits on
+// him, designer m_43892); right, before
+// the mic and send: the model and effort menu, 12 text-2 ('opus 5.5 · high ⌄'). Their pickers (ds
+// Picker, designer m_24786) open 8 px above the box, the mode's on its chip's left edge, the
+// model's on its right edge. Answering a card: '+' only (a model or a mode means nothing for an
+// answer). Short: the effort label goes into its menu (css), the mode never drops. Owner:
+// nm-composer.
+import { useCallback, useRef, useState } from 'react';
+import { AppIcon, PickerPop, PickerSeg, PickerTrigger, Press, tipAttrs } from '@/ds';
+import type { Agent } from '@/proto';
+import { useApprovals, useModels, useStore } from '@/store';
+import { useRouter } from '@/app/router';
+import { modelOrSetup } from '@/settings';
+import { effortsFor, modelGroups, modelOf, setEffort } from '@/agents/actions';
+import { modeSentence, modeWords, modelWords } from './tools';
+import { composer } from '../proto/words.gen';
+
+/** A chip's open state: `toggle` opens and closes it, `close` closes it. */
+function useOpen(): { open: boolean; toggle: () => void; close: () => void } {
+  const [open, setOpen] = useState(false);
+  const close = useCallback(() => {
+    setOpen(false);
+  }, []);
+  return { open, toggle: () => { setOpen((o) => !o); }, close };
+}
+
+/** '+': his files, by macOS's panel, as chips in the field. */
+export function AttachTool({ onPick }: { onPick: (paths: readonly string[]) => void }) {
+  return (
+    <Press
+      look="cmp-tool cmp-plus"
+      onMouseDown={(e) => {
+        e.preventDefault(); // the field keeps the caret
+      }}
+      onClick={() => {
+        const pick = window.bise.pickFiles;
+        void pick().then((paths) => {
+          onPick(paths);
+        });
+      }}
+      aria-label={composer.attach_files}
+      {...tipAttrs(composer.attach_files)}
+      data-testid="composer.attach"
+    >
+      <AppIcon name="plus" />
+    </Press>
+  );
+}
+
+/** The approvals mode: 'yolo ⌄' or 'approvals ⌄'; nothing until the hub said its mode. Its picker:
+ *  'mode  ⇧⇥', then each mode with its sentence on a second line (designer m_24786). */
+export function ModeTool({ project }: { project: string }) {
+  const store = useStore();
+  const approvals = useApprovals(project);
+  const trigger = useRef<HTMLButtonElement>(null);
+  const { open, toggle, close } = useOpen();
+  if (approvals === null) return null;
+  const now = approvals.mode === 'auto' ? 'auto' : 'yolo';
+  const what = modeSentence;
+  const set = (mode: string) => {
+    close();
+    if (mode !== now) store.command({ cmd: 'approvals', project, mode: mode === 'auto' ? 'auto' : 'yolo' });
+  };
+  return (
+    <>
+      <PickerTrigger ref={trigger} extra={now === 'yolo' ? 'cmp-menu cmp-yolo' : 'cmp-menu'} open={open} onClick={toggle} tip={`${modeWords(now)}: ${what(now)} · ⇧⇥ switches`} testId="composer.mode">
+        {modeWords(approvals.mode)}
+      </PickerTrigger>
+      {open && (
+        <PickerPop
+          anchor={trigger}
+          box=".box"
+          side="above"
+          align="start"
+          title="mode"
+          titleKeys="⇧⇥"
+          groups={[{ id: 'modes', rows: (['yolo', 'auto'] as const).map((m) => ({ id: m, name: modeWords(m), secondary: what(m), current: now === m, testId: `composer.mode.${m}` })) }]}
+          onPick={set}
+          onClose={close}
+          testId="composer.mode.menu"
+        />
+      )}
+    </>
+  );
+}
+
+/** The model and its effort: '<b>opus 5.5</b> high ⌄'. Its picker: the models under their provider's
+ *  head, the name only, ✓ the current one; then 'effort' and its segmented row (designer m_24786). */
+export function ModelTool({ project, a }: { project: string; a: Agent }) {
+  const store = useStore();
+  const router = useRouter();
+  const models = useModels(project);
+  const trigger = useRef<HTMLButtonElement>(null);
+  const { open, toggle, close } = useOpen();
+  const w = modelWords(models, a.model, a.effort);
+  if (w.model === '') return null;
+  const efforts = effortsFor(models, a.model);
+  const cur = modelOf(models, a.model)?.id ?? a.model;
+  const provider = modelOf(models, a.model)?.provider ?? '';
+  const pick = (model: string) => {
+    close();
+    if (model === a.model) return;
+    modelOrSetup(model, models, { cmd: 'model', project, agent: a.name, model }, {
+      send: (c) => {
+        store.command(c);
+      },
+      setup: () => {
+        router.go({ screen: 'settings', page: 'models' });
+      },
+    });
+  };
+  const groups = modelGroups(models)
+    .filter((g) => g.head !== 'aliases')
+    .map((g) => ({
+      id: g.head,
+      head: g.head,
+      rows: g.rows.map((m) => ({ id: m.id, name: m.label, current: m.id === cur, testId: `composer.model.pick.${m.id.replace(/[^a-z0-9-]/giu, '-').toLowerCase()}` })),
+    }));
+  return (
+    <>
+      <PickerTrigger ref={trigger} extra="cmp-menu cmp-model" open={open} onClick={toggle}
+        tip={[w.model, provider, w.effort === '' ? '' : `effort ${w.effort}`].filter((x) => x !== '').join(' · ')} testId="composer.model">
+        {w.model}
+        {w.effort !== '' && <span className="eff"> · {w.effort}</span>}
+      </PickerTrigger>
+      {open && (
+        <PickerPop
+          anchor={trigger}
+          box=".box"
+          side="above"
+          align="end"
+          groups={groups}
+          footer={efforts.length > 0 && (
+            <PickerSeg head="effort" items={efforts} on={a.effort ?? null} onPick={(e) => { close(); if (e !== a.effort) setEffort(store, project, a.name, e); }} testId="composer.effort" />
+          )}
+          onPick={pick}
+          onClose={close}
+          testId="composer.model.menu"
+        />
+      )}
+    </>
+  );
+}

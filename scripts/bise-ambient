@@ -1,0 +1,55 @@
+#!/bin/bash
+# bise-ambient: Gabriel's desktop app, always prebuilt (docs/desktop-try.md).
+#
+#   bise-ambient --real [args]   the promoted 'bise try' app on his real ~/.bise and hubs
+#                                (quits the open one, swaps in a staged build, reopens)
+#   bise-ambient --try [repo…]   the same app on its try home (~/.bise/try/desktop), with
+#                                throwaway clones of his repos
+#   bise-ambient [folder]        dev only: build bise from $BISE_AMBIENT_CHECKOUT and run
+#                                `bise ambient` on that folder (no default checkout)
+#
+# --real and --try exec scripts/desktop-try.sh from the try checkout, $BISE_TRY_CHECKOUT or
+# ~/.bise/dev/try-src (moved by --promote only), the one desktop_try.py's try_checkout() names.
+# Installed as ~/.local/bin/bise-ambient (a copy: `install -m 755 scripts/bise-ambient
+# ~/.local/bin/bise-ambient`).
+set -euo pipefail
+
+TRY_CHECKOUT="${BISE_TRY_CHECKOUT:-$HOME/.bise/dev/try-src}"
+
+# Never hand the app an agent's or a hub's identity: a shell inside bise (or a
+# terminal opened by an agent) carries SB_*/BISE_ROLE/BEND_STDIN, and the app
+# would pass them on to its core, which then talks to the wrong hub.
+for v in $(compgen -e); do
+  case "$v" in
+    SB_*|BISE_ROLE|BISE_AGENT*|BEND_STDIN|BEND_*SOCKET) unset "$v" ;;
+  esac
+done
+
+case "${1:-}" in
+  --try|--real)
+    mode="$1"; shift
+    [ -x "$TRY_CHECKOUT/scripts/desktop-try.sh" ] || {
+      echo "bise-ambient: no try checkout at $TRY_CHECKOUT (no scripts/desktop-try.sh; set BISE_TRY_CHECKOUT)" >&2; exit 1; }
+    exec "$TRY_CHECKOUT/scripts/desktop-try.sh" "$mode" "$@" ;;
+esac
+
+CHECKOUT="${BISE_AMBIENT_CHECKOUT:-}"
+TARGET="$HOME/.bise/dev/build/ambient/target"
+WS="${1:-$PWD}"
+[ -n "$CHECKOUT" ] && [ -d "$CHECKOUT/rust" ] || {
+  echo "bise-ambient: the dev build needs BISE_AMBIENT_CHECKOUT (a checkout with rust/); his app is 'bise-ambient --real'" >&2; exit 1; }
+[ -d "$WS" ] || { echo "bise-ambient: no folder $WS" >&2; exit 1; }
+WS="$(cd "$WS" && pwd)"
+
+sha="$(git -C "$CHECKOUT" rev-parse --short HEAD)"
+echo "bise-ambient: building $sha (waits for other heavy jobs first)…"
+
+export MACOSX_DEPLOYMENT_TARGET=14.0 CARGO_INCREMENTAL=0
+"$HOME/.bise/run/heavy-run" /bin/bash -c "
+  set -e
+  cd '$CHECKOUT/rust' && CARGO_TARGET_DIR='$TARGET' cargo build -q -p bend-harness
+  cd '$CHECKOUT' && scripts/bins.sh repl-live sb-core >/dev/null
+"
+
+echo "bise-ambient: opening it on $WS"
+cd "$WS" && exec "$TARGET/debug/bise" ambient

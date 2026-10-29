@@ -1,0 +1,271 @@
+{
+  "_about": "Fake accounts for QA hubs (the user's rule: no test touches his real accounts). Camille, ops at a 20-person startup (docs/ambient-vision.md's persona). Every item is invented. Dates are written for _today and moved by whole days to the hub's today when served (FAKE_ACCOUNTS_TODAY pins it).",
+  "_today": "2026-10-02",
+  "gmail": {
+    "me": "camille@acme.test",
+    "labels": ["INBOX", "IMPORTANT", "team", "vendors", "finance", "later"],
+    "messages": [
+      {"id": "m101", "thread": "t101", "from": "Marc Dubois <marc@acme.test>", "to": "camille@acme.test", "date": "2026-10-02T08:12:00Z", "labels": ["INBOX", "IMPORTANT", "team"], "unread": true,
+       "subject": "weekly update: can you post it by noon?", "body": "Hi Camille,\nCould you post the weekly update in #team by noon? Main points: signup 4.1 s -> 0.9 s, dark mode ships Monday, cookie banner fix. I'll check the numbers first if you send me a draft.\nThanks, Marc"},
+      {"id": "m102", "thread": "t102", "from": "Lea Martin <lea@venues.test>", "to": "camille@acme.test", "date": "2026-10-02T07:40:00Z", "labels": ["INBOX", "vendors"], "unread": true,
+       "subject": "Offsite: 3 venues available Nov 14-15", "body": "Hello Camille,\nFor 20 people on Nov 14-15 we have: La Grange (EUR 4,200, 1h from Paris), Le Moulin (EUR 3,600, 1h40, no projector), Les Tilleuls (EUR 5,100, 45 min, rooms for 22). Holding them until Friday.\nLea"},
+      {"id": "m103", "thread": "t103", "from": "billing@cloudhost.test", "to": "camille@acme.test", "date": "2026-10-01T22:05:00Z", "labels": ["INBOX", "finance"], "unread": true,
+       "subject": "Your invoice for September: EUR 1,284.50", "body": "Invoice INV-2026-09-4471. Amount due EUR 1,284.50 by October 15. Usage up 18% vs August (storage)."},
+      {"id": "m104", "thread": "t104", "from": "Sam Petit <sam@acme.test>", "to": "camille@acme.test", "date": "2026-10-01T17:30:00Z", "labels": ["INBOX", "team"], "unread": false,
+       "subject": "Re: laptop for the new hire", "body": "The MacBook for Ines arrives Monday. Can you set up her accounts before 10am? I'll do the onboarding call at 11."},
+      {"id": "m105", "thread": "t105", "from": "newsletter@saasweekly.test", "to": "camille@acme.test", "date": "2026-10-01T09:00:00Z", "labels": ["INBOX"], "unread": true,
+       "subject": "10 ops tools you missed this week", "body": "This week: tools for invoices, offsites and onboarding..."},
+      {"id": "m106", "thread": "t106", "from": "Nora Haddad <nora@acme.test>", "to": "camille@acme.test", "date": "2026-09-30T15:20:00Z", "labels": ["INBOX", "IMPORTANT", "finance"], "unread": true,
+       "subject": "Budget for Q4 offsite?", "body": "Do we have a cap for the offsite? Finance needs a number by Thursday. I'd say EUR 4,500 all in."},
+      {"id": "m107", "thread": "t107", "from": "Insurance Co <claims@insure.test>", "to": "camille@acme.test", "date": "2026-09-30T10:02:00Z", "labels": ["INBOX", "vendors"], "unread": false,
+       "subject": "Renewal: office insurance due Oct 31", "body": "Your office insurance renews on Oct 31. Reply to confirm the same coverage, or tell us what changed (headcount: 20?)."},
+      {"id": "m108", "thread": "t101", "from": "Marc Dubois <marc@acme.test>", "to": "camille@acme.test", "date": "2026-10-02T09:01:00Z", "labels": ["INBOX", "team"], "unread": true,
+       "subject": "Re: weekly update: can you post it by noon?", "body": "Also mention we hired Ines (starts Monday)."},
+      {"id": "m109", "thread": "t109", "from": "Nora Haddad <nora@acme.test>", "to": "camille@acme.test, marc@acme.test", "date": "2026-10-01T10:15:00Z", "labels": ["INBOX", "team"], "unread": false,
+       "subject": "Offsite venue: La Grange or Les Tilleuls?", "body": "Two options left for the offsite: La Grange (EUR 4,200, 1h) or Les Tilleuls (EUR 5,100, 45 min). Marc, your call? We need to tell Lea by Friday."},
+      {"id": "m110", "thread": "t109", "from": "Marc Dubois <marc@acme.test>", "to": "nora@acme.test, camille@acme.test", "date": "2026-10-01T14:40:00Z", "labels": ["INBOX", "team"], "unread": false,
+       "subject": "Re: Offsite venue: La Grange or Les Tilleuls?", "body": "La Grange. Les Tilleuls is over the EUR 4,500 cap and 15 minutes don't justify EUR 900."},
+      {"id": "m111", "thread": "t109", "from": "Nora Haddad <nora@acme.test>", "to": "camille@acme.test, marc@acme.test", "date": "2026-10-02T06:55:00Z", "labels": ["INBOX", "IMPORTANT", "team"], "unread": true,
+       "subject": "Re: Offsite venue: La Grange or Les Tilleuls?", "body": "Decided: La Grange, cap EUR 4,500 all in. Camille, can you confirm with Lea and ask for the deposit terms? Thanks!"},
+      {"id": "m112", "thread": "t112", "from": "Ines Moreau <ines.moreau@mail.test>", "to": "camille@acme.test", "date": "2026-10-02T07:05:00Z", "labels": ["INBOX"], "unread": true,
+       "subject": "Question before Monday", "body": "Hi Camille, what time should I arrive on Monday, and should I bring anything (ID, bank details for payroll)? Ines"},
+      {"id": "m113", "thread": "t113", "from": "Paul Girard <paul@compta.test>", "to": "camille@acme.test", "date": "2026-10-01T11:20:00Z", "labels": ["INBOX", "finance"], "unread": true,
+       "subject": "3 receipts missing for September", "body": "Hello, to close September I still need 3 receipts: train Paris-Lyon (EUR 112), team lunch Sept 18 (EUR 236), Figma seats (EUR 90). Can you send them by Tuesday? Paul"},
+      {"id": "m114", "thread": "t114", "from": "Jobs board <noreply@jobs.test>", "to": "camille@acme.test", "date": "2026-10-01T08:30:00Z", "labels": ["INBOX"], "unread": true,
+       "subject": "Ops intern: 2 candidates asked for an interview slot", "body": "Hugo Lambert and Sara Benali replied to your ops intern post. Both are free Tuesday or Wednesday afternoon. Reply with a slot."},
+      {"id": "m115", "thread": "t115", "from": "GitHub <notifications@github.test>", "to": "camille@acme.test", "date": "2026-10-01T16:02:00Z", "labels": ["INBOX"], "unread": false,
+       "subject": "[acme/app] PR #212 merged: dark mode on the settings page", "body": "lucas merged #212 into main. 14 files changed. Checks passed."},
+      {"id": "m116", "thread": "t116", "from": "Lucas Bernard <lucas@acme.test>", "to": "team@acme.test", "date": "2026-10-01T16:20:00Z", "labels": ["INBOX", "team"], "unread": false,
+       "subject": "Dark mode: release notes draft", "body": "Draft for Monday: 'Dark mode is here, starting with the settings page. Turn it on in Settings > Appearance.' Comments welcome until Friday."},
+      {"id": "m117", "thread": "t117", "from": "Calendar <calendar@acme.test>", "to": "camille@acme.test", "date": "2026-10-01T09:45:00Z", "labels": ["INBOX"], "unread": false,
+       "subject": "Invitation: Interview, ops intern (today 16:30)", "body": "Marc invited you to 'Interview: ops intern', 16:30-17:00, Room 1."},
+      {"id": "m118", "thread": "t118", "from": "The Ops Letter <hello@opsletter.test>", "to": "camille@acme.test", "date": "2026-10-02T05:00:00Z", "labels": ["INBOX"], "unread": true,
+       "subject": "The Ops Letter #88: offsites that people actually like", "body": "This week: why half-day agendas beat full days, and a checklist for venues."},
+      {"id": "m119", "thread": "t119", "from": "Product Daily <digest@productdaily.test>", "to": "camille@acme.test", "date": "2026-10-02T04:30:00Z", "labels": ["INBOX"], "unread": true,
+       "subject": "Today's top 5 launches", "body": "1. Pagecraft  2. Inbox Zero AI  3. Shiplog  4. Desko  5. Tally Forms 3"},
+      {"id": "m120", "thread": "t120", "from": "Figma <no-reply@figma.test>", "to": "camille@acme.test", "date": "2026-09-30T18:00:00Z", "labels": ["INBOX"], "unread": true,
+       "subject": "What's new in Figma this month", "body": "New: variables in prototypes, faster dev mode, and more."},
+      {"id": "m121", "thread": "t121", "from": "Marc Dubois <marc@acme.test>", "to": "camille@acme.test", "date": "2026-10-02T08:50:00Z", "labels": ["INBOX", "IMPORTANT", "team"], "unread": true,
+       "subject": "Can we get acme-team-planner-hq.app before Monday?", "body": "Camille, acme-team-planner-hq.app is free on Gandi (I checked last night). Can you buy it on the company card, 2 years, and point it to our Vercel project? Lucas needs the DNS records added once it's ours. Also ask legal if the trademark search is still fine.\nMarc"},
+      {"id": "m122", "thread": "t122", "from": "Gandi <noreply@gandi.test>", "to": "camille@acme.test", "date": "2026-10-02T09:20:00Z", "labels": ["INBOX", "vendors"], "unread": true,
+       "subject": "acme-team-planner-hq.app is available: EUR 14.00 / year", "body": "The domain acme-team-planner-hq.app is available. Price: EUR 14.00 per year (EUR 28.00 for 2 years). To finish: sign in to your Gandi account (2-step verification by SMS), then pay. After purchase, add DNS records in the Gandi dashboard or delegate to your DNS host. Note: .app requires HTTPS (HSTS preloaded)."}
+    ]
+  },
+  "slack": {
+    "me": "camille",
+    "channels": [
+      {"id": "C01", "name": "team", "topic": "everyone at acme"},
+      {"id": "C02", "name": "ops", "topic": "offices, tools, people"},
+      {"id": "C03", "name": "random", "topic": ""},
+      {"id": "C04", "name": "launch", "topic": "dark mode launch: numbers and go/no-go"},
+      {"id": "C05", "name": "acme-feedback", "topic": "users' bug reports and requests (shared channel)"},
+      {"id": "D01", "name": "@benjamin.roy", "topic": "direct messages with Benjamin Roy", "is_im": true}
+    ],
+    "messages": [
+      {"id": "s201", "channel": "team", "user": "marc", "ts": "2026-10-02T08:30:00Z", "text": "reminder: weekly update today please @camille"},
+      {"id": "s202", "channel": "ops", "user": "nora", "ts": "2026-10-02T08:05:00Z", "text": "who has the offsite venues list? need a budget number by thursday"},
+      {"id": "s203", "channel": "ops", "user": "sam", "ts": "2026-10-01T17:35:00Z", "text": "ines starts monday, laptop arrives monday morning"},
+      {"id": "s204", "channel": "team", "user": "lucas", "ts": "2026-10-01T16:00:00Z", "text": "dark mode is on staging, settings page first. feedback welcome"},
+      {"id": "s205", "channel": "random", "user": "ines", "ts": "2026-10-01T12:00:00Z", "text": "hello everyone, see you monday!"},
+      {"id": "s206", "channel": "ops", "user": "camille", "ts": "2026-09-30T11:00:00Z", "text": "insurance renewal is oct 31, i'll check the headcount"},
+      {"id": "s207", "channel": "launch", "user": "marc", "ts": "2026-10-02T09:10:00Z", "text": "numbers this morning: signups yesterday 312 (+24% vs last Thursday), trial to paid 3.1%, signup time 0.9 s (was 4.1 s)"},
+      {"id": "s208", "channel": "launch", "user": "lucas", "ts": "2026-10-02T09:20:00Z", "text": "GitHub: 1,284 stars (+96 since yesterday), 6 open PRs. our Show HN is #7 on the front page with 182 points, 64 comments"},
+      {"id": "s209", "channel": "launch", "user": "nora", "ts": "2026-10-02T09:32:00Z", "text": "support load is fine: 14 tickets yesterday, median first reply 22 min"},
+      {"id": "s210", "channel": "launch", "user": "marc", "ts": "2026-10-02T09:40:00Z", "text": "go for dark mode on Monday. @camille can the weekly update carry these numbers?"},
+      {"id": "s211", "channel": "team", "user": "nora", "ts": "2026-10-02T07:00:00Z", "text": "offsite venue decided: La Grange, Nov 14-15. details from camille soon"},
+      {"id": "s212", "channel": "acme-feedback", "user": "benjamin.roy", "ts": "2026-10-02T08:41:00Z", "text": "Install bug: after the install script, `acme` isn't found in fish. The script adds the PATH line to .bashrc and .zshrc only, nothing in ~/.config/fish/config.fish."},
+      {"id": "s213", "channel": "acme-feedback", "user": "benjamin.roy", "ts": "2026-10-02T09:05:00Z", "text": "Second one: behind our corporate proxy (HTTPS_PROXY set) the CLI times out after 30 s on `acme sync`. curl to the API works with the same proxy."},
+      {"id": "s215", "channel": "ops", "user": "lelio", "ts": "2026-10-02T09:12:00Z", "thread": "s215", "text": "@camille can you send HR (rh@acme.test) a short written summary of Ines's onboarding plan by mail? They need it in writing for her file. cc me please."},
+      {"id": "s216", "channel": "ops", "user": "camille", "ts": "2026-10-02T09:14:00Z", "thread": "s215", "text": "sure, today"},
+      {"id": "s217", "channel": "@benjamin.roy", "user": "benjamin.roy", "ts": "2026-10-02T10:02:00Z", "text": "hey Camille, quick one: how do I install acme's CLI on a Mac? brew didn't find it."},
+      {"id": "s214", "channel": "acme-feedback", "user": "benjamin.roy", "ts": "2026-10-02T09:32:00Z", "text": "Et une demande : est-ce que les réponses de l'assistant pourraient être en français quand on lui écrit en français ? Toute l'équipe est à Lyon."}
+    ]
+  },
+  "linear": {
+    "team": "OPS",
+    "issues": [
+      {"id": "OPS-41", "title": "Book the Q4 offsite venue", "state": "In Progress", "assignee": "camille", "priority": 2, "due": "2026-10-04", "description": "20 people, Nov 14-15, budget TBD with Nora."},
+      {"id": "OPS-42", "title": "Onboard Ines (accounts, laptop, buddy)", "state": "Todo", "assignee": "camille", "priority": 1, "due": "2026-10-06", "description": "Laptop Monday, accounts before 10am, buddy: Sam."},
+      {"id": "OPS-43", "title": "Renew office insurance", "state": "Todo", "assignee": "camille", "priority": 3, "due": "2026-10-31", "description": "Confirm headcount 20."},
+      {"id": "OPS-44", "title": "Cloud bill up 18%: check storage", "state": "Backlog", "assignee": null, "priority": 3, "due": null, "description": "September invoice EUR 1,284.50."},
+      {"id": "OPS-45", "title": "Weekly update, week 41", "state": "Todo", "assignee": "camille", "priority": 2, "due": "2026-10-02", "description": "Post in #team by noon, Marc checks the numbers."}
+    ]
+  },
+  "calendar": {
+    "events": [
+      {"id": "e301", "title": "Ops sync", "start": "2026-10-02T10:00:00Z", "end": "2026-10-02T10:30:00Z", "attendees": ["camille", "nora", "sam"], "location": "Room 2"},
+      {"id": "e302", "title": "Weekly update due", "start": "2026-10-02T12:00:00Z", "end": "2026-10-02T12:15:00Z", "attendees": ["camille"], "location": ""},
+      {"id": "e303", "title": "Venue call with Lea", "start": "2026-10-03T14:00:00Z", "end": "2026-10-03T14:30:00Z", "attendees": ["camille", "lea@venues.test"], "location": "phone"},
+      {"id": "e304", "title": "Ines onboarding", "start": "2026-10-06T11:00:00Z", "end": "2026-10-06T12:00:00Z", "attendees": ["camille", "sam", "ines"], "location": "Room 1"},
+      {"id": "e305", "title": "Finance: Q4 budgets", "start": "2026-10-03T09:00:00Z", "end": "2026-10-03T10:00:00Z", "attendees": ["camille", "nora"], "location": "Room 2"},
+      {"id": "e306", "title": "Launch standup", "start": "2026-10-02T07:30:00Z", "end": "2026-10-02T07:45:00Z", "attendees": ["camille", "marc", "lucas", "nora"], "location": "#launch huddle"},
+      {"id": "e307", "title": "1:1 Marc / Camille", "start": "2026-10-02T13:00:00Z", "end": "2026-10-02T13:30:00Z", "attendees": ["camille", "marc"], "location": "Room 3"},
+      {"id": "e308", "title": "Interview: ops intern", "start": "2026-10-02T14:30:00Z", "end": "2026-10-02T15:00:00Z", "attendees": ["camille", "marc"], "location": "Room 1"}
+    ]
+  },
+  "github": {
+    "repo": "acme/app",
+    "stats": {"stars": 1284, "stars_since_yesterday": 96, "forks": 71, "watchers": 38, "open_issues": 23, "open_pulls": 6,
+              "traffic_14d": {"views": 4210, "unique_visitors": 1930, "clones": 212},
+              "latest_release": {"tag": "v2.4.0", "date": "2026-09-29T10:00:00Z", "downloads": 842}},
+    "issues": [
+      {"number": 231, "title": "Dark mode: contrast too low on disabled buttons", "state": "open", "author": "jdoe", "comments": 3, "created": "2026-10-02T06:10:00Z", "labels": ["bug", "dark-mode"]},
+      {"number": 229, "title": "Signup hangs on Safari 17 with a password manager", "state": "open", "author": "mkim", "comments": 5, "created": "2026-10-01T19:40:00Z", "labels": ["bug"]},
+      {"number": 226, "title": "Feature request: export the weekly report as PDF", "state": "open", "author": "alex-r", "comments": 1, "created": "2026-09-30T13:00:00Z", "labels": ["enhancement"]}
+    ],
+    "pulls": [
+      {"number": 212, "title": "Dark mode on the settings page", "state": "merged", "author": "lucas", "merged": "2026-10-01T16:02:00Z"},
+      {"number": 233, "title": "Fix disabled button contrast in dark mode", "state": "open", "author": "lucas", "created": "2026-10-02T08:50:00Z", "checks": "passing"}
+    ],
+    "releases": [
+      {"tag": "v2.5.0", "name": "Dark mode, faster signup", "published_at": "2026-10-02T07:00:00Z", "url": "https://github.test/acme/app/releases/tag/v2.5.0",
+       "notes": "## What's new\n- Dark mode, starting with the settings page (Settings > Appearance)\n- Signup in 0.9 s (was 4.1 s): one round trip instead of four\n- The cookie banner no longer hides the buy button on mobile\n\n## Fixes\n- CSV export keeps the due dates (#228)\n- Safari 17 with a password manager no longer hangs at signup (#229)\n\n## Thanks\nIn the first 24 h: 312 signups, 1,284 GitHub stars."},
+      {"tag": "v2.4.0", "name": "Weekly view", "published_at": "2026-09-18T07:00:00Z", "url": "https://github.test/acme/app/releases/tag/v2.4.0",
+       "notes": "## What's new\n- The weekly view: what moved, what's stuck, who's on what\n- Linear import"}
+    ]
+  },
+  "registry": {
+    "_about": "roadmap D's domain lookup (ambient-lead m_5816): a fake registry/whois so the run never depends on the live web; the fixture's domain is invented and long, free in the real world too",
+    "domains": [
+      {"domain": "acme-team-planner-hq.app", "available": true, "registrar": "Gandi", "price": {"currency": "EUR", "per_year": 14.0, "years_min": 1}, "notes": ".app requires HTTPS (HSTS preloaded)"}
+    ],
+    "default": {"available": false, "registrar": "a registrar", "registered": "2018-05-08", "notes": "taken (the fake registry knows only the fixture's domain as free)"}
+  },
+  "kit": {
+    "subscribers": 1204,
+    "broadcasts": [
+      {"id": 9182, "subject": "Acme 2.4: the weekly view", "created_at": "2026-09-18T06:30:00Z", "draft": false, "published_at": "2026-09-18T08:00:00Z",
+       "stats": {"recipients": 1131, "open_rate": 0.47, "click_rate": 0.088, "unsubscribes": 3}},
+      {"id": 8977, "subject": "What we learned from 40 small teams", "created_at": "2026-09-04T06:30:00Z", "draft": false, "published_at": "2026-09-04T08:00:00Z",
+       "stats": {"recipients": 1052, "open_rate": 0.51, "click_rate": 0.061, "unsubscribes": 5}},
+      {"id": 8740, "subject": "Acme 2.3: Linear import", "created_at": "2026-08-21T06:30:00Z", "draft": false, "published_at": "2026-08-21T08:00:00Z",
+       "stats": {"recipients": 987, "open_rate": 0.44, "click_rate": 0.072, "unsubscribes": 2}}
+    ]
+  },
+  "hn": {
+    "stories": [
+      {"id": 41698770, "title": "Ask HN: What do you use for team offsites?", "url": null, "by": "opsnerd", "points": 41, "comments": 58, "rank": {"front": null, "top": null, "show": null, "newest": null}, "posted": "2026-10-01T15:00:00Z"}
+    ]
+  },
+  "granola": {
+    "meetings": [
+      {"id": "8b1f2c3d-0001-4a5b-9c8d-000000000001", "title": "Q2 review with Northwind", "date": "2026-09-11T13:00:00Z",
+       "attendees": [{"name": "Hélène Roux", "email": "helene.roux@northwind.test"}, {"name": "Camille", "email": "camille@acme.test"}],
+       "summary": "Northwind is happy with the weekly view; usage up 30%. Hélène asked for SSO before renewing and hinted at a 3-year deal if the price holds.",
+       "decisions": ["Keep the current price until the Q3 renewal", "Acme shares the SSO timeline in writing"],
+       "action_items": [{"owner": "Camille", "text": "send Hélène the SSO timeline in writing", "due": "2026-09-25"},
+                        {"owner": "Hélène Roux", "text": "confirm the seat count for Q3 (now 42)", "due": "2026-09-30"}],
+       "transcript": "Hélène: the weekly view saved my team a meeting a week... Camille: SSO is planned for Q4..."},
+      {"id": "8b1f2c3d-0002-4a5b-9c8d-000000000002", "title": "Team sync", "date": "2026-09-25T09:30:00Z",
+       "attendees": [{"name": "Marc Dubois", "email": "marc@acme.test"}, {"name": "Nora Haddad", "email": "nora@acme.test"}, {"name": "Lucas Bernard", "email": "lucas@acme.test"}, {"name": "Camille", "email": "camille@acme.test"}],
+       "summary": "Dark mode slips a week; offsite budget to be capped; Ines starts in October.",
+       "decisions": ["Dark mode ships on the settings page first"], "action_items": [{"owner": "Nora Haddad", "text": "propose the offsite cap", "due": "2026-10-01"}]}
+    ]
+  },
+  "sets": {
+    "today": {
+      "_about": "roadmap E and the meetings (amb-kit m_5643, m_5656): three meetings around the run's own now (minutes from the hub's start): the Northwind renewal (notes from the last time, and notes of today's that appear once it is over), the team sync, a coffee with no description and no notes, moved later in the day.",
+      "calendar": {"events": [
+        {"id": "e401", "title": "Q3 renewal with Northwind", "start_in_min": 15, "end_in_min": 45, "location": "Zoom",
+         "attendees": [{"name": "Hélène Roux", "email": "helene.roux@northwind.test"}, {"name": "Camille", "email": "camille@acme.test"}],
+         "description": "Northwind's annual plan renews on Oct 31. Hélène wants a 3-year price and SSO."},
+        {"id": "e402", "title": "Team sync", "start_in_min": 60, "end_in_min": 90, "location": "Room 2",
+         "attendees": [{"name": "Marc Dubois", "email": "marc@acme.test"}, {"name": "Nora Haddad", "email": "nora@acme.test"}, {"name": "Lucas Bernard", "email": "lucas@acme.test"}, {"name": "Camille", "email": "camille@acme.test"}],
+         "description": "weekly"},
+        {"id": "e403", "title": "Coffee with Yann", "start_in_min": 150, "end_in_min": 180, "moved_from_in_min": 105, "status": "moved", "location": "",
+         "attendees": [{"name": "Yann Meyer", "email": "yann@meyer.test"}, {"name": "Camille", "email": "camille@acme.test"}], "description": ""}
+      ]},
+      "granola": {"+meetings": [
+        {"id": "8b1f2c3d-0003-4a5b-9c8d-000000000003", "title": "Q3 renewal with Northwind", "start_in_min": 15, "available_in_min": 47,
+         "attendees": [{"name": "Hélène Roux", "email": "helene.roux@northwind.test"}, {"name": "Camille", "email": "camille@acme.test"}],
+         "summary": "Northwind renews for 3 years at the current price if SSO ships by January. 45 seats.",
+         "decisions": ["3-year renewal at the current price, conditional on SSO by January", "45 seats from November"],
+         "action_items": [{"owner": "Camille", "text": "send Hélène the renewal quote for 3 years, 45 seats", "due": "tomorrow"},
+                          {"owner": "Camille", "text": "ask Lucas for a firm SSO date", "due": "Friday"},
+                          {"owner": "Hélène Roux", "text": "get the legal sign-off on the 3-year term", "due": "next week"}],
+         "transcript": "Hélène: if SSO is there by January we sign for three years..."}
+      ]},
+      "gmail": {"+messages": [
+        {"id": "m130", "thread": "t130", "from": "Hélène Roux <helene.roux@northwind.test>", "to": "camille@acme.test", "date": "2026-09-30T16:10:00Z", "labels": ["INBOX", "IMPORTANT"], "unread": false,
+         "subject": "Before our renewal call", "body": "Hi Camille, before Thursday: can you bring a 3-year price, and where SSO is? Legal will ask. Best, Hélène"}
+      ]},
+      "people": ["- Hélène Roux: buyer at Northwind, prefers mail to calls, decides with legal", "- Marc Dubois: Acme's CEO, wants numbers first"]
+    },
+    "mentions": {
+      "_about": "roadmap F, mentions for him (amb-kit m_5997): 6 direct asks of Camille on Slack and mail in 3 batches (batch 0 at the hub's start, 1 after the first qa.py tick, 2 after the second), 2 of them from his team (people.md: Léa Martin, Nora Haddad), plus noise that must never show: a newsletter, a cc-only FYI, a notification, an ask already answered. 'batch' items get their time when their batch comes (at_min minutes before it); 'mention' and 'noise' are the QA's truth, never shown by the fake tools.",
+      "slack": {"+channels": [
+        {"id": "C06", "name": "design", "topic": "design reviews and the pricing page"},
+        {"id": "D02", "name": "@nora.haddad", "topic": "direct messages with Nora Haddad", "is_im": true},
+        {"id": "D03", "name": "@theo.blanc", "topic": "direct messages with Théo Blanc", "is_im": true}],
+       "messages": [
+        {"id": "s301", "channel": "design", "user": "lea", "batch": 0, "at_min": -4, "mention": "team", "text": "@camille which date works for the pricing review, tuesday or thursday?"},
+        {"id": "s303", "channel": "@nora.haddad", "user": "nora", "batch": 1, "at_min": -3, "mention": "team", "work": true, "text": "Camille, can you check why the CSV export drops the due dates? a customer asked this morning."},
+        {"id": "s305", "channel": "@theo.blanc", "user": "theo", "batch": 2, "at_min": -2, "mention": "other", "text": "hey Camille, can you approve the launch tweet copy before 4pm? the draft is in the doc."},
+        {"id": "s311", "channel": "design", "user": "lea", "batch": 0, "at_min": -40, "noise": "answered", "text": "@camille can you share the Figma link for the onboarding screens?"},
+        {"id": "s312", "channel": "design", "user": "camille", "batch": 0, "at_min": -38, "noise": "answered", "reply_to": "s311", "text": "here it is: https://figma.test/file/onboarding (the v3 page)"},
+        {"id": "s313", "channel": "team", "user": "slackbot", "batch": 0, "at_min": -20, "noise": "notification", "text": "Reminder: @camille, your status has been set to away for 2 hours."}
+      ]},
+      "gmail": {"messages": [
+        {"id": "m302", "thread": "t302", "from": "Hugo Bernard <hugo@brightline.test>", "to": "camille@acme.test", "batch": 0, "at_min": -6, "mention": "other", "labels": ["INBOX"], "unread": true, "subject": "March invoice", "body": "Hi Camille, could you resend the March invoice? Our accounting can't find it. Thanks, Hugo"},
+        {"id": "m304", "thread": "t304", "from": "Paul Girard <paul@studio-girard.test>", "to": "camille@acme.test", "batch": 1, "at_min": -1, "mention": "other", "labels": ["INBOX"], "unread": true, "subject": "Logo files for the case study", "body": "Hello Camille, can you send me the logo files (SVG) for the case study? We publish on Friday. Paul"},
+        {"id": "m306", "thread": "t306", "from": "Sophie Laurent <sophie@northwind.test>", "to": "camille@acme.test", "batch": 2, "at_min": -1, "mention": "other", "labels": ["INBOX"], "unread": true, "subject": "Quick call?", "body": "Hi Camille, are you free for a 20 min call on Thursday about the SSO pilot? Any time after 2pm works. Sophie"},
+        {"id": "m311", "thread": "t311", "from": "Product Weekly <news@productweekly.test>", "to": "camille@acme.test", "batch": 0, "at_min": -90, "noise": "newsletter", "labels": ["INBOX", "newsletter"], "unread": true, "subject": "Camille, 5 questions every PM should ask this week", "body": "Hi Camille! Can you answer these 5 questions about your roadmap? Read the issue online. Unsubscribe."},
+        {"id": "m312", "thread": "t312", "from": "Marc Dubois <marc@acme.test>", "to": "legal@acme.test", "cc": "camille@acme.test", "batch": 0, "at_min": -30, "noise": "cc-only", "labels": ["INBOX"], "unread": true, "subject": "FYI: Northwind contract signed", "body": "Legal, FYI the Northwind contract is signed, filed in the drive. Camille cc'd for the record, nothing to do. Marc"},
+        {"id": "m313", "thread": "t313", "from": "Linear <notifications@linear.test>", "to": "camille@acme.test", "batch": 0, "at_min": -15, "noise": "notification", "labels": ["INBOX", "notifications"], "unread": true, "subject": "Lucas mentioned you in ENG-412", "body": "Lucas Bernard mentioned you in ENG-412: '@camille can you look at this?' View the issue in Linear. You are receiving this because you are subscribed."}
+      ]},
+      "people": ["- Léa Martin: team · design lead", "- Nora Haddad: team · ops lead", "- Hugo Bernard: customer at Brightline, accounting questions"]
+    },
+    "promises": {
+      "_about": "roadmap G, his promises (ambient-lead m_6016, amb-kit 8ba1685a): what Camille said he'd do, across Granola (the Q2 review's 'send Hélène the SSO timeline in writing', due 09-25, in the base fixtures: overdue), his sent mail (the signed NDA to Paul 'tomorrow' on 09-28: overdue; the board deck to Marc 'by tomorrow noon', kept by his mail of 10-01) and Slack (the pricing copy 'on Monday': open, not due); plus others' promises that are not his (Lucas on SSO, Paul on the case study). 'promise' is the QA's truth: sso, nda, deck (kept), pricing.",
+      "people": ["- Lelio Garnier: team · ops, lelio@acme.test", "- Hélène Roux: buyer at Northwind, prefers mail to calls, decides with legal", "- Paul Girard: studio-girard, does our case study"],
+      "gmail": {"+messages": [
+        {"id": "m401", "thread": "t401", "from": "Camille <camille@acme.test>", "to": "Paul Girard <paul@studio-girard.test>", "date": "2026-09-28T10:05:00Z", "labels": ["SENT"], "unread": false, "promise": "nda",
+         "subject": "Re: NDA for the case study", "body": "Hi Paul, thanks for the draft. I'll send you the signed NDA tomorrow. Camille"},
+        {"id": "m402", "thread": "t402", "from": "Camille <camille@acme.test>", "to": "Marc Dubois <marc@acme.test>", "date": "2026-09-30T09:10:00Z", "labels": ["SENT"], "unread": false, "promise": "deck",
+         "subject": "Board deck", "body": "Marc, I'll share the board deck by tomorrow noon. Camille"},
+        {"id": "m403", "thread": "t402", "from": "Camille <camille@acme.test>", "to": "Marc Dubois <marc@acme.test>", "date": "2026-10-01T10:40:00Z", "labels": ["SENT"], "unread": false, "promise": "deck-kept",
+         "subject": "Re: Board deck", "body": "Here's the board deck: https://docs.acme.test/board-deck-q3. Camille"},
+        {"id": "m404", "thread": "t404", "from": "Paul Girard <paul@studio-girard.test>", "to": "camille@acme.test", "date": "2026-09-29T16:00:00Z", "labels": ["INBOX"], "unread": false, "promise": "not-his",
+         "subject": "Case study draft", "body": "Camille, I'll send you the case study draft by Friday. Paul"}
+      ]},
+      "slack": {"+messages": [
+        {"id": "s401", "channel": "design", "user": "camille", "ts": "2026-10-01T15:00:00Z", "promise": "pricing", "text": "i'll look at the pricing copy on Monday and tell you what to cut"},
+        {"id": "s402", "channel": "team", "user": "lucas", "ts": "2026-10-01T11:00:00Z", "promise": "not-his", "text": "I'll have SSO login ready for the beta by January"}
+      ]}
+    }
+  },
+  "launch": {
+    "_about": "Acme's launch day, seen from HN, Reddit, X and Bluesky (roadmap B's launch watch). Comments come in batches: batch 0 at the hub's start, then one more per tick (qa.py tick) or every every_min minutes of hub time. Numbers move per batch (index = batches seen - 1, the last one held). kind and needs_answer are the QA's truth: the fake tools never show them.",
+    "every_min": 30,
+    "hn": {"id": 41712001, "title": "Show HN: Acme - a calmer project tracker for small teams", "url": "https://acme.test", "by": "marcdubois", "posted_min": 180,
+           "points": [182, 241, 297, 330], "rank": [{"front": 7, "top": 7, "show": 2, "newest": null}, {"front": 4, "top": 4, "show": 1, "newest": null}, {"front": 3, "top": 3, "show": 1, "newest": null}, {"front": 5, "top": 5, "show": 1, "newest": null}]},
+    "reddit": {"id": "1fx9k2q", "sub": "SaaS", "title": "We launched Acme today: a calmer project tracker for teams under 20", "by": "acme_marc", "posted_min": 170,
+               "score": [58, 91, 120, 133], "ratio": [0.93, 0.94, 0.95, 0.95]},
+    "x": {"id": "1841760000000000001", "handle": "acme_app", "text": "Acme is live: a calmer project tracker for small teams. Signup in 0.9 s, dark mode Monday. acme.test", "posted_min": 175,
+          "metrics": [{"likes": 120, "reposts": 31, "quotes": 6, "impressions": 14200, "bookmarks": 22}, {"likes": 188, "reposts": 47, "quotes": 9, "impressions": 23900, "bookmarks": 35},
+                      {"likes": 240, "reposts": 58, "quotes": 11, "impressions": 31800, "bookmarks": 44}, {"likes": 262, "reposts": 61, "quotes": 12, "impressions": 35100, "bookmarks": 47}]},
+    "bluesky": {"id": "3l5acmelaunch", "handle": "acme.test", "text": "Acme is live today: a calmer project tracker for small teams. acme.test", "posted_min": 172,
+                "likes": [40, 66, 81, 95], "reposts": [9, 14, 19, 21], "quotes": [1, 2, 3, 3]},
+    "comments": [
+      {"id": "41712140", "batch": 0, "place": "hn", "author": "pg_fan", "ago_min": 150, "kind": "question", "needs_answer": true, "text": "The 0.9 s signup is noticeable. What did you change?"},
+      {"id": "41712233", "batch": 0, "place": "hn", "author": "kls", "ago_min": 120, "kind": "praise", "needs_answer": false, "text": "Dark mode on Monday is the right priority, my eyes thank you."},
+      {"id": "41712390", "batch": 0, "place": "hn", "author": "tptacek_not", "ago_min": 95, "kind": "question", "needs_answer": true, "text": "How do you handle SSO for teams under 20? The pricing page doesn't say."},
+      {"id": "lq1a2b3", "batch": 0, "place": "reddit", "author": "opsgal", "ago_min": 140, "kind": "praise", "needs_answer": false, "text": "Switched from Jira last month, the weekly view alone was worth it."},
+      {"id": "lq1c4d5", "batch": 0, "place": "reddit", "author": "bitrot", "ago_min": 80, "kind": "bug", "needs_answer": true, "text": "Signup hangs on Safari 17 when 1Password is open. Firefox works."},
+      {"id": "1841771000000000101", "batch": 0, "place": "x", "author": "devmarta", "ago_min": 130, "kind": "praise", "needs_answer": false, "text": "@acme_app the calmest UI I've used this year. nice work"},
+      {"id": "1841772000000000102", "batch": 0, "place": "x", "author": "growthguy", "ago_min": 110, "kind": "other", "needs_answer": false, "quote": true, "text": "congrats on the launch, big day for the acme team"},
+      {"id": "3l5lin1", "batch": 0, "place": "bluesky", "author": "lin.bsky.social", "ago_min": 100, "kind": "question", "needs_answer": true, "text": "is there a self-hosted version? we can't put client data in a SaaS"},
+      {"id": "41713010", "batch": 1, "place": "hn", "author": "agentsmith", "ago_min": 12, "kind": "question", "needs_answer": true, "text": "Does it work with Claude Code? I'd like my coding agent to file and close issues through your API."},
+      {"id": "41713055", "batch": 1, "place": "hn", "author": "skeptic42", "ago_min": 8, "kind": "question", "needs_answer": true, "text": "Another project tracker. What does it do that Linear doesn't, for a team of 10?"},
+      {"id": "lq2e6f7", "batch": 1, "place": "reddit", "author": "pmlife", "ago_min": 15, "kind": "bug", "needs_answer": true, "text": "Export to CSV drops the due dates. Tried twice, same result."},
+      {"id": "1841779000000000103", "batch": 1, "place": "x", "author": "ux_nadia", "ago_min": 10, "kind": "praise", "needs_answer": false, "text": "@acme_app the onboarding is the best I've seen this year, three clicks and I had my board"},
+      {"id": "1841779500000000104", "batch": 1, "place": "x", "author": "saasdir_bot", "ago_min": 6, "kind": "other", "needs_answer": false, "text": "@acme_app list your product on our SaaS directory for free! link in bio"},
+      {"id": "3l5tom2", "batch": 1, "place": "bluesky", "author": "tomk.bsky.social", "ago_min": 9, "kind": "question", "needs_answer": true, "text": "any pricing for nonprofits? we're 12 volunteers"},
+      {"id": "41713420", "batch": 2, "place": "hn", "author": "pg_fan", "ago_min": 14, "kind": "other", "needs_answer": false, "parent": "41712140", "text": "Thanks for the details on signup, that answers it."},
+      {"id": "41713488", "batch": 2, "place": "hn", "author": "dbadmin", "ago_min": 9, "kind": "bug", "needs_answer": true, "text": "Your API returns 500 when an issue title has an emoji in it."},
+      {"id": "lq3g8h9", "batch": 2, "place": "reddit", "author": "opsgal", "ago_min": 11, "kind": "praise", "needs_answer": false, "parent": "lq1a2b3", "text": "Update: the whole team moved over this afternoon."},
+      {"id": "1841785000000000105", "batch": 2, "place": "x", "author": "cto_ana", "ago_min": 7, "kind": "question", "needs_answer": true, "text": "@acme_app is SOC 2 on the roadmap? our security team will ask"},
+      {"id": "3l5lin3", "batch": 2, "place": "bluesky", "author": "lin.bsky.social", "ago_min": 5, "kind": "praise", "needs_answer": false, "parent": "3l5lin1", "text": "found the self-hosting docs, thanks!"}
+    ]
+  }
+}

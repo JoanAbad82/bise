@@ -1,0 +1,213 @@
+// The workshop's look (render/maps/look.ts; its plan: maps/workshop.ts): a garage, concrete floor
+// with an oil stain, tall grey walls, a pegboard of tools, wooden desks against the walls, the
+// workbench (the eating place) with its vise and toolbox, the ping-pong table, the roller door
+// rolled up on the left wall's front stretch, a scooter across it, a mint Vespa in the front middle, the neon :* over the board; its growth is the loft's (blook.ts
+// loftGrower), the mural in the back left corner. Past 18 desks the floor's pods and corners (page
+// bims-workshop; drawn by render/maps/workshop-floor.ts where maps/workshop-floor.ts puts them). Owner: maps-b.
+import { Group, type Object3D } from 'three';
+import { type WorkshopOffice, scooterAt } from '../../maps/workshop';
+import { decorOf } from '../decor';
+import { boxOf, onFloor } from '../kit';
+import { AZ } from '../camera';
+import { WORLD } from '../palette';
+import { loftLounge, loftTree } from '../stages';
+import { bigDesk, boxHolding, grow, loftGrower, palettes, pieceAtOf, turnedDesk } from './blook';
+import type { Build, MapLook } from './look';
+import { corner, podBeam } from './workshop-floor';
+
+const WALL_H = 2.1;
+const TOOLS = ['#f39a4c', '#6cb4ee', '#2b2d42', '#ffd166'] as const;
+
+const ws = (b: Build): WorkshopOffice => b.o as WorkshopOffice;
+const benchOf = (o: { island: { x0: number; x1: number; z0: number; z1: number } }) => ({ x: (o.island.x0 + o.island.x1) / 2, z: (o.island.z0 + o.island.z1) / 2 });
+const boardX = (o: { boardSpots: readonly { x: number }[] }): number => o.boardSpots.reduce((s, p) => s + p.x, 0) / Math.max(1, o.boardSpots.length);
+
+const grower = loftGrower({
+  fruit: (o) => ({ x: benchOf(o).x + 0.1, z: benchOf(o).z }),
+  fruit2: (o) => ({ x: benchOf(o).x - 0.75, z: benchOf(o).z }),
+  boombox: (o) => ({ x: benchOf(o).x + 0.85, z: benchOf(o).z }),
+  mural: (o) => [o.x0 + 0.15, o.x0 + 2.3],
+  arcade: (o) => ({ x: o.x0 + 0.5, z: 1.2 }),
+  nap: (o) => ({ x: o.x0 + o.W - 2.5, z: o.D - 2.5 }),
+  frameSpan: (o) => ({ xa: o.x0 + 2.4, xb: boardX(o) - 1.1, y: 1.9, z: 0.02 }),
+});
+
+/** the concrete, the tall walls, the pegboard, the roller door, the oil stain, the door mat */
+function shell(b: Build): void {
+  const { k, root } = b;
+  const { style, pal } = k;
+  const o = ws(b);
+  const { x0, W, D } = o;
+  const x1 = x0 + W;
+  k.add(style.box(W, 0.14, D), style.floor(pal.floor, W, D), root, x0 + W / 2, -0.05, D / 2);
+  k.add(style.box(W + 0.2, WALL_H, 0.2), k.mat(pal.wall), root, x0 + W / 2, WALL_H / 2, -0.1);
+  // the left wall, cut for the roller door (below)
+  const { z0: wz0, z1: wz1 } = o.roller;
+  k.add(style.box(0.2, 1.2, wz0 + 0.1), k.mat(pal.wall), root, x0 - 0.1, 0.6, (wz0 - 0.1) / 2);
+  k.add(style.box(0.2, 1.2, D + 0.1 - wz1), k.mat(pal.wall), root, x0 - 0.1, 0.6, (wz1 + D + 0.1) / 2);
+  k.add(style.box(W + 0.2, 0.08, 0.24), k.mat(pal.wallTop), root, x0 + W / 2, WALL_H, -0.1);
+  // the pegboard with its tools, over the board's left
+  const px = boardX(o) - 1.0;
+  k.add(style.box(1.2, 0.5, 0.04), k.mat('#c49a6c'), root, px, 1.75, 0.03 + style.pictureZ);
+  for (let i = 0; i < 6; i++) k.add(style.box(0.06, 0.3, 0.04), k.mat(TOOLS[i % TOOLS.length] ?? WORLD.dark), root, px - 0.45 + i * 0.18, 1.75 + (i % 2) * 0.06, 0.07 + style.pictureZ);
+  // the roller door rolled up on the left wall's front stretch (maps/workshop.ts rollerOf): the far
+  // side from the camera, it hides nothing (on the right edge it stood before main's desk: Gabriel via
+  // main m_35959, bims m_35967); its two posts, the drum's housing, the bottom of its slats under it,
+  // the wall cut for its opening; a scooter parked across it, its nose out through it
+  const { z0: rz0, z1: rz1 } = o.roller;
+  const rx = x0 - 0.1;
+  const rm = (rz0 + rz1) / 2;
+  for (const z of [rz0, rz1]) k.add(style.box(0.16, WALL_H, 0.16), k.mat(pal.wallTop), root, rx, WALL_H / 2, z);
+  k.add(style.box(0.36, 0.34, rz1 - rz0 + 0.2), k.mat(pal.wallTop), root, rx, WALL_H - 0.05, rm);
+  k.add(style.box(0.06, 0.4, rz1 - rz0 - 0.16), k.mat('#9aa3ab'), root, rx + 0.02, WALL_H - 0.42, rm);
+  for (let i = 0; i < 3; i++) k.add(style.box(0.07, 0.02, rz1 - rz0 - 0.16), k.mat('#77838c'), root, rx + 0.03, WALL_H - 0.3 - i * 0.12, rm);
+  const sp = scooterAt(o);
+  const sc = new Group();
+  sc.position.set(sp.x, 0, sp.z);
+  sc.rotation.y = Math.PI;
+  root.add(sc);
+  scooter(k, sc, 0, 0);
+  // a Vespa in the front middle, on its side stand, side on to the camera (where the old car
+  // stood: its wheels z-fought, bims-vespa)
+  // (its place is the plan's: on the front band once the room has corners, maps/workshop.ts)
+  if (o.vespa) vespa(k, root, o.vespa.x, o.vespa.z);
+  // the floor past the walls (page bims-workshop): each pod's lamp beam, each workshop corner
+  for (const p of o.pods) podBeam(k, root, p);
+  o.corners.forEach((c, i) => corner(k, root, c, i));
+  // an oil stain, a tyre lying flat on the right edge (low: nothing tall before main's desk)
+  const oil = k.add(style.cylinder(0.5, 0.01), k.mat('#9a978f'), root, x0 + W * 0.62, 0.025, D * 0.72);
+  oil.scale.z = 0.6;
+  k.add(style.cylinder(0.3, 0.16), k.mat(WORLD.dark), root, x1 - 0.4, 0.09, 4.8);
+  onFloor(k, root, boxOf(decorOf(o).doorMat), 0.04, 0.03, WORLD.mat);
+}
+
+/** the Vespa's tilt on its side stand, towards its +z (the stand's side) */
+const LEAN = 0.1;
+/**
+ * its turn: its long axis along the screen's horizontal (camera.ts RIGHT), the nose (+x before it)
+ * and headlight to the screen's left (-RIGHT), its whole side and two-tone seat on view. Its axis at
+ * the camera read as an upright mint figure (designer m_32508, bims m_32510)
+ */
+const YAW = AZ + Math.PI;
+/** a touch bigger than its first cut, so it reads as a vehicle by the bims (designer m_32508) */
+const SCALE = 1.2;
+/** its wheels along its length, back and front: ~1.4 long before its SCALE, so it reads as a vehicle by the bims (designer) */
+const WHEELS = [-0.47, 0.49] as const;
+/** the top of the workshop's concrete (style.box(W, 0.14, D) at -0.05): the wheels stand on it */
+const FLOOR_TOP = 0.012;
+
+/**
+ * a mint Vespa on its side stand, side on to the camera, its nose to the screen's left: round body,
+ * front shield, a round headlight, a two-tone seat a bim can ride (~0.55 up), ~1.7 long, a soft contact shadow under each
+ * wheel (designer). Every part stands off the others (no two faces in one plane: the old car's
+ * z-fight, coplanar.test.ts).
+ */
+export function vespa(k: Build['k'], root: Object3D, x: number, z: number): Group {
+  const { style } = k;
+  const g = new Group();
+  g.name = 'vespa';
+  g.position.set(x, FLOOR_TOP, z);
+  g.rotation.y = YAW;
+  g.scale.setScalar(SCALE);
+  root.add(g);
+  const lean = new Group();
+  lean.rotation.x = LEAN;
+  g.add(lean);
+  const shade = style.material('#000000', { opacity: 0.28 });
+  for (const wx of WHEELS) {
+    const s = k.add(style.cylinder(0.11, 0.002), shade, g, wx, 0.006, 0.01);
+    s.name = 'wheel shadow';
+    s.scale.z = 0.5;
+  }
+  const put = (name: string, geo: Parameters<typeof k.add>[0], color: string, px: number, py: number, pz: number) => {
+    const m = k.add(geo, k.mat(color), lean, px, py, pz);
+    m.name = name;
+    return m;
+  };
+  const mint = '#9ed8c4';
+  const cream = '#f3ead8';
+  // two small solid wheels, each one mesh, and a hub cap through it that stands 0.02 out each side
+  for (const [name, wx] of [['back', WHEELS[0]], ['front', WHEELS[1]]] as const) {
+    put(`${name} wheel`, style.cylinder(0.13, 0.09), WORLD.dark, wx, 0.13, 0).rotation.x = Math.PI / 2;
+    put(`${name} hub`, style.cylinder(0.06, 0.13), cream, wx, 0.13, 0).rotation.x = Math.PI / 2;
+  }
+  // the long round back over the engine, the floorboard, the front shield leaning back, the mudguard
+  put('body', style.ball(0.2), mint, -0.39, 0.28, 0).scale.set(2.0, 0.78, 1);
+  put('floorboard', style.box(0.6, 0.05, 0.26), mint, 0.03, 0.19, 0);
+  put('shield', style.box(0.05, 0.4, 0.3), mint, 0.33, 0.4, 0).rotation.z = 0.18;
+  put('mudguard', style.cap(0.15, 0.5), mint, WHEELS[1], 0.15, 0).scale.z = 0.55;
+  // the two-tone seat: a cream band under a brown top
+  put('seat band', style.capsule(0.07, 0.46), cream, -0.39, 0.43, 0).rotation.z = Math.PI / 2;
+  put('seat', style.capsule(0.064, 0.42), '#8a6248', -0.39, 0.48, 0).rotation.z = Math.PI / 2;
+  // the steering column, the headset with its round headlight, the handlebar
+  put('column', style.cylinder(0.03, 0.3), cream, 0.38, 0.58, 0).rotation.z = 0.18;
+  put('headset', style.box(0.12, 0.08, 0.14), mint, 0.345, 0.75, 0);
+  put('handlebar', style.capsule(0.022, 0.42), WORLD.dark, 0.335, 0.78, 0).rotation.x = Math.PI / 2;
+  put('headlight rim', style.cylinder(0.05, 0.04), cream, 0.425, 0.75, 0).rotation.z = Math.PI / 2;
+  put('headlight', style.ball(0.042), WORLD.paper, 0.44, 0.75, 0);
+  put('taillight', style.ball(0.03), '#f39a4c', -0.79, 0.33, 0);
+  // the side stand, from under the floorboard down to the floor on the side it leans to
+  const [ty, tz, fy, fz] = [0.21, 0.06, 0.2 * Math.tan(LEAN), 0.2];
+  const stand = put('stand', style.cylinder(0.014, Math.hypot(ty - fy, tz - fz)), WORLD.dark, -0.1, (ty + fy) / 2, (tz + fz) / 2);
+  stand.rotation.x = Math.atan2(tz - fz, ty - fy);
+  return g;
+}
+
+/** a scooter, its nose to its +x (towards the roller door) */
+function scooter(k: Build['k'], root: Object3D, x: number, z: number): void {
+  const { style } = k;
+  const body = k.mat('#6cb4ee');
+  for (const dx of [-0.42, 0.42]) {
+    const w = k.add(style.cylinder(0.16, 0.08), k.mat(WORLD.dark), root, x + dx, 0.16, z);
+    w.rotation.x = Math.PI / 2;
+  }
+  k.add(style.box(0.7, 0.14, 0.26), body, root, x - 0.05, 0.3, z);
+  k.add(style.box(0.3, 0.3, 0.3, 0.1), body, root, x - 0.3, 0.45, z);
+  k.add(style.box(0.34, 0.07, 0.24), k.mat(WORLD.dark), root, x - 0.28, 0.63, z);
+  k.add(style.box(0.08, 0.5, 0.2), body, root, x + 0.38, 0.45, z);
+  k.add(style.box(0.04, 0.04, 0.5), k.mat(WORLD.dark), root, x + 0.4, 0.72, z);
+  k.add(style.ball(0.05), k.mat(WORLD.paper), root, x + 0.44, 0.62, z);
+}
+
+/** the workbench (its vise, its toolbox, a radio) and the ping-pong table in front of it */
+function island(b: Build): void {
+  const { k, root } = b;
+  const { style, pal } = k;
+  const o = ws(b);
+  const { x, z } = benchOf(o);
+  k.add(style.box(2.5, 0.62, 0.8, 0.08), k.mat(pal.island), root, x, 0.31, z);
+  k.add(style.box(2.6, 0.07, 0.9), k.mat(pal.islandTop), root, x, 0.66, z);
+  k.add(style.box(0.2, 0.16, 0.16), k.mat(WORLD.dark), root, x - 1.1, 0.78, z + 0.32);
+  k.add(style.box(0.5, 0.26, 0.28), k.mat(WORLD.pot), root, x - 0.3, 0.83, z - 0.22);
+  const p = o.pingpong;
+  const px = (p.x0 + p.x1) / 2;
+  const pz = (p.z0 + p.z1) / 2;
+  k.add(style.box(p.x1 - p.x0, 0.06, p.z1 - p.z0), k.mat('#2a9d8f'), root, px, 0.72, pz);
+  k.add(style.box(0.02, 0.01, p.z1 - p.z0 - 0.04), k.mat(WORLD.paper), root, px - (p.x1 - p.x0) / 2 + 0.03, 0.755, pz);
+  k.add(style.box(0.04, 0.16, p.z1 - p.z0), k.mat(WORLD.paper), root, px, 0.83, pz);
+  for (const [dx, dz] of [[-1.1, -0.6], [1.1, -0.6], [-1.1, 0.6], [1.1, 0.6]] as const) k.add(style.box(0.06, 0.7, 0.06), k.mat(WORLD.dark), root, px + dx, 0.35, pz + dz);
+  k.add(style.ball(0.05), k.mat(WORLD.paper), root, px + 0.6, 0.9, pz + 0.2);
+}
+
+export const workshop: MapLook = {
+  id: 'workshop',
+  // its cozy pieces (render/cozy.ts; page bims-cozy v2 « la base, carte par carte »)
+  cozy: { plant: 'sansevieria', small: 'succulent', coffee: 'moka', bed: 'cot', shelf: 'radio', poster: 'ads', wood: '#8a6a4a', cloth: ['#6b7a4a', '#e9c46a', '#c9ccd3'], art: ['#e9c46a', '#2a9d8f', '#f28c28'], pot: '#9a958c', rug: '#2a9d8f' },
+  pal: palettes(
+    { floor: '#c4c1bb', wall: '#8e9aa3', wallTop: '#77838c', desk: '#c49a6c', deskTop: '#d8b483', island: '#5c677d', islandTop: '#c49a6c', rug: '#6cb4ee' },
+    { floor: '#7d7a75', wall: '#4f585f' },
+  ),
+  shell,
+  island,
+  bedShape: 'sink',
+  lounge: loftLounge,
+  desk: (b, d, name) => turnedDesk(b, d, name, { w: 1.6, d: 0.78, at: 0.5 }),
+  mainDesk: (b) => {
+    const md = b.o.mainDesk;
+    const box = boxHolding(b.o, { x: md.x, z: md.z + 0.6 }) ?? { x0: md.x - 1.15, x1: md.x + 1.15, z0: md.z + 0.1, z1: md.z + 1.1 };
+    return bigDesk(b, box, md, { x: boardX(b.o), y: 1.82 });
+  },
+  tree: ({ k }, parent, x, z, size) => { loftTree(k, parent, x, z, size); },
+  growth: (b) => { grow(b, grower); },
+  pieceAt: pieceAtOf(grower),
+};

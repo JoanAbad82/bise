@@ -11,6 +11,8 @@ import ../core/text.bend as Tx
 import ../core/config.bend as Cf
 import ../core/image.bend as Im
 import ../vendor/json.bend as J
+import ./plan-pure.bend as Plan
+import ../core/gen/obs.bend as OG
 
 # ---- the provider registry ----
 # A model id is "provider/model" (the model may hold '/' itself:
@@ -41,6 +43,9 @@ import ../vendor/json.bend as J
 # '/' is an alias, else the legacy guess: claude* -> foundry/<name>,
 # anything else -> mistral/<name>.
 
+# No models file (it could not be written: every spawn sets
+# BISE_MODELS_FILE): these two setups, with no efforts list (no effort
+# chosen, the body default goes; an effort list never lives in bend/).
 def builtin() -> List<&2, Cf.KV>:
   [Cf.KV{"aliases.\"opus-5.5\"", "foundry/claude-opus-5-5"},
     Cf.KV{"providers.foundry.api", "anthropic"},
@@ -337,31 +342,13 @@ def max_key.pick(is_openai: Bool) -> String:
       "max_tokens"
 
 # ---- the reasoning effort (BISE-135) ----
-# The words a model takes: its `efforts` key (comma-separated, the
-# models file has them normalized by Rust), else its family's; none
-# when it does not reason (an Anthropic one with thinking = "none"
-# included). The same rule as rust/catalog's Resolved::efforts.
-
-def anth_efforts() -> List<&2, String>:
-  ["none", "low", "medium", "high", "max"]
-
-def chat_efforts() -> List<&2, String>:
-  ["none", "low", "medium", "high"]
-
-def efforts.family(is_anth: Bool) -> List<&2, String>:
-  match is_anth:
-    case True{}:
-      anth_efforts()
-    case False{}:
-      chat_efforts()
-
-def efforts.own(empty: Bool, +own: List<&2, String>, is_anth: Bool)
-    -> List<&2, String>:
-  match empty:
-    case True{}:
-      efforts.family(is_anth)
-    case False{}:
-      own
+# The words a model takes: its `efforts` key, else its provider's
+# (comma-separated). Rust is the one owner of the lists
+# (rust/catalog/src/efforts.rs): the models file carries each model's
+# list and each provider's family list; no list lives here. None when it
+# does not reason (an Anthropic one with thinking = "none" included), or
+# when no file says (no models file: builtin() below has none, the body
+# default goes).
 
 def non_empty(s: String) -> Bool:
   Bool.not(String.is_empty(s))
@@ -369,11 +356,10 @@ def non_empty(s: String) -> Bool:
 def efforts.words(+s: String) -> List<&2, String>:
   List.filter(~String, ~non_empty, String.split(s, ','))
 
-def efforts.on(on: Bool, +own: String, is_anth: Bool) -> List<&2, String>:
+def efforts.on(on: Bool, +own: String) -> List<&2, String>:
   match on:
     case True{}:
-      +ws = efforts.words(own)
-      efforts.own(List.is_empty(&2, String, ws), ws, is_anth)
+      efforts.words(own)
     case False{}:
       Nil{}
 
@@ -389,7 +375,7 @@ def efforts(+reg: List<&2, Cf.KV>, +prov: String, +id: String)
   +off = Bool.and(is_anth,
     String.eq(Cf.cfg_or(model_key(reg, prov, id, "thinking"), ""), "none"))
   efforts.on(Bool.and(reasons, Bool.not(off)),
-    Cf.cfg_or(model_key(reg, prov, id, "efforts"), ""), is_anth)
+    Cf.cfg_or(model_key(reg, prov, id, "efforts"), ""))
 
 def has_word(+xs: List<&2, String>, +w: String) -> Bool:
   List.contains(~String, ~String.eq, xs, w)
@@ -537,13 +523,22 @@ def effort_asked(+choice: List<&2, Cf.KV>, +role: String,
 def NO_MODEL() -> String:
   "no model yet: run bise and pick a provider (it checks your key), or set model in ~/.bise/config.toml"
 
+# the full id a session asked for, before the swap (the note's <from>):
+# the same inputs as resolve_chosen; "" when there is no model
+def asked_chosen(+choice: String, +bise: String, +bend: String,
+    +agent: String, +role: String, +cfg: String, +file: String) -> String:
+  +reg = registry(file)
+  +name = chosen_name(Cf.parse_toml(choice),
+    model_name(bise, bend, agent, role, Cf.parse_toml(cfg), reg))
+  Bool.pick(String, String.is_empty(name), "", full_id(name, reg))
+
 def resolve_named(empty: Bool, +name: String, +reg: List<&2, Cf.KV>,
     +url_env: String, +asked: String) -> Resolved:
   match empty:
     case True{}:
       RErr{"", NO_MODEL()}
     case False{}:
-      resolve_id_effort(full_id(name, reg), reg, url_env, asked)
+      resolve_id_effort(Plan.swapped(full_id(name, reg), reg), reg, url_env, asked)
 
 # THE resolution with the session's choice (its file's text, "" when
 # none), pure
@@ -594,9 +589,8 @@ def shown_effort(r: Resolved) -> String:
 # ---- the context window and the compaction threshold (BISE-150) ----
 # The window of the model a REPL starts with: its `context` in the
 # models file, else its provider's; a model nothing describes gets
-# DEFAULT_CONTEXT (rust/catalog's DEFAULT_CAPS). The compaction starts
-# at 80 % of it unless BEND_THRESHOLD or config `compaction_threshold`
-# says, and never later (BISE-300).
+# DEFAULT_CONTEXT (rust/catalog's DEFAULT_CAPS). The compaction
+# threshold it gives: runtime/threshold-pure.bend.
 
 def DEFAULT_CONTEXT() -> U32:
   128000
@@ -642,77 +636,6 @@ def window_chosen(+choice: String, +bise: String, +bend: String,
 def window(+bise: String, +bend: String, +agent: String, +role: String,
     +cfg: String, +file: String) -> U32:
   window_chosen("", bise, bend, agent, role, cfg, file)
-
-# 80 % of a window, rounded down (no overflow: n / 5 first)
-def threshold_of(+n: U32) -> U32:
-  ((n / 5) * 4 + ((n % 5) * 4) / 5 : U32)
-
-# ---- the threshold as written (BISE-300) ----
-# a number of tokens ("450000") or a share of the window ("45%"); 0,
-# empty or anything else: None (the default applies)
-def thr_value.some(zero: Bool, +n: U32) -> Maybe<&2, U32>:
-  match zero:
-    case True{}:
-      None{}
-    case False{}:
-      Some{n}
-
-def thr_value.num(m: Maybe<&2, U32>) -> Maybe<&2, U32>:
-  match m:
-    case Some{+n}:
-      thr_value.some(U32.is_eq(n, 0), n)
-    case None{}:
-      None{}
-
-# p % of a window, rounded down; p above 100 counts as 100 (no
-# overflow: window / 100 first)
-def pct_of(+p: U32, +window: U32) -> U32:
-  +q = U32.min(p, 100)
-  ((window / 100) * q + ((window % 100) * q) / 100 : U32)
-
-def thr_value.pct(m: Maybe<&2, U32>, +window: U32) -> Maybe<&2, U32>:
-  match m:
-    case Some{+p}:
-      thr_value.num(Some{pct_of(p, window)})
-    case None{}:
-      None{}
-
-def thr_value.split(pct: Bool, +t: String, +window: U32) -> Maybe<&2, U32>:
-  match pct:
-    case True{}:
-      thr_value.pct(U32.read(String.trim(String.take(t,
-        Nat.sub(String.length(t), 1n)))), window)
-    case False{}:
-      thr_value.num(U32.read(t))
-
-def thr_value(+s: String, +window: U32) -> Maybe<&2, U32>:
-  +t = String.trim(s)
-  thr_value.split(String.ends_with(t, "%"), t, window)
-
-# a value, capped at 80 % of the window; none: that 80 %. A number
-# written for a 1M model never overflows a 200k one (an agent on a
-# smaller model, BISE-298's roles).
-def thr_capped(m: Maybe<&2, U32>, +cap: U32) -> U32:
-  match m:
-    case Some{+n}:
-      U32.min(n, cap)
-    case None{}:
-      cap
-
-def threshold.pick(empty: Bool, +envv: String, +cfgt: String,
-    +window: U32) -> U32:
-  match empty:
-    case True{}:
-      thr_capped(thr_value(Cf.cfg_or(Cf.cfg_get(cfgt,
-        "compaction_threshold"), ""), window), threshold_of(window))
-    case False{}:
-      thr_capped(thr_value(envv, window), threshold_of(window))
-
-# the compaction threshold: BEND_THRESHOLD (envv) > config.toml
-# `compaction_threshold` > 80 % of the model's window; either a number
-# of tokens or "45%" of the window, and never above 80 % of it
-def threshold(+envv: String, +cfgt: String, +window: U32) -> U32:
-  threshold.pick(String.is_empty(envv), envv, cfgt, window)
 
 # ---- the threshold in the Core's units ----
 # The threshold the user writes (and the 80 % cap) counts the
@@ -761,9 +684,11 @@ def interrupted_by(+who: String) -> String:
 
 # ---- a transport failure, without the Http types ----
 
+# NDns: why the name gave no address to connect to and what the user can
+# check ("" when nothing on his side would help), vendor/http/dns's words.
 type NetErr is Data:
   NUrl{}
-  NDns{}
+  NDns{why: String, check: String}
   NConnect{code: U32, what: String}
   NTls{code: U32, what: String}
   NRead{code: U32, what: String}
@@ -779,7 +704,7 @@ def api_err(e: NetErr) -> String:
   match e:
     case NUrl{}:
       "bad url"
-    case NDns{}:
+    case NDns{_, _}:
       "dns"
     case NConnect{+c, +w}:
       coded("connect ", c, w)
@@ -832,13 +757,21 @@ def url_host(+url: String) -> String:
 def check_network() -> String:
   " — check your network or VPN"
 
+# " — check <what>", or nothing when there is nothing to check
+def check_what(+what: String) -> String:
+  Bool.pick(String, String.is_empty(what), "", String.append(" — check ", what))
+
+# the host of "host:port" (a DNS miss names the name, not the port)
+def host_name(+hp: String) -> String:
+  url_host.head(String.split(hp, ':'))
+
 def net_cause(+host: String, e: NetErr) -> String:
   match e:
     case NUrl{}:
       String.concat(["bad provider URL (", host,
         ") — check BEND_PROVIDER_URL or the provider table"])
-    case NDns{}:
-      String.concat(["cannot resolve ", host, " (dns)", check_network()])
+    case NDns{+why, +what}:
+      String.concat(["cannot resolve ", host_name(host), ": ", why, check_what(what)])
     case NConnect{+c, +w}:
       String.concat(["cannot reach ", host, " (", coded("connect ", c, w),
         ")", check_network()])
@@ -920,7 +853,7 @@ def retryable_err(e: NetErr) -> Bool:
   match e:
     case NConnect{_, _}:
       True{}
-    case NDns{}:
+    case NDns{_, _}:
       True{}
     case NTimeout{}:
       True{}
@@ -1139,42 +1072,6 @@ def attempt_for(+tools: List<&2, W.WTool>, +name: String, +key: String,
 # the turn stops on bise's line, never a retry loop on a limit nor an
 # "OpenAI refused the key" on a sign-in that expired.
 
-# subscription_sharing_usage_limit_exceeded: OpenAI says not to infer a
-# reset time from it, so the line points at the usage page
-def PLAN_LIMIT() -> String:
-  "your ChatGPT plan's limit for bise is reached. your usage is at chatgpt.com/settings/usage, or switch model with /model."
-
-# subscription_sharing_user_not_eligible (403): final, no retry
-def PLAN_OFF() -> String:
-  "ChatGPT plan use is off for bise. turn it on in your ChatGPT settings, or pick another provider in /provider."
-
-# subscription_sharing_usage_unavailable, once the retries are spent
-def PLAN_UNCHECKED_LINE() -> String:
-  "ChatGPT couldn't check your plan's usage. try again in a moment, or switch model with /model."
-
-def PLAN_EXPIRED() -> String:
-  "your ChatGPT sign-in expired. sign in again in /provider, or run bise login chatgpt."
-
-# the retries' cause while ChatGPT cannot check the plan's usage
-# (subscription_sharing_usage_unavailable: OpenAI's errors-and-recovery
-# says retry later with a bounded backoff); PLAN_UNCHECKED_LINE is said
-# only once the retries are spent (exhausted_for)
-def PLAN_UNCHECKED() -> String:
-  "ChatGPT could not check your plan's usage (subscription_sharing_usage_unavailable)"
-
-# the final line for a reply's status and error code, None: not one of
-# the plan's final failures (a usage limit, plan use not allowed, a
-# sign-in refused)
-def plan_line(+status: U32, +code: String) -> Maybe<&2, String>:
-  Bool.pick(Maybe<&2, String>,
-    String.eq(code, "subscription_sharing_usage_limit_exceeded"),
-    Some{PLAN_LIMIT()},
-    Bool.pick(Maybe<&2, String>,
-      String.eq(code, "subscription_sharing_user_not_eligible"),
-      Some{PLAN_OFF()},
-      Bool.pick(Maybe<&2, String>, U32.is_eq(status, 401),
-        Some{PLAN_EXPIRED()}, None{})))
-
 def attempt_plan.line(m: Maybe<&2, String>, a: Attempt) -> Attempt:
   match m:
     case Some{+l}:
@@ -1187,9 +1084,9 @@ def attempt_plan.line(m: Maybe<&2, String>, a: Attempt) -> Attempt:
 def plan_retry(a: Attempt) -> Attempt:
   match a:
     case ARetry{+ms, _}:
-      ARetry{ms, PLAN_UNCHECKED()}
+      ARetry{ms, Plan.PLAN_UNCHECKED()}
     case _:
-      ARetry{0, PLAN_UNCHECKED()}
+      ARetry{0, Plan.PLAN_UNCHECKED()}
 
 def attempt_plan.pick(unchecked: Bool, +status: U32, +code: String,
     a: Attempt) -> Attempt:
@@ -1197,7 +1094,7 @@ def attempt_plan.pick(unchecked: Bool, +status: U32, +code: String,
     case True{}:
       plan_retry(a)
     case False{}:
-      attempt_plan.line(plan_line(status, code), a)
+      attempt_plan.line(Plan.plan_line(status, code), a)
 
 # a call's attempt on a plan provider: a usage limit or a refused
 # sign-in ends the turn on its line; usage unavailable is retried; any
@@ -1217,7 +1114,7 @@ def attempt_plan(plan: Bool, +status: U32, +code: String, a: Attempt)
 def key_why.cmd(plan: Bool, +prov: String) -> String:
   match plan:
     case True{}:
-      PLAN_EXPIRED()
+      Plan.PLAN_EXPIRED()
     case False{}:
       String.concat(["no ", prov,
         " key: its key_command failed or printed nothing (config.toml)"])
@@ -1252,8 +1149,8 @@ def attempt_err(+host: String, +e: NetErr) -> Attempt:
 # gateway can hold the head while it queues. Unset, 0 or not a number:
 # stream_step_ms (90 s), as before. Capped at a day (the ms fit a U32).
 # The wait carries the provider id: the timeout text names the key.
-type Wait is Data:
-  Wait{prov: String, ms: U32}
+type ProvWait is Data:
+  ProvWait{prov: String, ms: U32}
 
 def idle_max_secs() -> U32:
   86400
@@ -1269,13 +1166,13 @@ def idle_ms(+secs: U32) -> U32:
   idle_ms.pick(U32.is_eq(secs, 0), secs)
 
 # `id` is the full "provider/model"
-def stream_wait(+file: String, +prov: String, +id: String) -> Wait:
-  Wait{prov, idle_ms(u32_or(model_key(registry(file), prov, id,
+def stream_wait(+file: String, +prov: String, +id: String) -> ProvWait:
+  ProvWait{prov, idle_ms(u32_or(model_key(registry(file), prov, id,
     "idle_timeout_sec")))}
 
-def wait_ms(+w: Wait) -> U32:
+def wait_ms(+w: ProvWait) -> U32:
   match w:
-    case Wait{_, +ms}:
+    case ProvWait{_, +ms}:
       ms
 
 # "90 s"; under a second (never from the catalog): "0 s"
@@ -1285,9 +1182,9 @@ def wait_secs(+ms: U32) -> String:
 # a read that waited the whole limit: the host, the limit, and the key
 # that raises it (the user can't tell a slow model from a dead link;
 # the text says what to change when it is the model)
-def timeout_cause(+host: String, +w: Wait) -> String:
+def timeout_cause(+host: String, +w: ProvWait) -> String:
   match w:
-    case Wait{+prov, +ms}:
+    case ProvWait{+prov, +ms}:
       String.concat(["no answer from ", host, " in ", wait_secs(ms),
         " (timeout) — a slow model or gateway? raise idle_timeout_sec under [providers.",
         prov, "] in ~/.bise/config.toml"])
@@ -1299,7 +1196,7 @@ def is_timeout(e: NetErr) -> Bool:
     case _:
       False{}
 
-def attempt_err_in.pick(timeout: Bool, +host: String, +w: Wait, +e: NetErr)
+def attempt_err_in.pick(timeout: Bool, +host: String, +w: ProvWait, +e: NetErr)
     -> Attempt:
   match timeout:
     case True{}:
@@ -1309,20 +1206,13 @@ def attempt_err_in.pick(timeout: Bool, +host: String, +w: Wait, +e: NetErr)
 
 # a transport failure of a streamed call: a timeout names its limit and
 # idle_timeout_sec (still a retry, as before); the others as attempt_err
-def attempt_err_in(+host: String, +w: Wait, +e: NetErr) -> Attempt:
+def attempt_err_in(+host: String, +w: ProvWait, +e: NetErr) -> Attempt:
   attempt_err_in.pick(is_timeout(e), host, w, e)
 
 # the line the client shows while the call waits (the TUI renders it
 # as a warning): "provider_retry: 2/10 · <why> · retry in 4s"
 def retry_line(+n: Nat, +why: String, +delay_ms: U32) -> String:
-  String.append("  obs: provider_retry: ",
-    String.append(Nat.show(Nat.add(n, 1n)),
-      String.append("/",
-        String.append(Nat.show(max_attempts()),
-          String.append(" · ",
-            String.append(String.take(why, 200n),
-              String.append(" · retry in ",
-                String.append(U32.show(U32.div(delay_ms, 1000)), "s"))))))))
+  OG.provider_retry(Nat.add(n, 1n), max_attempts(), String.take(why, 200n), U32.to_nat(delay_ms))
 
 # the final error once every attempt failed: the count and the last cause
 def exhausted_text(+tries: Nat, +why: String) -> String:
@@ -1332,7 +1222,7 @@ def exhausted_text(+tries: Nat, +why: String) -> String:
 # the same, but a ChatGPT plan whose usage could never be checked ends
 # on the designer's line alone
 def exhausted_for(+tries: Nat, +why: String) -> String:
-  Bool.pick(String, String.eq(why, PLAN_UNCHECKED()), PLAN_UNCHECKED_LINE(),
+  Bool.pick(String, String.eq(why, Plan.PLAN_UNCHECKED()), Plan.PLAN_UNCHECKED_LINE(),
     exhausted_text(tries, why))
 
 # an interrupt during the retries stops them, and keeps the error that

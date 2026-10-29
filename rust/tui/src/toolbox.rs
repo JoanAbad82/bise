@@ -99,6 +99,10 @@ pub(crate) fn box_top(td: &ToolData, tick: u32, width: usize) -> Line<'static> {
     ];
     let dim_st = Style::default().fg(dim());
     match td.state {
+        _ if td.paused => {
+            spans.push(Span::raw(" "));
+            spans.extend(crate::toolrow::state_spans(td, tick));
+        }
         ToolState::Run => {
             let (p, c) = working_frame(tick);
             spans.push(Span::styled(format!(" {}", p), Style::default().fg(c)));
@@ -254,7 +258,6 @@ pub(crate) fn box_lines(
     let dim_st = Style::default().fg(dim());
     let faint_st = Style::default().fg(faint());
     let mut out = vec![box_top(td, tick, width)];
-    // the script, highlighted
     let script: Vec<Vec<Span<'static>>> = match code {
         Some((CodeLang::Bash, src)) => highlight_bash(src),
         Some((CodeLang::TypeScript, src)) => highlight_ts(src),
@@ -343,7 +346,7 @@ fn split(s_rows: usize, o_rows: Option<usize>) -> (usize, Option<usize>) {
 /// The marker on the last row of a closed box: `▸ n more lines`.
 pub(crate) fn more_label(n: usize) -> String {
     let mark = if theme::ascii_mode() { ">" } else { G_CLOSED };
-    format!("{} {} more line{}", mark, n, if n == 1 { "" } else { "s" })
+    format!("{} {}", mark, bise_proto::words::common::more_lines(n))
 }
 
 // ---- a box that only sends a message (BISE-110, book §9) ----

@@ -1,0 +1,93 @@
+//! The menus area's UI words (see [`super`]: the rules, how to read them):
+//! the desktop's native menus (bise fait mac, page native-mac mockup 9 and
+//! decision d4): the '…' and the right click on an agent, a project, a
+//! panel tab, an artifact, a process, a scheduled task, and the menu bar's
+//! Agent menu (apps/desktop/src/app/menus/registry.ts builds them, macOS
+//! draws them). English and in title case, as macOS's own menus (ui-review
+//! m_42540); designer signs them.
+
+crate::words! { menus:
+    // ---- the menu bar
+    /// the menu bar's menu of the agent in view (main/menu.ts)
+    agent_menu = "Agent";
+    /// the menu bar's Go menu: the rail's places, each with its key (rail-keys, designer m_45492)
+    go_menu = "Go";
+    /// Go › bise's place, ⌘0 (the brand stays lowercase, designer m_45492)
+    go_bise = "bise";
+    /// Go › the inbox block in place, ⌘I (b1/b2)
+    go_inbox = "Inbox";
+    /// Go › the inbox page, ⇧⌘I (designer m_45497)
+    go_inbox_page = "Inbox Page";
+    /// Go › the scheduled page, ⌘Y
+    go_scheduled = "Scheduled";
+    /// Go › the artifacts, ⇧⌘A
+    go_artifacts = "Artifacts";
+    /// Go › the plugins page, ⇧⌘X
+    go_plugins = "Plugins";
+
+    // ---- an agent (d4's order)
+    /// rename the agent (its thread head takes the new name)
+    rename = "Rename";
+    /// the agent's sheet on its model and reasoning (nm-pages-b, designer m_43315)
+    change_model = "Change Model…";
+    /// keep the agent at the top of the sidebar (a view state of the app)
+    pin = "Pin";
+    /// take it off the top of the sidebar
+    unpin = "Unpin";
+    /// the hover pin's tip when the pin it flipped at once did not save: it flips back (artifact-pin, designer m_49505)
+    pin_failed = "Couldn't pin";
+    /// the same for an unpin that did not save
+    unpin_failed = "Couldn't unpin";
+    /// the agent's changes, the review
+    changes = "Changes";
+    /// the submenu of what can be copied
+    copy = "Copy";
+    /// a Copy › with one item only, flat (macOS: no submenu of one): `Copy Link`
+    copy_one(what) = "Copy {what}";
+    /// Copy › the agent's or the project's name
+    copy_name = "Name";
+    /// Copy › its folder (the worktree, the project's folder)
+    copy_path = "Path";
+    /// Copy › its git branch
+    copy_branch = "Branch";
+    /// Copy › the agent's last answer, as text
+    copy_reply = "Last Reply";
+    /// Copy › an artifact's or a process's link
+    copy_link = "Link";
+    /// open it in a tab of the panel on the right
+    move_right = "Move to Right Pane";
+    /// open it in a window of its own
+    new_window = "Open in New Window";
+    /// the submenu of the Mac apps it opens in
+    open_in = "Open in";
+    /// Open in › the Finder
+    finder = "Finder";
+    /// Open in › his code editor
+    editor = "Editor";
+    /// stop the agent's turn
+    stop = "Stop";
+    /// archive the agent (restore undoes it)
+    archive = "Archive";
+    /// bring an archived agent back
+    restore = "Restore";
+
+    // ---- an artifact, a process, a scheduled task
+    /// macOS's Quick Look on its file
+    quick_look = "Quick Look";
+    /// its file selected in a Finder window
+    show_in_finder = "Show in Finder";
+    /// a process's page in his browser
+    open_browser = "Open in Browser";
+    /// a process: stop it
+    stop_process = "Stop Process";
+    /// a scheduled task: stop it
+    stop_scheduled = "Stop Schedule";
+
+    // ---- a panel tab
+    /// close the tab
+    close_tab = "Close Tab";
+    /// close every other tab
+    close_others = "Close Other Tabs";
+    /// the terminal tab goes back to the bottom panel
+    move_bottom = "Move to Bottom";
+}

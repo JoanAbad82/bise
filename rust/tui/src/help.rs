@@ -7,6 +7,7 @@
 //! the filter, then closes.
 
 use crate::{theme, App};
+use bise_proto::words::composer;
 use crossterm::event::{KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 use ratatui::layout::Rect;
 use ratatui::style::{Color, Modifier, Style};
@@ -53,17 +54,17 @@ const GHOSTTY: &str = "Ghostty tips";
 /// on the right while idle. Each starts with a key of [`ROWS`] (or a
 /// command); the key bar prefixes "tip · ".
 pub(crate) const TIPS: &[&str] = &[
-    "ctrl+o opens everything folded",
-    "$ calls a skill, tab completes",
-    "ctrl+` opens a terminal in the workspace",
-    "ctrl+1-9 open the items waiting in your inbox",
-    "ctrl+s finds an agent by name, ⏎ opens it",
-    "esc puts your draft away, ↑ brings it back",
-    "shift+⏎ adds a new line",
-    "ctrl+r speaks into the composer (turn it on with /voice)",
-    "/scheduled lists your scheduled tasks and when each runs next",
-    "ctrl+r twice starts voice mode: talk with the agent in view",
-    "/theme switches between light and dark",
+    composer::tip_fold,
+    composer::tip_skill,
+    composer::tip_terminal,
+    composer::tip_inbox,
+    composer::tip_find_agent,
+    composer::tip_draft,
+    composer::tip_newline,
+    composer::tip_dictate,
+    composer::tip_scheduled,
+    composer::tip_voice_mode,
+    composer::tip_theme,
 ];
 
 /// ctrl+f; once a cmd key reached us (the terminal passes them,
@@ -116,7 +117,8 @@ pub(crate) const ROWS: &[Row] = &[
     r(FEED, "ctrl+o", "open or close everything folded").top(),
     FIND,
     r(FEED, "/artifacts", "what your agents made, full screen: / find, ⏎ open, space quick look, v versions, @ put it in a message").top(),
-    r(FEED, "/scheduled", "your scheduled tasks (agents set them with sb every), full screen: ⏎ open, r run now, x stop, tab ended too"),
+    r(FEED, "/scheduled", "scheduled tasks: what agents run on a schedule, full screen: ⏎ open, r run now, x stop, tab ended too"),
+    r(FEED, "/processes|/running", "what the agents left running (dev servers, watchers), full screen: ⏎ its output, o open, s stop, a its agent, tab ended today"),
     r(FEED, "click ↗", "an artifact's chip: open it (a page in the browser, a .md in your editor, a file in its app)"),
     r(FEED, "ctrl+g|/diff", "the diff panel: the agent in view's changes against main (/diff <branch>: any branch); ctrl+g again closes it"),
     r(FEED, "click ± 3 files|click ψ", "the diff of what an agent landed, or of its branch (the composer keeps the keys; a click in the panel takes them)"),

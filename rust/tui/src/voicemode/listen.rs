@@ -227,7 +227,18 @@ fn run_batch(
             }
             Ok(ListenMsg::Clear) => clip.clear(),
             Ok(ListenMsg::Flush) => {
-                let mut result = voice::transcribe_clip(job, &clip, cancel, send);
+                // the job's model gone: the fallback heard it, and says so
+                let mut used = None;
+                let mut result = voice::transcribe(job, &clip, cancel, send).map(|w| {
+                    used = w.fell_back;
+                    w.text
+                });
+                let note = used.as_deref().and_then(|u| voice::fell_back_line(job, u));
+                // the guards' calls go to the model that heard it
+                let job = &match used {
+                    Some(u) => VoiceJob { model: u, fallback: None, ..job.clone() },
+                    None => job.clone(),
+                };
                 // auto language, and the words came in a script you never
                 // use: again, with your language
                 let auto = job.language.as_deref().is_none_or(|l| l.trim().is_empty());
@@ -269,6 +280,9 @@ fn run_batch(
                     Ok(text) => {
                         if !text.is_empty() {
                             let _ = events.send(Heard::Text(format!(" {}", text)));
+                        }
+                        if let Some(line) = note {
+                            let _ = events.send(Heard::Note(line));
                         }
                         events.send(Heard::Flushed)
                     }

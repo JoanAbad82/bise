@@ -23,6 +23,13 @@
 //! moves to the next card, or back to the thread when none are left,
 //! with `✓ you answered perf: both` in the history.
 //!
+//! The card you answer stays yours while your words are typed: closed
+//! elsewhere (withdrawn, answered via main, its agent stopped) it stays
+//! in view, `· closed`, your words in the composer; ⏎ sends them to its
+//! asker as a plain message, esc or another card leaves it and your
+//! words go to the history (`↑ brings them back`). Benjamin lost a half
+//! answer when the view jumped to the new card (designer m_24087).
+//!
 //! Approvals (docs/approvals.md §7, approvals-plan.md round 2) plug in
 //! as the kind `approval`: its text is the command (or a patch), a blank
 //! line, then the reason; the options are allow once / always here /
@@ -30,6 +37,7 @@
 //! opens them is not built yet.
 
 use super::*;
+use bise_proto::words::{common, inbox};
 use crate::editor::Editor;
 use crate::theme;
 use std::cell::RefCell;
@@ -53,9 +61,12 @@ pub(crate) struct Card {
     /// place's PR.
     pub(super) place: Option<String>,
     pub(super) pr: Option<u64>,
-    /// update-card: the release page an update item's `3` opens (the
-    /// hub's snapshot).
+    /// the update card's release page (its changelog's full notes link;
+    /// the hub's snapshot).
     pub(super) link: Option<String>,
+    /// the update card's release and changelog (update-dot: the hub's
+    /// snapshot, typed, never parsed from its text)
+    pub(super) release: Option<bise_proto::rows::ReleaseNotes>,
     /// dev-flow §5.1: a feature's merge item asks once more before its
     /// `3 drop the branch` (`drop computer-use? 14 commits go.`); the
     /// TUI's, kept across snapshots by `Sb::feature_drop_ask`.
@@ -63,6 +74,11 @@ pub(crate) struct Card {
     /// expired-ux: a `signin` item's agents, stopped on the expired
     /// ChatGPT sign-in (the hub's snapshot): ⏎ in their thread signs in.
     pub(super) waiting: Vec<String>,
+    /// the options this app does itself, as the hub's row says (an
+    /// asker's artifact, a merge's PR...; opt_open.rs)
+    pub(super) acts: Vec<(u32, bise_proto::rows::OptAct)>,
+    /// the page it is linked to and the asker's pick (card_page.rs)
+    pub(super) page: Option<Box<PageLink>>,
 }
 
 /// A paragraph of an item the TUI writes itself.
@@ -106,8 +122,11 @@ impl Default for Card {
             place: None,
             pr: None,
             link: None,
+            release: None,
             asking: false,
             waiting: Vec::new(),
+            acts: Vec::new(),
+            page: None,
         }
     }
 }
@@ -130,6 +149,8 @@ pub(super) enum CardHit {
     Tab(u64),
     /// open the card view on the top card
     Open,
+    /// open this card's linked page in the browser (its page line)
+    Page(u64),
 }
 
 /// The last answer, folded into one line on top of the box for 2 s
@@ -179,6 +200,11 @@ pub(super) struct CardView {
     pub(super) drafts: HashMap<u64, Editor>,
     /// The thread's draft while the view is open.
     pub(super) thread: Option<Editor>,
+    pub(super) linked: card_page::PageTitles,
+    /// The card in view the hub closed (withdrawn, answered via main,
+    /// its agent stopped) while your words were typed: it stays in view,
+    /// `· closed`, until you send them as a message or leave it.
+    pub(super) gone: Option<Card>,
     /// Answered or closed here, still in the hub's last snapshot: hidden.
     answered: Vec<u64>,
     /// The cards whose fold line this TUI wrote, and the feed it went
@@ -229,6 +255,8 @@ pub(super) enum Part {
     Code(Vec<Vec<Span<'static>>>),
     /// why it runs (approvals), dim
     Reason(String),
+    /// why it asks when it may not be undone (a connector deletes): ▲, warn tone
+    Warn(String),
     /// the hub's remark, dim italic
     Note(String),
     /// the facts under what it asks (a merge item's checks, its link):
@@ -358,27 +386,24 @@ fn approval_shape(c: &Card) -> Shape {
             lines.iter().filter_map(|l| l.strip_prefix("+++ ")).map(|f| f.trim().trim_start_matches("b/")).collect();
         let plus = lines.iter().filter(|l| l.starts_with('+') && !l.starts_with("+++")).count();
         let minus = lines.iter().filter(|l| l.starts_with('-') && !l.starts_with("---")).count();
-        let first = files.first().copied().unwrap_or("a file");
-        let more = match files.len() {
-            0 | 1 => String::new(),
-            n => format!(" +{} file{} ·", n - 1, if n > 2 { "s" } else { "" }),
-        };
+        let first = files.first().copied().unwrap_or(inbox::a_file);
+        let more = if files.len() > 1 { format!(" {} ·", inbox::more_files(files.len() - 1)) } else { String::new() };
         let minus_sign = if theme::ascii_mode() { "-" } else { "−" };
         (
-            format!("{} wants to edit {}", c.agent, first),
-            format!("{} wants to edit", c.agent),
+            inbox::wants_edit_file(&c.agent, first),
+            inbox::wants_edit(&c.agent),
             format!("{first}{more} +{plus} {minus_sign}{minus}"),
             crate::code::highlight_patch(head),
         )
     } else {
         let first = lines.first().map_or("", |l| l.trim());
-        let summary = if lines.len() > 1 { format!("{first} · {} lines", lines.len()) } else { first.to_string() };
+        let summary = if lines.len() > 1 { inbox::cmd_lines(first, lines.len()) } else { first.to_string() };
         // the bash mark in accent before the command, like a gate's card
         let mut rows = crate::code::highlight_bash(head);
         if let Some(first) = rows.first_mut() {
             first.insert(0, Span::styled("$ ", Style::default().fg(theme::accent())));
         }
-        (format!("{} wants to run", c.agent), format!("{} wants to run", c.agent), summary, rows)
+        (inbox::wants_run(&c.agent), inbox::wants_run(&c.agent), summary, rows)
     };
     let mut parts = vec![Part::Code(code)];
     if !reason.is_empty() {
@@ -400,101 +425,10 @@ fn approval_shape(c: &Card) -> Shape {
     s
 }
 
-/// A gate's card (approvals-design.md §9), as the hub writes it: the
-/// title (`wants to run`), `= ` the parts already allowed (dim, above),
-/// `| ` what needs you, `reason: `, one `always: ` per rule it saves (none:
-/// a hard rule, no option 2). Options: allow, always allow … here, no;
-/// typed words say no, with the words as the note.
-fn confirm_shape(c: &Card) -> Shape {
-    let (mut head, mut done, mut body, mut reason, mut always) = (String::new(), vec![], vec![], String::new(), vec![]);
-    for (i, l) in c.text.lines().enumerate() {
-        if i == 0 {
-            head = l.to_string();
-        } else if let Some(x) = l.strip_prefix("= ") {
-            done.push(x.to_string());
-        } else if let Some(x) = l.strip_prefix("| ").or(l.strip_prefix("|")) {
-            body.push(x.to_string());
-        } else if let Some(x) = l.strip_prefix("reason: ") {
-            reason = x.to_string();
-        } else if let Some(x) = l.strip_prefix("always: ") {
-            always.push(x.to_string());
-        }
-    }
-    let n = c.agent.split(", ").count();
-    let title = if n > 1 {
-        format!("{} agents {}", n, head.replacen("wants", "want", 1))
-    } else {
-        format!("{} {}", c.agent, head)
-    };
-    // `wants to run it outside the sandbox`: a sandbox card (brief 1e)
-    let bash = head.starts_with("wants to run");
-    let rerun = head.ends_with("outside the sandbox");
-    let edit = head.starts_with("wants to edit");
-    // an edit or a connector: its first 3 lines (after the path), the rest counted
-    let (shown, more) = if bash {
-        (body.clone(), 0)
-    } else {
-        let keep = if edit { 4 } else { 3 };
-        (body.iter().take(keep).cloned().collect::<Vec<_>>(), body.len().saturating_sub(keep))
-    };
-    let mut parts: Vec<Part> = done.iter().map(|d| Part::Reason(format!("$ {d}"))).collect();
-    let text = shown.join("\n");
-    parts.push(Part::Code(if bash {
-        // the bash mark in accent before the command (designer)
-        let mut rows = crate::code::highlight_bash(&text);
-        if let Some(first) = rows.first_mut() {
-            first.insert(0, Span::styled("$ ", Style::default().fg(theme::accent())));
-        }
-        rows
-    } else if edit {
-        crate::code::highlight_patch(&text)
-    } else {
-        text.lines().map(|l| vec![Span::raw(l.to_string())]).collect()
-    }));
-    if more > 0 {
-        parts.push(Part::Reason(format!("{} {} more line{}", theme::glyph("▸"), more, if more == 1 { "" } else { "s" })));
-    }
-    if !reason.is_empty() {
-        parts.push(Part::Reason(reason));
-    }
-    if !c.note.is_empty() {
-        parts.push(Part::Note(c.note.clone()));
-    }
-    let first = body.first().map_or("", |l| l.trim());
-    let summary = if body.len() > 1 && bash { format!("{first} · {} lines", body.len()) } else { first.to_string() };
-    let mut options = vec![if rerun { "run it again without the sandbox" } else { "allow" }.to_string()];
-    let mut short = vec![if rerun { "run again" } else { "allow" }.to_string()];
-    if !always.is_empty() {
-        options.push(always_option(rerun, &always, &body));
-        short.push("always".into());
-    }
-    options.push("no".into());
-    short.push("no".into());
-    let who = title.clone();
-    let hard = always.is_empty();
-    let mut s = Shape::plain(title, who, summary, parts, options, short, Enter::Deny);
-    s.note = String::new();
-    s.cmd = bash;
-    // `no` is always 3 (designer): a hard rule has no 2
-    if hard {
-        s.nums = vec![1, 3];
-    }
-    s
-}
+#[path = "confirm_card.rs"]
+mod confirm_card;
+use confirm_card::confirm_shape;
 
-/// A confirm card's option 2. A sandbox card's saves a "run outside the
-/// sandbox" rule, and says so (designer): `it` when the rule is the
-/// command shown, else the rule.
-fn always_option(rerun: bool, always: &[String], body: &[String]) -> String {
-    let rules = always.join(", ");
-    if !rerun {
-        format!("always allow {rules} here")
-    } else if rules == body.join("\n").trim() {
-        "always run it outside the sandbox here".to_string()
-    } else {
-        format!("always run {rules} outside the sandbox here")
-    }
-}
 
 impl super::Sb {
     /// expired-ux: the agent in view stopped on the expired ChatGPT
@@ -546,15 +480,7 @@ fn choice_shape(c: &Card) -> Shape {
             }));
         }
     } else if c.kind == "update" {
-        // update-card (designer): the notes are text, the running version
-        // (the last line) is dim; no link line, `3` opens it
-        let rest: Vec<&str> = rest.iter().map(|l| l.trim()).filter(|l| !l.is_empty()).collect();
-        if let Some((on, notes)) = rest.split_last() {
-            if !notes.is_empty() {
-                parts.push(Part::Text(notes.join("\n")));
-            }
-            parts.push(Part::Evidence(on.to_string()));
-        }
+        parts.extend(update_parts(c));
     } else {
         parts.push(Part::Text(rest.join("\n").trim().to_string()));
     }
@@ -564,8 +490,7 @@ fn choice_shape(c: &Card) -> Shape {
     let options: Vec<String> = if theme::ascii_mode() { options.iter().map(|o| o.replace('↗', "->")).collect() } else { options };
     let short = short_labels(&options);
     if c.kind == "update" {
-        // the hub's own news, not an agent's: the head alone
-        // the row: `bise · v0.0.2 is out`
+        // update-dot: bise's own news, not an agent's: `bise · v… is ready`
         let summary = head.strip_prefix("bise ").unwrap_or(&head).to_string();
         return Shape::plain(head.clone(), "bise".into(), summary, parts, options, short, Enter::Answer);
     }
@@ -574,6 +499,35 @@ fn choice_shape(c: &Card) -> Shape {
         return Shape::plain(head.clone(), "bise".into(), head, parts, options, short, Enter::Answer);
     }
     Shape::plain(format!("{}: {}", c.agent, head), c.agent.clone(), head, parts, options, short, Enter::Answer)
+}
+
+/// The changelog's most rows in the opened card (designer m_46058).
+pub(super) const CHANGELOG_ROWS: usize = 12;
+
+/// The update card's body (update-dot, designer m_46058): the safe line,
+/// the release's changelog (its first [`CHANGELOG_ROWS`] lines, then `▸ N
+/// more lines`), then `you're on v… · full notes on GitHub ↗` dim; no
+/// notes: `no notes for this release.`
+fn update_parts(c: &Card) -> Vec<Part> {
+    use bise_proto::words::settings;
+    let mut parts = vec![Part::Text(settings::bise_update_tip.to_string())];
+    let Some(r) = c.release.as_ref() else { return parts };
+    // a markdown heading reads as its words (ui-review m_46111): `## Fixes` is `Fixes`
+    let lines: Vec<&str> =
+        r.notes.lines().map(str::trim_end).filter(|l| !l.trim().is_empty()).map(|l| l.trim_start_matches('#').trim_start()).collect();
+    if lines.is_empty() {
+        parts.push(Part::Evidence(settings::bise_update_no_notes.to_string()));
+    } else {
+        parts.push(Part::Text(lines.iter().take(CHANGELOG_ROWS).copied().collect::<Vec<_>>().join("\n")));
+        if lines.len() > CHANGELOG_ROWS {
+            parts.push(Part::Evidence(settings::bise_update_more(lines.len() - CHANGELOG_ROWS)));
+        }
+    }
+    let notes = settings::bise_update_full_notes;
+    let notes = if theme::ascii_mode() { notes.replace('↗', "->") } else { notes.to_string() };
+    let link = c.link.as_deref().map_or(notes.clone(), |url| format!("[{notes}]({url})"));
+    parts.push(Part::Evidence(format!("{} · {link}", settings::bise_update_on(&r.running))));
+    parts
 }
 
 /// A feature merge item after `3 drop the branch` (designer, d4172e6):
@@ -585,7 +539,7 @@ fn drop_ask_shape(c: &Card) -> Shape {
         .place
         .as_deref()
         .and_then(|p| p.strip_prefix("feature:"))
-        .unwrap_or("the branch")
+        .unwrap_or(inbox::the_branch)
         .to_string();
     let commits = c
         .text
@@ -596,8 +550,8 @@ fn drop_ask_shape(c: &Card) -> Shape {
             w.next().filter(|x| x.starts_with("commit")).map(|_| n)
         })
         .unwrap_or(0);
-    let head = format!("drop {}? {} commit{} go.", name, commits, if commits == 1 { "" } else { "s" });
-    let options = vec!["drop it".to_string(), "keep it".to_string()];
+    let head = inbox::drop_ask(&name, commits);
+    let options = vec![inbox::drop_it.to_string(), inbox::keep_it.to_string()];
     let short = short_labels(&options);
     Shape::plain(format!("{}: {}", c.agent, head), c.agent.clone(), head, Vec::new(), options, short, Enter::Answer)
 }
@@ -612,17 +566,7 @@ pub(super) fn merge_link(sb: &Sb, c: &Card) -> Option<String> {
         .and_then(|p| p.pr.as_ref())
         .filter(|pr| c.pr.is_none_or(|n| n == pr.number))
         .map(|pr| pr.url.clone());
-    from_place.or_else(|| {
-        let (body, _) = split_choices(&c.text);
-        let tag = format!("/pull/{}", c.pr?);
-        body.lines().map(str::trim).find(|l| l.ends_with(&tag)).map(|l| {
-            if l.starts_with("http") {
-                l.to_string()
-            } else {
-                format!("https://{l}")
-            }
-        })
-    })
+    from_place.or_else(|| bise_proto::rows::pr_link(&c.text, c.pr))
 }
 
 /// A setup item (BISE-245): its look, written by setup.rs; without one
@@ -720,18 +664,32 @@ impl Sb {
         self.card.folded.iter().any(|(i, a)| *i == id && a == agent)
     }
 
+    /// Tests: he answered item `id` here, in `agent`'s feed.
+    #[cfg(test)]
+    pub(crate) fn fold_here(&mut self, id: u64, agent: &str) {
+        self.card.folded.push((id, agent.to_string()));
+    }
+
     pub(super) fn card_ids(&self) -> Vec<u64> {
         self.sorted_cards().iter().map(|c| c.id).collect()
     }
 
     /// The card in the view while it is open, else the top card.
     pub(super) fn current_card(&self) -> Option<&Card> {
+        if let Some(g) = self.closed_in_view() {
+            return Some(g);
+        }
         let v = self.sorted_cards();
         self.card
             .sel
             .filter(|_| self.card.open)
             .and_then(|id| v.iter().find(|c| c.id == id).copied())
             .or_else(|| v.first().copied())
+    }
+
+    /// The card in view the hub closed while your words were typed.
+    pub(super) fn closed_in_view(&self) -> Option<&Card> {
+        self.card.gone.as_ref().filter(|g| self.card.open && self.card.sel == Some(g.id))
     }
 
     pub(super) fn card_by_id(&self, id: u64) -> Option<&Card> {
@@ -769,14 +727,16 @@ pub(super) fn glyph_color(kind: &str) -> Color {
 /// A card's title, after its glyph (copy deck §17: `{name} needs you`).
 fn kind_title(kind: &str, agent: &str) -> String {
     match kind {
-        "question" => format!("{agent} asks"),
-        "blocked" => format!("{agent} is blocked"),
-        "failed" => format!("{agent} failed"),
-        "restart" => "restart failed".into(),
-        "drop" => format!("drop {agent}?"),
-        "overlap" => "overlap".into(),
-        "done" => format!("{agent} is done"),
-        k => format!("{agent}: {k}"),
+        "question" => common::title_asks(agent),
+        "blocked" => inbox::title_blocked(agent),
+        "failed" => inbox::title_failed(agent),
+        "restart" => inbox::title_restart.into(),
+        "drop" => inbox::title_drop(agent),
+        "overlap" => inbox::title_overlap.into(),
+        "done" => inbox::title_done(agent),
+        // never a card's kind id (designer m_15412): a plan proposes, any
+        // other kind asks like a question (card_page.rs)
+        k => card_page::other_title(k, agent),
     }
 }
 
@@ -816,8 +776,20 @@ pub(super) fn close_view(app: &mut App) {
     cv.scroll = 0;
 }
 
-/// The composer's draft goes to the card in view's slot.
+/// The composer's draft goes to the card in view's slot. A card the hub
+/// closed has none: leaving it, your words go to the history (↑ brings
+/// them back) and one line says so.
 fn park_draft(app: &mut App) {
+    if let Some(g) = app.sb.card.gone.take().filter(|g| app.sb.card.sel == Some(g.id)) {
+        app.sb.card.sel = None;
+        let d = std::mem::take(&mut app.ed);
+        if !d.text.trim().is_empty() {
+            app.history.insert(0, d.text);
+            let line = inbox::closed_words(&g.agent);
+            push_event(&mut app.events, &mut app.cache, Ev::Info(line));
+        }
+        return;
+    }
     let cv = &mut app.sb.card;
     if let Some(old) = cv.sel.take() {
         let d = std::mem::take(&mut app.ed);
@@ -860,6 +832,18 @@ fn step(app: &mut App, d: isize, wrap: bool) {
 /// (`✓ you answered perf: both`); the view moves on.
 /// `picked`: the short label of the option picked (on the line).
 fn answer(app: &mut App, id: u64, reply: &str, picked: Option<&str>) {
+    answer_with(app, id, &crate::said::Said { text: reply.to_string(), ..Default::default() }, picked);
+}
+
+/// [`answer`] with his typed words (msg-parts): the parts go to the hub
+/// with the text, and the fold line draws his quotes, pastes and images
+/// from them.
+fn answer_said(app: &mut App, id: u64, said: &crate::said::Said) {
+    answer_with(app, id, said, None);
+}
+
+fn answer_with(app: &mut App, id: u64, said: &crate::said::Said, picked: Option<&str>) {
+    let reply = said.text.as_str();
     // the TUI's own cards: answered here, their own result row
     if super::setup::is_local(id) {
         if super::setup::valid(app, id, reply) {
@@ -869,17 +853,30 @@ fn answer(app: &mut App, id: u64, reply: &str, picked: Option<&str>) {
         return;
     }
     let Some(c) = app.sb.card_by_id(id).cloned() else { return };
-    app.sb.send_input(format!("/answer {} {}", id, reply));
+    let mut params = json!({"card": id, "reply": reply});
+    if !said.parts.is_empty() {
+        params["parts"] = json!(said.parts);
+    }
+    app.sb.call("card/answer", params, super::rpc::Then::Line);
     // the thread says the box's fold line (designer: one sentence); a
-    // gate's card folds with the hub's own (`✓ you allowed …`)
-    let fold = fold_of(&c, reply, picked);
+    // gate's card folds with the hub's own (`✓ you allowed …`); his
+    // words alone on it, his chips under it
+    let words = said.words();
+    let fold = fold_of(&c, words.trim(), picked);
     if c.kind != "confirm" {
-        let ev = Ev::Approval { ok: fold.ok, text: fold.text.clone(), note: fold.note.clone(), asked: fold.asked.clone(), open: false };
+        let ev = Ev::Approval { ok: fold.ok, text: fold.text.clone(), note: fold.note.clone(), parts: said.parts.clone(), asked: fold.asked.clone(), open: false };
         push_event(&mut app.events, &mut app.cache, ev);
         app.sb.card.folded.push((id, app.sb.focus.clone()));
     }
     let open = app.sb.card.open && app.sb.card.sel == Some(id);
     retire(app, id);
+    // answer-in-thread A (designer m_24425 (7)): answered from main's view,
+    // the asker's thread opens at his answer (its end: the hub's row comes
+    // there), esc back to main; not while the card view moves on to the next
+    if let Some(to) = asker_view(&c.kind, &app.sb.focus, &c.agent, &app.sb.agents, app.sb.card.open) {
+        super::inbox::to_answer(app, &to, None, false);
+        return;
+    }
     if !open {
         return;
     }
@@ -888,8 +885,17 @@ fn answer(app: &mut App, id: u64, reply: &str, picked: Option<&str>) {
     if app.sb.card.open {
         app.sb.card.fold = Some((fold, std::time::Instant::now()));
     } else {
-        app.flash = Some(("inbox clear".into(), std::time::Instant::now()));
+        app.flash = Some((inbox::clear.into(), std::time::Instant::now()));
     }
+}
+
+/// Answer-in-thread A: the view an answer made in main's view goes to,
+/// the asker's (a live agent of this hub, not main); none from any other
+/// view, or while the card view shows the next card. A drop card's agent
+/// asked nothing: it is the one being archived, the view stays (drop-card).
+fn asker_view(kind: &str, focus: &str, asker: &str, agents: &[Agent], next_open: bool) -> Option<String> {
+    let live = agents.iter().any(|a| a.name == asker && !a.main && !a.archived());
+    (kind != "drop" && focus == "main" && !next_open && live).then(|| asker.to_string())
 }
 
 /// The one line an answer folds into (the hub's words for a gate's
@@ -901,7 +907,7 @@ pub(super) fn fold_of(c: &Card, reply: &str, picked: Option<&str>) -> Fold {
     if !gate {
         // a picked option: its short label on the line (`both`)
         let (text, note) = match picked {
-            Some(p) => (format!("you answered {}: {}", c.agent, p), String::new()),
+            Some(p) => (picked_fold(c, reply).unwrap_or_else(|| common::fold_answered(&c.agent, p)), String::new()),
             None => answered(&c.agent, reply),
         };
         return Fold { ok: true, text, note, asked: c.text.trim().to_string() };
@@ -910,13 +916,13 @@ pub(super) fn fold_of(c: &Card, reply: &str, picked: Option<&str>) -> Fold {
     let no = reply == "no" || reply == "deny" || reply.starts_with("deny: ");
     if no {
         let note = reply.strip_prefix("deny: ").unwrap_or("").trim().to_string();
-        return Fold { ok: false, text: format!("you said no to {}: {}", c.agent, what), note, asked: String::new() };
+        return Fold { ok: false, text: common::fold_no(&c.agent, &what), note, asked: String::new() };
     }
     let outside = c.text.lines().next().is_some_and(|h| h.ends_with("outside the sandbox"));
     let text = if outside {
-        format!("you let {} run it outside the sandbox: {}", c.agent, what)
+        common::fold_outside(&c.agent, &what)
     } else {
-        format!("you allowed {}: {}", c.agent, what)
+        common::fold_allowed(&c.agent, &what)
     };
     Fold { ok: true, text, note: String::new(), asked: String::new() }
 }
@@ -965,6 +971,12 @@ fn pick(app: &mut App, id: u64, i: usize) -> bool {
     let Some(c) = app.sb.card_by_id(id).cloned() else { return false };
     let s = shape(&c);
     let (Some(reply), Some(said)) = (s.options.get(i), s.short.get(i)) else { return false };
+    // the asker set this option to open an artifact (a drafts notification's
+    // `1 review`): it opens, nothing is sent, the item stays (opt_open.rs)
+    if let Some(act) = super::opt_open::asker_act(&c.acts, s.num(i) as u32) {
+        super::opt_open::run(app, act);
+        return true;
+    }
     // an approval answers with its digit (the composer rule: sb-core takes
     // only 1, 2 or 3 on it, never words), the history says the option's
     if matches!(c.kind.as_str(), "confirm" | "approval") {
@@ -1004,25 +1016,12 @@ fn pick(app: &mut App, id: u64, i: usize) -> bool {
             _ => {}
         }
     }
-    if c.kind == "merge" && n == 2 {
-        // `open it on GitHub`: here, and the item stays (pr-design §6.3)
-        if let Some(url) = merge_link(&app.sb, &c) {
-            crate::links::open(&url);
-        }
-        return true;
-    }
-    if c.kind == "signin" && n == 1 {
-        // expired-ux `sign in again`: the TUI's own ChatGPT sign-in (the
-        // browser, resign.rs); the hub closes the item once auth.json
-        // says it's back
-        crate::resign::start(app);
-        return true;
-    }
-    if c.kind == "update" && n == 3 {
-        // update-card `release notes ↗`: here, and the item stays
-        if let Some(url) = c.link.as_deref() {
-            crate::links::open(url);
-        }
+    // what this app does itself, never sent, the item stays (opt_open.rs):
+    // bise-proto's one rule, the window's too (a merge's `2 open it on
+    // GitHub`, an update's notes, `sign in again`)
+    let link = if c.kind == "merge" { merge_link(&app.sb, &c) } else { c.link.clone() };
+    if let Some(act) = bise_proto::rows::opt_act(&c.kind, n as u32, link.as_deref()) {
+        super::opt_open::run(app, &act);
         return true;
     }
     answer(app, id, &n.to_string(), Some(reply));
@@ -1033,6 +1032,9 @@ fn pick(app: &mut App, id: u64, i: usize) -> bool {
 /// text as a note); an empty composer acknowledges a card that needs no
 /// words, else does nothing.
 fn submit(app: &mut App) {
+    if app.sb.closed_in_view().is_some() {
+        return send_to_asker(app);
+    }
     let Some((id, enter)) = app.sb.current_card().map(|c| (c.id, shape(c).enter)) else { return };
     let text = app.ed.text.trim().to_string();
     // a setup card: never in the history (the key card's text is a key)
@@ -1052,15 +1054,50 @@ fn submit(app: &mut App) {
     // the chips go out whole, as a message to the thread would
     // (input.rs): a paste's text inline in its tag, an image's marker
     // with its saved path; a bare `[Paste #1]` reached the asker empty
-    let text = crate::attach::expand(app, &text);
+    // msg-parts: as typed parts (a deny's note keeps its text: its
+    // `deny: ` is the hub's word, not his)
+    let said = crate::attach::expand(app, &text);
     match enter {
-        Enter::Deny => answer(app, id, &format!("deny: {text}"), None),
-        _ => answer(app, id, &text, None),
+        Enter::Deny => answer(app, id, &format!("deny: {}", said.text), None),
+        _ => answer_said(app, id, &said),
     }
 }
 
-/// ctrl+x: close card `id` without answering.
+/// ⏎ on a card the hub closed: your words go to its asker as a plain
+/// message (the hub routes it, as a message typed in its thread), then
+/// the view moves on as after an answer. No words: it just goes.
+fn send_to_asker(app: &mut App) {
+    let Some(g) = app.sb.card.gone.take() else { return };
+    let text = app.ed.text.trim().to_string();
+    if !text.is_empty() {
+        app.history.insert(0, app.ed.text.clone());
+        let said = crate::attach::expand(app, &text);
+        let mut params = json!({"agent": g.agent, "text": said.text});
+        if !said.parts.is_empty() {
+            params["parts"] = json!(said.parts);
+        }
+        app.sb.call("turn/send", params, super::rpc::Then::Line);
+    }
+    app.ed = Editor::default();
+    leave_closed(app);
+}
+
+/// The view leaves the closed card in it: to the first card, or back to
+/// the thread.
+fn leave_closed(app: &mut App) {
+    park_draft(app);
+    match app.sb.card_ids().first() {
+        Some(&n) => show(app, n),
+        None => close_view(app),
+    }
+}
+
+/// ctrl+x: close card `id` without answering (a card the hub closed
+/// already: the view leaves it, your words to the history).
 fn close_card(app: &mut App, id: u64) {
+    if app.sb.closed_in_view().is_some() {
+        return leave_closed(app);
+    }
     if app.sb.card_by_id(id).is_none() {
         return;
     }
@@ -1069,14 +1106,17 @@ fn close_card(app: &mut App, id: u64) {
         super::setup::close(app, id);
         return;
     }
-    app.sb.send_input(format!("/close {}", id));
+    app.sb.call("card/close", json!({"card": id}), super::rpc::Then::Line);
     retire(app, id);
 }
 
-/// A new snapshot: forget what the hub closed; the card in view went
-/// away (answered elsewhere): its draft goes to the history (↑ brings it
-/// back) and the view moves on.
-pub(super) fn sync(app: &mut App) {
+/// A new snapshot (`before`: the last one's cards): forget what the hub
+/// closed. A new card never touches the card in view nor your words.
+/// The card in view went away (withdrawn, answered via main, its agent
+/// stopped): with your words typed it stays in view, closed, until you
+/// send them or leave it (Benjamin's lost answer: the view jumped to the
+/// new card); with none, the view moves on.
+pub(super) fn sync(app: &mut App, before: &[Card]) {
     let live: Vec<u64> = app.sb.cards.iter().map(|c| c.id).collect();
     let cv = &mut app.sb.card;
     cv.answered.retain(|x| live.contains(x));
@@ -1085,8 +1125,14 @@ pub(super) fn sync(app: &mut App) {
         return;
     }
     let ids = app.sb.card_ids();
+    if app.sb.card.sel.is_some_and(|s| ids.contains(&s)) || app.sb.closed_in_view().is_some() {
+        return;
+    }
     let cv = &mut app.sb.card;
-    if cv.sel.is_some_and(|s| ids.contains(&s)) {
+    let was = cv.sel.and_then(|s| before.iter().find(|c| c.id == s));
+    if let Some(c) = was.filter(|_| !app.ed.text.trim().is_empty()) {
+        cv.gone = Some(c.clone());
+        cv.opt = None;
         return;
     }
     let d = std::mem::take(&mut app.ed);
@@ -1205,6 +1251,7 @@ pub(super) fn key(app: &mut App, k: &crossterm::event::KeyEvent, popup_open: boo
             }
             _ => submit(app),
         },
+        (KeyCode::Char('t'), KeyModifiers::CONTROL) if sel.is_some_and(|id| open_page(app, id)) => {}
         // 1-9 picks on an empty composer; once you typed, digits are text
         (KeyCode::Char(c @ '1'..='9'), KeyModifiers::NONE) if empty => {
             return sel.is_some_and(|id| pick_digit(app, id, c as usize - '0' as usize));
@@ -1247,6 +1294,7 @@ pub(crate) fn card_mouse(app: &mut App, m: &crossterm::event::MouseEvent) -> boo
             match hit {
                 CardHit::Row(id) => open_view(app, Some(id)),
                 CardHit::Open => open_view(app, None),
+                CardHit::Page(id) => _ = open_page(app, id),
                 CardHit::Tab(id) => show(app, id),
                 CardHit::Pick(id, i) => {
                     pick(app, id, i);
@@ -1339,160 +1387,21 @@ fn split_inline(text: &str) -> Option<(String, Vec<String>)> {
     None
 }
 
-/// The open cards matching `q` (their number, kind, agent or text):
-/// the card argument of `/close` and `/answer`.
-pub(crate) fn card_choices(app: &App, q: &str) -> Vec<Choice> {
-    app.sb
-        .sorted_cards()
-        .into_iter()
-        .filter(|c| card_matches(q, c.id, &[&c.kind, &c.agent, &c.text]))
-        .map(|c| {
-            let (_, icon, _) = kind_look(&c.kind);
-            Choice {
-                value: c.id.to_string(),
-                label: if super::setup::is_local(c.id) { "setup".into() } else { format!("#{}", c.id) },
-                desc: format!("{} @{} · {}", c.kind, c.agent, truncate_chars(&one_line(&c.text), 80)),
-                mark: Some((icon, glyph_color(&c.kind))),
-            }
-        })
-        .collect()
-}
+#[path = "card_page.rs"]
+mod card_page;
+pub(super) use card_page::{link_feed, open_page, page_hint, page_link_line, page_mine, picked_fold, remember_pages, PageLink};
+#[path = "card_choices.rs"]
+mod card_choices;
+pub(crate) use card_choices::card_choices;
+#[path = "card_voice.rs"]
+mod card_voice;
+#[allow(unused_imports)] // voice mode's integration calls some only in tests yet
+pub(crate) use card_voice::{answer_by_voice, heard_on, show_heard, undo_heard, voice_question, VoiceQuestion};
+use card_voice::with_heard;
 
-/// A card for the typed `q`: a number is the start of the card's number
-/// (`99` finds #994, never #1999), and a setup card's number (2^50 + n,
-/// setup::LOCAL) is not the user's: it matches `setup` instead (`/close
-/// 999` had picked a setup card whose id holds "999", and the hub then
-/// answered `no open card #1125899906842624`).
-fn card_matches(q: &str, id: u64, fields: &[&str]) -> bool {
-    let q = q.trim_start_matches('#');
-    let local = super::setup::is_local(id);
-    if !q.is_empty() && q.bytes().all(|b| b.is_ascii_digit()) {
-        return !local && id.to_string().starts_with(q);
-    }
-    let num = if local { "setup".to_string() } else { id.to_string() };
-    crate::commands::matches(q, &[&num, fields[0], fields[1], fields[2]])
-}
-
-/// The text on one line: runs of whitespace become one space.
-fn one_line(s: &str) -> String {
-    s.split_whitespace().collect::<Vec<_>>().join(" ")
-}
-
-// ---- answers by voice (voice mode, design §5) ----
-//
-// In voice mode the turn after a question or an approval is matched
-// first (`voicemode::answers`): a match shows `heard "the first one" →
-// 1 smaller` on the item for 1.5 s (esc undoes), then counts.
-// (allow(dead_code) on the entry points until voice mode's integration
-// calls them; voicemode/mod.rs has the same.)
-
-thread_local! {
-    /// The item an answer was heard for, the line, and since when.
-    static HEARD: RefCell<Option<(u64, String, std::time::Instant)>> = const { RefCell::new(None) };
-}
-
-/// What voice mode can answer: the item in the view (else the top one),
-/// an approval or not, its options' words.
-#[allow(dead_code)]
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub(crate) struct VoiceQuestion {
-    pub(crate) id: u64,
-    pub(crate) approval: bool,
-    pub(crate) options: Vec<String>,
-}
-
-#[allow(dead_code)]
-pub(crate) fn voice_question(app: &App) -> Option<VoiceQuestion> {
-    let c = app.sb.current_card()?;
-    let s = shape(c);
-    (!s.options.is_empty()).then(|| VoiceQuestion { id: c.id, approval: c.kind == "approval", options: s.options })
-}
-
-/// `heard "…" → 1 smaller` on item `id` from `now` for
-/// [`crate::voicemode::answers::HEARD_FOR`].
-#[allow(dead_code)]
-pub(crate) fn show_heard(id: u64, line: String, now: std::time::Instant) {
-    HEARD.with(|h| *h.borrow_mut() = Some((id, line, now)));
-}
-
-/// esc: the heard answer does not count.
-#[allow(dead_code)]
-pub(crate) fn undo_heard() {
-    HEARD.with(|h| *h.borrow_mut() = None);
-}
-
-/// The heard line on item `id`, while it shows.
-pub(crate) fn heard_on(id: u64, now: std::time::Instant) -> Option<String> {
-    HEARD.with(|h| {
-        h.borrow().as_ref().and_then(|(at_id, line, at)| {
-            (*at_id == id && now.saturating_duration_since(*at) < crate::voicemode::answers::HEARD_FOR).then(|| line.clone())
-        })
-    })
-}
-
-/// The heard answer counts: option `i` of item `id`, as a key would
-/// pick it; the line goes.
-#[allow(dead_code)]
-pub(crate) fn answer_by_voice(app: &mut App, id: u64, i: usize) -> bool {
-    undo_heard();
-    pick(app, id, i)
-}
-
-/// The item's shape with the heard line under its body, while it shows.
-fn with_heard(c: &Card, mut s: Shape) -> Shape {
-    if let Some(line) = heard_on(c.id, std::time::Instant::now()) {
-        s.parts.push(Part::Note(line));
-    }
-    s
-}
-
-// ---- bise ambient (docs/ambient-app.md §4): the same options and replies ----
-
-/// A hub card as the ambient core gets it (no TUI state on it).
-fn ambient_card(kind: &str, agent: &str, text: &str) -> Card {
-    Card {
-        id: 0,
-        kind: kind.into(),
-        agent: agent.into(),
-        text: text.into(),
-        age_ms: 0,
-        seen_at: std::time::Instant::now(),
-        note: String::new(),
-        look: None,
-        place: None,
-        pr: None,
-        link: None,
-        asking: false,
-        waiting: Vec::new(),
-    }
-}
-
-/// A card's numbered options as the inbox box shows them: `(digit,
-/// whole label)` (a hard confirm's `no` is 3, like the box's).
-pub(crate) fn ambient_options(kind: &str, agent: &str, text: &str) -> Vec<(usize, String)> {
-    let s = base_shape(&ambient_card(kind, agent, text));
-    s.options.iter().enumerate().map(|(i, o)| (s.num(i), o.clone())).collect()
-}
-
-/// What digit `d` sends as `/answer <id> <reply>`, as the box's `pick`
-/// does: a hub item's digit itself, else the option's words. None: no
-/// such option, or one the box acts on locally (a PR or release page to
-/// open, the feature drop's second ask).
-pub(crate) fn ambient_reply(kind: &str, agent: &str, text: &str, d: usize) -> Option<String> {
-    let s = base_shape(&ambient_card(kind, agent, text));
-    let i = s.by_digit(d)?;
-    if !choice_kind(kind) {
-        return s.options.get(i).cloned();
-    }
-    (!ambient_local(kind, d)).then(|| d.to_string())
-}
-
-/// Digit `d` of a `kind` card is one the box acts on itself (a PR or
-/// release page to open, the feature drop's second ask).
-pub(crate) fn ambient_local(kind: &str, d: usize) -> bool {
-    matches!((kind, d), ("merge", 2) | ("update", 3) | ("feature_merge", 3))
-}
-
+#[path = "card_ambient.rs"]
+mod card_ambient;
+pub(crate) use card_ambient::{ambient_local, ambient_options, ambient_reply};
 
 #[cfg(test)]
 #[path = "cards_tests.rs"]

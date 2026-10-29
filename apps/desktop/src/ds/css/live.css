@@ -1,0 +1,80 @@
+/* src/ds · live overrides: what the React app needs on top of desktop-ds v5's rules (the other files in
+   css/ are the reference's ds.css, split, untouched). Real states through real selectors, so focusing
+   or typing re-renders nothing: :focus-within for the boxes, real <input>/<button> reset to the look. */
+
+/* a real <input> inside the field's frame */
+.b-field input{flex:1;min-width:0;height:100%;padding:0;border:0;outline:0;background:none;font:inherit;color:inherit}
+.b-field input::placeholder{color:var(--c-text-3)}
+/* a search that '/' focuses (GitHub's, ambient-lead m_22845, designer m_22848): the sidebar's boxed
+   key at the right end, 8 px from the edge, centred; a flex sibling, so the words never run under
+   it. Gone once the field has the focus or words; dropped whole under 160 px of field. */
+.b-field.slash{container-type:inline-size;padding-right:var(--s-2)}
+.b-field.slash .slash-key{flex:none;pointer-events:none}
+.b-field.slash input:focus~.slash-key,.b-field.slash input:not(:placeholder-shown)~.slash-key{display:none}
+/* the query sees the content box: 160 px of field less 12 (--pad-control-x) and 8 (--s-2) of padding */
+@container (max-width:139.9px){.b-field.slash .slash-key{display:none}}
+.b-field:focus-within{box-shadow:inset 0 0 0 1px var(--c-focus),0 0 0 3px color-mix(in srgb,var(--c-focus) 25%,transparent)}
+
+/* the composer's box shows focus while the editor inside has it; the editor's own caret, in the text color */
+.b-composer .box:focus-within{box-shadow:0 0 0 1px var(--c-focus)}
+.b-composer .in{min-width:0;caret-color:var(--c-text);color:var(--c-text)}
+.b-composer .in [contenteditable]{outline:0;white-space:pre-wrap;overflow-wrap:anywhere}
+.b-composer button.send{padding:0;border:0;font-family:var(--font-ui)}
+.b-composer button.send:focus-visible{outline:0;box-shadow:0 0 0 2px var(--c-solid),0 0 0 4px var(--c-focus)}
+
+/* the spotlight's real input */
+.b-spot .in .tx{min-width:0;caret-color:var(--c-text)}
+.b-spot .in .tx input,.b-spot .in .tx [contenteditable]{width:100%;padding:0;border:0;outline:0;background:none;font:inherit;color:inherit}
+.b-spot .in .tx input::placeholder{color:var(--c-text-3)}
+/* a still's caret (SpotStill), inline before the placeholder: the composer's caret, drawn in the
+   spotlight (the reference nested a .b-composer .in there, which .b-spot .in turns into a flex row) */
+.b-spot .in .tx>.cur{display:inline-block;width:2px;height:1.1em;background:var(--c-text);vertical-align:-.2em;animation:b-blink 1s steps(1) infinite}
+
+/* never by color alone (bar N2, NO_COLOR's stand-in): with macOS increase contrast (prefers-contrast:
+   more) or forced colors, every color cue also gets a glyph or a shape. Always on, without the media:
+   a dot's state word (aria-label, title), ▲ on Err, Toast err, Tool err and Dock err, the diff's
+   +/− column, the picked lines' outline, the keyboard's ring on options and rows. */
+@media (prefers-contrast: more), (forced-colors: active) {
+  /* a dot: a ring with its state's glyph, in its state's color */
+  .b-dot{display:inline-flex;align-items:center;justify-content:center;width:14px;height:14px;background:none;box-shadow:inset 0 0 0 1.5px currentColor;color:var(--c-text-2);font:700 9px/1 var(--font-ui);animation:none;opacity:1}
+  .b-dot.lg{width:16px;height:16px;font-size:10px}
+  /* working: the still '∿' in ink (bar N2's glyph) in place of the breath, so it reads without its tones */
+  .b-dot.wk{color:var(--c-text)}.b-dot.wk::before{content:none}.b-dot.wk>.wk-sign{display:none}.b-dot.wk::after{content:"∿"}
+  .b-dot.nd{color:var(--c-accent);box-shadow:inset 0 0 0 1.5px currentColor}.b-dot.nd::after{content:"?"}
+  .b-dot.ok{color:var(--c-ok)}.b-dot.ok::after{content:"✓"}
+  .b-dot.er{color:var(--c-err)}.b-dot.er::after{content:"!"}
+  .b-dot.off{color:var(--c-text-3);box-shadow:inset 0 0 0 1.5px currentColor}.b-dot.off::after{content:"–"}
+  /* chips: a glyph for a tone that means something, an outline for the accent */
+  .b-chip.err::before{content:"▲"}
+  .b-chip.ok::before{content:"✓"}
+  .b-chip.acc{box-shadow:inset 0 0 0 1px currentColor}
+  /* bars: done is solid, an error is struck through with stripes, a known end runs dashed */
+  .b-bar.err>i{background:repeating-linear-gradient(135deg,var(--c-err) 0 3px,transparent 3px 6px)}
+  /* the error words */
+  .b-help.err::before{content:"▲ "}
+  .b-field.is-error::after{content:"▲";margin-left:auto;color:var(--c-err)}
+  .b-msg.is-error .b-text::before{content:"▲ ";color:var(--c-err)}
+}
+
+/* hover on every control he can act on (bar O.6, qa-flows' clicks): the reference draws it on buttons,
+   rows, options, tabs and seg; these are the others. is-hover shows it in the gallery. */
+/* a switch's hover, also when he hovers the settings row it sits on (the whole row flips it) */
+.b-toggle:not(.is-disabled):hover,.b-toggle.is-hover,.b-gi.has-switch:not(.is-disabled):hover .b-toggle{background:var(--c-switch-off-hover)}
+.b-toggle.on:not(.is-disabled):hover,.b-toggle.on.is-hover,.b-gi.has-switch:not(.is-disabled):hover .b-toggle.on{background:var(--c-switch-on-hover)}
+.b-check:hover,.b-check.is-hover{box-shadow:inset 0 0 0 1.5px var(--c-text-2)}
+.b-check.on:hover,.b-check.on.is-hover{background:color-mix(in srgb,var(--c-ink) 85%,var(--c-solid));box-shadow:none}
+.b-field:not(.is-focus):not(.is-error):not(:focus-within):hover,.b-field.is-hover{box-shadow:inset 0 0 0 1px var(--c-line-strong)}
+/* the composer's editor is a .b-field inside the box: the box is the input and has the one ring, so
+   the editor shows no border or outline of its own on hover or focus (his round 2) */
+.b-composer .in .b-field:not(.is-focus):not(.is-error):not(:focus-within):hover,.b-composer .in .b-field.b-field:focus,.b-composer .in .b-field.b-field:focus-within{box-shadow:none;outline:0;border:0}
+.b-composer .box{cursor:text}
+.b-chip[role=button]:hover,.b-chip[role=button].is-hover{background:var(--c-active)}
+.b-tabs>span:not(.on):hover{background:var(--c-active)}
+.b-task:focus-visible{outline:0}
+
+/* keyboard focus on the parts that take it */
+.b-opt:focus-visible,.b-row:focus-visible,.b-mi:focus-visible,.b-task:focus-visible{outline:0;box-shadow:inset 0 0 0 2px var(--c-focus)}
+.b-check:focus-visible{outline:0;box-shadow:0 0 0 2px var(--c-solid),0 0 0 4px var(--c-focus)}
+.b-toggle:focus-visible{outline:0;--sw-ring:0 0 0 2px var(--c-solid),0 0 0 4px var(--c-focus)}
+/* a group row's check sits on the label's line: .b-gi .l span{display:block} (the sub) also caught the check (round 3 shots) */
+.b-gi .l>.b-check{display:inline-flex;margin-right:var(--gap-inline);vertical-align:-3px}

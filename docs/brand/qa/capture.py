@@ -158,7 +158,7 @@ def main():
         time.sleep(15)
         shot("levels-and-reports", "what's for you, what isn't + reports in main + busy hour (fold)")
         # --- a question card (main escalates a question of an agent)
-        say('[[bash: sb card "the brief says keep old clients working, but v2 removes /users. do we document v1 or v2?\n1. v1\n2. v2"]]')
+        say('[[bash: sb notify "the brief says keep old clients working, but v2 removes /users. do we document v1 or v2?\n1. v1\n2. v2"]]')
         time.sleep(6)
         keys("C-g")
         time.sleep(1)

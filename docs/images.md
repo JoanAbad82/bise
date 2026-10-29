@@ -187,6 +187,55 @@ content block only at the last step, the provider request.
 The feed shows a marker as `[Image #1 shots/login.png]` (user lines and
 tool results), not the raw tag.
 
+### Retention (D14)
+
+The store keeps an image `shots_keep_days` days (`prefs.json`, settings ›
+privacy › kept: 1, 7 or 30; unset: 7, `bise_home::prefs::keep_days`),
+then deletes it. Every image counts: pasted, dropped, made by an agent
+(`run_typescript`), taken at fn.
+
+The grace (architect m_33081): nothing goes at the update. A hub's first
+tick with the rule writes `images-since` in its folder and deletes
+nothing; it prunes only from `since + keep_days` on
+(`switchboard::image_care::prune_allowed`). The release note says:
+"images older than N days (settings › context and privacy, 7 by default)
+are deleted, starting N days after this update".
+
+- The rule (`bend_images::prune`, pure `doomed`): a hash, its image and
+  its `.b64` together, goes when its newest file is older than the
+  setting and no live text names it; a write's leftover (`tmp-*`,
+  `*.tmp`) goes after a day; any other name stays. Storing an image
+  already there refreshes its age (a re-paste is a fresh use).
+- The store is shared by every hub of the home and a hub knows only its
+  own state, so the protection across hubs is the age: each hub touches
+  the images its hot messages and open cards name at its start and every
+  hour, and prunes at most once a day (`switchboard::image_care`, its
+  stamps `images-touched` / `images-pruned` in the hub's folder). With
+  `keep_days >= 1` a live hub's named image never goes (the law
+  `named_by_a_live_hub_never_goes`). A stopped hub's open card can lose
+  its image: it is not live.
+- The clients never draw a broken image: an old bubble's image whose
+  store file is gone keeps its chip with the no-file look and says
+  `deleted · kept 7 days`, the desktop with `· settings` (a link,
+  tip `settings › context and privacy`) that opens settings › privacy
+  (`thread/ImageGone.tsx`, the store file beside the part's
+  `b64_file`), the TUI on its chip line
+  `▣ login.png · deleted · kept 7 days`, no link
+  (`rust/tui/src/image_gone.rs`). The words state today's rule (his
+  setting now), never the one an image went by: no record is kept per
+  image. Words: `bise_proto::words::thread::image_deleted`.
+- Known: an image older than the setting in a live agent's history (not
+  an open message) becomes `<image-unavailable …>` text at its next model
+  call, as an image past the 20 most recent already does.
+- Known, a follow-up: the desktop's `saveImage` writes a sha256 copy
+  (`<64 hex>.<ext>`) that the hub then stores again under its own name, so
+  that copy is an orphan at once (it goes with the rest after the
+  setting). The desktop could send the source and stop copying.
+- Tests: `rust/images/src/prune_tests.rs` (the rule and the law),
+  `switchboard::image_care` (the stamps), `tests/images_prune_e2e.py`
+  (a hub on a throwaway home: the setting changes what is kept, a named
+  image stays and is touched).
+
 ## Keys and flows
 
 - `@name.png` in the popup, Tab or Enter: `[Image #N]` (flash "attached").
@@ -249,9 +298,9 @@ its `[Image #1]` name, never only a path or the bare marker).
 
 ## Not done / later
 
-- bend-jsrt is a 110 MB debug binary: an agent shell (50 MB file cap)
-  cannot link it; rebuild it from a terminal (`cd rust/jsrt && cargo
-  build`) after a change in `rust/jsrt` or `rust/images`.
+- bend-jsrt is a 110 MB debug binary: rebuild it (`cd rust/jsrt && cargo
+  build`) after a change in `rust/jsrt` or `rust/images` (an agent's
+  shell has no file size cap since no-fsize).
 - Downscaling needs macOS `sips`; elsewhere an image over 2048 px or
   3.75 MB is refused with a message.
 

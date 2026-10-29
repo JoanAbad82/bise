@@ -5,7 +5,10 @@ use crate::code::*;
 use crate::markdown::*;
 use crate::theme::*;
 use crate::wire::*;
+use crate::said::Said;
 use crate::wrap_line;
+use bise_proto::parts::Part;
+use bise_proto::words::thread;
 use ratatui::style::{Modifier, Style};
 use ratatui::text::{Line, Span};
 
@@ -154,6 +157,10 @@ pub(crate) fn code_width(width: usize) -> usize {
 /// its measure, a tool (its line, its code, its output) at the code
 /// measure. The extra width stays empty: rows never stretch.
 pub(crate) fn ev_rows(ev: &Ev, tick: u32, width: usize) -> Vec<Line<'static>> {
+    // a kept answer: the reply's own rows, dim (as it was live)
+    if let Ev::Kept(t) = ev {
+        return crate::livetext::kept_rows(t, tick, width);
+    }
     let w = match ev {
         Ev::Tool(_) => code_width(width),
         // a reply wraps its prose at the prose measure itself; its tables
@@ -189,12 +196,11 @@ pub(crate) fn thinking_lines(ms: u128, text: &str, open: bool, width: usize) -> 
         return vec![head];
     }
     let mut rows = vec![head];
-    // the BENDSIG line carries the provider signature (the signed
-    // thinking transport), never part of the reasoning itself
+    // the span comes without its signature line (bise_proto
+    // thread::think::unsigned, through split_thinking)
     let body = unescape_md(text);
     let lines = body
         .split('\n')
-        .filter(|l| !l.starts_with("BENDSIG::"))
         .map(|l| Line::from(Span::styled(l.to_string(), dim_st)));
     let bar = Span::styled(RAIL, Style::default().fg(rule()));
     rows.extend(barred_rows(&bar, lines, width));
@@ -368,15 +374,26 @@ pub(crate) fn ev_lines(ev: &Ev, width: usize) -> Vec<Line<'static>> {
     let text_st = Style::default().fg(text());
     let err_st = Style::default().fg(error());
     match ev {
+        // a failed turn's kept text: the reply's rows, dim
+        Ev::Kept(t) => crate::livetext::kept_rows(t, 0, width),
         // an image marker is an accent chip `▣ login.png` (book §14)
-        Ev::You(t, mark, open) => user_block_lines(t, *mark, *open, width),
-        Ev::MarkYou { .. } => vec![],
+        Ev::You(t, mark, open, _) => user_block_lines(t, *mark, *open, width),
+        // a message held by the pause: his row, dim, and why under it
+        Ev::Held(t) => {
+            let mut rows: Vec<Line<'static>> = user_block_lines(t, Mark::Sent, false, width)
+                .into_iter()
+                .map(|l| Line::from(l.spans.into_iter().map(|s| Span::styled(s.content, s.style.fg(dim()))).collect::<Vec<_>>()))
+                .collect();
+            rows.extend(glyph_line(G_NOTE, Style::default().fg(faint()), thread::held.into(), dim_st, width));
+            rows
+        }
+        Ev::MarkYou { .. } | Ev::YouId(_) | Ev::YouWent { .. } => vec![],
         // BISE-86 (book §13, §17): `✗ not delivered: {name} stopped.`, and
         // while it waits for an answer `⏎ send again · esc drop`
         Ev::Undelivered { name, open, .. } => {
-            let mut l = glyph_line(G_FAILED, err_st, format!("not delivered: {} stopped.", name), text_st, width);
+            let mut l = glyph_line(G_FAILED, err_st, thread::undelivered(name), text_st, width);
             if *open {
-                l[0].spans.push(Span::styled(" ⏎ send again · esc drop", dim_st));
+                l[0].spans.push(Span::styled(thread::undelivered_keys, dim_st));
             }
             l
         }
@@ -447,9 +464,10 @@ pub(crate) fn ev_lines(ev: &Ev, width: usize) -> Vec<Line<'static>> {
         Ev::Compacted { text, open } => summary_lines(text, *open, width),
         Ev::Fold { head, text, open } => fold_lines(head, text, *open, width),
         Ev::Scheduled { head, words, open } => scheduled_lines(head, words, *open, width),
+        Ev::Wake { head, stopped, tail, open } => wake_lines(head, *stopped, tail, *open, width),
         // an interrupted turn ("turn interrupted by main" too) is dim;
         // any other warning reads as text
-        Ev::Warn(t) if t == "turn interrupted" || t.starts_with("turn interrupted by ") => glyph_line(G_INTERRUPTED, dim_st, t.clone(), dim_st, width),
+        Ev::Warn(t) if crate::feed::is_interrupt(t) => glyph_line(G_INTERRUPTED, dim_st, t.clone(), dim_st, width),
         // the plan's limit line: its usage page clickable (OSC 8)
         Ev::Warn(t) if crate::wire::is_plan_line(t) && t.contains(crate::wire::PLAN_USAGE_TEXT) => {
             use unicode_width::UnicodeWidthStr;
@@ -463,7 +481,7 @@ pub(crate) fn ev_lines(ev: &Ev, width: usize) -> Vec<Line<'static>> {
             ]);
             hung_rows(&first, &pad, [line], width)
         }
-        Ev::Warn(t) => glyph_line(G_INTERRUPTED, dim_st, t.clone(), text_st, width),
+        Ev::Warn(t) | Ev::Retry { text: t, .. } => glyph_line(G_INTERRUPTED, dim_st, t.clone(), text_st, width),
         // a model without vision refused an image: say so, and the way out
         Ev::Err(t) => match crate::attach::no_vision(t) {
             Some(mut spans) => {
@@ -477,7 +495,7 @@ pub(crate) fn ev_lines(ev: &Ev, width: usize) -> Vec<Line<'static>> {
             // (400).`), the provider's own words dim under it
             None => match crate::wire::refusal_parts(t) {
                 Some((head, said)) => {
-                    let mut l = glyph_line(G_FAILED, err_st, format!("the turn stopped: {}", head), err_st, width);
+                    let mut l = glyph_line(G_FAILED, err_st, thread::refused(head), err_st, width);
                     if !said.is_empty() {
                         l.extend(glyph_line(" ", dim_st, said.to_string(), dim_st, width));
                     }
@@ -496,7 +514,7 @@ pub(crate) fn ev_lines(ev: &Ev, width: usize) -> Vec<Line<'static>> {
         Ev::Pr { tone, number, url, text, url_row } => pr_lines(tone, *number, url, text, *url_row, width),
         Ev::Made { id, agent, title, kind, v } => made_lines(id, agent, title, kind, *v, width),
         Ev::Landed { agent, from, sha, files, add, del } => landed_lines(agent, from, sha, *files, *add, *del, width),
-        Ev::Approval { ok, text, note, asked, open } => answer_lines(*ok, text, note, asked, *open, width),
+        Ev::Approval { ok, text, note, parts, asked, open } => answer_lines(*ok, text, note, parts, asked, *open, width),
         Ev::Said { glyph, head, dim } => {
             // ✗ a failure (error); ? it needs you, ✓ it worked (accent)
             let calm = *glyph != "✗";
@@ -516,13 +534,19 @@ pub(crate) fn ev_lines(ev: &Ev, width: usize) -> Vec<Line<'static>> {
             let (kind, body) = report_parts(text).unwrap_or_default();
             report_lines(from, kind, body, *open, width)
         }
+        Ev::AgentMsg { from, to, level: 3, id, open, parts, .. } if crate::forwarded::of(parts).is_some() => {
+            let f = crate::forwarded::of(parts).unwrap_or_else(|| unreachable!());
+            let mut ls = vec![l3_chip_row(chip_form(), from, to, id, width)];
+            ls.extend(l3_forward_under(&f, *open, width));
+            ls
+        }
         Ev::AgentMsg { from, to, text, level: 3, id, open, .. } => l3_lines(from, to, id, text, *open, width),
         Ev::AgentMsg { from, text, .. } => l2_lines(from, text, width),
         Ev::Answered { agent, question, answer, why, open } => {
             crate::answered::answered_lines(agent, question, answer, why, *open, width)
         }
         Ev::TimeMark(t) => vec![Line::from(Span::styled(format!(" {} {} {}", G_NOTE, t, G_NOTE), Style::default().fg(faint())))],
-        Ev::Card { text, closed } => card_lines(text, closed, width),
+        Ev::Card { card, closed } => card_lines(card, closed, width),
         Ev::CardClosed { .. } | Ev::Ended(_) => vec![],
         Ev::Release(r) => crate::release_row::lines(r, width),
     }
@@ -701,7 +725,7 @@ fn l3_text_rows(text: &str, open: bool, room: usize) -> Vec<Line<'static>> {
         let mut rows: Vec<Line<'static>> = text
             .trim()
             .split('\n')
-            .flat_map(|l| wrap_line(Line::from(Span::styled(l.to_string(), dim_st)), room))
+            .flat_map(|l| wrap_line(Line::from(crate::agent_parts::spans(l, dim_st)), room))
             .collect();
         let mark = format!(" {}", glyph(G_OPEN));
         match rows.last_mut() {
@@ -711,7 +735,7 @@ fn l3_text_rows(text: &str, open: bool, room: usize) -> Vec<Line<'static>> {
         return rows;
     }
     let flat = text.split_whitespace().collect::<Vec<_>>().join(" ");
-    let mut rows = wrap_line(Line::from(Span::styled(flat, dim_st)), room);
+    let mut rows = wrap_line(Line::from(crate::agent_parts::spans(&flat, dim_st)), room);
     let more = if long { format!(" {}", glyph(G_CLOSED)) } else { String::new() };
     if rows.len() > L3_ROWS {
         rows.truncate(L3_ROWS);
@@ -754,6 +778,21 @@ pub(crate) fn l3_lines_as(
     ls
 }
 
+/// A forwarded message under its chip (forwarded.rs, designer m_41546):
+/// its note as a level-3 text, the `↪` line, the original quoted, all at
+/// x0+2 like [`l3_under`].
+fn l3_forward_under(f: &crate::forwarded::Fwd, open: bool, width: usize) -> Vec<Line<'static>> {
+    let room = width.saturating_sub(L3_UNDER.len());
+    let rows = crate::forwarded::rows(f, open, room, crate::running::clock, |note| l3_text_rows(note, open, room));
+    rows.into_iter()
+        .map(|r| {
+            let mut spans = vec![Span::raw(L3_UNDER)];
+            spans.extend(r.spans);
+            Line::from(spans)
+        })
+        .collect()
+}
+
 /// The chip row of a level-3 message. W, the reading width from x0
 /// (book §9 'Short on room'): names cut at 24 / 16 / 10, and then only
 /// as the row's room asks (BISE-109); under 40, the compact chip.
@@ -789,11 +828,15 @@ fn l3_under(text: &str, open: bool, width: usize) -> Vec<Line<'static>> {
 /// (book §9, BISE-127): no chip, its text alone at x0+2, like
 /// [`ev_rows`] would draw it under the chip.
 pub(crate) fn l3_text_only_rows(ev: &Ev, width: usize) -> Vec<Line<'static>> {
-    let Ev::AgentMsg { text, open, .. } = ev else {
+    let Ev::AgentMsg { text, open, parts, .. } = ev else {
         return Vec::new();
     };
     let w = code_width(width);
-    l3_under(text, *open, w).into_iter().flat_map(|l| wrap_line(l, w)).collect()
+    let under = match crate::forwarded::of(parts) {
+        Some(f) => l3_forward_under(&f, *open, w),
+        None => l3_under(text, *open, w),
+    };
+    under.into_iter().flat_map(|l| wrap_line(l, w)).collect()
 }
 
 /// The speaker of a level-2 block is bold (book §9 'Emphasis'): main's
@@ -810,7 +853,7 @@ fn l2_lines(from: &str, body: &str, width: usize) -> Vec<Line<'static>> {
     let (glyph, glyph_st, lead) = if from == "main" {
         (G_MAIN, main_mark_st(), String::new())
     } else {
-        (G_MSG, bold_st, format!("{} to you:", from))
+        (G_MSG, bold_st, thread::to_you(from))
     };
     let mut lines = md_lines(&unescape_md(body.trim()), width.saturating_sub(3), width.saturating_sub(3));
     if lines.is_empty() {
@@ -830,13 +873,8 @@ fn l2_lines(from: &str, body: &str, width: usize) -> Vec<Line<'static>> {
 /// from the right with `…` to fit `width`; the last run, still growing,
 /// carries the working pulse.
 pub(crate) fn fold_line(n: usize, agents: usize, open: bool, live: bool, tick: u32, width: usize) -> Line<'static> {
-    let label = format!(
-        "{} {} messages between {} agent{}",
-        if open { G_OPEN } else { G_CLOSED },
-        n,
-        agents,
-        if agents == 1 { "" } else { "s" }
-    );
+    let between = if agents == 1 { thread::between_one(n) } else { thread::between(n, agents) };
+    let label = format!("{} {}", if open { G_OPEN } else { G_CLOSED }, between);
     let pulse = if live { 2 } else { 0 };
     let room = width.saturating_sub(L3_X.len() + pulse).max(1);
     let mut row = vec![Span::raw(L3_X), Span::styled(fit_chars(&label, room), Style::default().fg(dim()))];
@@ -848,7 +886,7 @@ pub(crate) fn fold_line(n: usize, agents: usize, open: bool, live: bool, tick: u
 }
 
 /// A card line of the hub (`#3 question @docs : v1 or v2?`): its kind,
-/// the agent, the text.
+/// the agent, the text (the line path's parser: `wire::CardParts::of_line`).
 pub(crate) fn card_parts(t: &str) -> Option<(&str, &str, &str)> {
     let rest = t.strip_prefix('#')?;
     let (_, rest) = rest.split_once(' ')?;
@@ -858,28 +896,29 @@ pub(crate) fn card_parts(t: &str) -> Option<(&str, &str, &str)> {
     Some((kind, name, text))
 }
 
-// a card in the history (book §9): a question or a blocker is level 1,
-// an accent bar `┃`, the bold accent title `? {name} needs you`, the
-// body in text; a done or failed card is one line for you (`✓` accent, `✗`).
-// Answered (`closed`: the hub's word, book §10, §12), a level-1 card
-// fades in place: dim bar, dim title with ` · answered`, dim body; the
-// answer follows as its own line.
-fn card_lines(t: &str, closed: &str, width: usize) -> Vec<Line<'static>> {
+// a card in the history (book §9): a question or a blocker is level 1, an accent bar `┃`, the
+// bold accent title `? {name} needs you`, the body in text; a page's card is its head alone,
+// `? main asks: <question> ↗ <page>`; a done or failed card is one line for you (`✓`, `✗`).
+// Answered (`closed`: the hub's word, book §10, §12), a level-1 card fades in place (dim bar,
+// dim title with ` · answered`, dim body); the answer follows as its own line.
+fn card_lines(card: &crate::wire::CardParts, closed: &str, width: usize) -> Vec<Line<'static>> {
     let text_st = Style::default().fg(text());
-    let (kind, name, body) = card_parts(t).unwrap_or(("question", "", t));
+    let body = card.body();
+    let (kind, name, body) = (card.kind.as_str(), card.agent.as_str(), body.as_str());
     // bise's own items (opened for main): bise asks, not main
     let name = if matches!(kind, "signin" | "update") { "bise" } else { name };
     match kind {
         "done" => {
             let check = Style::default().fg(accent());
-            return glyph_line(done_glyph(), check, format!("{} is done: {}", name, body), text_st, width);
+            return glyph_line(done_glyph(), check, thread::card_done(name, body), text_st, width);
         }
         k if k.contains("fail") => {
-            return glyph_line(G_FAILED, Style::default().fg(error()), format!("{} failed: {}", name, body), text_st, width)
+            return glyph_line(G_FAILED, Style::default().fg(error()), thread::card_failed(name, body), text_st, width)
         }
         _ => {}
     }
-    let mut title = if name.is_empty() { "needs you".to_string() } else { format!("{} needs you", name) };
+    let page = card.page.as_ref().map(|p| if kind == "plan" { format!("{} ↗", crate::sb::answer_target::question_cut(&thread::card_plan_on(name, p), width.saturating_sub(8).max(12))) } else { thread::card_page_asks(name, card.question.lines().next().unwrap_or(""), p) });
+    let mut title = page.clone().unwrap_or_else(|| if name.is_empty() { thread::card_needs.to_string() } else if kind == "plan" { bise_proto::words::common::title_plan(name) } else if kind == "drop" { bise_proto::words::inbox::title_drop(name) } else { thread::card_needs_name(name) });
     let (bar_st, title_st, body_st) = if closed.is_empty() {
         let accent_st = Style::default().fg(accent()).add_modifier(Modifier::BOLD);
         (Style::default().fg(accent()), accent_st, text_st)
@@ -893,7 +932,7 @@ fn card_lines(t: &str, closed: &str, width: usize) -> Vec<Line<'static>> {
         Span::styled(format!("{} ", G_CARD), title_st),
         Span::styled(title, title_st),
     ])];
-    lines.extend(body.split('\n').map(|l| Line::from(Span::styled(l.to_string(), body_st))));
+    lines.extend(body.split('\n').filter(|_| page.is_none()).map(|l| Line::from(Span::styled(l.to_string(), body_st))));
     barred_rows(&bar, lines, width)
 }
 
@@ -901,17 +940,19 @@ fn card_lines(t: &str, closed: &str, width: usize) -> Vec<Line<'static>> {
 /// result: `answered`, `answered via @x`, `closed`, `accepted`, …).
 pub(crate) fn closed_word(res: &str) -> String {
     let res = res.trim();
+    // the hub's words on the left, his on the right
     if let Some(who) = res.strip_prefix("answered via @") {
-        return format!("answered by {}", who);
+        return thread::closed_by(who);
     }
     match res {
-        "closed" => "closed".into(),
-        "accepted" => "dropped".into(),
-        "refused" => "kept".into(),
-        "vue" => "seen".into(),
-        "reprise" => "resumed".into(),
-        "task stopped" => "agent stopped".into(),
-        "" => "answered".into(),
+        "closed" => thread::closed_closed.into(),
+        "accepted" => thread::closed_dropped.into(),
+        "refused" => thread::closed_kept.into(),
+        "vue" => thread::closed_seen.into(),
+        "reprise" => thread::closed_resumed.into(),
+        "task stopped" => thread::closed_stopped.into(),
+        "handed to main" => thread::closed_handed("main"),
+        "" => thread::closed_answered.into(),
         r => r.to_string(),
     }
 }
@@ -929,14 +970,18 @@ pub(crate) const YOU_ROWS: usize = 20;
 /// chip count one), or as many rows at 80 columns (one long paragraph).
 /// Width-free, so ctrl+o and find know it without the feed's width; at
 /// the feed's width a message that still fits shows whole.
-pub(crate) fn you_folds(msg: &str) -> bool {
+pub(crate) fn you_folds(msg: &Said) -> bool {
+    view_folds(&crate::said::view(msg))
+}
+
+/// [`you_folds`] of a message's view (msg-parts: its parts, never its
+/// text's tags).
+fn view_folds(v: &crate::said::View) -> bool {
     use unicode_width::UnicodeWidthStr;
-    let (quotes, body) = crate::quote::split(msg);
     // a long paste (BISE-240) is its chip in the line; it always
     // folds: its full text shows only open
-    let (body, pastes) = crate::pasted::fold(body);
-    let rows: usize = quotes.len() + body.split('\n').map(|l| l.width().div_ceil(77).max(1)).sum::<usize>();
-    !pastes.is_empty() || rows > YOU_ROWS
+    let rows: usize = v.quotes.len() + v.body.split('\n').map(|l| l.width().div_ceil(77).max(1)).sum::<usize>();
+    !v.pastes.is_empty() || rows > YOU_ROWS
 }
 
 /// The rows of your message's long pastes, under its text (behind its
@@ -949,22 +994,19 @@ fn paste_rows(pastes: &[crate::pasted::Pasted], open: bool, width: usize) -> Vec
 
 /// How many rows [`paste_rows`] takes in `msg` (feed::toggle_at: a
 /// click there opens or closes the message).
-pub(crate) fn you_paste_rows(msg: &str, open: bool, width: usize) -> usize {
-    let (_, body) = crate::quote::split(msg);
-    let (_, pastes) = crate::pasted::fold(body);
-    if pastes.is_empty() {
+pub(crate) fn you_paste_rows(msg: &Said, open: bool, width: usize) -> usize {
+    let v = crate::said::view(msg);
+    if v.pastes.is_empty() {
         return 0;
     }
-    paste_rows(&pastes, open, width).len()
+    paste_rows(&v.pastes, open, width).len()
 }
 
-pub(crate) fn user_block_lines(msg: &str, mark: Mark, open: bool, width: usize) -> Vec<Line<'static>> {
-    let style = Style::default().fg(text());
-    // BISE-134: the quotes in front (quote.rs), one dim line each:
-    // `❝ the selected words… · main · 3 lines`
-    let (quotes, body) = crate::quote::split(msg);
+/// His quotes (BISE-134), one dim line each: `❝ the selected words… ·
+/// main · 3 lines`.
+pub(crate) fn quote_lines(quotes: &[crate::quote::Quote], width: usize) -> Vec<Line<'static>> {
     let d = Style::default().fg(dim());
-    let quote_lines: Vec<Line<'static>> = quotes
+    quotes
         .iter()
         .map(|q| {
             let about = format!(" · {}", crate::quote::about(q));
@@ -972,16 +1014,25 @@ pub(crate) fn user_block_lines(msg: &str, mark: Mark, open: bool, width: usize) 
             let g = crate::theme::glyph(crate::theme::G_QUOTE);
             Line::from(Span::styled(format!("{g} {}{about}", crate::quote::preview(&crate::quote::words(q), room)), d))
         })
-        .collect();
-    let folds = you_folds(msg);
+        .collect()
+}
+
+/// His message, drawn from its parts (msg-parts): the quotes in front,
+/// the words with their chips, the pastes' and images' rows under it.
+pub(crate) fn user_block_lines(said_msg: &Said, mark: Mark, open: bool, width: usize) -> Vec<Line<'static>> {
+    let style = Style::default().fg(text());
+    let d = Style::default().fg(dim());
+    let view = crate::said::view(said_msg);
+    let quote_lines = quote_lines(&view.quotes, width);
+    let folds = view_folds(&view);
     // voice mode (design §5): what you said, not typed, carries `said`
-    let said = crate::voicemode::live::was_said(msg);
+    let said = crate::voicemode::live::was_said(said_msg);
     // BISE-240: each long paste is its chip in the line (pasted.rs)
-    let (folded, pastes) = crate::pasted::fold(body);
-    let msg = folded.as_str();
-    let mut lines: Vec<Line<'static>> = msg
-        .split('\n')
-        .map(|l| Line::from(crate::attach::chip_spans(l.trim_end_matches('\r'), style)))
+    let (quotes, pastes) = (&view.quotes, &view.pastes);
+    let msg = view.body.as_str();
+    // a fenced block's lines as the composer drew them (code-fences)
+    let mut lines: Vec<Line<'static>> = (msg.split('\n').zip(crate::mdlive::block_spans(msg)))
+        .map(|(l, b)| Line::from(b.unwrap_or_else(|| crate::attach::chip_spans(l.trim_end_matches('\r'), style))))
         .collect();
     // opened whole: `▾` after its last line (click it, or ctrl+o, to fold)
     if folds && open {
@@ -1013,19 +1064,19 @@ pub(crate) fn user_block_lines(msg: &str, mark: Mark, open: bool, width: usize) 
         }
         let mut hint = vec![bar.clone(), Span::styled(crate::toolbox::more_label(units.len() - shown), d)];
         hint.extend(said_span(said));
-        hint.extend(mark_span(mark));
+        hint.extend(crate::said::you_end(mark_span(mark), said_msg.tag.as_ref()));
         rows.push(Line::from(hint));
     } else {
         // its mark at the end (C3): `·` sent, `✓` got, `✓✓` read (accent);
         // said in voice mode: `said ✓✓`
         if let Some(last) = all.last_mut() {
             last.spans.extend(said_span(said));
-            last.spans.extend(mark_span(mark));
+            last.spans.extend(crate::said::you_end(mark_span(mark), said_msg.tag.as_ref()));
         }
         rows = hung_rows(&bar, &bar, all, width);
     }
     // its long pastes, one dim row each (the full text when open)
-    rows.extend(paste_rows(&pastes, open, width));
+    rows.extend(paste_rows(pastes, open, width));
     // the sizes of its images, dim, under it (still behind the bar)
     rows.extend(sizes_rows(msg, width));
     rows
@@ -1043,10 +1094,8 @@ fn sizes_rows(msg: &str, width: usize) -> Vec<Line<'static>> {
 /// How many rows the sizes of `msg`'s images take under it at `width`
 /// (feed::toggle_at: a click there does nothing; a few screenshots wrap
 /// to several rows, which hid the `▸ n more lines` row from the click).
-pub(crate) fn you_sizes_rows(msg: &str, width: usize) -> usize {
-    let (_, body) = crate::quote::split(msg);
-    let (folded, _) = crate::pasted::fold(body);
-    sizes_rows(&folded, width).len()
+pub(crate) fn you_sizes_rows(msg: &Said, width: usize) -> usize {
+    sizes_rows(&crate::said::view(msg).body, width).len()
 }
 
 // ---- an answer to an inbox item (BISE-307, designer) ----
@@ -1058,11 +1107,23 @@ const ANSWER_HEAD: usize = 77;
 /// Whether the line of an answer opens: its head is cut at 80 columns
 /// (the sentence and the question on one line), the question has more
 /// lines, or its words fold like a long message of yours.
-pub(crate) fn answer_opens(text: &str, note: &str, asked: &str) -> bool {
+pub(crate) fn answer_opens(text: &str, note: &str, parts: &[Part], asked: &str) -> bool {
     use unicode_width::UnicodeWidthStr;
     let asked = asked.trim();
     let head = text.width() + if asked.is_empty() { 0 } else { 3 + one_line(asked.lines().next().unwrap_or("")).width() };
-    head > ANSWER_HEAD || asked.contains('\n') || you_folds(note)
+    head > ANSWER_HEAD || asked.contains('\n') || view_folds(&answer_view(note, parts))
+}
+
+/// His answer's words as a message of his: from its parts when it has
+/// some (msg-parts; the words only when the note carries them, else they
+/// are on the head's line), else the note.
+fn answer_view(note: &str, parts: &[Part]) -> crate::said::View {
+    let mut v = crate::said::view_of(note, parts);
+    if note.trim().is_empty() {
+        v.body = String::new();
+    }
+    v.body = v.body.trim().to_string();
+    v
 }
 
 /// `s` on one line: runs of whitespace become one space.
@@ -1098,7 +1159,7 @@ fn cut_cols(s: &str, w: usize) -> String {
 /// from column 3, 20 rows then `▸ n more lines`). Open: `▾` at the
 /// head's end, the head whole, the full question hung at column 3, dim,
 /// the words whole.
-fn answer_lines(ok: bool, text: &str, note: &str, asked: &str, open: bool, width: usize) -> Vec<Line<'static>> {
+fn answer_lines(ok: bool, text: &str, note: &str, parts: &[Part], asked: &str, open: bool, width: usize) -> Vec<Line<'static>> {
     use unicode_width::UnicodeWidthStr;
     let d = Style::default().fg(dim());
     let text_st = Style::default().fg(crate::theme::text());
@@ -1109,7 +1170,7 @@ fn answer_lines(ok: bool, text: &str, note: &str, asked: &str, open: bool, width
     let mark = Span::styled(format!(" {} ", glyph(if ok { G_RECEIVED } else { G_FAILED })), mark_st);
     let pad = Span::raw("   ");
     let asked = asked.trim();
-    let opens = answer_opens(text, note, asked);
+    let opens = answer_opens(text, note, parts, asked);
     let mut rows = if open && opens {
         let head = Line::from(vec![Span::styled(text.to_string(), text_st), Span::styled(format!(" {}", glyph(G_OPEN)), d)]);
         let mut rows = hung_rows(&mark, &pad, [head], width);
@@ -1132,16 +1193,23 @@ fn answer_lines(ok: bool, text: &str, note: &str, asked: &str, open: bool, width
         }
         vec![Line::from(head)]
     };
-    if note.trim().is_empty() {
+    // your words, like a message of yours: from its parts (msg-parts),
+    // its quotes in front, its chips in the words, its pastes and
+    // images under them; never a tag
+    let view = answer_view(note, parts);
+    if view.body.is_empty() && view.quotes.is_empty() && view.pastes.is_empty() {
         return rows;
     }
-    // your words, like a message of yours
     let bar = Span::styled(format!("{}  ", user_bar()), Style::default().fg(accent()));
-    let units: Vec<Vec<Line<'static>>> = note
-        .trim()
-        .split('\n')
-        .map(|l| hung_rows(&bar, &bar, [Line::from(Span::styled(l.trim_end().to_string(), text_st))], width))
-        .collect();
+    let mut units: Vec<Vec<Line<'static>>> = quote_lines(&view.quotes, width).into_iter().map(|l| hung_rows(&bar, &bar, [l], width)).collect();
+    if !view.body.is_empty() {
+        units.extend(
+            view.body
+                .split('\n')
+                .map(|l| hung_rows(&bar, &bar, [Line::from(crate::attach::chip_spans(l.trim_end_matches('\r').trim_end(), text_st))], width)),
+        );
+    }
+    let under: Vec<Line<'static>> = paste_rows(&view.pastes, open, width).into_iter().chain(sizes_rows(&view.body, width)).collect();
     let total: usize = units.iter().map(Vec::len).sum();
     if !open && total > YOU_ROWS {
         let (mut words, mut shown) = (Vec::new(), 0);
@@ -1158,6 +1226,7 @@ fn answer_lines(ok: bool, text: &str, note: &str, asked: &str, open: bool, width
     } else {
         rows.extend(units.into_iter().flatten());
     }
+    rows.extend(under);
     rows
 }
 
@@ -1183,6 +1252,8 @@ fn mark_span(mark: Mark) -> Option<Span<'static>> {
         Mark::Received => (G_RECEIVED, faint()),
         Mark::Read => (G_READ, accent()),
         Mark::Failed => (G_FAILED, error()),
+        // a newer hub's mark: as sent
+        Mark::Unknown => (G_SENDING, dim()),
     };
     Some(Span::styled(format!(" {}", glyph(g)), Style::default().fg(c)))
 }
@@ -1281,6 +1352,8 @@ pub(crate) fn tool_head(td: &ToolData, tick: u32, name: &str, args: &str) -> Lin
         Span::styled(label.to_string(), dim_st),
     ];
     match td.state {
+        // cut by /pause: nothing went wrong (designer m_19111)
+        _ if td.paused => row.push(Span::styled(format!(" {}", crate::toolrow::PAUSE_CUT), dim_st)),
         ToolState::Run => {
             let (g, c) = working_frame(tick);
             row.push(Span::styled(format!(" {}", g), Style::default().fg(c)));
@@ -1543,6 +1616,33 @@ pub(crate) fn scheduled_lines(head: &str, words: &str, open: bool, width: usize)
     ls
 }
 
+/// event-wake (designer's page): a watch's end, one row. `· cargo test
+/// ended · rc 0 · after 2m04s  ▸ its last 3 lines` dim, a non-zero rc in
+/// red; `– stopped waiting for …` faint; never the accent. Open, the
+/// output's last lines under the rail.
+pub(crate) fn wake_lines(head: &[(String, bool)], stopped: bool, tail: &[String], open: bool, width: usize) -> Vec<Line<'static>> {
+    let st = Style::default().fg(if stopped { faint() } else { dim() });
+    let mut row = vec![Span::styled(if stopped { "– " } else { "· " }, st)];
+    for (i, (part, err)) in head.iter().enumerate() {
+        if i > 0 {
+            row.push(Span::styled(" · ", st));
+        }
+        row.push(Span::styled(part.clone(), if *err { Style::default().fg(error()) } else { st }));
+    }
+    let n = tail.len();
+    if n > 0 {
+        let what = if n == 1 { thread::wake_tail_one.to_string() } else { thread::wake_tail(n) };
+        row.push(Span::styled(format!("  {} {}", glyph(if open { G_OPEN } else { G_CLOSED }), what), st));
+    }
+    let mut ls = wrap_line(Line::from(row), width.max(1));
+    if open && n > 0 {
+        let bar = Span::styled(RAIL, Style::default().fg(rule()));
+        let rows: Vec<Line<'static>> = tail.iter().map(|l| Line::from(Span::styled(l.clone(), st))).collect();
+        ls.extend(barred_rows(&bar, rows, width));
+    }
+    ls
+}
+
 // ---- folded messages: reports in main, the brief inside an agent ----
 
 /// A report (`[report: done] summary…`): its kind and its text.
@@ -1607,8 +1707,8 @@ fn brief_lines(brief: &str, open: bool, width: usize) -> Vec<Line<'static>> {
     ])];
     if open {
         let body = brief.split_once('\n').map(|(_, r)| r.trim_matches('\n')).unwrap_or("");
-        let bar = Span::styled(" │ ", Style::default().fg(rule()));
-        ls.extend(barred_rows(&bar, md_lines(body, width.saturating_sub(3), width.saturating_sub(3)), width));
+        let rows = crate::agent_parts::with_chips(body, Style::default().fg(dim()), |w| md_lines(w, width.saturating_sub(3), width.saturating_sub(3)));
+        ls.extend(barred_rows(&Span::styled(" │ ", Style::default().fg(rule())), rows, width));
     }
     ls
 }
@@ -1634,11 +1734,31 @@ mod multiline_tests {
             .collect()
     }
 
+    /// his row as the TUI draws it from one transcript line (an old
+    /// `sb you : ` line or a record)
+    fn you_screen(line: &str, width: u16) -> Vec<String> {
+        let h = bise_proto::thread::lines::hub(line.strip_prefix("sb ").unwrap());
+        screen(crate::sb::hub_ev(h).unwrap(), width)
+    }
+
+    // issue 25 F: a real line break draws the same rows from a record as
+    // from the old line; a typed backslash-n is drawn as typed, as the
+    // agent got it (the old line turned it into a break)
+    #[test]
+    fn his_line_breaks_draw_the_same_from_a_record() {
+        let old = you_screen("sb you : first: pick one\\n1. alpha\\n2. beta", 30);
+        let rec = you_screen(r#"sb you :: {"text":"first: pick one\n1. alpha\n2. beta"}"#, 30);
+        assert_eq!(rec, old);
+        assert_eq!(rec[..3], ["│  first: pick one", "│  1. alpha", "│  2. beta ·"], "{rec:#?}");
+        let typed = you_screen(r#"sb you :: {"text":"first\\n1. alpha"}"#, 30);
+        assert_eq!(typed, ["│  first\\n1. alpha ·"], "{typed:#?}");
+    }
+
     #[test]
     fn user_message_keeps_its_line_breaks() {
         let long = "word ".repeat(12);
         let text = format!("first line\nsecond line\n{}end", long);
-        let s = screen(Ev::You(text, crate::wire::Mark::Read, false), 30);
+        let s = screen(Ev::You(text.into(), crate::wire::Mark::Read, false, None), 30);
         // the bar on every row (BISE-90), every row's text at column 3
         assert_eq!(s[0].as_str(), "│  first line", "{s:#?}");
         assert_eq!(s[1].as_str(), "│  second line", "{s:#?}");
@@ -1652,8 +1772,49 @@ mod multiline_tests {
         assert!(!s.iter().any(|r| r.contains('\n')));
     }
 
+    /// msg-parts, his screenshot: a card answer with a quote of main
+    /// draws the quote as its chip line and his words, never the tag
+    /// (an old journal's text read back, and the hub's parts alike).
+    #[test]
+    fn his_card_answer_draws_its_quote_never_its_tag() {
+        use crate::said::Said;
+        let said = Said::from("<selection from=\"main\">\nle process\n</selection>\nSon process prenait tout mon CPU!");
+        for (note_words, width) in [(said.words(), 80u16), (format!("{}\n{}", said.words(), "et encore"), 80)] {
+            let (text, note) = bise_proto::thread::words::answered_split("main", note_words.trim(), &unicode_width::UnicodeWidthStr::width);
+            let ev = Ev::Approval { ok: true, text, note, parts: said.parts.clone(), asked: String::new(), open: false };
+            let s = screen(ev, width);
+            assert!(!s.iter().any(|r| r.contains("<selection") || r.contains("</selection>")), "{s:#?}");
+            assert!(s[0].contains("you answered main"), "{s:#?}");
+            assert!(s.iter().any(|r| r.contains("le process") && r.contains("main · 1 line")), "{s:#?}");
+            assert!(s.iter().filter(|r| r.contains("Son process prenait tout mon CPU!")).count() == 1, "{s:#?}");
+        }
+    }
+
+    /// msg-parts: his message with a quote and a long paste, from its
+    /// parts: the quote line, the words with the paste's chip, its row
+    /// under them; no tag on screen.
+    #[test]
+    fn his_message_draws_from_its_parts() {
+        use crate::said::Said;
+        use bise_proto::parts::Part;
+        let paste: String = (1..=14).map(|i| format!("line {i}\n")).collect();
+        let parts = vec![
+            Part::Quote { from: "t1".into(), text: "the selected words".into(), file: String::new(), new: String::new(), old: String::new(), n: None },
+            Part::Text { text: "why ".into() },
+            Part::Paste { n: 1, text: paste.trim_end().into() },
+            Part::Text { text: " fails?".into() },
+        ];
+        let said = Said::of_parts(parts);
+        assert!(said.text.starts_with("<selection from=\"t1\">"));
+        let s = screen(Ev::You(said, crate::wire::Mark::Read, false, None), 60);
+        assert!(!s.iter().any(|r| r.contains('<')), "{s:#?}");
+        assert!(s[0].contains("the selected words") && s[0].contains("t1 · 1 line"), "{s:#?}");
+        assert!(s.iter().any(|r| r.contains("why") && r.contains("fails?")), "{s:#?}");
+        assert!(s.iter().any(|r| r.contains("14 lines")), "{s:#?}");
+    }
+
     fn answer(ok: bool, text: &str, note: &str, asked: &str, open: bool) -> Ev {
-        Ev::Approval { ok, text: text.into(), note: note.into(), asked: asked.into(), open }
+        Ev::Approval { ok, text: text.into(), note: note.into(), parts: Vec::new(), asked: asked.into(), open }
     }
 
     /// BISE-307 (the user: « crop trop vite, et ne peuvent pas être
@@ -1709,7 +1870,7 @@ Anthropic has the most users, OpenAI the most demand.";
         // a level-3 message opens whole: every line under the chip at
         // x0+2 (BISE-127)
         let text = format!("one{}two {}", '\n', "x ".repeat(30));
-        let s = screen(Ev::AgentMsg { from: "main".into(), to: "docs".into(), text, level: 3, id: String::new(), open: true, fold: false }, 70);
+        let s = screen(Ev::AgentMsg { from: "main".into(), to: "docs".into(), text, level: 3, id: String::new(), parts: Vec::new(), open: true, fold: false }, 70);
         let head = format!(" {} main → docs", super::G_ENVELOPE);
         assert_eq!(s[0], head, "{s:#?}");
         let hang = "  ";
@@ -1746,6 +1907,7 @@ mod emphasis_tests {
             text: text.into(),
             level,
             id: String::new(),
+            parts: Vec::new(),
             open: false,
             fold: false,
         }
@@ -1832,7 +1994,7 @@ mod chip_tests {
     use unicode_width::UnicodeWidthStr;
 
     fn msg(from: &str, to: &str, text: &str) -> Ev {
-        Ev::AgentMsg { from: from.into(), to: to.into(), text: text.into(), level: 3, id: String::new(), open: false, fold: false }
+        Ev::AgentMsg { from: from.into(), to: to.into(), text: text.into(), level: 3, id: String::new(), parts: Vec::new(), open: false, fold: false }
     }
 
     fn text_of(l: &Line) -> String {

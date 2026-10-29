@@ -1,0 +1,13 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "author": {
+    "name": "Ada"
+  },
+  "description": "Keep notes in a local folder.",
+  "keywords": [
+    "notes",
+    "files"
+  ],
+  "name": "notes",
+  "version": "1.2.0"
+}

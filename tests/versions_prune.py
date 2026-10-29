@@ -20,8 +20,8 @@ ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 SCRIPT = os.environ.get("VERSIONS_SH", os.path.join(ROOT, "scripts", "versions.sh"))
 PRIVATE = ("BISE_HOME", "SB_VERSIONS_DIR", "SB_BUILD_DIR", "SB_KEEP_VERSIONS", "XDG_STATE_HOME",
            "BISE_EXPORTS_FOR", "BEND_SESSION_FILE", "BEND_CONTEXT_FILE", "BEND_WIRE_LOG",
-           "BEND_REPL_PORT", "BEND_CONFIG", "BEND_SESSIONS_DIR", "BEND_IMAGE_DIR", "BEND_MCP_INDEX",
-           "BEND_SKILLS_INDEX", "BEND_PLUGINS_STATE", "BEND_PLUGINS_DATA", "BEND_RUN_DIR")
+           "BEND_REPL_PORT", "BEND_CONFIG", "BEND_SESSIONS_DIR", "BEND_IMAGE_DIR",
+           "BEND_PLUGINS_STATE", "BEND_PLUGINS_DATA", "BEND_RUN_DIR")
 
 
 def check(ok, what):
@@ -39,8 +39,6 @@ def main():
     versions = os.path.join(bise, "dev", "versions")
     os.makedirs(os.path.join(bise, "hubs", "h1"))
     os.makedirs(os.path.join(bise, "dev", "build"))
-    with open(os.path.join(bise, "migrated.json"), "w") as f:
-        f.write("{}\n")
     # v0 oldest ... v6 newest
     for i in range(7):
         d = os.path.join(versions, "v%d" % i)

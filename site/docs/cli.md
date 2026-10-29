@@ -1,6 +1,8 @@
 ---
 title: the bise command
 description: every subcommand of bise, for your terminal and your scripts. bise --help prints the same list.
+app: terminal
+other: settings | settings
 ---
 
 ## start

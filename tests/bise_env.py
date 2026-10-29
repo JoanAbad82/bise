@@ -26,18 +26,19 @@ INTERNAL = (
     "BEND_AGENTS_MD", "BEND_AGENT_RUN", "BEND_BG_DIR", "BEND_CONTEXT_FILE", "BEND_CONTINUE",
     "BEND_CRASH_NOTE", "BEND_DEBUG_DIR", "BEND_EXTRA_PROMPT", "BEND_FRESH_PROMPT",
     "BEND_HARNESS_BIN", "BEND_REPL_PORT", "BEND_SESSION_FILE", "BEND_TOOLS_NOTE", "BEND_WIRE_DUMP",
-    "BEND_WIRE_LOG", "BEND_WORKDIR", "BISE_APP_ROOT", "BISE_DESKTOP", "BISE_EXPORTS_FOR",
-    "BISE_MODELS_FILE", "BISE_ONESHOT", "BISE_OWNERS", "BISE_PAGES_EXPORT", "BISE_ROLE", "BISE_SESSION_CHOICE",
+    "BEND_WIRE_LOG", "BEND_WORKDIR", "BISE_APP_ROOT", "BISE_EXPORTS_FOR",
+    "BISE_MODELS_FILE", "BISE_ONESHOT", "BISE_OWNERS", "BISE_PAGES_EXPORT", "BISE_RENDER", "BISE_RENDER_OUT", "BISE_ROLE", "BISE_SESSION_CHOICE", "BISE_SKILL_ROOTS",
     "SB_AGENT", "SB_CORE_PORT", "SB_LAUNCH_DIR", "SB_PORT_OFFSET", "SB_SOCKET", "SB_TASK",
 )
 
 TEST = (
     "BEND_CLIPBOARD_FILE", "BEND_CLIPBOARD_IMAGE_FILE", "BEND_JSRT_BIN", "BISE_AMBIENT_FAKE_VOICE", "BISE_COMPUTER_USE",
-    "BISE_CU_EXTENSION", "BISE_CU_HELPER", "BISE_DETECT_KEYCHAIN", "BISE_GITHUB_API", "BISE_HOME_WORKSPACE",
-    "BISE_OPENROUTER_AUTH", "BISE_PROTO_BLESS", "BISE_RELEASE_CHECK_SECS", "BISE_RELEASE_SCRIPT", "BISE_TEST_HOME", "BISE_TEST_KEYCHAIN", "BISE_TEST_KEYCHAIN_LOCKED",
-    "BISE_VOICE_FAKE", "BISE_VOICE_FAKE_HEARD", "SB_BENCH_JOURNAL", "SB_BENCH_LINES", "SB_BENCH_TRANSCRIPT",
-    "SB_CORE_BIN", "SB_EVERY_MIN_MS", "SB_ONBOARDING", "SB_SEARCH_BENCH", "SB_SETUP",
-    "SB_SLOW_SPAWN", "SB_STALL_START", "SB_STATE_DIR", "SB_STT_WAV", "SB_VOICE", "SB_VOICE_FAKE_MIC",
+    "BISE_CU_EXTENSION", "BISE_CU_HELPER", "BISE_DETECT_KEYCHAIN", "BISE_DIST_URL_DESKTOP",
+    "BISE_DIST_URL_DESKTOP_BETA", "BISE_GITHUB_API", "BISE_HOME_WORKSPACE",
+    "BISE_MISTRAL_URL", "BISE_OPENROUTER_AUTH", "BISE_OPEN_RECORD", "BISE_PROBATION_SECS", "BISE_PROTO_BLESS", "BISE_RELEASE_CHECK_SECS", "BISE_RELEASE_LOOK_SECS", "BISE_RELEASE_SCRIPT", "BISE_TEST_HOME", "BISE_TEST_KEYCHAIN", "BISE_TEST_KEYCHAIN_LOCKED",
+    "BISE_VOICE_FAKE", "BISE_VOICE_FAKE_HEARD", "BISE_VOICE_FAKE_HEARD_MS", "SB_BENCH_JOURNAL", "SB_BENCH_LINES", "SB_BENCH_TRANSCRIPT",
+    "SB_CORE_BIN", "SB_EVERY_MIN_MS", "SB_LOAD_FACTOR", "SB_ONBOARDING", "SB_PULSE_MS", "SB_SEARCH_BENCH", "SB_SETUP",
+    "SB_SLOW_SPAWN", "SB_STALL_START", "SB_START_STILL_MS", "SB_STATE_DIR", "SB_STT_WAV", "SB_VOICE", "SB_VOICE_FAKE_MIC",
 )
 
 # what a test's own processes must not inherit from the caller
@@ -54,13 +55,48 @@ def _path_vars():
     return names
 
 
-# The single-path overrides (BEND_RUN_DIR, BEND_SESSIONS_DIR, BEND_MCP_INDEX...)
+# The single-path overrides (BEND_RUN_DIR, BEND_SESSIONS_DIR, BEND_CONFIG...)
 # and their stamp. The caller's are his own ~/.bise paths (an agent's shell
 # exports them): a REPL a test starts reads them raw (bend/runtime/plugins.bend,
 # jsrt), so a test's own HOME or BISE_HOME never keeps them. Rust's Home drops
 # them by the stamp; the Bend runtime does not.
 PATH_VARS = _path_vars()
 OWN_PATHS = PATH_VARS + ("BISE_EXPORTS_FOR",)
+
+
+def _provider_keys():
+    """Every provider's key variable: the catalog's key_env names
+    (rust/catalog/models.toml, the one table) and their aliases
+    (rust/catalog/src/auth.rs ALIASES), read from the sources themselves:
+    a provider added there is dropped here with no copy to update."""
+    root = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "rust", "catalog")
+    names = set(re.findall(r'^key_env = "([A-Z0-9_]+)"', open(os.path.join(root, "models.toml")).read(), re.M))
+    auth = open(os.path.join(root, "src", "auth.rs")).read()
+    m = re.search(r"pub const ALIASES: &\[\(&str, &\[&str\]\)\] = &\[(.*?)\];", auth, re.S)
+    assert m, "ALIASES in rust/catalog/src/auth.rs"
+    names.update(re.findall(r'"([A-Z0-9_]+)"', m.group(1)))
+    assert "OPENROUTER_API_KEY" in names and "GOOGLE_API_KEY" in names, names
+    return tuple(sorted(names))
+
+
+# The user's provider keys (OPENROUTER_API_KEY, ANTHROPIC_API_KEY...) and
+# any other *_API_KEY of his shell: a test hub never gets them, or its
+# checker, small jobs and the efforts refresher call the real provider with
+# his real key (one_key_auto_e2e's checker asked OpenRouter with it, red on
+# 'API key expired'; docs/issues/26). A test sets its own fake one.
+# BISE_TEST_REAL_ACCOUNTS=1 keeps them, for the one run he asks for (the
+# live tests: run_all.sh --live).
+PROVIDER_KEYS = _provider_keys()
+
+
+def is_real_key_var(k):
+    """A variable that holds one of the user's model or service keys."""
+    return k in PROVIDER_KEYS or k.endswith("_API_KEY")
+
+
+def real_accounts():
+    """BISE_TEST_REAL_ACCOUNTS=1: this run may use his real keys and accounts."""
+    return os.environ.get("BISE_TEST_REAL_ACCOUNTS") == "1"
 
 
 def real_home():
@@ -106,13 +142,31 @@ def is_place_var(k):
 
 def clean_env(**extra):
     """os.environ minus every internal and test variable, minus the
-    caller's path overrides (OWN_PATHS: his ~/.bise paths) and XDG homes,
-    on a throwaway HOME (test_home; cargo keeps its real CARGO_HOME and
-    RUSTUP_HOME), plus `extra` (a test's own HOME wins)."""
+    caller's path overrides (OWN_PATHS: his ~/.bise paths), XDG homes and
+    real keys (is_real_key_var, unless real_accounts()), on a throwaway
+    HOME (test_home; cargo keeps its real CARGO_HOME and RUSTUP_HOME),
+    plus `extra` (a test's own HOME wins)."""
     drop = NOT_INHERITED + OWN_PATHS
-    env = on_test_home({k: v for k, v in os.environ.items() if k not in drop})
+    keys = not real_accounts()
+    env = on_test_home({k: v for k, v in os.environ.items()
+                        if k not in drop and not (keys and is_real_key_var(k))})
     env.update(extra)
     return env
+
+
+# A test's git works in its own throwaway repo, never in a repo the caller's
+# environment points to: `git bisect run` (and a git hook or alias) exports
+# GIT_DIR, and e2e.Env's `git init && git config user.email t@t` in its ws
+# then wrote core.bare=true and user t into the real repo's .git/config
+# (every sb land failed, keep-current m_34361). tests/run_all.sh unsets them
+# too and fails a run that changes that file.
+GIT_REPO_VARS = ("GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_COMMON_DIR", "GIT_OBJECT_DIRECTORY",
+                 "GIT_ALTERNATE_OBJECT_DIRECTORIES", "GIT_NAMESPACE", "GIT_PREFIX")
+
+
+def drop_git_repo_vars(environ=os.environ):
+    for k in GIT_REPO_VARS:
+        environ.pop(k, None)
 
 
 def on_test_home(env):
@@ -144,6 +198,19 @@ def refuse_real_home(env):
             raise AssertionError("a test env's %s %s is in the user's home" % (k, v))
 
 
+def refuse_real_keys(env, caller=None):
+    """The law: a test's hub or REPL holds none of the user's real keys
+    (a key variable with the caller's own value), unless real_accounts().
+    A test's fake key (MISTRAL_API_KEY=fake-key) is its own: allowed."""
+    if real_accounts():
+        return
+    caller = os.environ if caller is None else caller
+    real = sorted(k for k, v in env.items() if is_real_key_var(k) and v and caller.get(k) == v)
+    if real:
+        raise AssertionError("a test env holds the user's real key %s (tests run on fakes: "
+                             "BISE_TEST_REAL_ACCOUNTS=1 for the one run he asks for)" % ", ".join(real))
+
+
 def refuse_real_skills(index):
     """The law, after the fact: the skills index a test hub's REPL wrote
     lists none of the user's own skill folders."""
@@ -159,11 +226,10 @@ def refuse_real_skills(index):
 
 def real_run_dirs():
     """The run folders of the user's own sessions: the caller's
-    $BEND_RUN_DIR and the defaults of his HOME (~/.bise/run,
-    ~/.bend-harness/run) and of his $BISE_HOME."""
+    $BEND_RUN_DIR and the default of his HOME (~/.bise/run) and of
+    his $BISE_HOME."""
     home = os.path.expanduser("~")
-    dirs = [os.environ.get("BEND_RUN_DIR"), os.path.join(home, ".bise", "run"),
-            os.path.join(home, ".bend-harness", "run")]
+    dirs = [os.environ.get("BEND_RUN_DIR"), os.path.join(home, ".bise", "run")]
     if os.environ.get("BISE_HOME"):
         dirs.append(os.path.join(os.environ["BISE_HOME"], "run"))
     return [os.path.realpath(d) for d in dirs if d]
@@ -183,6 +249,9 @@ def refuse_real_run_dir(env, tmp):
 
 
 def _self_test():
+    env = {"GIT_DIR": "/r/.git/worktrees/w", "GIT_PREFIX": "", "PATH": "/bin"}
+    drop_git_repo_vars(env)
+    assert env == {"PATH": "/bin"}, "drop_git_repo_vars keeps %r" % env
     for extra in ({"HOME": "/t/h"}, {"BISE_HOME": "/t/b"}, {}):
         env = clean_env(**extra)
         kept = [k for k in OWN_PATHS if k in env]
@@ -218,7 +287,33 @@ def _self_test():
         except AssertionError:
             continue
         raise AssertionError("refuse_real_run_dir let %r through" % bad)
-    print("ok   bise_env: clean_env drops %d path vars with an own HOME/BISE_HOME; the run-dir law refuses his run" % len(OWN_PATHS))
+    # the keys law: his provider keys never reach a test env, a fake one may
+    assert "ANTHROPIC_FOUNDRY_API_KEY" in PROVIDER_KEYS and "AWS_BEARER_TOKEN_BEDROCK" in PROVIDER_KEYS
+    saved = {k: os.environ.get(k) for k in ("OPENROUTER_API_KEY", "AWS_BEARER_TOKEN_BEDROCK", "KIT_API_KEY", "BISE_TEST_REAL_ACCOUNTS")}
+    try:
+        os.environ.pop("BISE_TEST_REAL_ACCOUNTS", None)
+        os.environ.update(OPENROUTER_API_KEY="his-or", AWS_BEARER_TOKEN_BEDROCK="his-aws", KIT_API_KEY="his-kit")
+        env = clean_env(MISTRAL_API_KEY="fake-key")
+        kept = [k for k in env if is_real_key_var(k) and k != "MISTRAL_API_KEY"]
+        assert not kept, "clean_env keeps his keys %s" % kept
+        refuse_real_keys(env)
+        for bad in ({"OPENROUTER_API_KEY": "his-or"}, {"AWS_BEARER_TOKEN_BEDROCK": "his-aws"}, {"KIT_API_KEY": "his-kit"}):
+            try:
+                refuse_real_keys(bad)
+            except AssertionError:
+                continue
+            raise AssertionError("refuse_real_keys let %r through" % bad)
+        os.environ["BISE_TEST_REAL_ACCOUNTS"] = "1"
+        assert clean_env().get("OPENROUTER_API_KEY") == "his-or", "BISE_TEST_REAL_ACCOUNTS=1 keeps his keys"
+        refuse_real_keys({"OPENROUTER_API_KEY": "his-or"})
+    finally:
+        for k, v in saved.items():
+            if v is None:
+                os.environ.pop(k, None)
+            else:
+                os.environ[k] = v
+    print("ok   bise_env: clean_env drops %d path vars with an own HOME/BISE_HOME and his %d provider keys + any *_API_KEY; "
+          "the run-dir and keys laws refuse his" % (len(OWN_PATHS), len(PROVIDER_KEYS)))
 
 
 if __name__ == "__main__":

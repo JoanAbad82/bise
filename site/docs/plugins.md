@@ -35,6 +35,11 @@ its skills show as `my-plugin:review`, and its MCP tools as `tools.my_plugin.<to
 
 ## see and change them
 
+::: desktop settings › plugins
+settings › plugins lists every plugin with its state and turns each one on or off; its servers that log in have **log in** and **log out**. `/plugins` in the composer opens the page. a change applies to the agents' next sessions.
+:::
+
+::: terminal /plugins, bise plugins
 ```sh
 bise plugins                    # every plugin, its state, and what's wrong with it
 bise plugins disable my-plugin
@@ -42,6 +47,7 @@ bise plugins enable my-plugin
 ```
 
 in bise, `/plugins` does the same. the open agents pick up a change at their next idle.
+:::
 
 ## MCP servers
 
@@ -93,7 +99,7 @@ bise plugins login linear
 bise plugins logout linear    # forget its tokens
 ```
 
-in bise: `/plugins login`. the server's tools reach your agents as soon as you're logged in, no restart. the tokens stay in `~/.bise/secrets/mcp-oauth/`, readable only by you; they are never printed or sent to a model.
+in bise desktop: settings › plugins, **log in** on the server's row. in bise terminal: `/plugins login`. the server's tools reach your agents as soon as you're logged in, no restart. the tokens stay in `~/.bise/secrets/mcp-oauth/`, readable only by you; they are never printed or sent to a model.
 
 with bise on another machine (SSH), log in in your local browser. the last page won't load: copy its address, then paste it into `bise plugins login`, or run `/plugins login linear <address>`.
 

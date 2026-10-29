@@ -1,0 +1,176 @@
+/* src/inbox (amb-home): one inbox, the block at the bottom of every view (no ⌘I screen since
+   designer m_19631); ds tokens only */
+/* a typed command's result (desktop-notices, designer): one quiet row in the thread, above the
+   composer, never a bar under it; tier 4 (dim sans 13, '·') from .th-notice.info. On the thread's
+   text column like the rows above it, its '·' on the column's left edge (his restart row sat 16 px
+   in from the screen's edge, left of the column: ambient-lead m_22827) */
+.th-hubnote { box-sizing: border-box; width: var(--th-col, auto); margin: 0 auto var(--s-2); }
+/* his /restart's row when a newer app is staged: '⏎ restart to update' after the words; a refusal's why dim */
+.th-hubnote .b-act { vertical-align: baseline; }
+.th-hubnote-why { color: var(--c-text-3); }
+/* bar N14: what the core heard, on the open card until the answer goes */
+.inbox-heard { color: var(--c-text); }
+/* the thread's inbox strip (Strip.tsx, bar W7/K24): its own box above the divider, rows numbered for ctrl+1-9 */
+.inbox-strip {
+  display: flex; flex-direction: column; gap: 0; margin: 0 var(--s-4) var(--s-2); padding: var(--s-2);
+  border-radius: var(--r-2); box-shadow: 0 0 0 1px var(--c-line); background: var(--c-raised);
+}
+.strip-title { display: flex; align-items: baseline; gap: var(--s-2); padding: 0 var(--s-2) var(--s-1); font-size: var(--t-12); color: var(--c-text-2); }
+.strip-count { color: var(--c-text-3); }
+.strip-keys { margin-left: auto; color: var(--c-text-3); }
+.strip-n { min-width: 1ch; color: var(--c-text-3); font-variant-numeric: tabular-nums; }
+/* ctrl held (app/held.ts, the TUI's card_draw.rs number_style): the numbers ctrl+N opens, in accent */
+.inbox-block[data-ctrl] .strip-n { color: var(--c-accent); }
+.strip-who { flex: none; }
+/* the dock's inbox at rest off the thread (Block.tsx rest 'line', ui-review-app #1, designer m_41569):
+   one 32 px row, the count and the newest item cut with …; a click or ⌃1-3 opens, a hover only tints */
+.inbox-line { padding: 0; }
+.inbox-line .b-row { height: var(--h-row); }
+.inbox-line .strip-title { padding: 0; font-size: var(--t-13); color: var(--c-text-2); }
+.inbox-line .line-what { display: block; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: var(--t-13); }
+.inbox-line .strip-keys { font-size: var(--t-12); }
+.strip-what { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; color: var(--c-text-2); }
+.strip-more { color: var(--c-text-3); font-size: var(--t-12); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; min-width: 0; }
+.strip-cmd { color: var(--c-accent); font-family: var(--font-mono); }
+.strip-note { color: var(--c-text-3); }
+/* inbox card v2 (InboxCard.tsx; ambient m_11273, its mock's values): opaque, docked in the flow; pink is the glyph and the numbers only */
+.ic {
+  box-sizing: border-box; display: flex; flex-direction: column; width: 100%; max-height: 55vh; padding: var(--pad-card);
+  color: var(--c-text); background: color-mix(in srgb, var(--p-raised) 100%, var(--p-bg)); border-radius: 14px;
+  box-shadow: 0 0 0 1px var(--c-line), 0 6px 18px color-mix(in srgb, var(--p-shadow) 14%, transparent);
+}
+/* a long ask opened whole (ctrl+o, bar I8): the card's 55vh cap lifts to all the window can give
+   it (the title bar, the block's head and the composer keep their room: 260 px), the screen above
+   gives it that room, and a question longer than that scrolls inside the card; folded again, the
+   cap is back (qa-native 9108fdae: the 16 lines were in the DOM, the card stayed 396 px) */
+.ic.whole { max-height: calc(100vh - 260px); }
+.ic-h { display: flex; align-items: baseline; gap: var(--gap-inline); min-width: 0; font-size: var(--t-12); color: var(--c-text-2); flex: none; }
+/* its row's mark in the same form, the ds RowMark icon (model markOf, designer m_45259, m_45334) */
+.ic-g { flex: none; display: inline-flex; align-self: center; }
+.ic-h b { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; color: var(--c-text); }
+.ic-p { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ic-k { flex: none; margin-left: auto; color: var(--c-text-3); }
+/* over 55vh the question gives way first (it scrolls), then the options (they scroll); the header and the footer always show */
+.ic-q { flex: 0 1000 auto; margin: var(--gap-tight) 0 var(--gap-block); min-height: 0; overflow-y: auto; font: 15px/1.45 var(--font-read); white-space: pre-wrap; overflow-wrap: anywhere; }
+/* a plan's card: what it does, under its question (plan-ok, designer m_26765) */
+.ic-qd { margin: calc(var(--s-1) * 1.5) 0 0; color: var(--c-text-2); }
+/* the update card's release (update-dot, designer m_46058): the safe line text-2; the changelog
+   (headings t-13/600 ink, items text-2, 4 apart) at most 240 high, then it scrolls with 16 px
+   fades; its last line t-12 text-3 with the release page's link */
+/* its question never shrinks for it: the changelog gives way first (ui-review m_46111) */
+.ic:has(> .ic-rel) > .ic-q { flex: none; }
+.ic-rel { flex: 0 1 auto; min-height: 0; display: flex; flex-direction: column; gap: var(--s-2); margin: 0 0 var(--gap-block); font: var(--t-13) var(--font-ui); color: var(--c-text-2); }
+.ic-rel p { margin: 0; }
+.ic-rel-safe { color: var(--c-text-2); }
+.ic-rel-notes { flex: 0 1 auto; min-height: 0; max-height: 240px; overflow-y: auto; }
+.ic-rel-notes .th-md { color: var(--c-text-2); font: var(--t-13) var(--font-ui); }
+.ic-rel-notes[data-top] { -webkit-mask-image: linear-gradient(to bottom, transparent, black var(--s-4)); mask-image: linear-gradient(to bottom, transparent, black var(--s-4)); }
+.ic-rel-notes[data-end] { -webkit-mask-image: linear-gradient(to top, transparent, black var(--s-4)); mask-image: linear-gradient(to top, transparent, black var(--s-4)); }
+.ic-rel-notes[data-top][data-end] { -webkit-mask-image: linear-gradient(to bottom, transparent, black var(--s-4), black calc(100% - var(--s-4)), transparent); mask-image: linear-gradient(to bottom, transparent, black var(--s-4), black calc(100% - var(--s-4)), transparent); }
+.ic-rel-notes .th-md.b-md :is(h1, h2, h3, h4) { margin: var(--s-2) 0 var(--s-1); font: 600 var(--t-13) var(--font-ui); color: var(--c-text); }
+.ic-rel-notes .th-md.b-md > :is(h1, h2, h3, h4):first-child { margin-top: 0; }
+.ic-rel-notes .th-md :is(ul, ol) { display: flex; flex-direction: column; gap: var(--s-1); margin: 0; padding-left: var(--s-4); }
+.ic-rel-notes .th-md p { margin: 0 0 var(--s-1); }
+.ic-rel-none, .ic-rel-foot { color: var(--c-text-3); }
+.ic-rel-foot { font-size: var(--t-12); }
+.ic-rel-foot a { color: inherit; text-underline-offset: 2px; }
+.ic-rel-foot a:hover { color: var(--c-text-2); }
+.ic-opts { display: flex; flex-direction: column; gap: var(--gap-tight); flex: 0 1 auto; min-height: 0; overflow-y: auto; }
+.ic-opt { flex: none; }
+.ic-opt {
+  /* a control's height (--h-control 32, designer m_21156), the words centred in it; a long option
+     that wraps grows, its lines a step from the edges */
+  display: grid; grid-template-columns: 22px 1fr; align-items: center; gap: var(--gap-inline); min-height: var(--h-control); box-sizing: border-box;
+  padding: var(--s-1) var(--s-3) var(--s-1) var(--s-2); border-radius: 9px;
+  background: var(--c-solid); box-shadow: inset 0 0 0 1px var(--c-line); font-size: 13.5px; line-height: 1.4; text-align: left;
+  overflow-wrap: anywhere; transition: background var(--d-fast) var(--ease-out);
+}
+.ic-opt:hover { background: var(--c-hover); }
+.ic.driving .ic-opt:hover { background: var(--c-solid); }
+.ic-opt.on { box-shadow: inset 0 0 0 1.5px var(--c-ink); }
+.ic-opt.picked { background: var(--c-ink); color: var(--c-on-ink); box-shadow: none; }
+.ic-opt.picked .ic-n { color: var(--c-on-ink); }
+.ic-n { font: 600 12px var(--font-mono); color: var(--c-accent); text-align: center; }
+/* the hub closed it while his words were typed (card-draft-keep, designer m_24087): its options dim, never picked */
+.ic.closed .ic-opt { color: var(--c-text-3); pointer-events: none; }
+.ic.closed .ic-n { color: var(--c-text-3); }
+.ic-l { min-width: 0; }
+.ic .inbox-answer { flex: none; }
+.ic-note { flex: none; margin-top: var(--s-2); font-size: var(--t-12); }
+/* his answer or close refused here (refused.ts): the hub's words on the card, 'try again' a plain act */
+.ic-refused { color: var(--c-err); }
+.ic-refused .b-act { color: inherit; text-decoration: underline; }
+.ic-refused-mark { flex: none; margin-left: var(--s-2); font-size: var(--t-12); color: var(--c-err); }
+.ic-foot {
+  display: flex; flex-wrap: wrap; gap: 0 var(--s-4); flex: none; margin-top: var(--gap-block); padding-top: var(--s-2); border-top: 1px solid var(--c-line);
+  font: 400 var(--f-meta); color: var(--c-text-3);
+}
+/* each pair is the ds Act, kept in the foot's dim tone; 'esc later' sits at the right end */
+.ic-foot .b-act { color: inherit; }
+.ic-foot .b-act:hover { color: var(--c-text-2); }
+.ic-foot-end { margin-left: auto; }
+/* its keys are the ds Kbd chips (native-mac §6), as the block's head: only their room after them */
+.ic-foot .b-kbd, .ic-foot kbd { margin-right: var(--s-1); }
+/* the capsule's card keeps its glass (the capsule draws the surface) */
+.ic.glass { background: transparent; box-shadow: none; border-radius: 0; max-height: none; }
+/* the strip's open item: docked between the thread and the composer's label, the composer's edges */
+.inbox-dock { margin: 0 var(--s-4) var(--s-2); flex: none; }
+
+/* b2: the inbox block (Block.tsx) reuses the strip's look; an item's sign on its line, and the open
+   item in place where its line was (the block grows, nothing floats) */
+.inbox-block .ib-sign { flex: none; width: 1em; text-align: center; font: 600 var(--t-12) var(--font-mono); color: var(--c-accent); }
+.inbox-block .ib-sign.acc { color: var(--c-accent); }
+.inbox-block-open { margin: var(--gap-tight) 0; }
+/* its question takes his words (composer-target A, designer m_26531): a 2 px accent rail on its left,
+   the pair of the composer's pink border; 120 ms as the border */
+.inbox-block-open .ic { transition: box-shadow 120ms var(--ease-out); }
+.inbox-block-open[data-answering] .ic {
+  box-shadow: inset 2px 0 0 var(--c-accent), 0 0 0 1px var(--c-line), 0 6px 18px color-mix(in srgb, var(--p-shadow) 14%, transparent);
+}
+/* H10 (tui-parity's thread-hierarchy, designer m_19835): folded at the thread's bottom, the block is
+   its head (28) and one item line (32): the rest is '+ N more' in the head. The notifications' ask is
+   an ordinary item from bise (Block.tsx notifyCard), never a line of its own. */
+.inbox-block .strip-title { align-items: center; min-width: 0; white-space: nowrap; }
+.inbox-block .strip-title .b-act { font-size: var(--t-12); color: var(--c-text-3); }
+.inbox-block .strip-title .b-act:hover { color: var(--c-text-2); }
+/* a project's block: '· 2 in other projects' after the count, dim, a link to the inbox screen (designer m_32874) */
+.inbox-block .strip-title .strip-others .b-act:hover { color: var(--c-text-3); text-decoration: underline; }
+/* folded (no item open): the head is a tight row (28), the box --s-1 above and below (designer's 8) */
+.inbox-block:not([data-open]) { padding: var(--s-1) var(--s-2); gap: 0; }
+.inbox-block:not([data-open]) .strip-title { height: var(--h-row-tight); padding-bottom: 0; }
+/* one inbox (designer m_19631, page desktop-right-bar): the row is the same everywhere: n, the
+   sign, the agent in 500, the question dim cut with …, then '<project> · <age>' mono t-12 faint */
+/* the same 28 px row in the block and the capsule (designer m_20053) */
+.inbox-block > .b-row { height: var(--h-row-tight); padding: 0 var(--pad-row-x); gap: var(--gap-inline); }
+.inbox-block > .b-row .nm { display: flex; gap: var(--gap-inline); flex: 1; min-width: 0; }
+.inbox-block .strip-who { font-weight: 500; }
+/* the project tag ('bise', 'shop · 5 min'): words, not machine text, so sans (designer m_20986) */
+.inbox-block > .b-row .end { flex: none; font: var(--t-13) var(--font-ui); color: var(--c-text-3); }
+
+/* inbox zero (designer's desktop-delight TOUCH 3, Zero.tsx): in the folded block's place for 2 s, then
+   fades; reduced motion: shown, no fade */
+.inbox-strip.inbox-zero { flex-direction: row; align-items: baseline; gap: var(--s-2); padding: var(--s-1) 0; background: none; box-shadow: none; font: var(--t-13) var(--font-ui); animation: inbox-zero 2.4s linear forwards; }
+.inbox-zero .inbox-zero-mark { font: 600 var(--t-13) var(--font-mono); color: var(--c-accent); }
+.inbox-zero .inbox-zero-words { color: var(--c-text-2); }
+@keyframes inbox-zero {
+  0%, 83% { opacity: 1; }
+  100% { opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .inbox-strip.inbox-zero { animation: none; }
+}
+/* a card linked to a page (notif-artifact, designer m_26560): the page's chip under the question,
+   'o open beside' at its right in text-3; each option's why in text-2 under its label; the
+   asker's 'my pick' at the row's right */
+/* narrow, the chip gives way first (down to its first letters and '…', designer m_47728); then
+   '⌘O open beside' drops whole, never clipped (m_47764): the row is one line that wraps, the chip
+   counted at its narrowest (flex-basis min-content) and grown back up to its whole width, so the
+   hint goes to the hidden second line only once the chip is at its narrowest. The clip's margin
+   keeps the chip's focus ring, under the second line (row-gap) */
+.ic-page { display: flex; flex-wrap: wrap; align-items: center; column-gap: var(--gap-inline); row-gap: var(--s-2); flex: none; height: var(--s-6); margin: 0 0 var(--gap-block); min-width: 0; overflow: clip; overflow-clip-margin: var(--s-1); }
+.ic-page > .b-artchip { flex: 1 1 min-content; max-width: max-content; }
+.ic-page > .b-act { flex: none; margin-left: auto; box-sizing: border-box; height: var(--s-6); padding: 0 var(--s-1); color: var(--c-text-3); display: inline-flex; align-items: center; gap: var(--s-1); }
+.ic-opt:has(.ic-mine) { grid-template-columns: 22px 1fr auto; }
+.ic-why { display: block; color: var(--c-text-2); font-size: var(--t-12); }
+.ic-opt.picked .ic-why { color: var(--c-on-ink); }
+.ic-mine { font-size: var(--t-12); color: var(--c-text-3); }

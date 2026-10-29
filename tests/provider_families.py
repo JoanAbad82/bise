@@ -31,6 +31,7 @@ ROOT = os.path.abspath(os.path.join(HERE, ".."))
 sys.path.insert(0, HERE)
 import fake_provider as F  # noqa: E402
 import provider_folds as P  # noqa: E402
+import obs_lines  # noqa: E402
 import wait  # noqa: E402
 
 FAILS = []
@@ -220,6 +221,7 @@ def part_d():
     open(models, "w").write(
         'version = 1\ndefault_model = "fake/claude-x"\n\n'
         '[providers.fake]\nname = "Fake"\napi = "anthropic"\nbase_url = "%s"\nkey_env = ""\n\n'
+        '[models."fake/claude-r"]\nreasoning = true\nefforts = "none,low,medium,high,xhigh,max"\n\n'
         '[providers.fakeoai]\nname = "Fake OpenAI"\napi = "openai-chat"\nbase_url = "%s"\nkey_env = ""\n\n'
         '[providers.fakegem]\nname = "Fake Gemini"\napi = "gemini"\nbase_url = "%s"\nkey_env = ""\n\n'
         '[providers.fakegw]\nname = "Fake Gateway"\napi = "anthropic"\nbase_url = "%s"\nkey_env = ""\n'
@@ -245,7 +247,6 @@ def part_d():
     env = {k: v for k, v in os.environ.items() if not k.startswith(("BEND_", "SB_", "BISE_"))}
     env.update(HOME=tmp, XDG_STATE_HOME=os.path.join(tmp, "state"), BISE_MODELS_FILE=models, BEND_CONFIG=cfg,
                BEND_REPL_PORT=str(port), BEND_SESSION_FILE=session, BEND_WIRE_LOG=os.path.join(tmp, "wire.log"),
-               BEND_MCP_INDEX=os.path.join(tmp, "mcp.txt"), BEND_SKILLS_INDEX=os.path.join(tmp, "sk.txt"),
                BEND_BG_ROOT=os.path.join(tmp, "bg"), SB_AGENT="probe", TMPDIR=tmp,
                FAKE_GW_HEADERS="source: bise\norg-id : 2\nnot a header", EMPTY_GW_HEADERS="   ")
     log, err = os.path.join(tmp, "repl.log"), os.path.join(tmp, "repl.err")
@@ -255,8 +256,8 @@ def part_d():
     # the interrupt flag the TUI writes on Ctrl+C (side dir: $TMPDIR)
     flag = os.path.join(tmp, "bend-interrupt-%d.txt" % port)
 
-    def turn(model, text, ctrl_c_on=None):
-        open(cfg, "w").write('model = "%s"\n' % model)
+    def turn(model, text, ctrl_c_on=None, extra=""):
+        open(cfg, "w").write('model = "%s"\n%s' % (model, extra))
         sock = socket.create_connection(("127.0.0.1", port), timeout=60)
         sock.sendall(("run " + text + "\n").encode())
         f = sock.makefile("rb")
@@ -269,7 +270,7 @@ def part_d():
             if ctrl_c_on and ctrl_c_on in out[-1]:
                 open(flag, "w").write("1")
                 ctrl_c_on = None
-            if line.startswith(b"  obs: turn_done"):
+            if obs_lines.kind(line) == "turn_done":
                 break
         sock.close()
         return out
@@ -282,7 +283,7 @@ def part_d():
         out = turn("fake/claude-x", "[[error: overloaded retry=0]] [[think: two steps]] [[bash: echo a1]] [[bash: echo a2]]")
         recs = [json.loads(l) for l in open(F.LOG)]
         text = open(session).read()
-        said = [l for l in out if "obs: assistant:" in l]
+        said = [l for l in out if obs_lines.kind(l) == "assistant"]
         check([r["status"] for r in recs] == [529, 200, 200, 200] and all(
             r["family"] == "anthropic" and r["stream"] and r["path"] == "/v1/messages" for r in recs),
             "anthropic via [providers.fake]: streamed to /v1/messages, the 529 retried: %r"
@@ -290,6 +291,12 @@ def part_d():
         check("tool bash ok: a1" in text and "tool bash ok: a2" in text and said and "done: " in said[-1],
               "anthropic: two bash calls, then the last reply: %r" % (said[-1:] if said else out[-5:]))
         n = len(recs)
+        # effort-table: xhigh is a Claude effort, sent as is in output_config.effort
+        out = turn("fake/claude-r", "plus fort", extra='reasoning_effort = "xhigh"\n')
+        recs = [json.loads(l) for l in open(F.LOG)][n:]
+        check(recs and all(r["family"] == "anthropic" and r["effort"] == "xhigh" for r in recs),
+              "anthropic: reasoning_effort xhigh reaches output_config.effort: %r" % [r["effort"] for r in recs])
+        n += len(recs)
         out = turn("fakeoai/m2", "[[bash: echo b1]]")
         recs = [json.loads(l) for l in open(F.LOG)][n:]
         check([r["family"] for r in recs] == ["openai-chat"] * 2 and all(r["stream"] for r in recs)
@@ -299,7 +306,7 @@ def part_d():
         n += len(recs)
         out = turn("fakegem/g", "hello")
         recs = [json.loads(l) for l in open(F.LOG)][n:]
-        errs = [l for l in out if "rror" in l or "not supported" in l.lower() or "obs: assistant" in l]
+        errs = [l for l in out if "rror" in l or "not supported" in l.lower() or obs_lines.kind(l) == "assistant"]
         check(repl.poll() is None and (recs and recs[0]["family"] == "gemini" or errs),
               "a gemini model: a reply, or a clean error before BISE-148: %r" % (errs[-1:] or out[-2:]))
         n += len(recs)
@@ -349,7 +356,7 @@ def part_d():
         # The interrupted slow request can finish after the next turn starts.
         recs = [json.loads(l) for l in open(F.LOG)][n:]
         recs = [r for r in recs if r.get("model") == "patient"]
-        said = [l for l in out if "obs: assistant:" in l]
+        said = [l for l in out if obs_lines.kind(l) == "assistant"]
         check(not [l for l in out if "provider_retry" in l] and said and "ack: " in said[-1]
               and [r["status"] for r in recs] == [200] and took >= 3,
               "idle_timeout_sec = 8: the same 3 s wait answers, no retry (%.1fs): %r"

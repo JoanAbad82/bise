@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>install and first run · bise docs</title>
-<meta name="description" content="one command installs bise. the first run asks for one thing, the model, and only when it finds no key.">
+<title>start with bise terminal · bise docs</title>
+<meta name="description" content="one command installs bise terminal. the first run asks for one thing, the model, and only when it finds no key.">
 <link rel="canonical" href="https://bise.dev/docs/install">
 <meta name="theme-color" content="#f2ede2">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
@@ -13,10 +13,11 @@
 <meta property="og:type" content="article">
 <meta property="og:site_name" content="bise">
 <meta property="og:url" content="https://bise.dev/docs/install">
-<meta property="og:title" content="install and first run · bise docs">
-<meta property="og:description" content="one command installs bise. the first run asks for one thing, the model, and only when it finds no key.">
+<meta property="og:title" content="start with bise terminal · bise docs">
+<meta property="og:description" content="one command installs bise terminal. the first run asks for one thing, the model, and only when it finds no key.">
 <meta property="og:image" content="https://bise.dev/og.png?v=paper">
 <meta name="twitter:card" content="summary_large_image">
+<script>{ const q = location.search; let a = /[?&]terminal\b/.test(q) ? 'terminal' : /[?&]desktop\b/.test(q) ? 'desktop' : null; try { if (a) localStorage.setItem('bise-docs-app', a); else a = localStorage.getItem('bise-docs-app'); } catch {} document.documentElement.classList.add('app-' + (a === 'terminal' ? 'terminal' : 'desktop')); }</script>
 <script>{ const q = location.search; let d = null; try { d = localStorage.getItem('bise-theme'); } catch {} if (/[?&]dark\b/.test(q) || (!/[?&]light\b/.test(q) && (d ?? (matchMedia('(prefers-color-scheme: dark)').matches ? '1' : '0')) === '1')) document.documentElement.classList.add('pd'); }</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,600;1,6..72,400&family=Caveat:wght@500;700&display=swap" rel="stylesheet">
@@ -38,9 +39,11 @@
 </header>
 <div class="wrap">
   <aside class="side"><nav aria-label="the docs">
+<div class="appswitch" role="group" aria-label="your app"><button type="button" data-app="desktop" aria-pressed="false">desktop</button><button type="button" data-app="terminal" aria-pressed="false">terminal</button></div>
 <div class="grp">get started</div><ul>
 <li><a href="/docs">what bise is</a></li>
-<li><a href="/docs/install" class="here" aria-current="page">install and first run</a></li>
+<li><a href="/docs/desktop" data-app="desktop">start with bise desktop</a></li>
+<li><a href="/docs/install" class="here" aria-current="page" data-app="terminal">start with bise terminal</a></li>
 </ul>
 <div class="grp">models</div><ul>
 <li><a href="/docs/providers">providers and keys</a></li>
@@ -50,9 +53,10 @@
 </ul>
 <div class="grp">using bise</div><ul>
 <li><a href="/docs/agents">main and the agents</a></li>
+<li><a href="/docs/window" data-app="desktop">the desktop window <span class="tag">desktop</span></a></li>
 <li><a href="/docs/approvals">approvals</a></li>
 <li><a href="/docs/flow">landing work</a></li>
-<li><a href="/docs/voice">voice</a></li>
+<li><a href="/docs/voice">voice and fn</a></li>
 <li><a href="/docs/computer-use">computer use</a></li>
 </ul>
 <div class="grp">extend</div><ul>
@@ -60,20 +64,23 @@
 <li><a href="/docs/skills">instructions and skills</a></li>
 </ul>
 <div class="grp">reference</div><ul>
+<li><a href="/docs/settings" data-app="desktop">settings <span class="tag">desktop</span></a></li>
 <li><a href="/docs/config">config.toml</a></li>
-<li><a href="/docs/cli">the bise command</a></li>
-<li><a href="/docs/keys">keys and commands</a></li>
+<li><a href="/docs/desktop-keys" data-app="desktop">keys and menus <span class="tag">desktop</span></a></li>
+<li><a href="/docs/keys" data-app="terminal">keys and commands <span class="tag">terminal</span></a></li>
+<li><a href="/docs/cli" data-app="terminal">the bise command <span class="tag">terminal</span></a></li>
 <li><a href="/docs/troubleshooting">troubleshooting</a></li>
 <li><a href="/docs/updates">updates</a></li>
 </ul>
   </nav></aside>
   <main>
-    <article>
+    <article data-app="terminal">
       <div class="head">
-        <h1>install and first run</h1>
+        <h1>start with bise terminal</h1>
         <button class="copymd" type="button" data-md="/docs/install.md">copy as markdown</button>
       </div>
-      <p class="lede">one command installs bise. the first run asks for one thing, the model, and only when it finds no key.</p>
+      <p class="lede">one command installs bise terminal. the first run asks for one thing, the model, and only when it finds no key.</p>
+<p class="only"><span>only in bise terminal</span> <a href="/docs/desktop?desktop" data-to="desktop">in bise desktop: download for Mac ›</a></p>
 <h2 id="install"><a class="anchor" href="#install" aria-hidden="true">#</a>install</h2>
 <div class="code"><div class="box"><pre><code class="lang-sh">curl -fsSL https://bise.dev/install | sh</code></pre><button class="copy" type="button" aria-label="copy the code">copy</button></div></div>
 <p>the installer picks the build for your machine (a Mac with Apple silicon or Intel, Linux on x86_64 or arm64), checks its sha256, and puts it in <code>~/.local/share/bise</code>. the <code>bise</code> command goes in <code>~/.local/bin</code>. no sudo.</p>
@@ -84,7 +91,7 @@
 <p>the same command works on Linux, x86_64 and arm64. the build needs glibc 2.34 or newer:</p>
 <div class="table"><table><thead><tr><th>works</th><th>not yet</th></tr></thead><tbody><tr><td>Ubuntu 22.04 and newer, Debian 12 and newer, Fedora, RHEL, Rocky and Alma 9, Amazon Linux 2023, Arch, WSL2 with Ubuntu 22.04+</td><td>Alpine (musl), Ubuntu 20.04, Debian 11, RHEL 8 (older glibc)</td></tr></tbody></table></div>
 <p>it needs <code>git</code>, and OpenSSL 3 (<code>libssl.so.3</code>, there by default on the systems above) for its HTTPS calls. <code>bise doctor</code> shows your distro and what is off on Linux.</p>
-<p>on Linux, these are macOS only and stay off: the <a href="/docs/approvals">sandbox</a> of <code>auto</code> approvals (auto checks each command instead, and says so once), <a href="/docs/voice">voice</a>, <a href="/docs/computer-use">computer use</a> and the desktop app.</p>
+<p>on Linux, these are macOS only and stay off: the <a href="/docs/approvals">sandbox</a> of <code>auto</code> approvals (auto checks each command instead, and says so once), <a href="/docs/voice">voice</a>, <a href="/docs/computer-use">computer use</a> and <a href="/docs/desktop">bise desktop</a>.</p>
 <h3 id="nixos"><a class="anchor" href="#nixos" aria-hidden="true">#</a>nixos</h3>
 <p>NixOS has no <code>/lib64/ld-linux</code>, so the installer stops and points here. install with Nix instead:</p>
 <div class="code"><div class="box"><pre><code class="lang-sh">nix profile install github:gvergnaud/bise                              <span class="c"># with flakes</span>
@@ -95,7 +102,7 @@ nix-env -if https://github.com/gvergnaud/bise/archive/main.tar.gz      <span cla
 <div class="code"><div class="box"><pre><code class="lang-text">read https://bise.dev/setup.md and set up bise for me</code></pre><button class="copy" type="button" aria-label="copy the code">copy</button></div></div>
 <p>it installs bise, then runs <code>bise setup scan</code>, which lists what your machine already has (the API keys and where they are, your agent's model, its instructions file, skills and MCP servers) without ever printing a key. it shows you one short plan and waits for your yes before it writes anything.</p>
 <h2 id="first-run"><a class="anchor" href="#first-run" aria-hidden="true">#</a>first run</h2>
-<p>go to a repo and start bise:</p>
+<p>bise terminal works in one repo at a time: go to a repo and start it there.</p>
 <div class="code"><div class="box"><pre><code class="lang-sh">cd your-repo
 bise</code></pre><button class="copy" type="button" aria-label="copy the code">copy</button></div></div>
 <p>the first run has up to four short screens:</p>
@@ -109,18 +116,20 @@ bise</code></pre><button class="copy" type="button" aria-label="copy the code">c
 <p>in Ghostty, a few keys need one line each in Ghostty's config before they reach bise: <code class="key">cmd+v</code> (paste an image), <code class="key">cmd+f</code>, <code class="key">cmd+k</code>, <code class="key">cmd+a</code> and <code class="key">cmd+↑↓</code>. <code class="key">/setup</code> offers them, or:</p>
 <div class="code"><div class="box"><pre><code class="lang-sh">bise setup ghostty --dry-run   <span class="c"># shows the change, writes nothing</span>
 bise setup ghostty             <span class="c"># adds the lines, after a backup of the file</span></code></pre><button class="copy" type="button" aria-label="copy the code">copy</button></div></div>
+<h2 id="bise-desktop-too"><a class="anchor" href="#bise-desktop-too" aria-hidden="true">#</a>bise desktop too</h2>
+<p>bise terminal and <a href="/docs/desktop">bise desktop</a> run the same agents, with the same threads, keys and settings. on a Mac with Apple silicon you can use both at once: <code>bise</code> in a folder that is a project of bise desktop opens the same threads.</p>
 <h2 id="uninstall"><a class="anchor" href="#uninstall" aria-hidden="true">#</a>uninstall</h2>
 <div class="code"><div class="box"><pre><code class="lang-sh">bise uninstall           <span class="c"># removes the app, keeps ~/.bise</span>
 bise uninstall --purge   <span class="c"># also removes ~/.bise: your settings, keys and threads</span></code></pre><button class="copy" type="button" aria-label="copy the code">copy</button></div></div>
 <aside class="callout careful"><span class="label">▲ careful</span><p><code>--purge</code> deletes your saved keys, sign-ins and every agent's thread.</p></aside>
     </article>
-    <nav class="pn"><a class="prev" href="/docs"><span>previous</span>what bise is</a><a class="next" href="/docs/providers"><span>next</span>providers and keys</a></nav>
+    <nav class="pn"><a class="prev" href="/docs/desktop"><span>previous</span>start with bise desktop</a><a class="next" href="/docs/providers"><span>next</span>providers and keys</a></nav>
     <footer>
       <p>for agents: <a href="/docs/install.md">bise.dev/docs/install.md</a></p>
       <p><a href="https://github.com/gvergnaud/bise/blob/main/site/docs/install.md">edit this page on GitHub</a></p>
     </footer>
   </main>
-  <aside class="toc"><div class="toch">on this page</div><ul><li class="l2"><a href="#install">install</a></li><li class="l3"><a href="#linux">linux</a></li><li class="l3"><a href="#nixos">nixos</a></li><li class="l3"><a href="#let-a-coding-agent-do-it">let a coding agent do it</a></li><li class="l2"><a href="#first-run">first run</a></li><li class="l2"><a href="#what-goes-where">what goes where</a></li><li class="l2"><a href="#ghostty">Ghostty</a></li><li class="l2"><a href="#uninstall">uninstall</a></li></ul></aside>
+  <aside class="toc"><div class="toch">on this page</div><ul><li class="l2"><a href="#install">install</a></li><li class="l3"><a href="#linux">linux</a></li><li class="l3"><a href="#nixos">nixos</a></li><li class="l3"><a href="#let-a-coding-agent-do-it">let a coding agent do it</a></li><li class="l2"><a href="#first-run">first run</a></li><li class="l2"><a href="#what-goes-where">what goes where</a></li><li class="l2"><a href="#ghostty">Ghostty</a></li><li class="l2"><a href="#bise-desktop-too">bise desktop too</a></li><li class="l2"><a href="#uninstall">uninstall</a></li></ul></aside>
 </div>
 <script src="/docs/docs.js" defer></script>
 </body>

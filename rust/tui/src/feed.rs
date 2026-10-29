@@ -1,16 +1,20 @@
 //! The feed layout cache: events wrap to rows once (per width, per
 //! mutation) and frames only clone the visible slice; plus the event
-//! merge rules (push_event) and the scroll anchor arithmetic.
+//! merge rules (push_event) and the scroll anchor arithmetic. The tool
+//! rows' folds live in feed_folds.rs.
 
 use crate::render::*;
 use crate::wire::*;
 use crate::feedsel;
+use bise_proto::thread::lines;
+use bise_proto::words::thread;
 use ratatui::style::Style;
 use ratatui::text::{Line, Span};
 use unicode_segmentation::UnicodeSegmentation;
 use unicode_width::UnicodeWidthStr;
 
 // a replayed tool has no meaningful duration (the timing is the replay's)
+#[cfg(test)]
 pub(crate) fn hide_replayed_elapsed(events: &mut [Ev], cache: &mut [Option<EventRows>], id: u32) {
     if let Some((i, td)) = last_tool_mut(events, |td| td.id == id) {
         td.elapsed = Some(String::new());
@@ -347,7 +351,7 @@ pub(crate) fn build_rows(events: &[Ev], i: usize, debug: bool, width: usize, tic
 pub(crate) fn is_message(ev: &Ev) -> bool {
     // an answer to an inbox item reads like your message (BISE-307): a
     // block with a blank row around it
-    matches!(ev, Ev::You(..) | Ev::Assistant(_) | Ev::Thinking { .. } | Ev::AgentMsg { .. } | Ev::Answered { .. } | Ev::Approval { .. })
+    matches!(ev, Ev::You(..) | Ev::Assistant(_) | Ev::Kept(_) | Ev::Thinking { .. } | Ev::AgentMsg { .. } | Ev::Answered { .. } | Ev::Approval { .. })
 }
 
 pub(crate) fn is_tool_block(ev: &Ev) -> bool {
@@ -358,6 +362,7 @@ pub(crate) fn is_notice(ev: &Ev) -> bool {
     matches!(
         ev,
         Ev::Warn(_)
+            | Ev::Retry { .. }
             | Ev::Card { .. }
             | Ev::Err(_)
             | Ev::Info(_)
@@ -368,6 +373,7 @@ pub(crate) fn is_notice(ev: &Ev) -> bool {
             | Ev::Compacted { .. }
             | Ev::Fold { .. }
             | Ev::Scheduled { .. }
+            | Ev::Wake { .. }
             | Ev::TurnDone
             | Ev::TimeMark(_)
     ) || matches!(ev, Ev::Release(r) if !r.is_l2())
@@ -400,7 +406,8 @@ pub(crate) fn wants_gap_before(ev: &Ev, prev: Option<&Ev>) -> bool {
     let prev_tool = is_tool_block(p);
     let prev_notice = is_notice(p);
     match ev {
-        Ev::Assistant(_) => {
+        // a kept answer sits where the live text was: the reply's gap
+        Ev::Assistant(_) | Ev::Kept(_) => {
             !matches!(p, Ev::Thinking { .. })
                 && (prev_message || prev_tool || prev_notice)
         }
@@ -460,10 +467,7 @@ fn merge_report_and_card(events: &mut [Ev], cache: &mut [Option<EventRows>], ev:
                 let (k, _) = report_parts(text)?;
                 Some((from.clone(), kind_of(k)?, false))
             }
-            Ev::Card { text, .. } => {
-                let (k, name, _) = card_parts(text)?;
-                Some((name.to_string(), kind_of(k)?, true))
-            }
+            Ev::Card { card, .. } => Some((card.agent.clone(), kind_of(&card.kind)?, true)),
             _ => None,
         }
     }
@@ -500,6 +504,50 @@ fn made_run_pad(events: &[Ev], i: usize) -> usize {
     back.chain(fwd).max().unwrap_or(0)
 }
 
+/// `turn interrupted`, `turn interrupted by main`: a stop someone asked
+/// for (the catalog's words, read back from the notice).
+pub(crate) fn is_interrupt(t: &str) -> bool {
+    t == thread::turn_interrupted || t.starts_with(&thread::turn_interrupted_by(""))
+}
+
+/// The REPL's own lines for an interrupted turn: its discarded candidate,
+/// `turn interrupted`, the dropped in-flight response.
+pub(crate) fn is_cut_noise(ev: &Ev) -> bool {
+    match ev {
+        Ev::Warn(t) => *t == thread::candidate_discarded("interrupt") || is_interrupt(t),
+        Ev::Info(t) => t == thread::response_dropped,
+        _ => false,
+    }
+}
+
+/// The calls of a turn cut by /pause (designer m_19111): nothing live
+/// draws while paused (a call still running there is the one the pause
+/// stops), and the call the pause stopped reads `– stopped by the
+/// pause`, without its error row (toolrow::error_line). The flag stays on
+/// the event when its end merges in (push_event's running-line rewrite).
+pub(crate) fn pause_cut_tools(evs: &mut [Ev]) {
+    for ev in evs.iter_mut() {
+        if let Ev::Tool(td) = ev {
+            let cut = td.result.as_ref().is_some_and(|(_, r)| r.contains("interrupted by bise"));
+            if matches!(td.state, ToolState::Run) || (matches!(td.state, ToolState::Fail) && cut) {
+                td.paused = true;
+            }
+        }
+    }
+}
+
+/// sb-core's `‖ paused · its turn stopped` line is among the last events,
+/// with no message of his since: the turn was cut by /pause, nothing went
+/// wrong. Not "no turn since": the REPL may write the cut turn's start
+/// after the paused line (a turn asked just before /pause).
+pub(crate) fn after_pause_cut(events: &[Ev]) -> bool {
+    events
+        .iter()
+        .rev()
+        .take_while(|e| !matches!(e, Ev::You(..)))
+        .any(|e| matches!(e, Ev::Info(t) if t.ends_with("paused · its turn stopped")))
+}
+
 pub(crate) fn push_event(events: &mut Vec<Ev>, cache: &mut Vec<Option<EventRows>>, ev: Ev) -> bool {
     // a new ↗ line may widen its run: the run's rows are built again
     if matches!(ev, Ev::Made { .. }) {
@@ -515,12 +563,17 @@ pub(crate) fn push_event(events: &mut Vec<Ev>, cache: &mut Vec<Option<EventRows>
     if let Some(appended) = merge_report_and_card(events, cache, &ev) {
         return appended;
     }
+    // cost-pause (designer m_18932): a turn cut by /pause shows only its
+    // `‖ paused` line; the REPL's interrupt lines after it are dropped
+    if is_cut_noise(&ev) && after_pause_cut(events) {
+        return false;
+    }
     // BISE-293: a turn that fails for the reason its candidate was
     // discarded says it once: the failure takes the warning's place
     if let Ev::Err(t) = &ev {
-        let why = t.strip_prefix("turn failed: ");
+        let why = t.strip_prefix(&thread::turn_failed(""));
         if let (Some(why), Some(Ev::Warn(w))) = (why, events.last()) {
-            if w.strip_prefix("candidate discarded: ") == Some(why) {
+            if w.strip_prefix(&thread::candidate_discarded("")) == Some(why) {
                 let i = events.len() - 1;
                 events[i] = ev;
                 if let Some(c) = cache.get_mut(i) {
@@ -529,6 +582,28 @@ pub(crate) fn push_event(events: &mut Vec<Ev>, cache: &mut Vec<Option<EventRows>
                 return false;
             }
         }
+    }
+    // H9 (architect m_19836): a retry in the same run as the newest
+    // event, itself a retry, takes its row (one updating row per call's
+    // retries, as the window's fold does)
+    if let Ev::Retry { .. } = &ev {
+        let prev = match events.last() {
+            Some(Ev::Retry { retry, .. }) => Some(retry),
+            _ => None,
+        };
+        if bise_proto::thread::lines::is_same_retry_run(prev, false) {
+            let i = events.len() - 1;
+            events[i] = ev;
+            if let Some(c) = cache.get_mut(i) {
+                *c = None;
+            }
+            return false;
+        }
+    }
+    // his message's id, or where bise sent it: on his row (said.rs), no row
+    if matches!(ev, Ev::YouId(_) | Ev::YouWent { .. }) {
+        crate::said::on_you(events, cache, ev);
+        return false;
     }
     // annotations enrich the matching tool event instead of stacking
     match &ev {
@@ -606,53 +681,41 @@ pub(crate) fn push_event(events: &mut Vec<Ev>, cache: &mut Vec<Option<EventRows>
         // BISE-86: the hub could not deliver your message: its line gets
         // `✗`; only the newest `not delivered` line keeps its question
         Ev::Undelivered { name, text, .. } => {
-            // your line is the text, or `@name text` from another view
-            let yours = |t: &str| {
-                t == text
-                    || t.strip_prefix('@').and_then(|r| r.split_once(' ')).is_some_and(|(n, r)| n == name && r.trim() == text)
-            };
-            let mut found = false;
             for (i, e) in events.iter_mut().enumerate().rev() {
-                match e {
-                    Ev::Undelivered { open, .. } if *open => {
+                if let Ev::Undelivered { open, .. } = e {
+                    if *open {
                         *open = false;
                         cache[i] = None;
                     }
-                    Ev::You(t, m, ..) if !found && yours(t) && *m != Mark::Failed => {
-                        *m = Mark::Failed;
-                        cache[i] = None;
-                        found = true;
-                    }
-                    _ => {}
                 }
             }
-            // not in this feed (an `@name` line from another view shows
-            // only once delivered): your line comes back, marked
-            if !found {
+            // your line (the text, or `@name text` from another view) gets
+            // `✗` by bise-proto's one rule (G1, the hub's fold too); not in
+            // this feed (an `@name` line from another view shows only once
+            // delivered): your line comes back, marked
+            let m = lines::Mark::Failed { to: name.clone(), text: text.clone() };
+            if !deliver(events, cache, &m) {
                 let t = format!("@{} {}", name, text);
-                push_event(events, cache, Ev::You(t, Mark::Failed, false));
+                push_event(events, cache, Ev::You(t.into(), Mark::Failed, false, None));
             }
         }
-        // C3: a steering line moves the mark of your message
-        Ev::MarkYou { text, mark, or } => {
-            if !mark_you(events, cache, text, *mark) {
+        // C3: a steering line moves the mark of your message (bise-proto's
+        // one rule, G1: none with its words raises what you sent this turn,
+        // BISE-90); an injected notification with no message of yours
+        // shows its info line
+        Ev::MarkYou { mark, or } => {
+            if !deliver(events, cache, mark) {
                 if let Some(ev) = or {
                     return push_event(events, cache, (**ev).clone());
                 }
-                // BISE-90: the hub steered your message together with an
-                // agent's message and the agents' status, so the steered
-                // text is that whole block (your words on a later line):
-                // it moves the marks of what you sent during this turn
-                mark_this_turn(events, cache, *mark);
             }
             return false;
         }
         // BISE-31: a closed card fades in place (its last line in this
         // feed); not in the feed (an older page): an info line as before
         Ev::CardClosed { id, res } => {
-            let head = format!("#{} ", id);
             let found = events.iter_mut().enumerate().rev().find_map(|(i, e)| match e {
-                Ev::Card { text, closed } if text.starts_with(&head) => Some((i, closed)),
+                Ev::Card { card, closed } if card.id == Some(*id) => Some((i, closed)),
                 _ => None,
             });
             match found {
@@ -677,20 +740,9 @@ pub(crate) fn push_event(events: &mut Vec<Ev>, cache: &mut Vec<Option<EventRows>
             }
         }
         // a turn starts: the model reads what you sent since the last one
-        // (a message at idle goes straight to ✓✓)
+        // (a message at idle goes straight to ✓✓; G1, bise-proto's rule)
         Ev::Turn => {
-            for (i, e) in events.iter_mut().enumerate().rev() {
-                match e {
-                    Ev::Turn => break,
-                    Ev::You(_, m, ..) if matches!(*m, Mark::Sent | Mark::Received) => {
-                        *m = Mark::Read;
-                        if let Some(c) = cache.get_mut(i) {
-                            *c = None;
-                        }
-                    }
-                    _ => {}
-                }
-            }
+            deliver(events, cache, &lines::Mark::Turn);
         }
         // the turn ended: a tool still shown as running was abandoned
         // (interrupt or failed turn) — freeze it so the elapsed stops
@@ -941,12 +993,13 @@ pub(crate) fn discloses(ev: &Ev) -> bool {
         // a why, or a question or answer longer than its gist
         Ev::Answered { agent, question, answer, why, .. } => crate::answered::answered_opens(agent, question, answer, why),
         Ev::Compacted { text, .. } | Ev::Fold { text, .. } | Ev::Scheduled { words: text, .. } => !text.trim().is_empty(),
+        Ev::Wake { tail, .. } => !tail.is_empty(),
         Ev::Release(r) => r.discloses(),
         // a long message of yours folds (BISE-239)
         Ev::You(t, ..) => crate::render::you_folds(t),
         // an answer to an inbox item opens on its full question and
         // words (BISE-307)
-        Ev::Approval { text, note, asked, .. } => crate::render::answer_opens(text, note, asked),
+        Ev::Approval { text, note, parts, asked, .. } => crate::render::answer_opens(text, note, parts, asked),
         _ => false,
     }
 }
@@ -1010,7 +1063,7 @@ pub(crate) fn toggle_at(events: &mut [Ev], cache: &mut [Option<EventRows>], i: u
 /// list that fits, several when a few screenshots wrap). Only its hint
 /// row (`▸ n more lines` / `▾`) and its long pastes' rows toggle.
 fn you_row_stays(events: &[Ev], cache: &[Option<EventRows>], i: usize, row: usize) -> bool {
-    let (Some(Ev::You(t, _, open)), Some(Some(c))) = (events.get(i), cache.get(i)) else { return false };
+    let (Some(Ev::You(t, _, open, _)), Some(Some(c))) = (events.get(i), cache.get(i)) else { return false };
     let width = usize::from(c.width);
     let sizes = crate::render::you_sizes_rows(t, width);
     let pastes = crate::render::you_paste_rows(t, *open, width);
@@ -1062,8 +1115,9 @@ fn toggle_own(events: &mut [Ev], cache: &mut [Option<EventRows>], i: usize) -> b
         | Ev::Compacted { open, .. }
         | Ev::Fold { open, .. }
         | Ev::Scheduled { open, .. }
+        | Ev::Wake { open, .. }
         | Ev::Approval { open, .. }
-        | Ev::You(_, _, open) => *open = !*open,
+        | Ev::You(_, _, open, _) => *open = !*open,
         Ev::Tool(td) if crate::toolbox::opens_as_box(td) => {
             // BISE-223: the row opens into its box (15 rows), a box that
             // hides lines opens whole, then back to the row
@@ -1110,7 +1164,7 @@ pub(crate) const PAUSE_MS: u128 = 5 * 60 * 1000;
 /// an agent writing to you, a report (not a brief, not level 3).
 pub(crate) fn is_l2(ev: &Ev) -> bool {
     match ev {
-        Ev::Assistant(_) | Ev::Answered { .. } => true,
+        Ev::Assistant(_) | Ev::Kept(_) | Ev::Answered { .. } => true,
         Ev::Release(r) => r.is_l2(),
         Ev::AgentMsg { text, .. } => !is_brief(text) && !is_l3(ev),
         _ => false,
@@ -1415,8 +1469,8 @@ pub(crate) fn turn_end_of(events: &[Ev], i: usize) -> Option<u64> {
     let ends_turn = |e: &Ev| match e {
         Ev::TurnDone => true,
         // "turn interrupted by main": a stop mid-answer (wire.rs)
-        Ev::Warn(t) => t == "turn interrupted" || t.starts_with("turn interrupted by ") || crate::wire::is_plan_line(t),
-        Ev::Err(t) => t.starts_with("turn failed: ") || t.starts_with("turn stopped: "),
+        Ev::Warn(t) => is_interrupt(t) || crate::wire::is_plan_line(t),
+        Ev::Err(t) => t.starts_with(&thread::turn_failed("")) || t.starts_with(&thread::turn_stopped("")),
         _ => false,
     };
     let e = events.get(i)?;
@@ -1433,6 +1487,7 @@ pub(crate) fn turn_end_of(events: &[Ev], i: usize) -> Option<u64> {
 /// The local time, `14:31`: the zone from `when::offset_at` (one `date`
 /// per hour, cached; UTC when it fails), not a `date` process per call
 /// (BISE-292).
+#[cfg(test)]
 pub(crate) fn local_hhmm() -> String {
     let ms = crate::when::now_ms();
     let s = (ms / 1000) as i64 + i64::from(crate::when::offset_at(ms));
@@ -1455,8 +1510,9 @@ fn own_open(ev: &Ev) -> Option<bool> {
         | Ev::Compacted { open, .. }
         | Ev::Fold { open, .. }
         | Ev::Scheduled { open, .. }
+        | Ev::Wake { open, .. }
         | Ev::Approval { open, .. }
-        | Ev::You(_, _, open) => Some(*open),
+        | Ev::You(_, _, open, _) => Some(*open),
         // a row, or an open box that still hides lines, is closed
         Ev::Tool(td) if crate::toolbox::opens_as_box(td) => {
             Some(td.opened && (td.expanded || !crate::toolbox::box_folds(td)))
@@ -1520,230 +1576,50 @@ pub(crate) fn set_everything(events: &mut [Ev], cache: &mut [Option<EventRows>],
 
 // ---- message marks (C3, book §13, BISE-15) ----
 
-/// How far back a steering line looks for your message.
-const MARK_LOOKBACK: usize = 500;
-
-/// The words of a text, for matching a steering line to your message
-/// (the wire flattens its line breaks).
-fn words(t: &str) -> impl Iterator<Item = &str> {
-    t.split_whitespace()
-}
-
-/// Move the mark of your last message with `text` up to `mark` (never
-/// down). False when there is no such message.
-/// Raise to `mark` the marks of your messages since the turn started
-/// (never lowers one; a message at idle started the turn itself).
-fn mark_this_turn(events: &mut [Ev], cache: &mut [Option<EventRows>], mark: Mark) {
-    for (i, e) in events.iter_mut().enumerate().rev() {
-        match e {
-            Ev::Turn => break,
-            Ev::You(_, m, ..) if matches!(*m, Mark::Sent | Mark::Received) && mark > *m => {
-                *m = mark;
-                if let Some(c) = cache.get_mut(i) {
-                    *c = None;
-                }
-            }
-            _ => {}
+/// Mark `m` on the feed by bise-proto's one rule (`lines::deliver`, G1):
+/// the rows whose mark moved are drawn again. False: no message of yours
+/// matched.
+fn deliver(events: &mut [Ev], cache: &mut [Option<EventRows>], m: &lines::Mark) -> bool {
+    let Some(moved) = lines::deliver(events, m) else { return false };
+    for i in moved {
+        if let Some(c) = cache.get_mut(i) {
+            *c = None;
         }
     }
-}
-
-pub(crate) fn mark_you(events: &mut [Ev], cache: &mut [Option<EventRows>], text: &str, mark: Mark) -> bool {
-    let plain = crate::markdown::unescape_md(text);
-    let from = events.len().saturating_sub(MARK_LOOKBACK);
-    for i in (from..events.len()).rev() {
-        if let Ev::You(t, m, ..) = &mut events[i] {
-            if words(t).eq(words(&plain)) {
-                if mark > *m {
-                    *m = mark;
-                    if let Some(c) = cache.get_mut(i) {
-                        *c = None;
-                    }
-                }
-                return true;
-            }
-        }
-    }
-    false
-}
-
-// ---- tool rows: the `▸ n commands` fold (BISE-223) and the edits fold ----
-
-/// What a fold of calls gathers: bash / TypeScript calls (`▸ 6
-/// commands`, BISE-223) or file edits (`▸ edited 4 files`, BISE-304).
-/// The two never mix: a command ends a run of edits and the reverse.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) enum FoldKind {
-    Commands,
-    Edits,
-}
-
-/// A file edit: Vibe's edit and write_file, OpenAI's apply_patch.
-pub(crate) fn is_edit(td: &ToolData) -> bool {
-    matches!(td.name.as_deref(), Some("apply_patch" | "edit" | "write_file"))
-}
-
-fn call_kind(td: &ToolData) -> Option<FoldKind> {
-    if crate::toolbox::is_boxed(td) {
-        Some(FoldKind::Commands)
-    } else if is_edit(td) {
-        Some(FoldKind::Edits)
-    } else {
-        None
-    }
-}
-
-/// The work a fold of `kind` holds: its calls, their sub-calls (the
-/// commands'), the thinking between them.
-fn in_run(ev: &Ev, kind: FoldKind) -> bool {
-    match ev {
-        Ev::Tool(td) => call_kind(td) == Some(kind),
-        Ev::Sub { .. } => kind == FoldKind::Commands,
-        Ev::Thinking { .. } => true,
-        _ => false,
-    }
-}
-
-/// The kinds of fold `ev` can sit in: a call its own, the thinking
-/// between calls either.
-fn kinds_of(ev: &Ev) -> &'static [FoldKind] {
-    match ev {
-        Ev::Tool(td) => match call_kind(td) {
-            Some(FoldKind::Commands) => &[FoldKind::Commands],
-            Some(FoldKind::Edits) => &[FoldKind::Edits],
-            None => &[],
-        },
-        Ev::Sub { .. } => &[FoldKind::Commands],
-        Ev::Thinking { .. } => &[FoldKind::Commands, FoldKind::Edits],
-        _ => &[],
-    }
-}
-
-fn is_work(ev: &Ev) -> bool {
-    !kinds_of(ev).is_empty()
-}
-
-/// The first and last event of the run of `kind` that holds `i` (the
-/// visible events only; the hidden ones are skipped).
-fn work_run(events: &[Ev], i: usize, debug: bool, kind: FoldKind) -> (usize, usize) {
-    let (mut a, mut b) = (i, i);
-    for j in (0..i).rev() {
-        let e = &events[j];
-        if !ev_visible(e, debug) {
-            continue;
-        }
-        if !in_run(e, kind) {
-            break;
-        }
-        a = j;
-    }
-    for (j, e) in events.iter().enumerate().skip(i + 1) {
-        if !ev_visible(e, debug) {
-            continue;
-        }
-        if !in_run(e, kind) {
-            break;
-        }
-        b = j;
-    }
-    (a, b)
-}
-
-/// A fold of done calls: its first call (which draws the fold row), its
-/// last one, its calls, their total time, open or not.
-pub(crate) struct ToolFold {
-    pub(crate) carrier: usize,
-    pub(crate) last: usize,
-    pub(crate) n: usize,
-    /// the done calls it folds, in order
-    pub(crate) calls: Vec<usize>,
-    pub(crate) total: std::time::Duration,
-    pub(crate) open: bool,
-}
-
-/// A done call of `kind`: ok, and for an edit, its patch known (the
-/// fold counts its files and lines).
-fn done_call(ev: &Ev, kind: FoldKind) -> Option<&ToolData> {
-    match ev {
-        Ev::Tool(td) if call_kind(td) == Some(kind) && matches!(td.state, ToolState::Ok) => {
-            (kind == FoldKind::Commands || td.code.is_some()).then_some(td)
-        }
-        _ => None,
-    }
-}
-
-/// How many done calls a run needs to fold.
-fn fold_at(kind: FoldKind) -> usize {
-    match kind {
-        FoldKind::Commands => crate::toolrow::FOLD_TOOLS,
-        FoldKind::Edits => crate::toolrow::FOLD_EDITS,
-    }
-}
-
-fn fold_of(events: &[Ev], i: usize, debug: bool, kind: FoldKind) -> Option<ToolFold> {
-    let (a, b) = work_run(events, i, debug, kind);
-    let calls: Vec<usize> =
-        (a..=b).filter(|&j| ev_visible(&events[j], debug) && done_call(&events[j], kind).is_some()).collect();
-    if calls.len() < fold_at(kind) {
-        return None;
-    }
-    let total = calls.iter().filter_map(|&j| done_call(&events[j], kind).and_then(|td| td.took)).sum();
-    let carrier = calls[0];
-    let open = done_call(&events[carrier], kind).is_some_and(|td| td.fold_open);
-    Some(ToolFold { carrier, last: *calls.last()?, n: calls.len(), calls, total, open })
-}
-
-/// The fold of the run that holds `i`, in any view, when it has
-/// [`fold_at`] done calls or more. Failed and running calls keep their
-/// own rows; nothing moves. A thinking between calls: the fold it sits
-/// inside, if any.
-pub(crate) fn tool_fold(events: &[Ev], i: usize, debug: bool) -> Option<ToolFold> {
-    let kinds = kinds_of(events.get(i)?);
-    if let [kind] = kinds {
-        return fold_of(events, i, debug, *kind);
-    }
-    kinds
-        .iter()
-        .filter_map(|&k| fold_of(events, i, debug, k))
-        .find(|f| (f.carrier..=f.last).contains(&i))
-}
-
-/// The patches of a fold's edits, decoded, in order.
-fn fold_patches(events: &[Ev], f: &ToolFold) -> Vec<String> {
-    f.calls
-        .iter()
-        .filter_map(|&j| match &events[j] {
-            Ev::Tool(td) => td.code.as_deref().map(|raw| crate::code::tool_source(crate::code::CodeLang::Patch, wire_decode(raw))),
-            _ => None,
-        })
-        .collect()
-}
-
-/// Hidden by a closed fold: a done call after its first, or the
-/// thinking between its calls.
-fn folded_away(events: &[Ev], i: usize, debug: bool) -> bool {
-    let ev = &events[i];
-    let done = kinds_of(ev).iter().any(|&k| done_call(ev, k).is_some());
-    if !done && !matches!(ev, Ev::Thinking { .. }) {
-        return false;
-    }
-    tool_fold(events, i, debug).is_some_and(|f| !f.open && i > f.carrier && i <= f.last)
-}
-
-/// Open or close the fold whose first call is `i`.
-fn toggle_tool_fold(events: &mut [Ev], cache: &mut [Option<EventRows>], i: usize) -> bool {
-    if let Some(Ev::Tool(td)) = events.get_mut(i) {
-        td.fold_open = !td.fold_open;
-    }
-    forget_work_run(events, cache, i);
     true
 }
 
-/// The rows of a run of work depend on each other (the fold): a change
-/// to one call rebuilds them all.
-fn forget_work_run(events: &[Ev], cache: &mut [Option<EventRows>], i: usize) {
-    for &kind in kinds_of(&events[i]) {
-        let (a, b) = work_run(events, i, false, kind);
-        forget(cache, a..=b);
+/// Your messages and the turns in the feed, as bise-proto's rule reads
+/// them.
+impl lines::Delivered for Ev {
+    fn yours(&self) -> Option<(&str, Mark)> {
+        match self {
+            Ev::You(t, m, ..) => Some((t.as_str(), *m)),
+            _ => None,
+        }
+    }
+
+    fn set_mark(&mut self, to: Mark) {
+        if let Ev::You(_, m, ..) = self {
+            *m = to;
+        }
+    }
+
+    fn msg_id(&self) -> Option<u64> {
+        match self {
+            Ev::You(_, _, _, id) => *id,
+            _ => None,
+        }
+    }
+
+    fn turn_start(&self) -> bool {
+        matches!(self, Ev::Turn)
     }
 }
+
+// ---- tool rows: the `▸ n commands` fold (BISE-223) and the edits fold ----
+// (feed_folds.rs, moved whole: rule 5)
+#[path = "feed_folds.rs"]
+mod folds;
+use folds::*;
+pub(crate) use folds::{is_edit, tool_fold};

@@ -4,11 +4,13 @@ nothing is lost.
 A real hub (bise sbd) on the fake provider, with a grace of 4 s
 (BISE_IDLE_EXIT) and a REPL hub watch of 3 s (BEND_HUB_GONE_MS):
 - a UI back within the grace: the hub stays;
-- the last UI leaves while t1 is mid-turn: the hub waits for the turn,
-  then stops, and every REPL with it (checkpointed: "REPLs saved");
-- the next start: main and t1 are back with their feeds, and answer;
-- a background job of t1 (BEND_BG_AFTER 2 s): the hub waits for it,
-  the job ends on its own (its .rc), then the hub stops;
+- the last UI leaves while t1 is mid-turn, with a background job
+  (BEND_BG_AFTER 2 s) and an `sb every`: the hub stops at the grace all
+  the same (quit-stop, #817), names the cut in hub.log, and every REPL
+  and the job go with it;
+- the next start: main and t1 are back with their feeds, main's thread
+  says what stopped, t1's turn resumes, t1 is told its job was stopped,
+  the standing order is still there, and t1 answers;
 - a hub killed -9 leaves its REPLs: they exit by themselves (no hub for
   the watch's 10 looks), and the next hub brings the agents back.
 
@@ -19,13 +21,19 @@ import signal
 import socket
 import subprocess
 import sys
+import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import e2e  # noqa: E402
 import wait  # noqa: E402
 from e2e import EXE, check  # noqa: E402
 
-GRACE = 4
+# IDLE_E2E_GRACE=120: the same run at the real grace (quit-stop's check)
+GRACE = int(os.environ.get("IDLE_E2E_GRACE", "4"))
+# the cut turn and job outlive the grace: at the real grace the turn's
+# provider wait is raised past its 90 s default (BEND_CONFIG)
+LONG_TURN = max(60, GRACE * 2 + 60)
+LONG_JOB = max(120, GRACE * 3)
 
 
 def repls(state):
@@ -68,6 +76,11 @@ def main():
     E.env["BISE_IDLE_EXIT"] = str(GRACE)
     E.env["BEND_HUB_GONE_MS"] = "3000"
     E.env["BEND_BG_AFTER"] = "2"
+    if LONG_TURN > 80:
+        cfg = os.path.join(E.tmp, "config.toml")
+        with open(cfg, "w") as f:
+            f.write("[providers.mistral]\nidle_timeout_sec = %d\n" % (LONG_TURN * 2))
+        E.env["BEND_CONFIG"] = cfg
     ok = True
     try:
         c = E.start_hub()
@@ -86,46 +99,51 @@ def main():
         # past the grace: still up
         wait.holds(lambda: E.hub.poll() is None, GRACE + 2, "a UI back within the grace: the hub stays")
 
-        # the last UI leaves while t1 is mid-turn: the hub waits for it
-        c.say("[[slow: 12]] long turn", focus="t1")
+        # quit-stop (#817): the last UI leaves while t1 is mid-turn, has a
+        # background job and a standing order: the hub stops at the grace
+        # all the same, and says what it cut
+        bg = os.path.join(E.state, "agents", "t1", "tmp", "bg")
+        c.say('[[bash: sb every 10m "poll the build"]]', focus="t1")
+        c.wait_idle("t1")
+        c.say("[[bash: sleep %d; echo bg-done]]" % LONG_JOB, focus="t1")
+        c.wait(lambda: os.path.isdir(bg) and any(f.endswith(".slot") for f in os.listdir(bg)), 30, "t1's job in the background")
+        c.wait_idle("t1")
+        c.say("[[slow: %d]] long turn" % LONG_TURN, focus="t1")
         c.wait_status("t1", "working", 30)
         leave(c)
-        wait.until(lambda: "the hub waits for: t1 mid-turn" in log(E), GRACE + 10, "the hub waiting for t1's turn")
-        check(E.hub.poll() is None, "no stop mid-turn")
-        wait.until(lambda: stopped(E), 60, "the hub stopped after t1's turn")
+        t_left = time.time()
+        wait.until(lambda: stopped(E), GRACE + 20, "the hub stopped at the grace, mid-turn")
+        print("the hub stopped %.0f s after the last UI left (grace %d s)" % (time.time() - t_left, GRACE), flush=True)
         L = log(E)
-        check("nothing runs: the hub stops" in L, "the stop says why")
-        check("REPLs saved and gone: 2 of 2" in L, "both REPLs checkpointed and exited: %s" % L[-600:])
-        wait.until(lambda: not repls(E.state), 15, "no process of the hub left")
+        check("the hub waits for" not in L.split("idle exit: no UI left")[-1], "nothing of the agents held it")
+        check("cut: t1 mid-turn, t1's background job" in L and "a standing order (sb every)" in L, "the stop names the cut: %s" % L[-800:])
+        check("REPLs saved and gone" in L, "the REPLs went: %s" % L[-600:])
+        check(not any(f.endswith(".rc") for f in os.listdir(bg)), "the job was cut, not run to its end")
+        wait.until(lambda: not repls(E.state), 15, "no process of the hub left (the job's included)")
         E.hub = None
 
-        # the next start: everything is back
+        # the next start: everything is back, the turn resumes, the job's
+        # agent is told it was stopped, the standing order is still there
         c = E.start_hub()
         c.wait(lambda: c.state is not None, 30, "state")
         check([a["name"] for a in c.state["agents"]] == ["main", "t1"], "main and t1 are back")
         c.wait(lambda: any("first-turn" in l for l in c.lines("t1")), 30, "t1's feed is back")
-        c.wait_idle("main", "t1")
+        c.wait(lambda: any("that stopped t1 mid-turn" in l for l in c.lines("main")), 30, "main's line says what stopped")
+        c.wait(lambda: any("its turn was interrupted by a restart" in l for l in c.lines("t1")), 60, "t1's turn resumes")
+        c.wait(lambda: any("was stopped · no rc" in l for l in c.lines("t1")), 60, "t1 told its job was stopped")
+        c.wait_idle("main", "t1", timeout=90)
+        c.say("[[bash: sb every]]", focus="t1")
+        c.wait_line("t1", "poll the build", 60)
         c.say("after the stop", focus="t1")
         c.wait_line("t1", "ack: after the stop", 60)
-        check("its turn was interrupted" not in "\n".join(c.lines("t1")[-5:]), "no turn resumed by mistake")
 
-        # a background job holds the hub; it ends on its own, then the stop
-        bg = os.path.join(E.state, "agents", "t1", "tmp", "bg")
-        c.say("[[bash: sleep 10; echo bg-done]]", focus="t1")
-        c.wait(lambda: os.path.isdir(bg) and any(f.endswith(".slot") for f in os.listdir(bg)), 30, "t1's job in the background")
-        c.wait_idle("t1")
-        leave(c)
-        wait.until(lambda: "t1's background job" in log(E), GRACE + 10, "the hub waiting for t1's job")
-        wait.until(lambda: stopped(E), 60, "the hub stopped after the job")
-        check(any(f.endswith(".rc") for f in os.listdir(bg)), "the job ran to its end (its .rc)")
-        wait.until(lambda: not repls(E.state), 15, "no process of the hub left")
-        E.hub = None
-
-        # a hub killed -9: its REPLs see no hub and exit by themselves
-        E.env["BISE_IDLE_EXIT"] = "off"
-        c = E.start_hub()
+        # a hub killed -9 (the one up since the stop above): its REPLs see
+        # no hub and exit by themselves
         c.wait_idle("main", "t1", timeout=60)
-        check(len(repls(E.state)) >= 2, "the REPLs run")
+        # waited for: main and t1 read idle from the replayed journal at
+        # once, before their REPL processes are up (red under load: 'the
+        # REPLs run' read once right after the boot)
+        wait.until(lambda: len(repls(E.state)) >= 2, 60, lambda: "the REPLs run: %s" % repls(E.state))
         os.kill(E.hub.pid, signal.SIGKILL)
         E.hub.wait()
         E.hub = None
@@ -133,6 +151,7 @@ def main():
         # the dead hub's socket file stays (a `bise` finds it refused and
         # starts a hub, which replaces it); start_hub waits for the file
         os.remove(os.path.join(E.state, "hub.sock"))
+        E.env["BISE_IDLE_EXIT"] = "off"
         c = E.start_hub()
         c.wait(lambda: c.state is not None, 30, "state")
         c.wait_idle("main", "t1", timeout=60)

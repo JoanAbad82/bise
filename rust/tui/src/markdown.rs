@@ -325,21 +325,16 @@ pub(crate) fn md_lines(text: &str, prose: usize, wide: usize) -> Vec<Line<'stati
             .find(|(i, c)| *i > 0 && *c == '.' && t[i + 1..].starts_with(' '));
         if let Some((i, _)) = dot {
             if t[..i].chars().all(|c| c.is_ascii_digit()) {
-                out.push(Line::from_iter(
-                    std::iter::once(Span::styled(
-                        format!("  {} ", &t[..i + 1]),
-                        Style::default().fg(theme::dim()),
-                    ))
-                    .chain(inline_spans(t[i + 1..].trim_start(), base)),
-                ));
+                let mark = Span::styled(format!("  {} ", &t[..i + 1]), Style::default().fg(theme::dim()));
+                done.extend(out.drain(..).flat_map(|l| wrap_line(l, prose)));
+                done.extend(list_item(mark, inline_spans(t[i + 1..].trim_start(), base), prose));
                 continue;
             }
         }
         if indent == 0 && (t.starts_with("- ") || t.starts_with("* ")) {
-            out.push(Line::from_iter(
-                std::iter::once(Span::styled("  - ", Style::default().fg(theme::accent())))
-                    .chain(inline_spans(&t[2..], base)),
-            ));
+            let mark = Span::styled("  - ", Style::default().fg(theme::accent()));
+            done.extend(out.drain(..).flat_map(|l| wrap_line(l, prose)));
+            done.extend(list_item(mark, inline_spans(&t[2..], base), prose));
             continue;
         }
         if indent == 0 && t.starts_with("> ") {
@@ -357,6 +352,15 @@ pub(crate) fn md_lines(text: &str, prose: usize, wide: usize) -> Vec<Line<'stati
         done.extend(crate::codeblock::lines(&tag, &hl, code.join("\n"), boxed));
     }
     done
+}
+
+/// A list item's rows (designer m_41685): its mark, then its text wrapped
+/// to `width`; the wrapped rows hang under the text, never back at the
+/// mark's column.
+fn list_item(mark: Span<'static>, text: Vec<Span<'static>>, width: usize) -> Vec<Line<'static>> {
+    use unicode_width::UnicodeWidthStr;
+    let pad = Span::raw(" ".repeat(mark.content.width()));
+    crate::render::hung_rows(&mark, &pad, [Line::from(text)], width)
 }
 
 // ---- GFM tables (BISE-87) ----

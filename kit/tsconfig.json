@@ -1,0 +1,17 @@
+{
+  "//": "The kit's browser scripts (served raw by the hub's page server under /kit/): classic scripts, each an IIFE, emitted next to their .ts by scripts/ts_emit.ts and committed (cargo and the release never run node). globals.d.ts types what they share on window. alwaysStrict off: each script says \"use strict\" inside its IIFE, the emit adds no prologue of its own. typescript is office/sdk's.",
+  "compilerOptions": {
+    "target": "ESNext",
+    "module": "ESNext",
+    "moduleDetection": "legacy",
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "types": [],
+    "strict": true,
+    "alwaysStrict": false,
+    "erasableSyntaxOnly": true,
+    "noEmit": true,
+    "skipLibCheck": true
+  },
+  "include": ["*.ts"],
+  "exclude": ["*.check.ts", "check.ts"]
+}

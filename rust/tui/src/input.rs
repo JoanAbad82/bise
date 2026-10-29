@@ -2,6 +2,7 @@
 //! the composer editor keys, voice keys, and the feed selection copy.
 
 use crate::*;
+use bise_proto::words::composer;
 use crossterm::event::{KeyCode, KeyEventKind, KeyModifiers, MouseButton, MouseEventKind};
 use ratatui::text::Line;
 use unicode_width::UnicodeWidthStr;
@@ -192,7 +193,7 @@ pub(crate) fn toggle_voice(app: &mut App, job: impl FnOnce() -> Result<voice::Vo
     match job() {
         Ok(j) => {
             app.voice.enabled = true;
-            Some(saved(voice::save_voice_enabled(true), format!("{}{}", voice::ENABLED_MESSAGE, j.name)))
+            Some(saved(voice::save_voice_enabled(true), composer::voice_enabled(&j.name)))
         }
         Err(_) => {
             open_voice_setup(app, true);
@@ -204,7 +205,7 @@ pub(crate) fn toggle_voice(app: &mut App, job: impl FnOnce() -> Result<voice::Vo
 fn saved(r: Result<(), String>, line: String) -> Ev {
     match r {
         Ok(()) => Ev::Info(line),
-        Err(e) => Ev::Warn(format!("{} (not saved: {})", line, e)),
+        Err(e) => Ev::Warn(composer::not_saved(line, e)),
     }
 }
 
@@ -224,10 +225,10 @@ pub(crate) fn voice_out(app: &mut App, out: crate::onboarding::VoiceOut) {
     match out {
         crate::onboarding::VoiceOut::On(m) => {
             app.voice.enabled = true;
-            let head = format!("voice is on: {}.", m);
+            let head = composer::voice_on(m);
             let ev = match voice::save_voice_enabled(true) {
                 Ok(()) => Ev::Said { glyph: "✓", head, dim: vec![voice::ON_HOW.into()] },
-                Err(e) => Ev::Warn(format!("{} (not saved: {})", head, e)),
+                Err(e) => Ev::Warn(composer::not_saved(head, e)),
             };
             push_event(&mut app.events, &mut app.cache, ev);
         }
@@ -317,14 +318,23 @@ pub(crate) fn on_mouse(app: &mut App, m: &crossterm::event::MouseEvent, term_h: 
             app.quote_hint = false;
         }
         textlayer::Out::Copy(t) => copy_text(app, &t),
-        textlayer::Out::Open(url) => {
-            let note = textlayer::open(app, &url);
-            flash(app, note);
-        }
+        textlayer::Out::Open(url) => open_link(app, &url, m.modifiers.contains(crossterm::event::KeyModifiers::ALT)),
         textlayer::Out::Click(press) => {
             on_screen_mouse(app, &press, term_h);
             on_screen_mouse(app, m, term_h);
         }
+    }
+}
+
+/// A click on a link: an attachment's chip previews its file, ⌥ held
+/// shows it in Finder (open_file.rs); any other opens (textlayer::open).
+fn open_link(app: &mut App, url: &str, alt: bool) {
+    let note = match crate::open_file::path_of_url(url) {
+        Some(path) => crate::open_file::on_chip(path, alt),
+        None => textlayer::open(app, url),
+    };
+    if !note.is_empty() {
+        flash(app, note);
     }
 }
 
@@ -349,6 +359,9 @@ fn on_screen_mouse(app: &mut App, m: &crossterm::event::MouseEvent, term_h: u16)
         return;
     }
     if crate::scheduled_screen::mouse(app, m) {
+        return;
+    }
+    if crate::plugins::mouse(app, m) {
         return;
     }
     if crate::diffview::mouse(app, m) {
@@ -512,9 +525,9 @@ fn on_screen_mouse(app: &mut App, m: &crossterm::event::MouseEvent, term_h: u16)
             // the terminal's own (Ghostty keeps the release)
             let Some((i, row, col)) = app.feed_sel.take().map(|s| s.anchor) else { return };
             if let Some(url) = feed_link_at(app, i, row, col) {
-                // a local file opens in your editor (BISE-264)
-                let note = textlayer::open(app, &url);
-                flash(app, note);
+                // a local file opens in your editor (BISE-264), an
+                // attachment's chip in its preview (⌥: Finder)
+                open_link(app, &url, m.modifiers.contains(crossterm::event::KeyModifiers::ALT));
                 return;
             }
             crate::feed::toggle_at(&mut app.events, &mut app.cache, i, row);
@@ -548,6 +561,10 @@ pub(crate) fn on_paste(app: &mut App, text: &str) {
     // normalize CRLF/CR so a terminal paste behaves like the
     // typed newline, then insert at the cursor
     let text = text.replace("\r\n", "\n").replace('\r', "\n");
+    if link_over_selection(app, &text) {
+        app.popup_sel = 0;
+        return;
+    }
     // a paste that is only image paths (a file dragged into the
     // terminal, iTerm2's "Save to Temp File and Paste Path" on an image)
     // attaches the images; an empty or blank paste (Cmd+V on an image in
@@ -559,12 +576,12 @@ pub(crate) fn on_paste(app: &mut App, text: &str) {
     let attached = if text.trim().is_empty() {
         Some(crate::attach::attach_clipboard(app).map(|l| vec![l]))
     } else {
-        crate::attach::on_paste(app, &text)
+        crate::attach_file::on_paste(app, &text)
     };
     match attached {
-        Some(Ok(labels)) => flash(app, format!("attached {}", labels.join(" "))),
+        Some(Ok(labels)) => flash(app, composer::attached(labels.join(" "))),
         Some(Err(e)) if !text.trim().is_empty() => {
-            flash(app, format!("image not attached: {e}"));
+            flash(app, composer::image_not_attached(e));
             app.ed.paste(&text);
         }
         Some(Err(_)) => {}
@@ -572,11 +589,26 @@ pub(crate) fn on_paste(app: &mut App, text: &str) {
         // (BISE-240, pasted.rs)
         None if crate::pasted::is_long(&text) => {
             let chip = crate::pasted::add(app, &text);
-            flash(app, format!("attached {chip}"));
+            flash(app, composer::attached(chip));
         }
         None => app.ed.paste(&text),
     }
     app.popup_sel = 0;
+}
+
+/// A URL pasted over selected words: `[words](url)`, the cursor after
+/// it, one undo step that gives the selection back (paste_link.rs).
+/// False: a chip in the selection, or not one URL over words.
+fn link_over_selection(app: &mut App, text: &str) -> bool {
+    let Some((a, b)) = app.ed.selection() else { return false };
+    let Some(selected) = app.ed.selected_text() else { return false };
+    if crate::attach::chips(&app.ed.text).iter().any(|&(s, e, _)| s < b && a < e) {
+        return false;
+    }
+    let Some(link) = crate::paste_link::link_paste(&selected, text) else { return false };
+    app.ed.paste(&link.text);
+    app.ed.cursor = a + link.caret;
+    true
 }
 
 /// A newline in the composer (BISE-276, mdlive.rs): it continues or
@@ -631,7 +663,16 @@ pub(crate) fn on_key(app: &mut App, k: &crossterm::event::KeyEvent) -> bool {
     if crate::artifacts_screen::on_key(app, k) {
         return false;
     }
-    if crate::scheduled_screen::on_key(app, k) {
+    if crate::scheduled_screen::on_key(app, k) || crate::inbox_screen::on_key(app, k) {
+        return false;
+    }
+    if crate::plugins::on_key(app, k) {
+        return false;
+    }
+    if crate::usage_screen::on_key(app, k) {
+        return false;
+    }
+    if crate::running_screen::on_key(app, k) {
         return false;
     }
     if crate::computer_use::on_key(app, k) {
@@ -681,6 +722,11 @@ pub(crate) fn on_key(app: &mut App, k: &crossterm::event::KeyEvent) -> bool {
     let matches = popup_items(app);
     let popup_open = !matches.is_empty();
     let sel = matches.get(app.popup_sel.min(matches.len().saturating_sub(1)));
+    // the queue drawer (designer m_25146): ↑ in an empty composer moves
+    // into it; there it has the keys (sb/queued.rs)
+    if !popup_open && crate::sb::queued::key(app, k) {
+        return false;
+    }
     if sb::key(app, k, popup_open) {
         return false;
     }
@@ -763,10 +809,10 @@ pub(crate) fn on_key(app: &mut App, k: &crossterm::event::KeyEvent) -> bool {
                 apply_md(app, e);
                 app.key_in_composer = true;
             } else if app.pending {
-                // BISE-89 (after Codex): the draft waits in the TUI for
-                // the end of the turn, shown above the composer; nothing
-                // goes to the hub before
-                crate::queue::push(app);
+                // BISE-89 (after Codex): the draft waits for the end of
+                // the turn, held by the hub (issue 23: sb/queued.rs),
+                // shown above the composer
+                crate::sb::queued::queue(app);
             }
         }
         // a newline in the composer: Shift+Enter (needs
@@ -778,7 +824,7 @@ pub(crate) fn on_key(app: &mut App, k: &crossterm::event::KeyEvent) -> bool {
         // (Ghostty `keybind = performable:super+v=paste_from_clipboard`
         // passes it through on an image-only clipboard)
         (KeyCode::Char('v'), KeyModifiers::CONTROL) | (KeyCode::Char('v'), KeyModifiers::SUPER) => match crate::attach::attach_clipboard(app) {
-            Ok(l) => flash(app, format!("attached {l}")),
+            Ok(l) => flash(app, composer::attached(l)),
             Err(e) => flash(app, e),
         },
         (KeyCode::Enter, KeyModifiers::SHIFT)
@@ -816,7 +862,15 @@ pub(crate) fn on_key(app: &mut App, k: &crossterm::event::KeyEvent) -> bool {
                 app.follow = true;
             } else {
                 let v = app.ed.take().trim().to_string();
-                let v = if v.starts_with('/') { v } else { crate::attach::expand(app, &v) };
+                // msg-parts: his chips as typed parts, sent with the line
+                let v = match v.starts_with('/') {
+                    true => v,
+                    false => {
+                        let said = crate::attach::expand(app, &v);
+                        app.sb.parts_out = said.parts;
+                        said.text
+                    }
+                };
                 app.follow = true;
                 app.unseen = 0;
                 if !v.is_empty() {
@@ -837,12 +891,6 @@ pub(crate) fn on_key(app: &mut App, k: &crossterm::event::KeyEvent) -> bool {
                     handle_input(app, &line);
                 }
             }
-        }
-        // BISE-89: ↑ in an empty composer edits the newest queued
-        // message (the history comes after the queue)
-        (KeyCode::Up, KeyModifiers::NONE) if !popup_open && app.ed.text.is_empty() && !app.queued.is_empty() => {
-            crate::queue::pop_last(app);
-            app.key_in_composer = true;
         }
         // the popup takes the plain arrows
         (KeyCode::Up | KeyCode::Down, KeyModifiers::NONE) if popup_open => {
@@ -915,15 +963,12 @@ fn pick(app: &mut App, c: &PopItem) {
     }
     if let Some(p) = c.path.as_ref().filter(|_| !c.folder) {
         files::picked(p);
-        // an image is attached, not inserted as a path
-        match crate::attach::pick_image(app, p) {
-            Some(Ok(l)) => {
-                flash(app, format!("attached {l} {}", crate::attach::file_name(p)));
-                app.popup_sel = 0;
-                return;
-            }
-            Some(Err(e)) => flash(app, format!("image not attached: {e}")),
-            None => {}
+        // a file is attached as a chip at the `@`, never inserted as a
+        // path (at-chips: parts::chip_kind, code too)
+        if let Some(l) = crate::attach_file::pick(app, p) {
+            flash(app, composer::attached(format!("{l} {}", crate::attach::file_name(p))));
+            app.popup_sel = 0;
+            return;
         }
     }
     app.ed.set(&c.fill, c.fill_cursor);
@@ -931,48 +976,5 @@ fn pick(app: &mut App, c: &PopItem) {
 }
 
 #[cfg(test)]
-mod keys_tests {
-    use super::*;
-    use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
-
-    fn thinking(open: bool) -> Ev {
-        Ev::Thinking { ms: 10, text: "hm".into(), open }
-    }
-
-    fn report(open: bool) -> Ev {
-        let text = "[report: done] p95 at 180 ms.\n- ran 3 times";
-        Ev::AgentMsg { from: "bench".into(), to: String::new(), text: text.into(), level: 3, id: "m_3".into(), open, fold: false }
-    }
-
-    fn opens(app: &App) -> Vec<bool> {
-        app.events
-            .iter()
-            .map(|e| match e {
-                Ev::Thinking { open, .. } | Ev::AgentMsg { open, .. } => *open,
-                _ => true,
-            })
-            .collect()
-    }
-
-    fn press(app: &mut App, code: KeyCode, m: KeyModifiers) {
-        on_key(app, &KeyEvent::new(code, m));
-    }
-
-    /// ctrl+o (book §16): one state for everything folded. Anything
-    /// closed: all open; again: all closed; new thinking follows.
-    #[test]
-    fn ctrl_o_opens_then_closes_everything_folded() {
-        let mut app = crate::sb::bench::test_app();
-        app.events = vec![thinking(true), report(false), Ev::Info("x".into()), thinking(false)];
-        app.cache = (0..4).map(|_| None).collect();
-        press(&mut app, KeyCode::Char('o'), KeyModifiers::CONTROL);
-        assert_eq!(opens(&app), vec![true, true, true, true]);
-        assert!(app.show_thinking);
-        press(&mut app, KeyCode::Char('o'), KeyModifiers::CONTROL);
-        assert_eq!(opens(&app), vec![false, false, true, false]);
-        assert!(!app.show_thinking);
-        // ctrl+t is gone (no alias): nothing changes
-        press(&mut app, KeyCode::Char('t'), KeyModifiers::CONTROL);
-        assert_eq!(opens(&app), vec![false, false, true, false]);
-    }
-}
+#[path = "input_keys_tests.rs"]
+mod keys_tests;

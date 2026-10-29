@@ -173,8 +173,7 @@ type RRes is Data:
 # the one --resume (runtime/main-pure.bend replay) and the session
 # migration recognise as a summary.
 def summary_message(+summary: String) -> T.Msg:
-  T.injected_user(String.append(
-    "Summary of the earlier conversation:\n<summary>", String.append(summary,
+  T.injected_user(String.append(H.SUMMARY_PREFIX(), String.append(summary,
       "</summary>\nThe conversation was compacted: this summary replaces it. The user messages after this one, if any, are the user's most recent ones, kept verbatim for their exact wording; older ones are only in the summary. They were sent before the summary was written: it already says what was done about each, so continue the work from where it stops and do not redo what it reports as done.")))
 
 # 1. the current system message (projected, not stored in canonical history)

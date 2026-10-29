@@ -23,9 +23,12 @@ so its first run asks almost nothing. Work in the user's shell, step by step.
   can't do it for them (`--no-browser` prints the link). OpenRouter can
   sign in too (`bise login openrouter`), and the GLM, Kimi and MiniMax
   coding plans are keys (`bise login zai-coding`, `kimi-code`,
-  `minimax`). A Claude Pro/Max login can't be used (Anthropic's terms:
-  bise needs an Anthropic API key); Copilot and SuperGrok are not
-  supported. bise.dev/docs/subscriptions says more.
+  `minimax`). A Claude plan's login can't be used (Anthropic's terms),
+  but Max and Team include monthly API credits (Max 5x $100, Max 20x
+  $200, Team up to $500; Pro none): the user links a Console org on
+  claude.ai (Settings > Billing > API credits > Link organization),
+  makes a key there and pastes it in `bise login anthropic`. Copilot and
+  SuperGrok are not supported. bise.dev/docs/subscriptions says more.
 
 ## 1. Install
 

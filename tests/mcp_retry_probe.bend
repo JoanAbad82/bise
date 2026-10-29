@@ -1,5 +1,6 @@
 # tests/mcp_retry.py's probe: one MCP tool call through runtime/mcp.bend's
-# mcp_call ($PROBE_TOOL with $PROBE_ARGS, the index at $BEND_MCP_INDEX),
+# mcp_call ($PROBE_TOOL with $PROBE_ARGS, the index where the session's
+# plugins bridge writes it: $BEND_RUN_DIR/$BEND_REPL_PORT/plugins/mcp-index.txt),
 # then prints "ok" or "err" on the first line and the answer after it.
 import Base
 import ../bend/runtime/mcp.bend as Mcp

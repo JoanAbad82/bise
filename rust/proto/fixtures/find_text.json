@@ -1,0 +1,30 @@
+[
+  {
+    "name": "an answer: its text",
+    "entry": {"pos": 10, "at_ms": 1, "kind": "agent", "text": "The deploy went through.\nNumbers below."},
+    "text": "The deploy went through.\nNumbers below."
+  },
+  {
+    "name": "his message: its text",
+    "entry": {"pos": 11, "at_ms": 2, "kind": "you", "text": "ship it"},
+    "text": "ship it"
+  },
+  {
+    "name": "tools: the text, then each tool's text, never its output",
+    "entry": {"pos": 12, "at_ms": 3, "kind": "tools", "text": "", "tools": {"count": 2, "summary": "ran 2 commands", "items": [
+      {"pos": 12, "at_ms": 3, "name": "bash", "text": "running the deploy", "kind": "run", "out": "never searched"},
+      {"pos": 13, "at_ms": 4, "name": "read_file", "text": "read_file: src/main.rs", "kind": "read"}
+    ]}},
+    "text": "\nrunning the deploy\nread_file: src/main.rs"
+  },
+  {
+    "name": "a card: its text, its question, each option's label",
+    "entry": {"pos": 14, "at_ms": 5, "kind": "card", "text": "ask", "card": {"id": 3, "question": "Deploy now?", "options": [{"n": 1, "label": "yes"}, {"n": 2, "label": "wait for the gate"}], "answered": false}},
+    "text": "ask\nDeploy now?\nyes\nwait for the gate"
+  },
+  {
+    "name": "a page: its text, then its title",
+    "entry": {"pos": 15, "at_ms": 6, "kind": "page", "text": "published", "page": {"id": "plan", "title": "Deploy plan", "url": "http://x/p/plan"}},
+    "text": "published\nDeploy plan"
+  }
+]

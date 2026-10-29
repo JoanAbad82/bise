@@ -1,0 +1,18 @@
+{
+  "//": "The harness's two files Electron loads itself (pageapp/main.js, coverage/hook.js): CommonJS scripts, emitted from their .ts by scripts/ts_emit.ts and committed (Electron's node doesn't strip types)",
+  "compilerOptions": {
+    "target": "ES2023",
+    "module": "CommonJS",
+    "moduleResolution": "node10",
+    "moduleDetection": "auto",
+    "lib": ["ES2023"],
+    "types": ["node"],
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noEmit": true,
+    "skipLibCheck": true
+  },
+  "files": ["pageapp/main.ts", "coverage/hook.ts"]
+}

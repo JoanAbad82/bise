@@ -4,7 +4,10 @@
 //! repo must not pick the repo's REPL.
 //!
 //! In order:
-//!   1. `BISE_APP_ROOT` (run.sh, a hub started by a TUI, a version switch);
+//!   1. `BISE_APP_ROOT` (run.sh, a hub started by a TUI, a version switch;
+//!      a version's `bise.app/Contents/MacOS` counts as the version dir:
+//!      what a TUI of before the bundle layout hands over when it follows
+//!      a bundle hub, v2026.10.2-30's);
 //!   2. the executable's folder when it holds `VERSION` (a version dir, an
 //!      installed bundle);
 //!   3. dev only: a source tree (it holds `rust/Cargo.toml` and the REPL):
@@ -75,14 +78,18 @@ pub(crate) fn find(
     has: &dyn Fn(&Path, &str) -> bool,
 ) -> Result<(PathBuf, Via), String> {
     if let Some(r) = &inp.env_root {
-        let r = std::path::absolute(r).unwrap_or_else(|_| r.clone());
+        // a version's bundle folder counts as the version dir: an older
+        // TUI (before bise_home::exe_home_dir) that follows a bundle
+        // hub's exe hands over <root>/bise.app/Contents/MacOS
+        let r = bise_home::exe_home_dir(&std::path::absolute(r).unwrap_or_else(|_| r.clone()));
         return if has(&r, repl) {
             Ok((r, Via::Env))
         } else {
             Err(format!("{}={} has no {}", ENV, r.display(), repl))
         };
     }
-    let exe_dir = inp.exe.as_ref().and_then(|e| e.parent()).map(Path::to_path_buf);
+    // a version's bundle (<root>/bise.app/Contents/MacOS) counts as <root>
+    let exe_dir = inp.exe.as_ref().and_then(|e| e.parent()).map(bise_home::exe_home_dir);
     if let Some(d) = &exe_dir {
         if has(d, "VERSION") {
             return if has(d, repl) {
@@ -102,12 +109,42 @@ pub(crate) fn find(
             return Ok((d, Via::DevTree));
         }
     }
-    Err(format!(
+    Err(missing_words(exe_dir.as_deref(), repl))
+}
+
+/// Why there is no app root, in the words its reader can act on: inside
+/// a `.app` (the desktop app's bise, `Contents/Resources/bin`), the app's
+/// own runtime is missing and reinstalling it is the fix (no variable to
+/// set: an app gets none); else how a developer points at one. The
+/// window draws these words as they are (CoreEv::Broken).
+pub(crate) fn missing_words(exe_dir: Option<&Path>, repl: &str) -> String {
+    let dir = exe_dir.map(|d| d.display().to_string()).unwrap_or_else(|| "unknown".into());
+    if dir.contains(".app/Contents/") {
+        return format!("bise's runtime is missing: no {} in {}. reinstall bise", repl, dir);
+    }
+    format!(
         "{} not found: no VERSION next to the executable ({}); set {} to the folder that holds it, or build it in the repo with ./run.sh",
-        repl,
-        exe_dir.map(|d| d.display().to_string()).unwrap_or_else(|| "unknown".into()),
-        ENV
-    ))
+        repl, dir, ENV
+    )
+}
+
+/// The V8 engine the runtime runs `run_typescript` with, handed to the
+/// REPLs as BEND_JSRT_BIN: `bend-jsrt` in the app root (a version dir, a
+/// bundle), else the dev tree's debug build (./run.sh builds it), else its
+/// release build; else the test setting BEND_JSRT_BIN (a test's tree has
+/// none built). Never an engine of another version when the root has one.
+pub(crate) fn jsrt_bin(root: &std::path::Path) -> Option<std::path::PathBuf> {
+    let found = [
+        "bend-jsrt",
+        "rust/jsrt/target/debug/bend-jsrt",
+        "rust/jsrt/target/release/bend-jsrt",
+    ]
+    .iter()
+    .map(|rel| root.join(rel))
+    .find(|p| p.exists());
+    found
+        .map(|p| std::path::absolute(&p).unwrap_or(p))
+        .or_else(|| bise_home::env::test_setting("BEND_JSRT_BIN").map(std::path::PathBuf::from))
 }
 
 /// `find` on the real environment and file system.
@@ -152,6 +189,26 @@ mod tests {
     }
 
     #[test]
+    fn an_env_root_in_a_version_bundle_is_the_version_dir() {
+        // v2026.10.2-30's TUI follows a bundle hub's exe and sets
+        // BISE_APP_ROOT to the exe's folder (its of_exe knows no bundle)
+        let d = std::env::temp_dir().join(format!("approot-bundle-{}", std::process::id()));
+        let v = d.join("v1");
+        let macos = v.join("bise.app/Contents/MacOS");
+        std::fs::create_dir_all(&macos).unwrap();
+        std::fs::write(v.join("VERSION"), "id=v1\n").unwrap();
+        std::fs::write(v.join("repl-live"), "").unwrap();
+        let real = |d: &Path, f: &str| d.join(f).exists();
+        let got = find(&inp(Some(macos.to_str().unwrap()), "/elsewhere/bise", None), "repl-live", &real);
+        assert_eq!(got, Ok((v.clone(), Via::Env)));
+        // any other folder without the REPL stays an error
+        let other = v.join("bise.app/Contents");
+        let err = find(&inp(Some(other.to_str().unwrap()), "/elsewhere/bise", None), "repl-live", &real).unwrap_err();
+        assert!(err.contains("has no repl-live"), "{err}");
+        let _ = std::fs::remove_dir_all(&d);
+    }
+
+    #[test]
     fn a_version_dir_is_its_own_root() {
         let has = fs(&["/v/VERSION", "/v/repl-live", "/v/repl-scripted"]);
         assert_eq!(find(&inp(None, "/v/bise", None), "repl-live", &has), Ok(("/v".into(), Via::Bundle)));
@@ -179,6 +236,16 @@ mod tests {
     fn nothing_found_says_how_to_fix() {
         let err = find(&inp(None, "/usr/local/bin/bise", None), "repl-live", &fs(&[])).unwrap_err();
         assert!(err.contains("set BISE_APP_ROOT"), "{err}");
+        // the desktop app's bise: its runtime is missing, reinstall; never a variable to set
+        let err = find(&inp(None, "/Applications/bise.app/Contents/Resources/bin/bise", None), "repl-live", &fs(&[])).unwrap_err();
+        assert_eq!(err, "bise's runtime is missing: no repl-live in /Applications/bise.app/Contents/Resources/bin. reinstall bise");
+    }
+
+    #[test]
+    fn a_packed_app_is_a_version_dir_found_with_no_env() {
+        let bin = "/Applications/bise.app/Contents/Resources/bin";
+        let has = fs(&[&format!("{bin}/VERSION"), &format!("{bin}/repl-live")]);
+        assert_eq!(find(&inp(None, &format!("{bin}/bise"), None), "repl-live", &has), Ok((bin.into(), Via::Bundle)));
     }
 
     #[test]

@@ -4,16 +4,18 @@
 //! agent alone in one carries its mark in its row's last column.
 //!
 //! The hub sends `places` (the worktrees only, in their first agent's
-//! order, the frozen contract of switchboard's `place.rs`) and each
-//! agent's `place_id`; this module reads them and draws what is git's:
+//! order, the frozen contract of switchboard's `place.rs`) on hub/agents
+//! and each agent's `place_id` (state_rows.rs maps the typed rows,
+//! P4c-4b); this module draws what is git's:
 //! the section's title (` ψ sb/dark-mode      ↑ `), the held lid line
 //! (`changes asked · checks pass`), a solo row's mark, the PR's words
 //! for the divider and the header.
 
 use super::*;
+use bise_proto::words;
 use unicode_width::UnicodeWidthStr;
 
-/// A worktree as the hub sends it (`PlaceView`).
+/// A worktree as the hub sends it (`rows::Place`, state_rows.rs).
 #[derive(Clone, Debug, Default, PartialEq)]
 pub(crate) struct Place {
     pub(crate) id: String,
@@ -24,11 +26,16 @@ pub(crate) struct Place {
     /// the held line the hub writes (`waits to land · 2nd`, `no PR yet ·
     /// 2 commits`): it wins over the PR's words, shown as it is
     pub(crate) lid: Option<String>,
+    /// its 1-based rank in the land queue's line (1: it lands now);
+    /// None when not in line
+    pub(crate) landing: Option<u32>,
     /// dev-flow §5.1, pr-design §4.1 item 8: a feature branch (its agents
     /// may each have a worktree; they share the branch). `trying`: its
     /// try build builds or is on trial: `Δ` dim, else `ψ`; never `↑`.
     pub(crate) feature: bool,
     pub(crate) trying: bool,
+    /// the worktree's folder (its ψ's hover); None for a feature
+    pub(crate) path: Option<String>,
 }
 
 /// The PR of a worktree's branch (`PrView`): the enums as their JSON
@@ -46,44 +53,6 @@ pub(crate) struct Pr {
     pub(crate) failing: Vec<String>,
     /// how old the forge's last answer is, when it is late
     pub(crate) stale_ms: Option<u64>,
-}
-
-/// The snapshot's `places` (absent from an older hub: none).
-pub(super) fn parse(v: &Value) -> Vec<Place> {
-    let s = |x: &Value, k: &str| x.get(k).and_then(|b| b.as_str()).map(String::from);
-    let Some(all) = v.get("places").and_then(|p| p.as_array()) else {
-        return Vec::new();
-    };
-    all.iter()
-        .map(|p| Place {
-            id: s(p, "id").unwrap_or_default(),
-            branch: s(p, "branch"),
-            agents: p
-                .get("agents")
-                .and_then(|a| a.as_array())
-                .map(|a| a.iter().filter_map(|n| n.as_str().map(String::from)).collect())
-                .unwrap_or_default(),
-            pr: p.get("pr").filter(|x| x.is_object()).map(|x| {
-                let checks = x.get("checks");
-                Pr {
-                    number: x.get("number").and_then(|n| n.as_u64()).unwrap_or(0),
-                    url: s(x, "url").unwrap_or_default(),
-                    state: s(x, "state").unwrap_or_default(),
-                    review: s(x, "review").unwrap_or_default(),
-                    checks: checks.and_then(|c| s(c, "state")).unwrap_or_default(),
-                    failing: checks
-                        .and_then(|c| c.get("failing"))
-                        .and_then(|f| f.as_array())
-                        .map(|f| f.iter().filter_map(|n| n.as_str().map(String::from)).collect())
-                        .unwrap_or_default(),
-                    stale_ms: x.get("stale_ms").and_then(|n| n.as_u64()),
-                }
-            }),
-            lid: s(p, "lid").filter(|l| !l.is_empty()),
-            feature: p.get("feature").and_then(|b| b.as_bool()).unwrap_or(false),
-            trying: p.get("trying").and_then(|b| b.as_bool()).unwrap_or(false),
-        })
-        .collect()
 }
 
 impl Pr {
@@ -119,20 +88,20 @@ impl Pr {
         let mut parts: Vec<Vec<Span<'static>>> = Vec::new();
         let w = |t: &str| vec![Span::styled(t.to_string(), st)];
         if self.state == "draft" {
-            parts.push(w("draft"));
+            parts.push(w(words::panel::pr_draft));
         }
         match self.review.as_str() {
-            "changes_requested" => parts.push(w("changes asked")),
-            "approved" => parts.push(w("approved")),
-            "pending" => parts.push(w("in review")),
+            "changes_requested" => parts.push(w(words::panel::pr_changes_asked)),
+            "approved" => parts.push(w(words::panel::pr_approved)),
+            "pending" => parts.push(w(words::panel::pr_in_review)),
             _ => {}
         }
         match self.checks.as_str() {
-            "pass" => parts.push(w("checks pass")),
-            "running" => parts.push(w("checks running")),
+            "pass" => parts.push(w(words::panel::pr_checks_pass)),
+            "running" => parts.push(w(words::panel::pr_checks_running)),
             "fail" => {
                 let red = if no_color() { st.add_modifier(Modifier::BOLD) } else { st.fg(error()) };
-                let mut v = vec![Span::styled("checks fail", red)];
+                let mut v = vec![Span::styled(words::panel::pr_checks_fail, red)];
                 if !self.failing.is_empty() {
                     v.push(Span::styled(format!(": {}", self.failing.join(", ")), st));
                 }
@@ -141,10 +110,10 @@ impl Pr {
             _ => {}
         }
         if parts.is_empty() {
-            parts.push(w("open"));
+            parts.push(w(words::panel::pr_open));
         }
         if let Some(ms) = self.stale_ms {
-            parts.push(w(&format!("state from {} ago", panel::short_age(ms))));
+            parts.push(w(&words::panel::pr_state_from(panel::short_age(ms))));
         }
         let mut out = Vec::new();
         for (k, p) in parts.into_iter().enumerate() {
@@ -190,10 +159,10 @@ impl Place {
         }
     }
 
-    /// Trunk flow: its land waits in the queue (the hub's lid says
-    /// `waits to land · 2nd`): `…` in its border (dev-flow §7).
+    /// Trunk flow: its land waits in the queue (2nd or later in line, the
+    /// hub's lid `waits to land · 2nd`): `…` in its border (dev-flow §7).
     fn waits_to_land(&self) -> bool {
-        self.lid.as_deref().is_some_and(|l| l.starts_with("waits to land"))
+        self.landing.is_some_and(|n| n >= 2)
     }
 
     /// The title of a shared worktree's section (option B, sidebar-wt),
@@ -386,7 +355,7 @@ pub(crate) fn trial_notes(places: &[Place]) -> Vec<String> {
     places
         .iter()
         .filter(|p| p.feature && p.trying)
-        .map(|p| format!("{} {} on trial", G_BUILDING, p.branch.as_deref().unwrap_or(&p.id)))
+        .map(|p| format!("{} {}", G_BUILDING, words::panel::on_trial(p.branch.as_deref().unwrap_or(&p.id))))
         .collect()
 }
 
@@ -398,15 +367,24 @@ pub(crate) fn open_prs(places: &[Place]) -> usize {
 /// §7): `lands via PRs`, `lands on main`; "" when the hub has not said.
 pub(crate) fn flow_words(flow: &str) -> &'static str {
     match flow {
-        "pr" => "lands via PRs",
-        "trunk" => "lands on main",
+        "pr" => words::panel::lands_via_prs,
+        "trunk" => words::panel::lands_on_main,
         _ => "",
     }
 }
 
+/// What a ψ says under the mouse (wt-sign).
+pub(crate) mod psi_tip;
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// hub/agents' typed `places` as the panel's (state_rows.rs).
+    fn parse(v: &serde_json::Value) -> Vec<Place> {
+        let rows: Vec<bise_proto::rows::Place> = serde_json::from_value(v["places"].clone()).unwrap_or_default();
+        rows.iter().map(Place::of_row).collect()
+    }
 
     fn text(l: &Line) -> String {
         l.spans.iter().map(|s| s.content.as_ref()).collect()
@@ -464,15 +442,15 @@ mod tests {
         assert_eq!(trial_notes(&parse(&v)), vec!["Δ gift-cards on trial".to_string()]);
     }
 
-    /// The contract's JSON (switchboard place.rs, `the_contract_json`)
-    /// read back: the tagged checks, the snake_case words.
+    /// hub/agents' typed places read back (P4c-4b): the review and
+    /// checks as the words the panel draws.
     #[test]
     fn reads_the_hubs_places() {
         let v = serde_json::json!({"places": [
             {"id": "wt:dark", "branch": "sb/dark", "agents": ["dark", "i18n"], "lid": null,
-             "pr": {"number": 412, "url": "u", "state": "open", "review": "changes_requested",
-                    "checks": {"state": "fail", "failing": ["ci/test"]}, "stale_ms": null}},
-            {"id": "wt:csv", "branch": null, "agents": [], "pr": null, "lid": "waits to land · 2nd"}
+             "pr": {"number": 412, "url": "u", "branch": "sb/dark", "agents": ["dark", "i18n"], "state": "open",
+                    "review": "changes", "checks": "fail", "failing": ["ci/test"], "words": "", "text": ""}},
+            {"id": "wt:csv", "branch": null, "agents": [], "pr": null, "lid": "waits to land · 2nd", "landing": 2}
         ]});
         let ps = parse(&v);
         assert_eq!(ps.len(), 2);
@@ -509,7 +487,7 @@ mod tests {
         let closed = place("sb/x", Some(pr("closed", "none", "none")), None);
         assert!(!text(&closed.title(31, true)).contains('↑'));
         // trunk: a land waiting
-        let land = place("sb/emoji-csv", None, Some("waits to land · 2nd"));
+        let land = Place { landing: Some(2), ..place("sb/emoji-csv", None, Some("waits to land · 2nd")) };
         assert_eq!(text(&land.title(31, false)), " ψ sb/emoji-csv              …");
         // never wider than its room, whatever the branch
         for w in [12, 18, 24, 31, 44] {

@@ -213,7 +213,7 @@ fn the_settings_fit_150_95_and_80_columns() {
             "ctrl+r twice",
             "dictation",
             "speech to text",
-            "Mistral · Voxtral Transcribe 3",
+            "Mistral · Voxtral Mini Transcribe 3",
             "listen",
             "voice",
             "speed",
@@ -452,7 +452,7 @@ fn a_speech_model_is_named_never_its_id() {
     assert_eq!(model_name("nova-3"), "Nova 3");
     let s = screen(Open::Settings);
     let f = frame(&s, 95, 40);
-    assert!(f.contains("speech to text   Mistral · Voxtral Transcribe 3") && !f.contains("voxtral-transcribe"), "{f}");
+    assert!(f.contains("speech to text   Mistral · Voxtral Mini Transcribe 3") && !f.contains("voxtral-mini-transcribe"), "{f}");
 }
 
 /// The keys block (designer's words): what to try, at the bottom; the

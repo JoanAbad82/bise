@@ -1,4 +1,5 @@
 use super::*;
+use super::words::{LIVE_FAILED, LIVE_NOT_RUN, LIVE_PASSED};
 use serde_json::json;
 
 fn text(lines: &[Line]) -> String {
@@ -42,16 +43,66 @@ fn the_extension_step_shows_the_load_unpacked_steps() {
 
  ✓ Chrome              Chrome 154
  ? Chrome extension    add bise to Chrome
-                       1  ⏎ opens chrome://extensions · turn on Developer mode,…
-                       2  Load unpacked · cmd+shift+g, cmd+v (i copied the fold…
-                       3  i'll see it here, no key needed
- · live test           last
+                       1  ⏎ opens chrome://extensions and copies bise's folder
+                       2  turn on Developer mode, top right
+                       3  click Load unpacked, then cmd+shift+g, cmd+v, return
+                          and Select
+                          the folder: /h/.bise/dev/try/computer-use/extension
+                       4  i'll see it here, no key needed
+ · live test           not run yet
 
  what the agents see goes only to their model: Anthropic.
  in yolo, agents act without asking, purchases included. ⇧⇥ for auto.
 
- ⏎ open chrome://extensions   ↑↓ step   esc later"
+ ⏎ open chrome://extensions   c copy the path   ↑↓ step   esc later"
     );
+    assert_eq!(rows[1].copy.as_deref(), Some("/h/.bise/dev/try/computer-use/extension"), "c copies the folder");
+}
+
+/// Benjamin (13 Oct): with the helper app installed but not answering,
+/// the "for apps" rows had no ⏎ at all. They act now: ⏎ opens their
+/// pane in System Settings, `c` copies the app for its `+`.
+#[test]
+fn the_apps_rows_act_while_the_helper_does_not_answer() {
+    let mut c = check(vec![
+        row("browser", "done", "Chrome 154", None),
+        row("extension", "done", "v0.1.0", None),
+        row("live_test", "done", "ready", None),
+        row("accessibility", "checking", "", None),
+        row("screen_recording", "checking", "", None),
+    ]);
+    c["helper"] = json!("/x/bise Computer Use.app");
+    let r = rows(&c, &Busy::default());
+    for (i, id) in [(3, "accessibility"), (4, "screen_recording")] {
+        assert_eq!(r[i].id, id);
+        assert_eq!(r[i].fix.as_deref(), Some(format!("request_{id}").as_str()), "{:?}", r[i]);
+        assert_eq!(r[i].action.as_deref(), Some("open System Settings"));
+        assert_eq!(r[i].copy.as_deref(), Some("/x/bise Computer Use.app"));
+    }
+    let t = text(&lines(&r, 3, &Around { apps: true, ..around() }, 80));
+    assert!(t.contains(" ∿ accessibility       waiting for bise Computer Use to answer…
+                       1  ⏎ opens Privacy & Security › Accessibility
+                       2  turn on bise Computer Use
+                          not in the list? click +, then cmd+shift+g, cmd+v,
+                          return, Open
+                       3  i'll see it here
+"), "{t}");
+    assert!(t.ends_with(" ⏎ open System Settings   c copy the path   ↑↓ step   esc later"), "{t}");
+    assert_eq!(pane_url("accessibility"), Some("x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility"));
+    assert_eq!(pane_url("screen_recording"), Some("x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture"));
+    // granted: no ⏎, nothing to copy
+    c["rows"][3] = row("accessibility", "done", "", None);
+    let r = rows(&c, &Busy::default());
+    assert_eq!((r[3].st, r[3].action.clone(), r[3].copy.clone()), (St::Done, None, None));
+}
+
+/// a step's words wrap under their number, never cut
+#[test]
+fn the_steps_wrap_under_their_number() {
+    assert_eq!(wrap("2  turn on bise Computer Use", 40), ["2  turn on bise Computer Use"]);
+    assert_eq!(wrap("3  click Load unpacked, then Select", 20), ["3  click Load", "   unpacked, then", "   Select"]);
+    assert_eq!(wrap("   the folder: ~/x", 12), ["   the", "   folder:", "   ~/x"]);
+    assert_eq!(wrap("install it, i'll wait", 12), ["install it,", "i'll wait"]);
 }
 
 /// Chrome not open, too old, not installed: the designer's lines
@@ -87,15 +138,32 @@ fn the_live_test_runs_then_says_ready() {
     let done = rows(&base(row("live_test", "done", "ready", None)), &Busy::default());
     assert!(ready(&done));
     let t = text(&lines(&done, 2, &Around { mode: "auto".into(), ..around() }, 100));
-    assert!(t.contains(" ✓ live test           opened a tab, clicked a button. all set"), "{t}");
+    assert!(t.contains(&format!(" ✓ live test           {LIVE_PASSED}")), "{t}");
     // Chrome only: only what's true (m_3904)
     assert!(t.contains(" ✓ Chrome is ready. ask any agent to use it."), "{t}");
     assert!(t.contains(" in auto, agents ask you in their thread before buying"), "{t}");
     assert!(t.ends_with(" ↑↓ step   esc later"), "{t}");
     let failed = rows(&base(row("live_test", "failed", "the click did not land", Some("run_live_test"))), &Busy::default());
     assert_eq!((failed[2].st, failed[2].action.as_deref()), (St::Failed, Some("try again")));
-    assert_eq!(failed[2].detail, "the click didn't land", "contractions (m_3904)");
+    assert_eq!(failed[2].detail, format!("{LIVE_FAILED} · the click didn't land"), "contractions (m_3904)");
     assert!(!ready(&failed));
+}
+
+/// the live test's detail says what happened (designer m_42943), never
+/// 'last': not run yet before one (the extension not there, or waiting
+/// to run), `passed · 14:02` after one (when it ran, his zone)
+#[test]
+fn the_live_test_says_not_run_yet_then_passed_and_when() {
+    let at = 1_791_100_000_000u64;
+    let with = |ext: &str, lt: Value| check(vec![row("browser", "done", "Chrome 154", None), row("extension", ext, "", None), lt]);
+    let before = rows(&with("waits", row("live_test", "not_yet", "", None)), &Busy::default());
+    assert_eq!(before[2].detail, LIVE_NOT_RUN);
+    let waits = rows(&with("done", row("live_test", "waits", "last", Some("run_live_test"))), &Busy::default());
+    assert_eq!(waits[2].detail, LIVE_NOT_RUN);
+    let mut c = with("done", row("live_test", "done", "ready", None));
+    c["live_test"] = json!({"ok": true, "at_ms": at});
+    let done = rows(&c, &Busy::default());
+    assert_eq!(done[2].detail, format!("{LIVE_PASSED} · {}", crate::running::clock(at)));
 }
 
 /// the helper installed: the "for apps" rows after the live test, the
@@ -113,7 +181,7 @@ fn the_apps_rows_come_after_the_live_test() {
     assert_eq!(follow(&[], &r, 0), 4);
     let t = text(&lines(&r, 4, &Around { apps: true, ..around() }, 90));
     assert!(t.starts_with(" computer use · agents can drive your apps and Chrome"), "{t}");
-    assert!(t.contains("   for apps\n ✓ accessibility       bise can click and type in apps\n ? screen recording    optional · for screenshots of apps\n                       turn on bise Computer Use in the list. macOS reopens it, i'll wait"), "{t}");
+    assert!(t.contains("   for apps\n ✓ accessibility       bise can click and type in apps\n ? screen recording    optional · for screenshots of apps\n                       1  ⏎ opens Privacy & Security › Screen Recording\n                       2  turn on bise Computer Use. macOS reopens it, i'll wait\n                       3  i'll see it here"), "{t}");
     assert!(t.ends_with(" ⏎ open System Settings   ↑↓ step   esc later"), "{t}");
     // an apps row not done yet: the ready line names Chrome only
     assert!(t.contains(" ✓ Chrome is ready. ask any agent to use it."), "{t}");
@@ -180,7 +248,7 @@ fn state_json_reads_who_drives() {
     let v = json!({"v": 2, "agents": {format!("{hub}.perf"): {"name": "perf", "hub": hub, "driving": "Chrome", "paused": false, "stopped": false}}});
     assert_eq!(parse_state(&v, &hub_of(&short)).keys().collect::<Vec<_>>(), ["perf"]);
     assert!(parse_state(&v, &hub_of(&natural)).is_empty(), "the natural path would blank the driving line");
-    assert_eq!(d["api-v2"], Driver { driving: Some("Chrome".into()), place: Some("amazon.fr".into()), paused: false, stopped: false });
+    assert_eq!((d["api-v2"].driving.as_deref(), d["api-v2"].place.as_deref(), d["api-v2"].paused, d["api-v2"].stopped), (Some("Chrome"), Some("amazon.fr"), false, false));
     assert!(d["held"].stopped && d["held"].driving.is_none());
     assert!(d["mail"].paused);
     assert_eq!(short_app("Calculator"), "Calcula…");
@@ -201,4 +269,20 @@ fn an_action_row_reads_its_summary() {
     assert_eq!(sub_row("computer.snapshot", r##"{"refs":3,"target":"tab:1","text":"# x"##), None);
     assert_eq!(sub_row("github.search", r##"{"summary":"x"}"##), None);
     assert_eq!(sub_row("computer.act", r##"{"summary":"typed \u00e9t\u00e9 · Figma","ok":true}"##).map(|x| x.1), Some("typed été · Figma".into()));
+}
+
+/// S29/L19 (architect m_16121): the status row's words are
+/// `bise_computer_use::live::line`'s, the ones the window's row carries;
+/// the TUI adds its own age form (`2m`) and colours only
+#[test]
+fn the_status_row_says_the_shared_line() {
+    let at = |d: &Driver| status_line_of(d, 125_000).map(|l| text(&[l]));
+    let drives = Driver { name: "api-v2".into(), driving: Some("Chrome".into()), place: Some("amazon.fr".into()), since_ms: Some(5_000), ..Driver::default() };
+    assert_eq!(at(&drives).as_deref(), Some("↖ driving Chrome · amazon.fr · 2m"));
+    assert_eq!(at(&drives), bise_computer_use::live::line(&drives, Some("2m"), false).map(|l| l.text()));
+    let paused = Driver { paused: true, ..drives.clone() };
+    assert_eq!(at(&paused).as_deref(), Some("? you took the wheel · ⏎ give it back"));
+    let stopped = Driver { stopped: true, driving: None, was: Some("Chrome".into()), stopped_by: Some("you".into()), ..drives.clone() };
+    assert_eq!(at(&stopped).as_deref(), Some("↖ you stopped it driving Chrome · write to it to go on"));
+    assert_eq!(at(&Driver::default()), None);
 }

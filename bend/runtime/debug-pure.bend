@@ -1,7 +1,7 @@
 # runtime/debug-pure.bend — the session debug log, pure side.
 #
 # Every live session keeps a debug directory (BEND_DEBUG_DIR, set by the
-# parent: ~/.bend-harness/sessions/<id>.debug/). The REPL appends one
+# parent: ~/.bise/sessions/<id>.debug/). The REPL appends one
 # JSON object per line to events.jsonl: a breadcrumb for every obs and
 # tool annotation it sends the client, and an incident for every
 # provider attempt that failed (with the request and the raw reply saved
@@ -56,11 +56,13 @@ def reply_max() -> Nat:
 
 # ---- breadcrumbs: what the REPL sent the client ----
 
-def obs_prefix() -> String:
-  "  obs: "
+# an obs line, either form: the record (`obs <kind> :: <json>`, issue 38)
+# or the text (`  obs: …`: older history lines replay as text)
+def is_obs_line(+l: String) -> Bool:
+  String.starts_with(l, "obs ") || String.starts_with(l, "  obs: ")
 
 def is_crumb(+l: String) -> Bool:
-  String.starts_with(l, obs_prefix())
+  is_obs_line(l)
     || String.starts_with(l, "tool #")
     || String.starts_with(l, "tool_result #")
 

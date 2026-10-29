@@ -167,6 +167,18 @@ account, sign out, ChatGPT usage settings (link). `openrouter` gets
 `~/.bise/cache/chatgpt-models.json`, 1 day), falling back to the built-in
 entries. Each row says what pays: `ChatGPT plan` vs the price.
 
+The cached list comes first everywhere, the catalog is the fallback
+(`rust/catalog/src/plan_list.rs`): `/models` offers only listed models,
+the first run and the sign-in pick the catalog's pick when listed, else
+the first listed. A role's model the list lacks (a main written by hand,
+an older sign-in) is swapped for that pick: a warning in `bise doctor`,
+the hand-off's `[swaps]` row (the runtime follows it once, never
+chained), and one notice per session in the thread (`model_swapped`).
+If the plan still refuses a model (its 400 "not supported when using
+Codex with a ChatGPT account": the list changed since the cache), the
+turn ends on one line that names it ("isn't on your ChatGPT plan any more") and says to pick another or sign in
+again; never a retry.
+
 ### `bise doctor` (no network, never a secret)
 
 - `chatgpt`: `signed in as you@example.com (Plus) · token renews by

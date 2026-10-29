@@ -18,9 +18,13 @@
 # that never reached the tool (initialize failed, no connection, the
 # session lost) is tried again on a fresh connection, 3 tries in all; a
 # tools/call that may have run is never sent twice. A failure for good
-# names the server, the phase, the cause, the retries and whether
-# calling again is safe (the policy and words: mcp-pure.bend; the
-# retries and failures go to the debug log's events.jsonl).
+# names its kind, the server, the phase, the cause in the server's own
+# words, the retries and whether calling again is safe (the policy and
+# words: mcp-pure.bend; the retries and failures go to the debug log's
+# events.jsonl). A tool that answers an error (isError), or a failure
+# whose kind is bad arguments, also gets what was sent, the tool's
+# parameters from its index line's input schema and a check of the
+# arguments against it (mcp-args.bend).
 #
 # Defs are ordered bottom-up: a def only calls defs defined ABOVE it.
 # Recursive loops pass their recursive result to a pure "put" helper
@@ -40,6 +44,7 @@ import ../vendor/http/encoding/encoding.bend as Enc
 import ../vendor/json.bend as J
 import 0x16458a2db4f36577294543ec2a6d420c/json.bend as Jv
 import ./mcp-pure.bend as Mcp
+import ./mcp-args.bend as Ma
 import ./plugins.bend as Pl
 import ./provider.bend as Pv
 import ./provider-pure.bend as Pvp
@@ -50,8 +55,10 @@ import ./debug-pure.bend as Dp
 type MR is Data:
   MR{ok: Bool, out: String}
 
+# schema: the tool's input schema as JSON text ("" when its index line
+# has none), for the words of a failure (runtime/mcp-args.bend)
 type McpTool is Data:
-  MT{cid: String, tool: String}
+  MT{cid: String, tool: String, schema: String}
 
 # ---- tolerant JSON accessors (numbers-as-text JSON) ----
 
@@ -113,193 +120,14 @@ def jarr.m(m: Maybe<&2, Jv.Val>) -> List<&2, Jv.Val>:
 def jarr(v: Jv.Val, +k: String) -> List<&2, Jv.Val>:
   jarr.m(Jv.get(v, k))
 
-def index_path() -> IO(String):
-  P.env_path("BEND_MCP_INDEX", "/.bend-harness/mcp-index.txt")
-
-# the index every lookup reads: this session's plugin tools
-# (runtime/plugins.bend) first, then the connectors; either may be
-# missing
-def index_content.join(mp: Maybe<&2, String>, mc: Maybe<&2, String>)
-    -> Maybe<&2, String>:
-  match mp:
-    case None{}:
-      mc
-    case Some{+s}:
-      Some{String.append(s, Maybe.default(&2, String, mc, ""))}
-
+# the index every lookup reads: this session's one tool index, written
+# by its plugins bridge (runtime/plugins.bend): the plugins' tools and
+# the Mistral connectors', minus the ones he turned off. Missing: no
+# tool (no bridge, or it has not written it yet)
 def index_content() -> IO(Maybe<&2, String>):
   do IO<Maybe<&2, String>>:
     +pp : String <- Pl.mcp_index_path()
-    +cp : String <- index_path()
-    mp : Maybe<&2, String> <- P.read_file(pp)
-    mc : Maybe<&2, String> <- P.read_file(cp)
-    IO.pure(Maybe<&2, String>, index_content.join(mp, mc))
-
-# ---- bootstrap: the connector catalog becomes index lines ----
-
-def is_ready(c: Jv.Val) -> Bool:
-  jbool(jdone(Jv.get(c, "status")), "is_ready", False{})
-
-# descriptions may contain raw newlines; the index is line-oriented, so
-# newline and carriage-return characters flatten to spaces
-def flat.chr(is_nl: Bool, +c: U32) -> String:
-  match is_nl:
-    case True{}:
-      " "
-    case False{}:
-      SCon{Chr{c}, SNil{}}
-
-def flat(s: String) -> String:
-  match s:
-    case SNil{}:
-      ""
-    case SCon{Chr{+c}, +t}:
-      String.append(
-        flat.chr(Bool.or(U32.is_eq(c, 10), U32.is_eq(c, 13)), c), flat(t))
-
-# the input schema rides in the index line so details mode returns real
-# declarations (vibe_sdk shows input_schema in details, not just the text)
-def tool_line.schema(m: Maybe<&2, Jv.Val>) -> String:
-  match m:
-    case None{}:
-      ""
-    case Some{+v}:
-      String.append(" | input: ", flat(Jv.encode(v)))
-
-def tool_line(+cid: String, +cname: String, +t: Jv.Val) -> String:
-  String.append(cid, String.append(" ", String.append(cname,
-    String.append(" ", String.append(flat(jstr(t, "name", "?")),
-      String.append(" : ", String.append("#",
-        String.append(flat(jstr(t, "description", "")),
-          tool_line.schema(Jv.get(t, "inputSchema"))))))))))
-
-def tool_lines(+cid: String, +cname: String, ts: List<&2, Jv.Val>) -> String:
-  match ts:
-    case Nil{}:
-      ""
-    case Con{+t, rest}:
-      String.append(tool_line(cid, cname, t),
-        String.append("\n", tool_lines(cid, cname, rest)))
-
-# the cname of an index line is the normalized, deduplicated alias; the
-# connector id (for the gateway URL) stays raw
-def conn_lines.emit(+c: Jv.Val, alias: String, +rest_res: String) -> String:
-  String.append(tool_lines(jstr(c, "id", ""), alias, jarr(c, "tools")),
-    String.append("\n", rest_res))
-
-# seen = the aliases BEFORE the current connector (the dedupe must not
-# see the connector it is naming); seen2 adds the current one for the
-# rest of the list
-def conn_lines.ready(skip: Bool, +c: Jv.Val, +rest: List<&2, Jv.Val>,
-    +seen: List<&2, String>, +rest_res: String,
-    +seen2: List<&2, String>) -> String:
-  match skip:
-    case True{}:
-      conn_lines.emit(c, "", rest_res)
-    case False{}:
-      conn_lines.emit(c,
-        Mcp.dedupe(Mcp.normalize_name(jstr(c, "name", "")), seen), rest_res)
-
-def conn_lines.go.step(skip: Bool, +c: Jv.Val, +rest: List<&2, Jv.Val>,
-    +seen: List<&2, String>, +seen2: List<&2, String>,
-    rest_res: String) -> String:
-  conn_lines.ready(skip, c, rest, seen, rest_res, seen2)
-
-def conn_lines.go(cs: List<&2, Jv.Val>, +seen: List<&2, String>) -> String:
-  match cs:
-    case Nil{}:
-      ""
-    case Con{+c, +rest}:
-      conn_lines.go.step(Bool.not(is_ready(c)), c, rest, seen,
-        Con{Mcp.normalize_name(jstr(c, "name", "")), seen},
-        conn_lines.go(rest, Con{Mcp.normalize_name(jstr(c, "name", "")), seen}))
-
-def conn_lines(cs: List<&2, Jv.Val>) -> String:
-  conn_lines.go(cs, Nil{})
-
-# the index lines of a bootstrap reply: only a 200 whose JSON has a
-# "connectors" array; anything else (the gateway answers 500 now and
-# then, a 401 without a Mistral key) is None, and the index on disk is
-# kept: writing "" there hid every connector until the next good start
-def bootstrap.conns(m: Maybe<&2, Jv.Val>) -> Maybe<&2, String>:
-  match m:
-    case None{}:
-      None{}
-    case Some{+w}:
-      Some{conn_lines(jarr.w(w))}
-
-def bootstrap.body(m: Maybe<&2, Jv.Val>) -> Maybe<&2, String>:
-  match m:
-    case None{}:
-      None{}
-    case Some{+v}:
-      bootstrap.conns(Jv.get(v, "connectors"))
-
-def bootstrap.ok(ok: Bool, +res: Http.Res) -> Maybe<&2, String>:
-  match ok:
-    case True{}:
-      bootstrap.body(Jv.parse(Http.text(res)))
-    case False{}:
-      None{}
-
-def bootstrap.res(+res: Http.Res) -> Maybe<&2, String>:
-  match res:
-    case Http.Res{+status, _, _}:
-      bootstrap.ok(U32.is_eq(status, 200), res)
-
-def bootstrap.index(r: Result<&2, &2, Http.Err, Http.Res>)
-    -> Maybe<&2, String>:
-  match r:
-    case Fail{+e}:
-      None{}
-    case Done{+res}:
-      bootstrap.res(res)
-
-# BEND_MCP_BOOTSTRAP_URL: a test's fake gateway
-def bootstrap.fetch(+key: String) -> IO(Maybe<&2, String>):
-  do IO<Maybe<&2, String>>:
-    ur : Result<&1, &1, U32 & String, String> <- IO.get_env(
-      "BEND_MCP_BOOTSTRAP_URL")
-    +url : String <- IO.pure(String, P.env_or(ur, Mcp.bootstrap_url()))
-    +h : Map<&2, List<&2, String>> <- IO.pure(Map<&2, List<&2, String>>,
-      Http.set(Http.empty(), "Authorization", String.append("Bearer ", key)))
-    r : Result<&2, &2, Http.Err, Http.Res> <- Http.fetch("GET", url, h, "")
-    IO.pure(Maybe<&2, String>, bootstrap.index(r))
-
-# one more try: the gateway's 500s come and go
-def bootstrap.retry(+key: String, m: Maybe<&2, String>)
-    -> IO(Maybe<&2, String>):
-  match m:
-    case Some{+s}:
-      IO.pure(Maybe<&2, String>, Some{s})
-    case None{}:
-      bootstrap.fetch(key)
-
-def bootstrap.save(+path: String, m: Maybe<&2, String>) -> IO(Unit):
-  match m:
-    case None{}:
-      IO.print("[mcp] bootstrap failed twice; the connector index on disk is kept")
-    case Some{+s}:
-      do IO<Unit>:
-        u : Unit <- P.write_file(path, s)
-        IO.print("[mcp] connector index written")
-
-def bootstrap.keyed(empty: Bool, +key: String, +path: String) -> IO(Unit):
-  match empty:
-    case True{}:
-      IO.print("[mcp] no Mistral key (MISTRAL_API_KEY: env, auth.json or .env); the connector index on disk is kept")
-    case False{}:
-      do IO<Unit>:
-        m1 : Maybe<&2, String> <- bootstrap.fetch(key)
-        m2 : Maybe<&2, String> <- bootstrap.retry(key, m1)
-        bootstrap.save(path, m2)
-
-# the connectors always use the mistral provider's key, whatever model
-# the agent talks to (the harness exports every provider's key)
-def bootstrap(+key: String) -> IO(Unit):
-  do IO<Unit>:
-    +path : String <- index_path()
-    bootstrap.keyed(String.is_empty(key), key, path)
+    P.read_file(pp)
 
 # ---- resolve "<cname>.<tool>" against the index lines ----
 
@@ -312,8 +140,8 @@ def find_line.hit(+line: String, +v: String) -> Bool:
   find_line.hit.of(Mcp.line_parts(line), v)
 
 def find_put.of(sp: String & String & String & String) -> McpTool:
-  (cid, a1, tool, a3) = sp
-  MT{cid, tool}
+  (cid, a1, tool, desc) = sp
+  MT{cid, tool, Ma.schema_of(desc)}
 
 def find_put(hit: Bool, +line: String, +rest_res: Maybe<&2, McpTool>)
     -> Maybe<&2, McpTool>:
@@ -393,33 +221,58 @@ def content_texts(blocks: List<&2, Jv.Val>) -> String:
       String.append(jstr(b, "text", ""),
         String.append("\n", content_texts(rest)))
 
+# a result's text blocks; a result with none (an error made of
+# structuredContent, or of blocks that are not text) is shown as its JSON
+def res_text(+texts: String, +r: Jv.Val) -> String:
+  Bool.pick(String, String.is_empty(String.trim(texts)),
+    Bool.pick(String, String.eq(Jv.encode(r), "null"), "", Jv.encode(r)), texts)
+
 def call_res(+j: Jv.Val) -> String & Bool:
-  (content_texts(jarr(jdone(Jv.get(j, "result")), "content")),
+  (res_text(content_texts(jarr(jdone(Jv.get(j, "result")), "content")),
+      jdone(Jv.get(j, "result"))),
     jbool(jdone(Jv.get(j, "result")), "isError", False{}))
 
 def call_ok(sp: String & Bool) -> Mcp.Try:
   (out, is_err) = sp
   Mcp.TOk{Bool.not(is_err), out}
 
-# a JSON-RPC error the server answered instead of a result
-def rpc_err.of(m: Maybe<&2, Jv.Val>) -> Maybe<&2, String>:
+# a JSON-RPC error the server answered instead of a result: its code
+# (the JSON text, "" when absent) and its message with its data (a
+# validation error's details are often there)
+def rpc_code(m: Maybe<&2, Jv.Val>) -> String:
+  match m:
+    case Some{Jv.Num{+s}}:
+      s
+    case _:
+      ""
+
+def rpc_data(m: Maybe<&2, Jv.Val>) -> String:
+  match m:
+    case None{}:
+      ""
+    case Some{+d}:
+      Bool.pick(String, String.eq(Jv.encode(d), "null"), "",
+        String.append(" data: ", Jv.encode(d)))
+
+def rpc_err.of(m: Maybe<&2, Jv.Val>) -> Maybe<&2, Mcp.Why>:
   match m:
     case None{}:
       None{}
     case Some{+e}:
-      Some{jstr(e, "message", Jv.encode(e))}
+      Some{Mcp.WRpc{rpc_code(Jv.get(e, "code")), String.append(
+        jstr(e, "message", Jv.encode(e)), rpc_data(Jv.get(e, "data")))}}
 
-def rpc_err(+j: Jv.Val) -> Maybe<&2, String>:
+def rpc_err(+j: Jv.Val) -> Maybe<&2, Mcp.Why>:
   rpc_err.of(Jv.get(j, "error"))
 
 # a 200 body (JSON, or an event stream whose last data line is the answer)
 def rpc_json(+body: String) -> Jv.Val:
   jdone(Jv.parse(Mcp.rpc_text(body)))
 
-def call_rpc(m: Maybe<&2, String>, +j: Jv.Val) -> Mcp.Try:
+def call_rpc(m: Maybe<&2, Mcp.Why>, +j: Jv.Val) -> Mcp.Try:
   match m:
-    case Some{+said}:
-      Mcp.TFail{Mcp.SCall{}, Mcp.WRpc{said}}
+    case Some{+w}:
+      Mcp.TFail{Mcp.SCall{}, w}
     case None{}:
       call_ok(call_res(j))
 
@@ -495,12 +348,12 @@ def with_session(+h: Map<&2, List<&2, String>>, +sid: String, +ver: String)
     hdr_if(String.is_empty(sid), h, "Mcp-Session-Id", sid),
     "MCP-Protocol-Version", ver)
 
-def try_init_rpc(m: Maybe<&2, String>, p1: Http.Pool, +url: String,
+def try_init_rpc(m: Maybe<&2, Mcp.Why>, p1: Http.Pool, +url: String,
     +h: Map<&2, List<&2, String>>, +tool: String, +args: String)
     -> IO(Mcp.Try):
   match m:
-    case Some{+said}:
-      try_end(p1, Mcp.TFail{Mcp.SInit{}, Mcp.WRpc{said}})
+    case Some{+w}:
+      try_end(p1, Mcp.TFail{Mcp.SInit{}, w})
     case None{}:
       try_open(p1, url, h, tool, args)
 
@@ -565,12 +418,25 @@ def try_why(+host: String, t: Mcp.Try) -> String:
     case Mcp.TFail{+st, +w}:
       Mcp.why_line(host, st, w)
 
-def try_mr(t: Mcp.Try, +name: String, +host: String, +n: Nat) -> MR:
+# the answer the model reads: a result as it came; a tool that answered
+# an error, or a call that failed for good, in words that say the kind,
+# the server's own message, and (its arguments may be the cause) what was
+# sent and the tool's parameters (runtime/mcp-args.bend)
+def try_mr.ok(ok: Bool, +out: String, +name: String, +host: String,
+    +schema: String, +args: String) -> MR:
+  match ok:
+    case True{}:
+      MR{True{}, out}
+    case False{}:
+      MR{False{}, Ma.tool_failed(name, host, schema, args, out)}
+
+def try_mr(t: Mcp.Try, +name: String, +host: String, +schema: String,
+    +args: String, +n: Nat) -> MR:
   match t:
-    case Mcp.TOk{+ok, +out}:
-      MR{ok, out}
+    case Mcp.TOk{ok, +out}:
+      try_mr.ok(ok, out, name, host, schema, args)
     case Mcp.TFail{+st, +w}:
-      MR{False{}, Mcp.fail_text(name, host, st, w, n)}
+      MR{False{}, Ma.call_failed(name, host, schema, args, st, w, n)}
 
 def try_done.log(ok: Bool, +name: String, +text: String, +n: Nat) -> IO(Unit):
   match ok:
@@ -589,8 +455,8 @@ def try_done(+m: MR, +name: String, +n: Nat) -> IO(MR):
 
 # go again (after a pause, with a fresh initialize) or answer; `more`
 # is the next try, built lazily and run only when chosen
-def try_next(go: Bool, +t: Mcp.Try, +name: String, +host: String, +n: Nat,
-    more: IO(MR)) -> IO(MR):
+def try_next(go: Bool, +t: Mcp.Try, +name: String, +host: String,
+    +schema: String, +args: String, +n: Nat, more: IO(MR)) -> IO(MR):
   match go:
     case True{}:
       do IO<MR>:
@@ -600,10 +466,11 @@ def try_next(go: Bool, +t: Mcp.Try, +name: String, +host: String, +n: Nat,
         w : Unit <- IO.sleep(Mcp.pause_ms(n))
         more
     case False{}:
-      try_done(try_mr(t, name, host, n), name, n)
+      try_done(try_mr(t, name, host, schema, args, n), name, n)
 
 def tries(+fuel: Nat, +n: Nat, +name: String, +host: String, +url: String,
-    +h: Map<&2, List<&2, String>>, +tool: String, +args: String) -> IO(MR):
+    +h: Map<&2, List<&2, String>>, +tool: String, +schema: String,
+    +args: String) -> IO(MR):
   match fuel:
     case 0n:
       IO.pure(MR, MR{False{}, "mcp call failed: no try left"})
@@ -611,13 +478,28 @@ def tries(+fuel: Nat, +n: Nat, +name: String, +host: String, +url: String,
       do IO<MR>:
         +t : Mcp.Try <- attempt(url, h, tool, args)
         try_next(Bool.and(Mcp.again(t), Bool.not(Nat.is_eq(p, 0n))), t, name,
-          host, n, tries(p, Nat.add(n, 1n), name, host, url, h, tool, args))
+          host, schema, args, n, tries(p, Nat.add(n, 1n), name, host, url, h,
+            tool, schema, args))
 
-def mcp_call.found(+name: String, +cid: String, +tool: String, +args: String,
-    +key: String) -> IO(MR):
+def mcp_call.send(+name: String, +cid: String, +tool: String,
+    +schema: String, +args: String, +key: String) -> IO(MR):
   tries(Mcp.max_tries(), 0n, name, Pvp.url_host(gateway_url(cid)),
     gateway_url(cid), mcp_hdrs(Bool.pick(String, is_local(cid), "", key)),
-    tool, args)
+    tool, schema, args)
+
+# a gateway call needs the Mistral key: without one, say so and send nothing
+def mcp_call.keyed(no_key: Bool, +name: String, +cid: String, +tool: String,
+    +schema: String, +args: String, +key: String) -> IO(MR):
+  match no_key:
+    case True{}:
+      IO.pure(MR, MR{False{}, Mcp.no_key_text()})
+    case False{}:
+      mcp_call.send(name, cid, tool, schema, args, key)
+
+def mcp_call.found(+name: String, +cid: String, +tool: String,
+    +schema: String, +args: String, +key: String) -> IO(MR):
+  mcp_call.keyed(Bool.and(String.is_empty(key), Bool.not(is_local(cid))),
+    name, cid, tool, schema, args, key)
 
 # a call with no arguments still needs a JSON object body
 def call_args.of(is_empty: Bool, +args: String) -> String:
@@ -633,19 +515,21 @@ def call_args(+args: String) -> String:
 def mcp_call.mt(mt: McpTool, +name: String, +args: String, +key: String)
     -> IO(MR):
   match mt:
-    case MT{+cid, +tool}:
-      mcp_call.found(name, cid, tool, call_args(args), key)
+    case MT{+cid, +tool, +schema}:
+      mcp_call.found(name, cid, tool, schema, call_args(args), key)
 
-def index_missing() -> MR:
-  MR{False{}, "tool index not found — remote MCP tools are unavailable in this session"}
+# no index: the call is still named (issue 21: a nameless answer read
+# like an empty result)
+def index_missing(+name: String) -> MR:
+  MR{False{}, Xp.unknown_text(name,
+    "the tool index is missing: remote MCP tools are unavailable in this session")}
 
 def mcp_call.resolved(m: Maybe<&2, McpTool>, +name: String, +args: String,
     +key: String) -> IO(MR):
   match m:
     case None{}:
-      IO.pure(MR, MR{False{},
-        String.append("unknown tool: ", String.append(name,
-          " — discover tools with search_tool_functions"))})
+      IO.pure(MR, MR{False{}, Xp.unknown_text(name,
+        "discover tools with search_tool_functions")})
     case Some{+mt}:
       mcp_call.mt(mt, name, args, key)
 
@@ -653,7 +537,7 @@ def mcp_call.read(m: Maybe<&2, String>, +name: String, +args: String,
     +key: String) -> IO(MR):
   match m:
     case None{}:
-      IO.pure(MR, index_missing())
+      IO.pure(MR, index_missing(name))
     case Some{+content}:
       mcp_call.resolved(find_line(content, name), name, args, key)
 

@@ -16,6 +16,12 @@ Markdown, the subset the pages use:
   lists            - item / 1. item, continuation lines indented
   tables           | a | b |
   callouts         > note: ...   > careful: ...   (careful: only when something can be lost)
+  one app's way    ::: desktop settings › models      a block for one app only; the words after
+                   ...                                 the app are the one line it folds to when
+                   :::                                 the reader's switch shows the other app
+                   (docs.js; with no script both show, each tagged 'bise desktop' / 'bise terminal')
+  one app's page   front matter  app: desktop   (or terminal): tagged in the nav, 'only in bise
+                   desktop' under its title; other: <words> | <page>  adds the other app's way
   inline           `code`, **bold**, *em*, [text](url)
 A page missing from this folder is left out of the sidebar (a draft that
 waits for its release lives in docs/site-drafts/).
@@ -29,7 +35,11 @@ BASE = "https://bise.dev"
 
 # the sidebar: (group, [(slug, label)]); a slug with no .md here is skipped
 NAV = [
-    ("get started", [("index", "what bise is"), ("install", "install and first run")]),
+    ("get started", [
+        ("index", "what bise is"),
+        ("desktop", "start with bise desktop"),
+        ("install", "start with bise terminal"),
+    ]),
     ("models", [
         ("providers", "providers and keys"),
         ("subscriptions", "subscriptions"),
@@ -38,16 +48,19 @@ NAV = [
     ]),
     ("using bise", [
         ("agents", "main and the agents"),
+        ("window", "the desktop window"),
         ("approvals", "approvals"),
         ("flow", "landing work"),
-        ("voice", "voice"),
+        ("voice", "voice and fn"),
         ("computer-use", "computer use"),
     ]),
     ("extend", [("plugins", "plugins and MCP"), ("skills", "instructions and skills")]),
     ("reference", [
+        ("settings", "settings"),
         ("config", "config.toml"),
-        ("cli", "the bise command"),
+        ("desktop-keys", "keys and menus"),
         ("keys", "keys and commands"),
+        ("cli", "the bise command"),
         ("troubleshooting", "troubleshooting"),
         ("updates", "updates"),
     ]),
@@ -63,7 +76,7 @@ def slugify(s):
     return re.sub(r"[\s_]+", "-", s.strip()).strip("-") or "section"
 
 
-KEY_RE = re.compile(r"^(/[a-z][a-z-]*( [a-z|<>\[\]-]+)*|(ctrl|shift|cmd|alt|⌥|⇧)\+.+|esc|tab|⏎|enter|space|hold space|ctrl\+r twice)$")
+KEY_RE = re.compile(r"^(/[a-z][a-z-]*( [a-z|<>\[\]-]+)*|(ctrl|shift|cmd|alt|⌥|⇧)\+.+|[⌘⌥⇧]+.{1,3}( / [⌘⌥⇧]+.{1,3})?|esc|tab|⏎|⇧⏎|enter|space|hold space|ctrl\+r twice|hold fn|fn fn|fn space)$")
 
 
 def inline(s, page_links):
@@ -127,21 +140,77 @@ def table(rows, links):
     return f'<div class="table"><table><thead><tr>{h}</tr></thead><tbody>{b}</tbody></table></div>'
 
 
-def render(md):
-    """Markdown body to (html, toc, plain sections for search, linked pages)."""
+APPS = {"desktop": "bise desktop", "terminal": "bise terminal"}
+
+
+def scoped(app, summary, inner, links):
+    """A `::: desktop|terminal <summary>` block: its tag, its body, and the one line it folds to
+    when the reader's switch shows the other app (docs.js; with no script both show, tagged)."""
+    fold = inline(summary, links) if summary else "how"
+    return (f'<div class="scoped" data-app="{app}"><p class="tag">{APPS[app]}</p><div class="body">{inner}</div>'
+            f'<button class="fold" type="button" data-to="{app}">in {APPS[app]}: {fold} ›</button></div>')
+
+
+def plain(s):
+    """Markdown to the search's plain text: a code span's text kept whole (`` ctrl+` ``, `:*`),
+    a link's words without its address, no emphasis marks."""
+    codes = []
+
+    def keep(t):
+        codes.append(t)
+        return f"\x00{len(codes) - 1}\x00"
+
+    s = re.sub(r"``\s?(.+?)\s?``|`([^`]+)`", lambda m: keep(m.group(1) if m.group(1) is not None else m.group(2)), s)
+    s = re.sub(r"\[([^\]]+)\]\([^)\s]*\)", r"\1", s)
+    s = re.sub(r"\*\*([^*]+)\*\*", r"\1", s)
+    s = re.sub(r"(?<![\w*])\*([^*\s][^*]*?)\*(?![\w*])", r"\1", s)
+    return re.sub(r"\x00(\d+)\x00", lambda m: codes[int(m.group(1))], s)
+
+
+def render(md, seen=None, app=None):
+    """Markdown body to (html, toc, plain sections for search, linked pages).
+    A toc row is (level, anchor, text, app); a search section has the app of the block it is in."""
     lines = md.split("\n")
     out, toc, sections, links = [], [], [], []
-    cur = {"heading": "", "anchor": "", "text": []}
-    seen = set()
+    cur = {"heading": "", "anchor": "", "text": [], "app": app}
+    seen = set() if seen is None else seen
     i = 0
 
     def text_of(s):
-        cur["text"].append(re.sub(r"[`*\[\]]|\]\([^)]*\)", "", s))
+        cur["text"].append(plain(s))
 
     while i < len(lines):
         ln = lines[i]
         if not ln.strip():
             i += 1
+            continue
+        m = re.match(r"^:::\s*(desktop|terminal)\b\s*(.*)$", ln)
+        if m and app is None:
+            j = i + 1
+            while j < len(lines) and lines[j].strip() != ":::":
+                j += 1
+            if j == len(lines):
+                sys.exit(f"::: {m.group(1)} is never closed (a line with ::: alone)")
+            body, btoc, bsecs, blinks = render("\n".join(lines[i + 1:j]), seen, m.group(1))
+            block = scoped(m.group(1), m.group(2).strip(), body, links)
+            # blocks side by side share a group, so the reader's app's comes first (docs.css order)
+            if out and out[-1].startswith('<div class="scopes">'):
+                out[-1] = out[-1][: -len("</div>")] + block + "</div>"
+            else:
+                out.append(f'<div class="scopes">{block}</div>')
+            toc += btoc
+            links += blinks
+            # the block's text before its own first heading: a section of its own, the shared heading's
+            if bsecs[0]["text"]:
+                sections.append(cur)
+                sections.append({"heading": cur["heading"], "anchor": cur["anchor"], "text": bsecs[0]["text"], "app": m.group(1)})
+                cur = {"heading": cur["heading"], "anchor": cur["anchor"], "text": [], "app": app}
+            if len(bsecs) > 1:
+                sections.append(cur)
+                sections += bsecs[1:]
+                # a heading inside the block owns what follows it, up to the next heading
+                cur = {"heading": bsecs[-1]["heading"], "anchor": bsecs[-1]["anchor"], "text": [], "app": app}
+            i = j + 1
             continue
         m = re.match(r"^```(\w*)(?:\s+title=\"([^\"]+)\")?\s*$", ln)
         if m:
@@ -163,9 +232,9 @@ def render(md):
             hh = inline(title, links)
             out.append(f'<h{level} id="{a}"><a class="anchor" href="#{a}" aria-hidden="true">#</a>{hh}</h{level}>')
             if level <= 3:
-                toc.append((level, a, re.sub(r"<[^>]+>", "", hh)))
+                toc.append((level, a, re.sub(r"<[^>]+>", "", hh), app))
             sections.append(cur)
-            cur = {"heading": html.unescape(re.sub(r"<[^>]+>", "", hh)), "anchor": a, "text": []}
+            cur = {"heading": html.unescape(re.sub(r"<[^>]+>", "", hh)), "anchor": a, "text": [], "app": app}
             i += 1
             continue
         if ln.startswith("|") and i + 1 < len(lines) and re.match(r"^\|[\s:|-]+\|\s*$", lines[i + 1]):
@@ -173,7 +242,9 @@ def render(md):
             while j < len(lines) and lines[j].startswith("|"):
                 j += 1
             out.append(table(lines[i:j], links))
-            text_of(" ".join(lines[i:j]).replace("|", " "))
+            # a row as 'cell · cell', the --- row out
+            rows = [re.split(r"(?<!\\)\|", r.strip().strip("|")) for k, r in enumerate(lines[i:j]) if k != 1]
+            text_of(". ".join(" · ".join(c.strip().replace("\\|", "|") for c in r) for r in rows))
             i = j
             continue
         if ln.startswith(">"):
@@ -253,8 +324,18 @@ def url_of(slug):
     return "/docs" if slug == "index" else f"/docs/{slug}"
 
 
+def app_of(src):
+    """A page's app from its front matter: desktop, terminal, or None (both)."""
+    return front(src)[0].get("app") or None
+
+
+SWITCH = ('<div class="appswitch" role="group" aria-label="your app">'
+          '<button type="button" data-app="desktop" aria-pressed="false">desktop</button>'
+          '<button type="button" data-app="terminal" aria-pressed="false">terminal</button></div>')
+
+
 def sidebar(pages, current):
-    out = []
+    out = [SWITCH]
     for group, items in NAV:
         rows = [(s, l) for s, l in items if s in pages]
         if not rows:
@@ -262,7 +343,11 @@ def sidebar(pages, current):
         out.append(f'<div class="grp">{html.escape(group)}</div><ul>')
         for s, l in rows:
             cls = ' class="here" aria-current="page"' if s == current else ""
-            out.append(f'<li><a href="{url_of(s)}"{cls}>{html.escape(l)}</a></li>')
+            a = app_of(pages[s])
+            tag = f' data-app="{a}"' if a else ""
+            # the tag after the label, unless the label names the app already ('start with bise terminal')
+            words = f' <span class="tag">{a}</span>' if a and f"bise {a}" not in l else ""
+            out.append(f'<li><a href="{url_of(s)}"{cls}{tag}>{html.escape(l)}{words}</a></li>')
         out.append("</ul>")
     return "\n".join(out)
 
@@ -272,6 +357,25 @@ def order(pages):
 
 
 TEMPLATE = open(os.path.join(HERE, "page.tmpl"), encoding="utf-8").read()
+
+
+def only_strip(meta, pages):
+    """A one-app page's line under its title: 'only in bise desktop', and the other app's way
+    when there is one (front matter `other: <words> | <page>`, the link flips the reader's switch)."""
+    a = meta.get("app")
+    if not a:
+        return ""
+    if a not in APPS:
+        sys.exit(f"app: {a}? desktop or terminal")
+    out = f'<span>only in {APPS[a]}</span>'
+    if meta.get("other"):
+        words, _, page = meta["other"].rpartition("|")
+        o = "terminal" if a == "desktop" else "desktop"
+        page = page.strip()
+        if page not in pages:
+            sys.exit(f"other: '{page}' is not a page here")
+        out += f' <a href="{url_of(page)}?{o}" data-to="{o}">in {APPS[o]}: {inline(words.strip(), [])} ›</a>'
+    return f'<p class="only">{out}</p>'
 
 
 def page_html(slug, meta, body, toc, pages):
@@ -285,7 +389,7 @@ def page_html(slug, meta, body, toc, pages):
         pn += f'<a class="prev" href="{url_of(prev)}"><span>previous</span>{html.escape(label[prev])}</a>'
     if nxt:
         pn += f'<a class="next" href="{url_of(nxt)}"><span>next</span>{html.escape(label[nxt])}</a>'
-    toc_html = "".join(f'<li class="l{lv}"><a href="#{a}">{t}</a></li>' for lv, a, t in toc)
+    toc_html = "".join(f'<li class="l{lv}"{f" data-app={chr(34)}{ap}{chr(34)}" if ap else ""}><a href="#{a}">{t}</a></li>' for lv, a, t, ap in toc)
     title = meta.get("title", slug)
     md_url = f"{BASE}/docs/{slug}.md"
     rep = {
@@ -294,6 +398,8 @@ def page_html(slug, meta, body, toc, pages):
         "{{description}}": html.escape(meta.get("description", "")),
         "{{canonical}}": BASE + url_of(slug),
         "{{sidebar}}": sidebar(pages, slug),
+        "{{only}}": only_strip(meta, pages),
+        "{{app}}": f' data-app="{meta["app"]}"' if meta.get("app") else "",
         "{{body}}": body,
         "{{toc}}": f'<div class="toch">on this page</div><ul>{toc_html}</ul>' if toc else "",
         "{{prevnext}}": pn,
@@ -326,11 +432,17 @@ def build():
             if l and l not in pages:
                 problems.append(f"{slug}.md links to '{l}', which is not a page here")
         files[f"{slug}.html"] = page_html(slug, meta, body, toc, pages)
+        full = {s["anchor"] for s in sections if "".join(s["text"]).strip()}
         for s in sections:
             t = " ".join(" ".join(s["text"]).split())
-            if not t and not s["heading"]:
+            # an empty piece of a heading split by a ::: block: its other pieces carry it
+            if not t and (not s["heading"] or s["anchor"] in full):
                 continue
-            index.append({"p": url_of(slug), "t": meta.get("title", slug), "h": s["heading"], "a": s["anchor"], "x": t[:1200]})
+            row = {"p": url_of(slug), "t": meta.get("title", slug), "h": s["heading"], "a": s["anchor"], "x": t[:1200]}
+            a = s["app"] or meta.get("app")
+            if a:
+                row["app"] = a
+            index.append(row)
     files["search.json"] = json.dumps(index, ensure_ascii=False, separators=(",", ":"))
     return files, problems, pages
 

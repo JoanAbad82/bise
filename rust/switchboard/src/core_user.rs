@@ -8,7 +8,25 @@
 
 use super::*;
 
+/// `/help`'s words (the TUI's typed line and the window's slash).
+pub const HELP: &str = "\
+plain text        message to the agent in view (main by default)
+@agent text       direct message to an agent, without main (@main from an agent)
+/new [-w] [name:] objective   create an agent (-w: its own git worktree, --with-changes: with your changes)
+/archive [agent] [--force]    stop an agent and archive it, with its worktree
+/restore agent    bring an archived agent back (and its saved worktree)
+/isolate agent    give a worktree to an agent that has not changed anything yet
+/rename a b       rename an agent (the old name still works)
+/answer N text    answer card N
+/agents           list the agents and what they do
+/interrupt        interrupt the turn of the agent in view
+/compact          compact the conversation of the agent in view
+/model [m] [default]  the model of the agent in view (default: also config.toml's)
+/flow [pr|trunk]  how this repo ships code (PRs or straight to main), why, and switch it
+/reasoning [effort]   its reasoning effort (none, low, medium, high, max...)";
+
 impl Hub {
+    #[allow(clippy::too_many_arguments)]
     pub(super) fn user_input(
         &mut self,
         fx: &mut Fx,
@@ -17,6 +35,8 @@ impl Hub {
         focus: &str,
         text: &str,
         queued: bool,
+        parts: &str,
+        from: &str,
     ) {
         let focus = self.focus_of(client, focus);
         // only words wait for the turn's end: a command runs now
@@ -24,7 +44,7 @@ impl Hub {
         if queued && !matches!(cmd, UserCmd::Say(_) | UserCmd::To { .. }) {
             fx.push(notice(client, "commands run now, not queued"));
         }
-        self.user_cmd(fx, env, client, focus, cmd, queued);
+        self.user_cmd(fx, env, client, focus, cmd, queued, parts, from);
     }
 
     /// The agent `focus` names (main when none), now `client`'s focus.
@@ -39,20 +59,21 @@ impl Hub {
     }
 
     /// One command of `client`, for the agent `focus` (resolved).
-    pub(super) fn user_cmd(&mut self, fx: &mut Fx, env: &mut dyn Env, client: ClientId, focus: String, cmd: UserCmd, queued: bool) {
+    /// `parts`: the parts' JSON of his words (msg-parts, "" none): on a
+    /// say or a route, sb-core keeps them on the message. `from`: the
+    /// thread a say was typed in when not `focus`'s ("" none, at-start).
+    #[allow(clippy::too_many_arguments)]
+    pub(super) fn user_cmd(&mut self, fx: &mut Fx, env: &mut dyn Env, client: ClientId, focus: String, cmd: UserCmd, queued: bool, parts: &str, from: &str) {
         let c = Some(client);
         match cmd {
             UserCmd::Say(t) => {
                 if !t.is_empty() {
-                    self.core(fx, env, c, json!({"t": "say", "focus": focus, "text": t, "queued": queued}));
+                    self.core(fx, env, c, In::Say(ci::Say { focus, text: t, queued, parts: parts.into(), from: from.into() }));
                 }
             }
-            UserCmd::To { target, text } => self.core(
-                fx,
-                env,
-                c,
-                json!({"t": "route", "target": target, "text": text, "focus": focus, "queued": queued}),
-            ),
+            UserCmd::To { target, text } => {
+                self.core(fx, env, c, In::Route(ci::Route { target, text, focus, queued, parts: parts.into() }))
+            }
             UserCmd::New {
                 name,
                 brief,
@@ -68,11 +89,8 @@ impl Hub {
                     objective: brief,
                     ..Brief::default()
                 };
-                match new_task(name.as_deref(), &b, worktree, with_changes) {
-                    Ok(mut v) => {
-                        v["t"] = json!("new");
-                        self.core(fx, env, c, v)
-                    }
+                match new_task(name.as_deref(), &b, "", worktree, with_changes) {
+                    Ok(new) => self.core(fx, env, c, In::New(new)),
                     Err(e) => fx.push(notice(client, &e)),
                 }
             }
@@ -81,34 +99,16 @@ impl Hub {
                     client,
                     "usage: /archive <agent> (or /archive from the agent's view)",
                 )),
-                Some(name) => self.core(
-                    fx,
-                    env,
-                    c,
-                    json!({"t": "drop", "name": name, "force": force}),
-                ),
+                Some(name) => self.core(fx, env, c, In::Drop(ci::Drop { name, force })),
             },
-            UserCmd::Restore { name } => {
-                self.core(fx, env, c, json!({"t": "restore", "name": name}))
-            }
-            UserCmd::Isolate { name } => {
-                self.core(fx, env, c, json!({"t": "isolate", "name": name}))
-            }
+            UserCmd::Restore { name } => self.core(fx, env, c, In::Restore(ci::Restore { name })),
+            UserCmd::Isolate { name } => self.core(fx, env, c, In::Isolate(ci::Isolate { name })),
             UserCmd::Rename { name, new_name } => {
                 let valid = router::valid_name(&new_name);
-                self.core(
-                    fx,
-                    env,
-                    c,
-                    json!({"t": "rename", "name": name, "new_name": new_name, "valid": valid}),
-                )
+                self.core(fx, env, c, In::Rename(ci::Rename { name, new_name, valid }))
             }
-            UserCmd::Answer { card, text } => {
-                self.core(fx, env, c, json!({"t": "answer", "card": card, "text": text}))
-            }
-            UserCmd::Close { card } => {
-                self.core(fx, env, c, json!({"t": "close", "card": card}))
-            }
+            UserCmd::Answer { card, text, parts } => self.core(fx, env, c, In::Answer(ci::Answer { card, text, parts })),
+            UserCmd::Close { card } => self.core(fx, env, c, In::Close(ci::Close { card })),
             UserCmd::Tasks => fx.push(notice(client, &board::user_board(&self.st, env.now()))),
             UserCmd::Prs => {
                 // `prs`: the typed rows (bise-proto rows::Pr), the TUI
@@ -126,24 +126,21 @@ impl Hub {
             }
             UserCmd::Interrupt => {
                 self.interrupt_by = Some("user".into());
-                self.core(fx, env, c, json!({"t": "interrupt", "agent": focus}));
+                self.core(fx, env, c, In::Interrupt(ci::Interrupt { agent: focus }));
                 self.interrupt_by = None;
             }
+            UserCmd::Pause => self.core(fx, env, c, In::Pause(ci::Pause {})),
+            UserCmd::Resume => self.core(fx, env, c, In::Resume(ci::Resume {})),
             UserCmd::Passthrough(l) => {
                 let first = l.split_whitespace().next().unwrap_or("");
                 if first != "/compact" {
                     fx.push(notice(
                         client,
-                        &format!("unknown command: {} (see /help)", first),
+                        &format!("unknown command: {} · see /help", first),
                     ));
                     return;
                 }
-                self.core(
-                    fx,
-                    env,
-                    c,
-                    json!({"t": "passthrough", "focus": focus, "line": l}),
-                )
+                self.core(fx, env, c, In::Passthrough(ci::Passthrough { focus, line: l }))
             }
             UserCmd::Model { model, default } => fx.push(Effect::Choose {
                 client,
@@ -165,16 +162,46 @@ impl Hub {
             // the daemon runs these (proto_view::slash routes them before
             // the core; the TUI runs its own arms): a line that still
             // reaches the core gets today's words
-            UserCmd::Stop { .. } => fx.push(notice(client, "unknown command: /stop (see /help)")),
-            UserCmd::Approvals { .. } => fx.push(notice(client, "unknown command: /approvals (see /help)")),
+            UserCmd::Stop { .. } => fx.push(notice(client, "unknown command: /stop · see /help")),
+            UserCmd::Approvals { .. } => fx.push(notice(client, "unknown command: /approvals · see /help")),
             UserCmd::Version(v) => {
                 let first = match v {
                     bise_proto::slash::Version::Restart(_) => "/restart",
                     bise_proto::slash::Version::Update => "/update",
                     _ => "/version",
                 };
-                fx.push(notice(client, &format!("unknown command: {} (see /help)", first)));
+                fx.push(notice(client, &format!("unknown command: {} · see /help", first)));
             }
         }
     }
+}
+
+/// A new task's sb-core input (`sb spawn`, the user's `/new`, a feature's
+/// worktree name): its name checked or made from the objective.
+/// `parts`: the brief's parts (send-parts, `sb spawn --attach`; "" none):
+/// its text is then their render, the body and the markers after it.
+pub(super) fn new_task(name: Option<&str>, brief: &Brief, parts: &str, worktree: bool, with_changes: bool) -> Result<ci::New, String> {
+    if brief.objective.trim().is_empty() {
+        return Err("empty objective".into());
+    }
+    let base = match name {
+        Some(n) if !n.is_empty() => {
+            if !router::valid_name(n) {
+                return Err(format!("invalid name: {} ([a-z0-9-], 24 characters max)", n));
+            }
+            n.to_string()
+        }
+        _ => router::slug(&brief.objective),
+    };
+    Ok(ci::New {
+        base,
+        brief: json!(brief),
+        brief_text: match serde_json::from_str::<Vec<bise_proto::parts::Part>>(parts) {
+            Ok(p) if !p.is_empty() => bise_proto::parts::render(&p),
+            _ => prompts::brief_body(brief),
+        },
+        objective: brief.objective.clone(),
+        worktree,
+        with_changes,
+    })
 }

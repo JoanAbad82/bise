@@ -17,8 +17,9 @@ import Base
 import ../vendor/json.bend as J
 
 import ./model.bend as M
+import ./cold.bend as CO
 
-import ./codec.bend as C
+import ./gen/state.bend as S
 
 import ./cx.bend as X
 
@@ -26,19 +27,29 @@ import ./core.bend as H
 
 import ./view.bend as V
 
+# his message a step made (A1: AStep.msg)
+import ./said.bend as SD
+
+# his answer to a card a step made (inbox picks (3): AStep.ans_*)
+import ./picks.bend as PK
+
+# the link's requests and answers, generated from bise_proto::core
+import ./gen/link.bend as L
+
+# the hub's photo (issue 36): photo / restore_photo
+import ./photo.bend as PH
+
+import ./gen/journal.bend as GJ
+
+import ./gen/fx.bend as F
+
+# `part`: the chars read after the last newline, newest first (Cut)
 type Got is Type:
-  Got{s: Socket, h: H.Hub, buf: String}
+  Got{s: Socket, h: H.Hub, part: String}
 
-type Split is Data:
-  Split{line: String, rest: String}
-
-type Tag is Data:
-  TInit{}
-  TReplay{}
-  TReplayMany{}
-  TPing{}
-  TView{}
-  TStep{}
+type Cut is Data:
+  Line{line: String, rest: String}
+  More{part: String}
 
 type Flow is Type:
   Go{h: H.Hub}
@@ -46,7 +57,7 @@ type Flow is Type:
 def fx_json(f: X.Fx) -> J.Json:
   match f:
     case X.FJ{+e}:
-      J.obj([J.kv("fx", J.JStr{"journal"}), J.kv("ev", C.ev_json(e))])
+      J.obj(F.journal(GJ.json(e)))
     case X.FO{+o}:
       o
 
@@ -59,93 +70,98 @@ def fxs_json(xs: List<&2, X.Fx>) -> List<&2, J.Json>:
 
 # `before`: the runtime and wait marks before the step (V.changed). The
 # view carries only what the step changed: an idle tick answers a few
-# hundred bytes, whatever the history (idle-cpu)
+# hundred bytes, whatever the history (idle-cpu). `msg`: the id of his
+# message the step made (SD.said), for the asker's send result (A1).
+# `ans_*`: his answer to a card in the step (X.R.answered), for the
+# answer's result (inbox picks (3), architect m_22636)
 def answer.go(need: Maybe<&2, J.Json>, +h: H.Hub, +fx: List<&2, X.Fx>, +before: List<&2, V.Mark>) -> H.Hub & String:
   match need:
     case Some{+q}:
-      (h, J.stringify(J.obj([J.kv("need", q)])))
+      (h, J.stringify(L.answer_need(q)))
     case None{}:
-      (h, J.stringify(J.obj([J.kv("fx", J.JArr{fxs_json(fx)}), J.kv("dirty", J.JBool{X.R.dirty(H.Hub.r(h))}),
-        J.kv("view", V.view(H.Hub.d(h), X.R.rts(H.Hub.r(h)), X.R.waiters(H.Hub.r(h)), False{}, V.touched(X.journal(fx)),
-          V.changed(X.journal(fx), before, X.R.rts(H.Hub.r(h)), X.R.waiters(H.Hub.r(h))),
-          X.journal(fx)))])))
+      (h, J.stringify(L.answer_step(fxs_json(fx), X.R.dirty(H.Hub.r(h)),
+        V.view(H.Hub.d(h), X.R.rts(H.Hub.r(h)), X.R.waiters(H.Hub.r(h)), False{}, List.append(&2, Nat, V.touched(X.journal(fx)), V.moved_ids(X.journal(fx), S.St.hot(H.Hub.d(h)))),
+          List.append(&2, String, V.changed(X.journal(fx), before, X.R.rts(H.Hub.r(h)), X.R.waiters(H.Hub.r(h))), V.fx_names(fx)),
+          X.journal(fx)),
+        SD.said_id(SD.said(X.journal(fx))),
+        PK.card_of(X.R.answered(H.Hub.r(h))), PK.who_of(X.R.answered(H.Hub.r(h))), PK.said_of(X.R.answered(H.Hub.r(h))),
+        PK.ask_of(X.R.answered(H.Hub.r(h))), PK.pick_of_ans(X.R.answered(H.Hub.r(h))))))
 
 # the answer line of a committed step (H.commit, the law run_replays)
-def answer(+before: List<&2, V.Mark>, +o: H.Out) -> H.Hub & String:
-  answer.go(H.Out.need(o), H.Out.hub(o), H.Out.fx(o), before)
+def answer(+before: List<&2, V.Mark>, +o: H.Turn) -> H.Hub & String:
+  answer.go(H.Turn.need(o), H.Turn.hub(o), H.Turn.fx(o), before)
 
 # an event this hub does not know (written by a newer hub, before a
-# /version rollback) is not applied: the answer says so, the Rust side logs it
+# /version rollback), or a message_sent with a reused or older id, is
+# not applied (CO.replay_fresh): the answer says so, the Rust side logs it
 def replay(+h: H.Hub, m: Maybe<&2, M.Ev>) -> H.Hub & String:
   match m:
     case None{}:
-      (h, J.stringify(J.obj([J.kv("skipped", J.JBool{True{}})])))
+      (h, J.stringify(L.answer_skipped(True{})))
     case Some{+e}:
-      (H.Hub{M.apply(H.Hub.d(h), e), H.Hub.r(h)}, "{}")
+      +ok = CO.replay_fresh(H.Hub.d(h), e)
+      (H.Hub{CO.replay_one(ok, H.Hub.d(h), e), H.Hub.r(h), False{}}, J.stringify(Bool.pick(J.Json, ok, L.answer_done(), L.answer_skipped(True{}))))
 
 # {"t":"replay_many","evs":[..]}: a batch of journal events at boot,
-# answered {"skipped":[<index in the batch>..]}. The messages stay newest
-# first through the batch (M.apply_rev): linear, where one `replay` per
-# event was quadratic in the messages (a 20k-event journal: ~18 s).
+# answered {"skipped":[<index in the batch>..]} (CO.replay_batch).
 def evs_of(evs: List<&2, J.Json>) -> List<&2, Maybe<&2, M.Ev>>:
   match evs:
     case Nil{}:
       Nil{}
     case Con{+e, +rest}:
-      C.ev_of(e) <> evs_of(rest)
+      GJ.of(e) <> evs_of(rest)
 
-def json_list(m: Maybe<&2, J.Json>) -> List<&2, J.Json>:
-  match m:
-    case Some{J.JArr{+vals}}:
-      vals
-    case _:
-      Nil{}
-
-def replay_many.go(ms: List<&2, Maybe<&2, M.Ev>>, +st: M.St, +i: Nat, +sk: List<&2, J.Json>) -> M.St & List<&2, J.Json>:
-  match ms:
-    case Nil{}:
-      (st, List.reverse(&2, J.Json, sk))
-    case Con{None{}, +rest}:
-      replay_many.go(rest, st, 1n+i, J.JNum{i} <> sk)
-    case Con{Some{+e}, +rest}:
-      replay_many.go(rest, M.apply_rev(e, st), 1n+i, sk)
-
-def replay_many.done(p: M.St & List<&2, J.Json>, +r: X.R) -> H.Hub & String:
+def replay_many.done(p: S.St & List<&2, Nat>, +r: X.R) -> H.Hub & String:
   match p:
     case (+d, +sk):
-      (H.Hub{M.msgs_rev(d), r}, J.stringify(J.obj([J.kv("skipped", J.JArr{sk})])))
+      (H.Hub{d, r, False{}}, J.stringify(L.answer_skipped_at(sk)))
 
 def replay_many(+h: H.Hub, +evs: List<&2, J.Json>) -> H.Hub & String:
-  replay_many.done(replay_many.go(evs_of(evs), M.msgs_rev(H.Hub.d(h)), 0n, Nil{}), H.Hub.r(h))
+  replay_many.done(CO.replay_batch(evs_of(evs), H.Hub.d(h), 0n, Nil{}), H.Hub.r(h))
 
-def tag_of(+t: String) -> Tag:
-  Bool.pick(Tag, String.eq(t, "init"), TInit{},
-    Bool.pick(Tag, String.eq(t, "replay_many"), TReplayMany{},
-    Bool.pick(Tag, String.eq(t, "replay"), TReplay{},
-      Bool.pick(Tag, String.eq(t, "ping"), TPing{},
-        Bool.pick(Tag, String.eq(t, "view_all"), TView{}, TStep{})))))
+# `photo`: the durable state's photo, or why not (an env query pending)
+def photo.answer(m: Maybe<&2, J.Json>) -> J.Json:
+  match m:
+    case Some{+st}:
+      L.answer_photo(st)
+    case None{}:
+      L.answer_error("photo: an env query is pending")
 
-def handle.tag(tag: Tag, +h: H.Hub, +i: J.Json) -> H.Hub & String:
-  match tag:
-    case TInit{}:
-      (H.hub_new(J.get_str_or(i, "workspace", "")), "{}")
-    case TReplay{}:
-      replay(h, C.ev_of(Maybe.default(&2, J.Json, J.get(i, "ev"), J.JNull{})))
-    case TReplayMany{}:
-      replay_many(h, json_list(J.get(i, "evs")))
-    case TPing{}:
-      (h, "{}")
-    case TView{}:
-      (h, J.stringify(J.obj([J.kv("view", V.view(H.Hub.d(h), X.R.rts(H.Hub.r(h)), X.R.waiters(H.Hub.r(h)), True{}, Nil{}, Nil{}, Nil{}))])))
-    case TStep{}:
+# `restore_photo`: the hub from the photo; not an object: unchanged
+def restore_photo(m: Maybe<&2, H.Hub>, +h: H.Hub) -> H.Hub & String:
+  match m:
+    case Some{+h2}:
+      (h2, J.stringify(L.answer_done()))
+    case None{}:
+      (h, J.stringify(L.answer_error("restore_photo: only a hub that applied nothing yet, from a photo object")))
+
+# the link's own requests (gen/link.bend, from bise_proto::core::Link);
+# any other tag is a step of sb-core
+def handle.link(l: L.Link, +h: H.Hub, +i: J.Json) -> H.Hub & String:
+  match l:
+    case L.TInit{+workspace}:
+      (H.hub_new(workspace), J.stringify(L.answer_done()))
+    case L.TReplay{+ev}:
+      replay(h, GJ.of(ev))
+    case L.TReplayMany{+evs}:
+      replay_many(h, evs)
+    case L.TPing{}:
+      (h, J.stringify(L.answer_done()))
+    case L.TView{}:
+      (h, J.stringify(L.answer_view(V.view(H.Hub.d(h), X.R.rts(H.Hub.r(h)), X.R.waiters(H.Hub.r(h)), True{}, Nil{}, Nil{}, Nil{}))))
+    case L.TPhoto{}:
+      (h, J.stringify(photo.answer(PH.photo(h))))
+    case L.TRestorePhoto{+st}:
+      restore_photo(PH.restore(h, st), h)
+    case L.TStep{}:
       answer(V.marks(X.R.rts(H.Hub.r(h)), X.R.waiters(H.Hub.r(h))), H.commit(h, i))
 
 def handle.parsed(r: Result<&2, &2, String, J.Json>, +h: H.Hub) -> H.Hub & String:
   match r:
     case Fail{+e}:
-      (h, J.stringify(J.obj([J.kv("error", J.JStr{String.append("json: ", e)})])))
+      (h, J.stringify(L.answer_error(String.append("json: ", e))))
     case Done{+i}:
-      handle.tag(tag_of(J.get_str_or(i, "t", "")), h, i)
+      handle.link(L.of(i), h, i)
 
 # one input line
 def handle(+h: H.Hub, +line: String) -> H.Hub & String:
@@ -153,34 +169,41 @@ def handle(+h: H.Hub, +line: String) -> H.Hub & String:
 
 # ---- the line server ----
 
-def send_line.after(r: Socket & Result<&1, &1, U32 & String, Unit>) -> IO(Socket):
+# a failed send's error carries the text the kernel did not take (bend
+# 2.0.37): dropped, as the failed send itself always was
+def send_line.after(r: Socket & Result<&1, &1, (U32 & String) & String, Unit>) -> IO(Socket):
   match r:
     case (s, _):
       IO.pure(Socket, s)
 
+# the text, then its newline: two sends; appending the newline copied
+# the whole answer to add one char (view_all: 30 MB, ~0.2 s)
 def send_line(s: Socket, +text: String) -> IO(Socket):
   do IO<Socket>:
-    r : Socket & Result<&1, &1, U32 & String, Unit> <- TCP.send(s, String.append(text, "\n"))
+    r0 : Socket & Result<&1, &1, (U32 & String) & String, Unit> <- TCP.send(s, text)
+    s2 : Socket <- send_line.after(r0)
+    r : Socket & Result<&1, &1, (U32 & String) & String, Unit> <- TCP.send(s2, "\n")
     send_line.after(r)
 
-# split the buffer at the first newline: (line, rest), or None
-def split_line.go(s: String, +acc: String) -> Maybe<&2, Split>:
-  match s:
+# the received `data` after `part` (the line so far, newest first): the
+# first whole line and the data after it, or More: the line so far with
+# `data` in it. Each char is read once: a line that comes in many recvs
+# is never appended to nor scanned again (the old buffer was appended to
+# and rescanned from its start at each recv: quadratic in a big line)
+def cut(data: String, +part: String) -> Cut:
+  match data:
     case SNil{}:
-      None{}
+      More{part}
     case SCon{'\n', +t}:
-      Some{Split{String.reverse(acc), t}}
+      Line{String.reverse(part), t}
     case SCon{+c, +t}:
       # a pattern, not Bool.pick: pick computes both of its arguments, so
       # it reversed the whole prefix at every char (quadratic in the line)
-      split_line.go(t, SCon{c, acc})
-
-def split_line(+s: String) -> Maybe<&2, Split>:
-  split_line.go(s, "")
+      cut(t, SCon{c, part})
 
 @unsafe
-def lines(s: Socket, +h: H.Hub, +buf: String) -> IO(Got):
-  lines.split(split_line(buf), s, h, buf)
+def lines(s: Socket, +h: H.Hub, +part: String, +data: String) -> IO(Got):
+  lines.split(cut(data, part), s, h)
 
 @unsafe
 def lines.answer(p: H.Hub & String, s: Socket, +rest: String) -> IO(Got):
@@ -188,40 +211,58 @@ def lines.answer(p: H.Hub & String, s: Socket, +rest: String) -> IO(Got):
     case (+h2, +out):
       do IO<Got>:
         s2 : Socket <- send_line(s, out)
-        lines(s2, h2, rest)
+        lines(s2, h2, "", rest)
 
 @unsafe
-def lines.split(m: Maybe<&2, Split>, s: Socket, +h: H.Hub, +buf: String) -> IO(Got):
+def lines.split(m: Cut, s: Socket, +h: H.Hub) -> IO(Got):
   match m:
-    case None{}:
-      IO.pure(Got, Got{s, h, buf})
-    case Some{Split{+l, +rest}}:
+    case More{+part}:
+      IO.pure(Got, Got{s, h, part})
+    case Line{+l, +rest}:
       lines.answer(handle(h, l), s, rest)
 
 @unsafe
-def conn.after(rm: Socket & Result<&1, &1, U32 & String, String>, +h: H.Hub, +buf: String) -> IO(H.Hub):
+def conn.after(rm: Socket & Result<&1, &1, U32 & String, Maybe<&1, String>>, +h: H.Hub, +part: String) -> IO(H.Hub):
   match rm:
     case (s, Fail{_}):
       do IO<H.Hub>:
         Socket.close(s)
         IO.pure(H.Hub, h)
-    case (s, Done{+data}):
-      conn.data(String.is_empty(data), s, h, String.append(buf, data))
+    case (s, Done{m}):
+      conn.got(s, h, part, recv_text(m))
+
+# TCP.recv's None (bend 2.0.37: the peer sent everything) is the closed
+# connection the empty text was before
+def recv_text(m: Maybe<&1, String>) -> String:
+  match m:
+    case None{}:
+      ""
+    case Some{+d}:
+      d
 
 @unsafe
-def conn(s: Socket, +h: H.Hub, +buf: String) -> IO(H.Hub):
+def conn.got(s: Socket, +h: H.Hub, +part: String, +data: String) -> IO(H.Hub):
+  conn.data(String.is_empty(data), s, h, part, data)
+
+@unsafe
+def conn(s: Socket, +h: H.Hub, +part: String) -> IO(H.Hub):
   do IO<H.Hub>:
-    rm : Socket & Result<&1, &1, U32 & String, String> <- TCP.recv(s, 65536)
-    conn.after(rm, h, buf)
+    # TCP.recv decodes each recv on its own: a multi-byte char a recv
+    # boundary cuts would read as U+FFFD. Safe only because the hub writes
+    # every line ASCII-only (bise_proto::ascii, CoreLink::call; its test
+    # pins no byte >= 0x80, issue 36); the REPL's reader decodes bytes
+    # across recvs instead (core/utf8.bend)
+    rm : Socket & Result<&1, &1, U32 & String, Maybe<&1, String>> <- TCP.recv(s, 65536)
+    conn.after(rm, h, part)
 
 @unsafe
 def conn.next(r: Got) -> IO(H.Hub):
   match r:
-    case Got{s, +h, +buf}:
-      conn(s, h, buf)
+    case Got{s, +h, +part}:
+      conn(s, h, part)
 
 @unsafe
-def conn.data(closed: Bool, s: Socket, +h: H.Hub, +buf: String) -> IO(H.Hub):
+def conn.data(closed: Bool, s: Socket, +h: H.Hub, +part: String, +data: String) -> IO(H.Hub):
   match closed:
     case True{}:
       do IO<H.Hub>:
@@ -229,7 +270,7 @@ def conn.data(closed: Bool, s: Socket, +h: H.Hub, +buf: String) -> IO(H.Hub):
         IO.pure(H.Hub, h)
     case False{}:
       do IO<H.Hub>:
-        r : Got <- lines(s, h, buf)
+        r : Got <- lines(s, h, part, data)
         conn.next(r)
 
 @unsafe

@@ -2,8 +2,14 @@
 //! from the Rust types with ts-rs (feature `ts`, so bise and sb never
 //! compile ts-rs), never hand-edited (architect m_9476).
 //!
-//! - one `.ts` per wire module (hub, draft, thread, rows, diff, context,
-//!   helper, pty) + `json.ts` (serde_json's Value) + `index.ts`;
+//! - one `.ts` per wire module (hub, draft, core_ev, app_cmd, app_rows,
+//!   thread, rows, diff, ops, context, helper, pty, rpc, commands, app_rpc) + `json.ts`
+//!   (serde_json's Value) + `index.ts`; `methods.gen.ts`: rpc's tables;
+//!   `app_methods.gen.ts`: app_rpc's names as constants;
+//! - `anchor.ts` also goes, the same bytes, to
+//!   `office/sdk/src/anchor.gen.ts` (the office SDK's `at()` takes it);
+//! - `words_<area>.gen.ts` + `words.gen.ts`: the UI words (bise_proto::words),
+//!   and their JSON for the Python tests in `tests/words/` (see `ts/words.rs`);
 //! - `fixtures.gen.ts`: every fixture line as a typed constant, so
 //!   `pnpm typecheck` fails when a fixture doesn't fit its generated type;
 //! - u64/i64 come out as `number` (ids, positions, `*_ms`: safe below 2^53),
@@ -15,7 +21,10 @@
 //! stale; `BISE_PROTO_BLESS=1` writes them.
 #![cfg(feature = "ts")]
 
-use bise_proto::{context, diff, draft, helper, hub, pty, rows, thread};
+#[path = "ts/words.rs"]
+mod words;
+
+use bise_proto::{activity, anchor, app_cmd, app_rows, app_rpc, commands, core_ev, context, diff, draft, helper, hub, inbox, log, ops, parts, pty, rows, rpc, thread};
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::Write;
 use std::path::{Path, PathBuf};
@@ -57,13 +66,39 @@ fn modules(cfg: &Config) -> Vec<(&'static str, Vec<Decl>)> {
     vec![
         module!(cfg, "json": serde_json::Value),
         module!(cfg, "context": context::FnContext),
-        module!(cfg, "diff": diff::LineKind, diff::DiffLine, diff::Hunk, diff::DiffFile, diff::DiffResult, diff::Series),
-        module!(cfg, "rows": rows::Status, rows::ReportKind, rows::Report, rows::Agent, rows::Opt, rows::CardPage, rows::Card, rows::Merged, rows::DevServer, rows::Worktree, rows::FeatureTry, rows::Feature, rows::PrState, rows::PrChecks, rows::PrReview, rows::Pr, rows::ModelRole, rows::Model, rows::Artifact, rows::ArtifactVersion, rows::ScheduledTask, rows::AgentUsage, rows::WaitingOn, rows::ApprovalMode, rows::CheckerKind, rows::ApprovalRule),
-        module!(cfg, "thread": thread::EntryKind, thread::ToolKind, thread::ToolState, thread::FileCount, thread::ToolItem, thread::Tools, thread::EntryCard, thread::PageRef, thread::ReportRef, thread::Thinking, thread::NoticeLevel, thread::Notice, thread::NotDelivered, thread::Landed, thread::PrNewsState, thread::PrNews, thread::Made, thread::ImageRef, thread::Answered, thread::ApprovalFold, thread::Scheduled, thread::TurnFailed, thread::Entry),
-        module!(cfg, "hub": hub::JobState, hub::Job, hub::HubEv, hub::Mode, hub::HubCmd, hub::ErrorKind),
-        module!(cfg, "draft": draft::Quote, draft::Queued, draft::DraftHubCmd, draft::ProjectRow, draft::OpenWhat, draft::Account, draft::Found, draft::AwayProject, draft::Plugin, draft::PluginLogin, draft::CuRow, draft::RoleRow, draft::Runs, draft::PickChoice, draft::PickArg, draft::PickCommand, draft::PickSkill, draft::PickFile, draft::PickFolder, draft::CoreEv, draft::AppCmd, draft::TalkPage, draft::ProjectView, draft::IndexRow),
+        module!(cfg, "anchor": anchor::Rect, anchor::Anchor),
+        module!(cfg, "parts": parts::PageNote, parts::HintKind, parts::Part),
+        module!(cfg, "diff": diff::LineKind, diff::DiffLine, diff::Hunk, diff::DiffFile, diff::DiffResult, diff::Series, diff::DiffView),
+        module!(cfg, "rows": rows::Status, rows::Phase, rows::ReportKind, rows::Report, rows::Agent, rows::ArchivedAgent, rows::OptAct, rows::Opt, rows::CardPage, rows::ArtLink, rows::Card, rows::CardBatch, rows::ReleaseNotes, rows::Merged, rows::ProcKind, rows::ProcState, rows::OutKind, rows::Fd1, rows::Proc, rows::Worktree, rows::FeatureTry, rows::Feature, rows::PrState, rows::PrChecks, rows::PrReview, rows::Pr, rows::Page, rows::Place, rows::ModelRole, rows::Model, rows::Artifact, rows::ArtifactPr, rows::ArtifactVersion, rows::ArtifactLive, rows::ArtifactBack, rows::Folder, rows::FolderOp, rows::ArtifactMoved, rows::LibraryProject, rows::ScheduledTask, rows::ScheduledEnd, rows::AgentUsage, rows::WaitingOn, rows::AgentMode, rows::Changes, rows::FlowMode, rows::ApprovalMode, rows::CheckerKind, rows::ApprovalRule, rows::WatchKind, rows::AgentWatch, rows::UsageSum, rows::UsageRow, rows::SwitchPhase, rows::SwitchRow, rows::DoingKind, rows::Doing, rows::Growth, rows::Pulse, rows::News, rows::NewsWhat, rows::BiseUpdateState, rows::BiseUpdate),
+        module!(cfg, "thread": thread::EntryKind, thread::ToolKind, thread::ToolState, thread::GateWait, thread::ToolGate, thread::FileCount, thread::ToolItem, thread::Tools, thread::EntryCard, thread::PageRef, thread::ReportRef, thread::Thinking, thread::Delivery, thread::NoticeLevel, thread::Notice, thread::NotDelivered, thread::Landed, thread::PrNewsState, thread::PrNews, thread::Made, thread::ImageRef, thread::Answered, thread::ApprovalFold, thread::Scheduled, thread::TurnFailed, thread::WakeEv, thread::WakeFold, thread::Went, thread::Entry, thread::RetryEnd, thread::Retry, thread::find::FindHit),
+        module!(
+            cfg,
+            "log": log::LogRole,
+            log::LogBodyKind,
+            log::LogBody,
+            log::LogItem,
+            log::CompBlock,
+            log::CompRow,
+            log::CompRole,
+            log::CompKind,
+            log::CompPart,
+            log::CompSlot,
+            log::CompletionAsk,
+            log::Completion,
+            log::BodyOf
+        ),
+        module!(cfg, "ops": ops::BranchRow, ops::VersionItem, ops::ReleaseEv, ops::UpdateEv),
+        module!(cfg, "inbox": inbox::InboxState, inbox::InboxKind, inbox::Where, inbox::AnswerAt, inbox::InboxRecord, inbox::StateFilter, inbox::HistoryParams, inbox::InboxPage),
+        module!(cfg, "hub": hub::JobState, hub::Job, activity::Party, activity::MsgMode, activity::ActivityEv, hub::HubEv, hub::Mode, hub::SendOpts, hub::HubCmd, hub::ErrorKind),
+        module!(cfg, "rpc": rpc::Id, rpc::Request, rpc::Notification, rpc::Response, rpc::ErrorData, rpc::RpcError, rpc::Watermark, rpc::ClientInfo, rpc::InitializeParams, rpc::HubState, rpc::AgentGetParams, rpc::AgentGetResult, rpc::InitializeResult, rpc::CommandsList, rpc::CommandRunResult, rpc::SendReason, rpc::SendResult, rpc::CardAnswer, rpc::AnswerResult),
+        module!(cfg, "commands": commands::WordRow, commands::ArgRow, commands::CommandRow),
+        module!(cfg, "draft": draft::Quote, draft::Queued, draft::DraftHubCmd, draft::ProjectView),
+        module!(cfg, "app_rows": app_rows::ProjectRow, app_rows::OpenWhat, app_rows::Account, app_rows::KeyFrom, app_rows::CheckState, app_rows::CheckWhy, app_rows::Found, app_rows::AwayProject, app_rows::Plugin, app_rows::PluginLogin, app_rows::PluginKind, app_rows::PluginScope, app_rows::PluginState, app_rows::PluginAction, app_rows::PluginPart, app_rows::PluginPreview, app_rows::PluginRun, app_rows::RunTransport, app_rows::PartKind, app_rows::LoginState, app_rows::ConnectorsProblem, app_rows::PluginsSummary, app_rows::PluginSuggest, app_rows::Why, app_rows::WhySource, app_rows::SuggestKind, app_rows::CuRow, app_rows::ComputerAgent, app_rows::LiveKind, app_rows::PeekShot, app_rows::VoiceLit, app_rows::RoleRow, app_rows::Runs, app_rows::PickChoice, app_rows::PickArg, app_rows::PickCommand, app_rows::PickSkill, app_rows::PickFile, app_rows::PickFolder, app_rows::IndexRow, app_rows::StateAgent, app_rows::StateCard, app_rows::PhasePage, app_rows::PreviewAction, app_rows::PreviewWait, app_rows::PreviewReport),
+        module!(cfg, "core_ev": core_ev::CoreEv),
+        module!(cfg, "app_cmd": app_cmd::AppCmd, app_cmd::TalkPage, app_cmd::PluginAddKind, app_cmd::SecretValue, app_cmd::Secret, app_cmd::ImportFrom, app_cmd::FolderItem),
         module!(cfg, "helper": helper::HelperEv, helper::Responsible, helper::FnAct, helper::TalkKey, helper::Grant, helper::QuietWhy, helper::Perm, helper::PermAction, helper::HelperCmd),
         module!(cfg, "pty": pty::PtyEv, pty::PtyCmd),
+        module!(cfg, "app_rpc": app_rpc::AppClient, app_rpc::AppInit, app_rpc::AppInitResult),
     ]
 }
 
@@ -72,8 +107,8 @@ fn modules(cfg: &Config) -> Vec<(&'static str, Vec<Decl>)> {
 const FIXTURES: &[(&str, &str, &str)] = &[
     ("hub_ev.jsonl", "HubEv", "hub"),
     ("hub_cmd.jsonl", "HubCmd", "hub"),
-    ("core_ev.jsonl", "CoreEv", "draft"),
-    ("app_cmd.jsonl", "AppCmd", "draft"),
+    ("core_ev.jsonl", "CoreEv", "core_ev"),
+    ("app_cmd.jsonl", "AppCmd", "app_cmd"),
     ("draft_hub_cmd.jsonl", "DraftHubCmd", "draft"),
     ("project_view.json", "ProjectView", "draft"),
     ("context.jsonl", "FnContext", "context"),
@@ -81,6 +116,10 @@ const FIXTURES: &[(&str, &str, &str)] = &[
     ("helper_cmd.jsonl", "HelperCmd", "helper"),
     ("pty_ev.jsonl", "PtyEv", "pty"),
     ("pty_cmd.jsonl", "PtyCmd", "pty"),
+    ("command_run_result.jsonl", "CommandRunResult", "rpc"),
+    ("send_result.jsonl", "SendResult", "rpc"),
+    ("answer_result.jsonl", "AnswerResult", "rpc"),
+    ("anchor.jsonl", "Anchor", "anchor"),
 ];
 
 fn proto_dir() -> PathBuf {
@@ -152,6 +191,62 @@ fn render_fixtures() -> String {
     s
 }
 
+/// The app <-> core JSON-RPC names (bise_proto::app_rpc), so the window's
+/// main process maps commands and events from the same owner.
+fn render_app_methods() -> String {
+    let list = |xs: Vec<String>| xs.iter().map(|x| format!("{x:?}")).collect::<Vec<_>>().join(", ");
+    let mut s = String::new();
+    header(&mut s);
+    writeln!(s, "// bise_proto::app_rpc's names: core/<tag> and hub/<tag>, params = the command's or event's fields.").unwrap();
+    writeln!(s).unwrap();
+    writeln!(s, "export const PROTO = {};", bise_proto::PROTO).unwrap();
+    writeln!(s, "export const INITIALIZE = {:?};", app_rpc::INITIALIZE).unwrap();
+    writeln!(s, "export const INITIALIZED = {:?};", app_rpc::INITIALIZED).unwrap();
+    writeln!(s, "/** the tags a command with a project sends to that project's hub (hub/<tag>) */").unwrap();
+    writeln!(s, "export const HUB_CMDS = [{}] as const;", list(app_rpc::hub_cmds().map(str::to_string).collect())).unwrap();
+    writeln!(s, "export const METHODS = [{}] as const;", list(app_rpc::methods())).unwrap();
+    writeln!(s, "export const NOTIFICATIONS = [{}] as const;", list(app_rpc::notifications())).unwrap();
+    writeln!(s, "/** never logged, by the core or the app: a broken or refused one is logged as its name and size */").unwrap();
+    writeln!(s, "export const NO_LOG = [{}] as const;", list(app_rpc::NO_LOG.iter().map(|x| x.to_string()).collect())).unwrap();
+    writeln!(s, "/** the prefs key of when he last looked at a project: SEEN_PREFIX + its id (bise_proto::rows::seen_key) */").unwrap();
+    writeln!(s, "export const SEEN_PREFIX = {:?};", bise_proto::rows::SEEN_PREFIX).unwrap();
+    s
+}
+
+/// The JSON-RPC tables (bise_proto::rpc): each method's HubCmd tag and
+/// result HubEv tag, each notification's HubEv tag and scope, so the
+/// window's client maps them from the same owner (architect m_13089).
+fn render_methods() -> String {
+    let mut s = String::new();
+    header(&mut s);
+    writeln!(s, "// bise_proto::rpc's tables: a method's params are its HubCmd's fields, a notification's its HubEv's.").unwrap();
+    writeln!(s).unwrap();
+    writeln!(s, "export const PROTO = {};", bise_proto::PROTO).unwrap();
+    writeln!(s, "export const OWN_METHODS = [{}] as const;", rpc::OWN_METHODS.iter().map(|m| format!("{m:?}")).collect::<Vec<_>>().join(", ")).unwrap();
+    writeln!(s).unwrap();
+    writeln!(s, "export const METHODS = {{").unwrap();
+    for r in rpc::METHODS {
+        let result = r.result.map_or("null".to_string(), |t| format!("{t:?}"));
+        writeln!(s, "  {:?}: {{ cmd: {:?}, result: {result} }},", r.method, r.cmd).unwrap();
+    }
+    writeln!(s, "}} as const;").unwrap();
+    writeln!(s).unwrap();
+    writeln!(s, "export const NOTIFICATIONS = {{").unwrap();
+    for r in rpc::NOTIFICATIONS {
+        let scope = format!("{:?}", r.scope).to_lowercase();
+        writeln!(s, "  {:?}: {{ ev: {:?}, scope: {scope:?} }},", r.method, r.ev).unwrap();
+    }
+    writeln!(s, "}} as const;").unwrap();
+    writeln!(s).unwrap();
+    writeln!(s, "// the methods whose result is its own type, not a HubEv's fields").unwrap();
+    writeln!(s, "export const RESULTS = {{").unwrap();
+    for (m, t) in rpc::OWN_RESULTS {
+        writeln!(s, "  {m:?}: {t:?},").unwrap();
+    }
+    writeln!(s, "}} as const;").unwrap();
+    s
+}
+
 fn render_all() -> BTreeMap<String, String> {
     let cfg = Config::new().with_large_int("number");
     let modules = modules(&cfg);
@@ -166,12 +261,40 @@ fn render_all() -> BTreeMap<String, String> {
     header(&mut index);
     writeln!(index).unwrap();
     for (file, decls) in &modules {
-        out.insert(format!("{file}.ts"), render_module(file, decls, &home));
+        let mut text = render_module(file, decls, &home);
+        if *file == "anchor" {
+            // the kinds at run time too (architect m_23712: no list typed by hand in TS or kit/)
+            let kinds = anchor::Anchor::KINDS.iter().map(|k| format!("{k:?}")).collect::<Vec<_>>().join(", ");
+            writeln!(text, "\n/** the kinds this version knows (bise_proto::anchor::Anchor::KINDS) */").unwrap();
+            writeln!(text, "export const ANCHOR_KINDS = [{kinds}] as const;").unwrap();
+        }
+        out.insert(format!("{file}.ts"), text);
         writeln!(index, "export type * from './{file}';").unwrap();
     }
     out.insert("index.ts".to_string(), index);
     out.insert("fixtures.gen.ts".to_string(), render_fixtures());
+    out.insert("app_methods.gen.ts".to_string(), render_app_methods());
+    out.insert("methods.gen.ts".to_string(), render_methods());
+    out.insert("chips.gen.ts".to_string(), render_chips());
+    out.extend(words::render_ts(header));
     out
+}
+
+/// bise_proto::parts' table of what a path becomes (architect m_21764 B):
+/// the window reads these, never a list of its own.
+fn render_chips() -> String {
+    let list = |xs: &[&str]| xs.iter().map(|x| format!("{x:?}")).collect::<Vec<_>>().join(", ");
+    let mut s = String::new();
+    header(&mut s);
+    writeln!(s, "// bise_proto::parts' chip table: an image chip by these extensions, any other file a file chip (an @ pick, a drop, a paste).").unwrap();
+    writeln!(s).unwrap();
+    writeln!(s, "export const IMAGE_EXTS = [{}] as const;", list(parts::IMAGE_EXTS)).unwrap();
+    writeln!(s, "// a file chip shows its name, cut at this many characters with a glued '…'").unwrap();
+    writeln!(s, "export const FILE_CHIP_CHARS = {};", parts::FILE_CHIP_CHARS).unwrap();
+    let marks = parts::NO_SPACE_BEFORE.iter().map(|c| format!("{:?}", c.to_string())).collect::<Vec<_>>().join(", ");
+    writeln!(s, "// the marks that take no space after a chip ('❝ 1, which?')").unwrap();
+    writeln!(s, "export const NO_SPACE_BEFORE = [{marks}] as const;").unwrap();
+    s
 }
 
 #[test]
@@ -208,16 +331,60 @@ fn the_typescript_types_are_fresh() {
     assert!(stale.is_empty(), "apps/desktop/src/proto is stale: {stale:?}; run {BLESS}=1 cargo test -p bise-proto --features ts --test ts");
 }
 
+/// The office SDK's copy of `anchor.ts` (architect m_23712: one generator,
+/// two outputs, so office/sdk never imports from apps/desktop).
+fn sdk_anchor() -> PathBuf {
+    Path::new(env!("CARGO_MANIFEST_DIR")).join("../../office/sdk/src/anchor.gen.ts")
+}
+
+#[test]
+fn the_sdk_anchor_type_is_fresh() {
+    let want = render_all().remove("anchor.ts").expect("anchor.ts is rendered");
+    let p = sdk_anchor();
+    if std::env::var_os(BLESS).is_some_and(|v| v == "1") {
+        std::fs::write(&p, &want).unwrap_or_else(|e| panic!("{}: {e}", p.display()));
+        return;
+    }
+    let have = std::fs::read_to_string(&p).unwrap_or_default();
+    assert!(have == want, "office/sdk/src/anchor.gen.ts is stale; run {BLESS}=1 cargo test -p bise-proto --features ts --test ts");
+}
+
 #[test]
 fn omitted_fields_are_optional_and_ids_are_numbers() {
     let cfg = Config::new().with_large_int("number");
-    // Hello's typed_only: default + skip_serializing_if, so absent on the wire
+    // PageVoice's text: default + skip_serializing_if, so absent on the wire
     let cmd = hub::HubCmd::decl(&cfg);
-    assert!(cmd.contains("typed_only?: boolean"), "{cmd}");
+    assert!(cmd.contains("text?: string"), "{cmd}");
     // Thread's before: an Option written as null when there is none
     let ev = hub::HubEv::decl(&cfg);
     assert!(ev.contains("before: number | null"), "{ev}");
     assert!(!ev.contains("bigint"), "{ev}");
     // the Unknown variants are not in the TS
     assert!(!ev.contains("\"unknown\"") && !ev.contains("raw:"), "{ev}");
+}
+
+#[test]
+fn the_words_json_is_fresh() {
+    let dir = words::json_dir();
+    let want = words::render_json();
+    let present: Vec<String> = std::fs::read_dir(&dir)
+        .map(|rd| rd.filter_map(|e| e.ok()).map(|e| e.file_name().to_string_lossy().to_string()).filter(|n| n.ends_with(".gen.json")).collect())
+        .unwrap_or_default();
+    if std::env::var_os(BLESS).is_some_and(|v| v == "1") {
+        std::fs::create_dir_all(&dir).unwrap();
+        for name in present.iter().filter(|n| !want.contains_key(*n)) {
+            std::fs::remove_file(dir.join(name)).unwrap();
+        }
+        for (name, text) in &want {
+            std::fs::write(dir.join(name), text).unwrap();
+        }
+        return;
+    }
+    let mut stale: Vec<String> = want
+        .iter()
+        .filter(|(name, text)| std::fs::read_to_string(dir.join(name)).ok().as_deref() != Some(text.as_str()))
+        .map(|(name, _)| name.clone())
+        .collect();
+    stale.extend(present.iter().filter(|n| !want.contains_key(*n)).map(|n| format!("{n} (not generated)")));
+    assert!(stale.is_empty(), "tests/words is stale: {stale:?}; run {BLESS}=1 cargo test -p bise-proto --features ts --test ts");
 }

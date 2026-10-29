@@ -1,0 +1,336 @@
+/* The floating composer (Host.tsx; page native-mac §6, mockups 6-8): fixed at the shell's root, 24
+   from the bottom, centred on the content's column (its left set inline). At rest a 560 × 44 pill,
+   r 22, --c-overlay over --glass, --e-2: '+', the field on one line, the mic, send. Focused 640, r 16,
+   its head 40 (─ 28, 'to bise ⌄' 13/500, the grip) over a 48 field. Open 640 × 560 (70% of the
+   window's height at most), --e-3, the mini thread scrolls over the field and its rule. It unfolds
+   in --d-base --ease-out (0 under reduce motion, the tokens' fallback). */
+.cmp-float {
+  position: fixed;
+  z-index: 40;
+  bottom: var(--float-bottom);
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  width: var(--float-w);
+  max-width: calc(100vw - var(--s-12));
+  /* it grows up from the bottom to its max height in every state, never over the window's top */
+  max-height: var(--float-max-h);
+  border-radius: var(--r-5);
+  background: var(--c-overlay);
+  backdrop-filter: var(--glass);
+  box-shadow: var(--e-2);
+  transition:
+    width var(--d-base) var(--ease-out),
+    height var(--d-base) var(--ease-out),
+    border-radius var(--d-base) var(--ease-out),
+    box-shadow var(--d-base) var(--ease-out);
+}
+.cmp-float[data-state='focus'],
+.cmp-float[data-state='open'] {
+  width: var(--float-w-focus);
+  border-radius: var(--r-4);
+}
+.cmp-float[data-state='open'] {
+  height: min(var(--float-h-open), var(--float-max-h));
+  box-shadow: var(--e-3);
+}
+/* open with nothing in the thread yet, or its first page still on its way: one line over the field
+   (the empty line, or the loading dots), no blank glass */
+.cmp-float[data-state='open'][data-empty] {
+  height: auto;
+}
+.cmp-float[data-empty] .body {
+  flex: none;
+}
+.cmp-float[data-empty] .th-loading {
+  flex: none;
+  min-height: var(--s-10);
+}
+/* its dots on the empty line's inset, the line's height, never on the glass's edge */
+.cmp-float[data-empty] .th-loading .th-sync {
+  top: 0;
+  height: auto;
+  padding: 0 var(--s-4);
+}
+.cmp-float .body-empty {
+  margin: 0;
+  padding: var(--s-4);
+  font: var(--f-ui);
+  color: var(--c-text-3);
+}
+/* the head: ─ 28, 'to bise ⌄' 13/500, the grip at its right; a rule under it */
+.cmp-float .hd {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  height: var(--s-10);
+  padding: 0 var(--s-2);
+  box-shadow: inset 0 -1px 0 var(--c-line);
+  font: 500 var(--f-ui);
+  color: var(--c-text);
+}
+/* files dragged over the window: the thread's zone over the whole float (his m_44892), what is under it dims */
+.cmp-float:has(> .art-give) > :not(.art-give) {
+  opacity: 0.2;
+}
+/* 'to bise ⌄': the ds PickerTrigger's chip, text-2 at 400 as the docked strip's 'to bise'
+   (composer-target's rule: main never stands out, designer m_47289) */
+.cmp-float .hd .cmp-float-to {
+  min-width: 0;
+  font: inherit;
+  font-weight: 400;
+  color: var(--c-text-2);
+}
+/* 'to perf ⌄': his words go to an agent that is not main, in the accent (his ask m_44704) */
+.cmp-float .hd .cmp-float-to.other {
+  color: var(--c-accent);
+  font-weight: 600;
+}
+/* an inbox item open here: its label; in the accent only while his words answer its question (an
+   approval waits for its buttons: his words go as a plain message) */
+.cmp-float .hd .cmp-float-ans {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--c-text-2);
+}
+.cmp-float .hd .cmp-float-ans.acc {
+  color: var(--c-accent);
+}
+/* an item his words close without answering it: 'to perf' in the accent at 600, its rest text-3 (designer m_44890) */
+.cmp-float .hd .cmp-float-ans.to {
+  color: var(--c-text-3);
+}
+.cmp-float .hd .cmp-float-ans.to .who {
+  color: var(--c-accent);
+  font-weight: 600;
+}
+/* ─ and the grip: 28 square icon buttons, the 6% hover (their tips say what they do) */
+.cmp-float .hd .cmp-tool {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--h-control-sm);
+  height: var(--h-control-sm);
+  padding: 0;
+  border: 0;
+  border-radius: var(--r-2);
+  background: none;
+  color: var(--c-text-2);
+}
+.cmp-float .hd .cmp-tool:hover,
+.cmp-float .hd .cmp-tool[aria-expanded='true'] {
+  background: var(--c-hover);
+  color: var(--c-text);
+}
+.cmp-float .hd .grip {
+  margin-left: auto;
+  color: var(--c-text-3);
+}
+/* its chevron: up while the thread is hidden (a click shows it), down while shown */
+.cmp-float .hd .grip[aria-expanded='false'] svg {
+  transform: rotate(180deg);
+}
+/* the mini thread: the addressee's own rows, scrolling over the field */
+.cmp-float .body {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  /* the thread's column inside the glass (Gabriel m_44317: the rows sat flush on its edges): the
+     rows' text, their separators and the day lines 24 in from each side (--pad-column, like the
+     field and the bar row), the list's scroller and its fades still edge to edge. These are
+     .th-screen's (thread.css): the float's rows are not in a thread screen */
+  --th-col: calc(100% - 2 * var(--pad-column));
+  --th-col-x: var(--pad-column);
+  --lh-row: 1.5;
+  --s-thread-end: var(--s-6);
+  --th-mark: 1em;
+}
+/* the composer inside: no frame of its own (the float is the frame), one row: '+', the field, the
+   mic, send; 44 at rest, 48 focused; a rule over it when the thread is open */
+.cmp-float .b-composer {
+  flex: none;
+  padding: 0;
+}
+.cmp-float .b-composer .box,
+.cmp-float .b-composer .box:focus-within,
+.cmp-float .b-composer .box.is-focus {
+  flex-direction: row;
+  align-items: center;
+  gap: var(--s-2);
+  width: 100%;
+  min-height: var(--float-h);
+  padding: 0 var(--s-2);
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+}
+.cmp-float[data-state='focus'] .b-composer .box,
+.cmp-float[data-state='open'] .b-composer .box {
+  min-height: var(--s-12);
+}
+.cmp-float[data-state='open'] .b-composer .box,
+.cmp-float[data-state='open'] .b-composer .box:focus-within {
+  box-shadow: inset 0 1px 0 var(--c-line);
+}
+/* answering a card: the box's 1.5 px accent border follows the glass's corners (his m_46152: it
+   was square, the box has no radius of its own here), inside the glass's edge, never over it; an
+   agent that is not main too (his m_47126) */
+.cmp-float .b-composer .box.ans,
+.cmp-float .b-composer .box.ans:focus-within,
+.cmp-float .b-composer .box.ans.is-focus {
+  border-radius: var(--r-4);
+  box-shadow: inset 0 0 0 1.5px var(--c-accent);
+}
+.cmp-float[data-state='rest'] .b-composer .box.ans {
+  border-radius: var(--r-5);
+}
+/* the composer's one-off notice (the hub's flow hint, a refused command) is its box's head: never
+   at rest, the pill is '+', the field, the mic, send (§6, ui-review m_43779); focused or open, its
+   own line over the field */
+.cmp-float .b-composer .box {
+  flex-wrap: wrap;
+}
+/* border-box: its 100% holds its padding, so a notice cuts with its '…' inside it, never past the
+   box's right edge (designer m_47289) */
+.cmp-float .b-composer .box > .head {
+  order: -1;
+  flex: 1 0 100%;
+  box-sizing: border-box;
+  min-width: 0;
+  padding: var(--s-2) var(--s-2) 0;
+}
+/* the notice from its start, its words right after the mark, never a lone '·' out in the row */
+.cmp-float .b-composer .box > .head > .notice {
+  justify-content: flex-start;
+}
+.cmp-float[data-state='rest'] .b-composer .box > .head {
+  display: none;
+}
+/* a 0 basis: a long line wraps in the field (then the float goes tall, useFit.ts), never takes a
+   row of its own with '+' alone above it (ui-review m_45663) */
+.cmp-float .b-composer .box > .line {
+  order: 1;
+  flex: 1 1 0;
+  min-width: 0;
+  padding: var(--s-2) 0;
+}
+.cmp-float .b-composer .box > .row {
+  display: contents;
+}
+.cmp-float .b-composer .box > .row > * {
+  order: 2;
+}
+.cmp-float .b-composer .box > .row > .cmp-plus {
+  order: 0;
+}
+.cmp-float .b-composer .box > .row > .sp {
+  display: none;
+}
+/* its max: what the float has left for it (useFit.ts --cmp-field-max: 4 lines at least, then the
+   list and the question give way), else half the float's max */
+.cmp-float .b-composer .in .b-field {
+  max-height: var(--cmp-field-max, calc(var(--float-max-h) / 2));
+}
+/* grown (a second line, an attachment: useFit.ts data-tall), the docked box's layout (designer
+   m_45666): his words on their own lines, then one row, '+' at the left, mic and send at the right */
+.cmp-float[data-tall] .b-composer .box,
+.cmp-float[data-tall] .b-composer .box:focus-within,
+.cmp-float[data-tall] .b-composer .box.is-focus {
+  flex-direction: column;
+  flex-wrap: nowrap;
+  align-items: stretch;
+  gap: 0;
+  padding: 0;
+}
+.cmp-float[data-tall] .b-composer .box > .head {
+  flex: none;
+}
+.cmp-float[data-tall] .b-composer .box > .line {
+  order: 0;
+  flex: none;
+  padding: var(--s-3) var(--s-4) var(--s-2);
+}
+.cmp-float[data-tall] .b-composer .box > .row {
+  display: flex;
+  order: 1;
+}
+.cmp-float[data-tall] .b-composer .box > .row > * {
+  order: 0;
+}
+.cmp-float[data-tall] .b-composer .box > .row > .sp {
+  display: block;
+}
+/* no room for 4 lines of his words: the list keeps 2 rows and says how many it hid (useFit.ts
+   data-attach-cut, AttachList's '+ N more') */
+.cmp-float[data-attach-cut] .b-composer .b-attach-row:nth-child(n + 3) {
+  display: none;
+}
+.cmp-float[data-attach-cut] .b-composer .b-attach-more {
+  display: flex;
+  align-items: center;
+  flex: none;
+  height: var(--h-row-tight);
+  padding: 0 var(--s-1);
+  font: var(--t-12) var(--font-ui);
+  color: var(--c-text-3);
+}
+/* the inbox item opened here (^1-3, ⌘I): under the head, flat in the float (never a frame in a
+   frame), a rule between it and the field */
+.cmp-float .inbox-block {
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  box-shadow: inset 0 -1px 0 var(--c-line);
+  /* the float stops at its max height (.cmp-float): once his field is down to 4 lines and the
+     list to 2 rows (useFit.ts), the open question's text gives way and scrolls; its options, its
+     foot and the float's head stay (designer m_45666, his m_45466: the float grew over the
+     window's top) */
+  flex: 0 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.cmp-float .inbox-block > * {
+  flex: none;
+}
+/* and past the question's text, the inbox's other lines (its head, the other items) fold away: the
+   open question and its options stay (useFit.ts data-inbox-fold) */
+.cmp-float[data-inbox-fold] .inbox-block > :not(.inbox-block-open) {
+  display: none;
+}
+/* its open item lies flat too (ui-review m_42926): no card's fill, radius or frame in the glass; a
+   question that takes his words keeps the 2 px accent rail on its left */
+.cmp-float .inbox-block-open {
+  margin: 0;
+}
+.cmp-float .inbox-block > .inbox-block-open {
+  flex: 0 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.cmp-float .inbox-block-open .ic {
+  flex: 0 1 auto;
+  min-height: 0;
+  overflow: hidden;
+}
+.cmp-float .inbox-block-open .ic-opts {
+  flex: none;
+}
+.cmp-float .inbox-block-open .ic,
+.cmp-float .inbox-block-open[data-answering] .ic {
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+}
+.cmp-float .inbox-block-open[data-answering] .ic {
+  box-shadow: inset 2px 0 0 var(--c-accent);
+}

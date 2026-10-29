@@ -12,9 +12,12 @@ import ./persist.bend as P
 import ./remote.bend as Rem
 import ../core/config.bend as Cf
 import ../vendor/http/http.bend as Http
+import ../vendor/http/dns/dns-pure.bend as Dnp
 import ../vendor/http/encoding/encoding.bend as Enc
 import ./settings.bend as St
 import ./provider-pure.bend as Pvp
+import ./plan-pure.bend as Plan
+import ./plan.bend as Pl
 import ../core/image.bend as Im
 import ./debug.bend as Dbg
 import ./debug-pure.bend as Dp
@@ -24,6 +27,8 @@ import ../core/ev.bend as Ev
 import ./race.bend as Race
 import ./race-pure.bend as Rcp
 import ./sse-read.bend as Sr
+import ./live-pure.bend as Lp
+import ./reqlog.bend as Rl
 # ---- the live provider call, fully in Bend (hub HTTP client) ----
 # The wire request (MODEL/TOOL/MSG/CALL lines) becomes the provider
 # JSON in core/api.bend, is POSTed by the hub HTTP client, and the reply
@@ -35,8 +40,8 @@ def net_of(e: Http.Err) -> Pvp.NetErr:
   match e:
     case Http.ErrUrl{}:
       Pvp.NUrl{}
-    case Http.ErrDns{}:
-      Pvp.NDns{}
+    case Http.ErrDns{+m}:
+      Pvp.NDns{Dnp.why(m), Dnp.check(m)}
     case Http.ErrConnect{+c, +w}:
       Pvp.NConnect{c, w}
     case Http.ErrTls{+c, +w}:
@@ -52,35 +57,6 @@ def net_of(e: Http.Err) -> Pvp.NetErr:
     case Http.ErrBad{}:
       Pvp.NBad{}
 
-# BEND_WIRE_DUMP=<path>: write the last provider request body (debug)
-def dump_wire.write(+path: String, +body: String) -> IO(Unit):
-  do IO<Unit>:
-    u : Unit <- P.write_file(path, body)
-    IO.pure(Unit, Unit{})
-
-def dump_wire.skip(empty: Bool, +path: String, +body: String) -> IO(Unit):
-  match empty:
-    case True{}:
-      IO.pure(Unit, Unit{})
-    case False{}:
-      dump_wire.write(path, body)
-
-def dump_wire(+path: String, +body: String) -> IO(Unit):
-  dump_wire.skip(String.is_empty(path), path, body)
-
-# BEND_WIRE_DUMP ending in "/" (a folder: the hub's BISE_DEBUG_REQUESTS):
-# one file per attempt, <call ms>-<try>.json, all kept (the TUI's /log
-# shows them as what the model got); else the path itself (the last one)
-def dump_path.pick(dir: Bool, +path: String, +call: Nat, +tries: Nat) -> String:
-  match dir:
-    case True{}:
-      String.concat([path, Nat.show(call), "-", Nat.show(tries), ".json"])
-    case False{}:
-      path
-
-def dump_path(+path: String, +call: Nat, +tries: Nat) -> String:
-  dump_path.pick(String.ends_with(path, "/"), path, call, tries)
-
 # the family's headers (core/api.bend), set in their order
 def headers_of(hs: List<&2, Api.Hdr>, m: Map<&2, List<&2, String>>)
     -> Map<&2, List<&2, String>>:
@@ -94,21 +70,17 @@ def model_headers(st: Api.Style, +betas: String, +key: String)
     -> Map<&2, List<&2, String>>:
   headers_of(Api.headers(st, betas, key), Http.empty())
 
-# BEND_WIRE_DUMP also captures the raw provider response (suffix .reply):
-# the tool-call arguments exactly as the provider serialized them,
-# before any harness parsing - the ground truth for wire-encoding bugs.
-def model_call.dump_res(+path: String, +body: String) -> IO(Unit):
-  do IO<Unit>:
-    u : Unit <- P.write_file(String.append(path, ".reply"), body)
-    IO.pure(Unit, Unit{})
-
-def model_call.res.dumper(m: Result<&1, &1, U32 & String, String>, +res: Http.Res)
+# the ring also keeps the raw reply of a family that answers whole
+# (<slot>.json.reply, runtime/reqlog.bend): the tool-call arguments
+# exactly as the provider serialized them, before any harness parsing -
+# the ground truth for wire-encoding bugs. rpath "": no ring.
+def model_call.res.dumper(empty: Bool, +rpath: String, +res: Http.Res)
     -> IO(Unit):
-  match m:
-    case Fail{_}:
+  match empty:
+    case True{}:
       IO.pure(Unit, Unit{})
-    case Done{+path}:
-      model_call.dump_res(path, Http.text(res))
+    case False{}:
+      P.write_file(rpath, Http.text(res))
 
 # a response, judged by the pure policy: its status, its Retry-After,
 # and the reply the style mapper made of its body
@@ -133,12 +105,11 @@ def got_res(+res: Http.Res, st: Api.Style) -> Got:
       Got{verdict_res(res, st), status, Http.text(res)}
 
 def model_call.verdict(r: Result<&2, &2, Http.Err, Http.Res>, st: Api.Style,
-    +host: String) -> IO(Got):
+    +host: String, +rpath: String) -> IO(Got):
   match r:
     case Done{+res}:
       do IO<Got>:
-        dr : Result<&1, &1, U32 & String, String> <- IO.get_env("BEND_WIRE_DUMP")
-        d : Unit <- model_call.res.dumper(dr, res)
+        d : Unit <- model_call.res.dumper(String.is_empty(rpath), rpath, res)
         IO.pure(Got, got_res(res, st))
     case Fail{+e}:
       IO.pure(Got, got_err(host, e))
@@ -152,7 +123,7 @@ type Out is Type:
   OStd{}
   ONet{sock: Socket}
 
-def out.pair(sm: Socket & Result<&1, &1, U32 & String, Unit>) -> Socket:
+def out.pair(sm: Socket & Result<&1, &1, (U32 & String) & String, Unit>) -> Socket:
   match sm:
     case (s2, _):
       s2
@@ -188,7 +159,7 @@ def note(n: Out, +line: String) -> IO(Out):
     case ONet{sock}:
       do IO<Out>:
         wire_log(String.append(line, "\n"))
-        sm : Socket & Result<&1, &1, U32 & String, Unit> <- TCP.send(sock,
+        sm : Socket & Result<&1, &1, (U32 & String) & String, Unit> <- TCP.send(sock,
           String.append(line, "\n"))
         s2 : Socket <- IO.pure(Socket, out.pair(sm))
         IO.pure(Out, ONet{s2})
@@ -286,13 +257,12 @@ def model_call.step(a: Pvp.Attempt, n: Out, +k: Nat, +tries: Nat, +req: U32,
 def sse.text(+parts: List<&2, String>) -> String:
   Enc.utf8.decode(String.join(List.reverse(&2, String, parts), ""))
 
-def sse.dump(m: Result<&1, &1, U32 & String, String>, +text: String)
-    -> IO(Unit):
-  match m:
-    case Fail{_}:
+def sse.dump(empty: Bool, +rpath: String, +text: String) -> IO(Unit):
+  match empty:
+    case True{}:
       IO.pure(Unit, Unit{})
-    case Done{+path}:
-      model_call.dump_res(path, text)
+    case False{}:
+      P.write_file(rpath, text)
 
 # a 200 streams events; any other status carries a plain error body
 def sse.verdict.pick(ok: Bool, +status: U32, +retry_after: String,
@@ -305,10 +275,9 @@ def sse.verdict.pick(ok: Bool, +status: U32, +retry_after: String,
         Api.reply_of_for(st, status, text))
 
 def sse.body(+status: U32, +retry_after: String, +text: String,
-    st: Api.Style) -> IO(Got):
+    st: Api.Style, +rpath: String) -> IO(Got):
   do IO<Got>:
-    dr : Result<&1, &1, U32 & String, String> <- IO.get_env("BEND_WIRE_DUMP")
-    d : Unit <- sse.dump(dr, text)
+    d : Unit <- sse.dump(String.is_empty(rpath), rpath, text)
     IO.pure(Got,
       Got{sse.verdict.pick(U32.is_eq(status, 200), status, retry_after, text,
         st), status, text})
@@ -316,12 +285,12 @@ def sse.body(+status: U32, +retry_after: String, +text: String,
 # a stream cut short keeps what it had received (the debug log shows
 # how far the reply got)
 def sse.done(rd: Sr.Rd, +status: U32, +retry_after: String, +ck: Sr.Ck,
-    +host: String, +w: Pvp.Wait, fam: Api.Style) -> IO(Got):
+    +host: String, +w: Pvp.ProvWait, fam: Api.Style, +rpath: String) -> IO(Got):
   match rd:
     case Sr.RdEnd{st, +parts}:
       do IO<Got>:
         c : Unit <- Http.stream.close(st)
-        sse.body(status, retry_after, sse.text(parts), fam)
+        sse.body(status, retry_after, sse.text(parts), fam, rpath)
     case Sr.RdErr{st, +parts, +e}:
       do IO<Got>:
         c : Unit <- Http.stream.close(st)
@@ -339,60 +308,69 @@ def sse.done(rd: Sr.Rd, +status: U32, +retry_after: String, +ck: Sr.Ck,
             IO.pure(Got, Got{Pvp.AFail{"cancelled"}, status, sse.text(parts)})
 
 @unsafe
-def sse.head(sr: Http.Stream & Http.Res, +ck: Sr.Ck, +host: String,
-    +w: Pvp.Wait, fam: Api.Style) -> IO(Got):
+def sse.head(sr: Http.Stream & Http.Res, +c: Chan(Race.Step<Got>), +lv: Lp.Lv,
+    +ck: Sr.Ck, +host: String, +w: Pvp.ProvWait, fam: Api.Style,
+    +rpath: String) -> IO(Got):
   match sr:
     case (st, res):
       match res:
         case Http.Res{+status, +h, _}:
           do IO<Got>:
-            rd : Sr.Rd <- Sr.sse.check(st, Nil{}, ck, 0)
+            rd : Sr.Rd <- Sr.sse.check(Got, c, lv, st, Nil{}, ck, 0)
             sse.done(rd, status, Http.header(h, "retry-after"), ck, host,
-              w, fam)
+              w, fam, rpath)
 
 @unsafe
-def sse.opened(r: Result<&1, &1, Http.Err, Http.Stream>, +ck: Sr.Ck,
-    +host: String, +w: Pvp.Wait, fam: Api.Style) -> IO(Got):
+def sse.opened(r: Result<&1, &1, Http.Err, Http.Stream>,
+    +c: Chan(Race.Step<Got>), +lv: Lp.Lv, +ck: Sr.Ck, +host: String,
+    +w: Pvp.ProvWait, fam: Api.Style, +rpath: String) -> IO(Got):
   match r:
     case Fail{+e}:
       IO.pure(Got, Got{Pvp.attempt_err_in(host, w, net_of(e)), 0, ""})
     case Done{st}:
-      sse.head(Http.stream.res(st), ck, host, w, fam)
+      sse.head(Http.stream.res(st), c, lv, ck, host, w, fam, rpath)
 
 # the wait (Pvp.stream_wait): the provider's idle_timeout_sec, else 90 s;
-# tok: the attempt's token in the cancel file at cpath
+# tok: the attempt's token in the cancel file at cpath; c, lv: the race
+# channel its partials go to and its live reader (runtime/live-pure.bend)
 @unsafe
-def sse.call(+tok: String, +cpath: String, +url: String,
-    hdrs: Map<&2, List<&2, String>>, +body: String, +w: Pvp.Wait,
-    fam: Api.Style) -> IO(Got):
+def sse.call(+c: Chan(Race.Step<Got>), +lv: Lp.Lv, +tok: String,
+    +cpath: String, +url: String, hdrs: Map<&2, List<&2, String>>,
+    +body: String, +w: Pvp.ProvWait, fam: Api.Style, +rpath: String) -> IO(Got):
   do IO<Got>:
     r : Result<&1, &1, Http.Err, Http.Stream> <- Http.open.with("POST", url,
       hdrs, body, Pvp.wait_ms(w))
-    sse.opened(r, Sr.Ck{cpath, tok, Pvp.wait_ms(w)}, Pvp.url_host(url), w, fam)
+    sse.opened(r, c, lv, Sr.Ck{cpath, tok, Pvp.wait_ms(w)}, Pvp.url_host(url),
+      w, fam, rpath)
 
 # the whole reply at once (a family that does not stream)
 def whole.call(+url: String, hdrs: Map<&2, List<&2, String>>, +body: String,
-    st: Api.Style) -> IO(Got):
+    st: Api.Style, +rpath: String) -> IO(Got):
   do IO<Got>:
     r : Result<&2, &2, Http.Err, Http.Res> <- Http.fetch.with("POST", url,
       hdrs, body, Pvp.step_timeout_ms())
-    model_call.verdict(r, st, Pvp.url_host(url))
+    model_call.verdict(r, st, Pvp.url_host(url), rpath)
 
 @unsafe
-def call.by_style.pick(streams: Bool, +tok: String, +cpath: String,
-    st: Api.Style, +url: String, hdrs: Map<&2, List<&2, String>>,
-    +body: String, +w: Pvp.Wait) -> IO(Got):
+def call.by_style.pick(streams: Bool, +c: Chan(Race.Step<Got>), +lv: Lp.Lv,
+    +tok: String, +cpath: String, st: Api.Style, +url: String,
+    hdrs: Map<&2, List<&2, String>>, +body: String, +w: Pvp.ProvWait,
+    +rpath: String) -> IO(Got):
   match streams:
     case True{}:
-      sse.call(tok, cpath, url, hdrs, body, w, st)
+      sse.call(c, lv, tok, cpath, url, hdrs, body, w, st, rpath)
     case False{}:
-      whole.call(url, hdrs, body, st)
+      whole.call(url, hdrs, body, st, rpath)
 
-# the family says whether it streams (core/api.bend)
+# the family says whether it streams (core/api.bend); rpath: the ring's
+# .reply for a whole answer ("" none)
 @unsafe
-def call.by_style(+tok: String, +cpath: String, +st: Api.Style, +url: String,
-    hdrs: Map<&2, List<&2, String>>, +body: String, +w: Pvp.Wait) -> IO(Got):
-  call.by_style.pick(Api.streams(st), tok, cpath, st, url, hdrs, body, w)
+def call.by_style(+c: Chan(Race.Step<Got>), +lv: Lp.Lv, +tok: String,
+    +cpath: String, +st: Api.Style, +url: String,
+    hdrs: Map<&2, List<&2, String>>, +body: String, +w: Pvp.ProvWait,
+    +rpath: String) -> IO(Got):
+  call.by_style.pick(Api.streams(st), c, lv, tok, cpath, st, url, hdrs, body,
+    w, rpath)
 
 # the cancel file of this REPL (race-pure.bend), next to its interrupt flag
 def cancel_path() -> IO(String):
@@ -406,27 +384,65 @@ def cancel_path() -> IO(String):
 # cancel file (it closes its connection at its next piece or quiet
 # slice), and the call ends as an interrupted attempt (AFail: no retry);
 # the boundary drain after model_call then applies the interrupt
-def call.raced.got(r: Race.Raced<Got>, +tok: String, +cpath: String)
-    -> IO(Got):
+def call.raced.got(n: Out, r: Race.Raced<Got>, +tok: String, +cpath: String)
+    -> IO(Out & Got):
   match r:
     case Race.Won{g}:
-      IO.pure(Got, g)
+      IO.pure(Out & Got, (n, g))
     case Race.Stopped{+who}:
-      do IO<Got>:
+      do IO<Out & Got>:
         u : Unit <- P.write_file(cpath, tok)
-        IO.pure(Got, Got{Pvp.AFail{Pvp.interrupted_by(who)}, 0, ""})
+        IO.pure(Out & Got, (n, Got{Pvp.AFail{Pvp.interrupted_by(who)}, 0, ""}))
+
+# a partial line: the hub reads the REPL's lines from the wire log only
+# (switchboard daemon/repl.rs pump_wire; the socket is only drained), so
+# a partial goes there and nowhere else: no TCP send, and the log's path
+# read once per call (wpath), not per partial (R40's CPU bar)
+def note.partial(n: Out, +wpath: String, +line: String) -> IO(Out):
+  match n:
+    case OStd{}:
+      do IO<Out>:
+        IO.print(line)
+        IO.pure(Out, OStd{})
+    case ONet{sock}:
+      do IO<Out>:
+        wire_log.when(String.is_empty(wpath), wpath, String.append(line, "
+"))
+        IO.pure(Out, ONet{sock})
+
+# the race read until its end; each partial the attempt sends is written
+# here, by the one owner of the wire (Out)
+@unsafe
+def call.raced.read(x: Race.Next<Got>, n: Out, +c: Chan(Race.Step<Got>),
+    +ipath: String, +tok: String, +cpath: String, +wpath: String)
+    -> IO(Out & Got):
+  match x:
+    case Race.NPart{+line}:
+      do IO<Out & Got>:
+        n2 : Out <- note.partial(n, wpath, line)
+        y : Race.Next<Got> <- Race.next(Got, c, ipath)
+        call.raced.read(y, n2, c, ipath, tok, cpath, wpath)
+    case Race.NDone{r}:
+      call.raced.got(n, r, tok, cpath)
 
 # every model attempt goes through here (the one call.by_style caller):
-# raced against the interrupt flag, so a stop ends it within a tick
+# raced against the interrupt flag, so a stop ends it within a tick.
+# id: the attempt's partial id (<call>.<attempt>); live: its text is the
+# agent's answer, so it streams in (Lp.lv0)
 @unsafe
-def call.raced(+tok: String, +st: Api.Style, +url: String,
-    hdrs: Map<&2, List<&2, String>>, +body: String, +w: Pvp.Wait) -> IO(Got):
-  do IO<Got>:
+def call.raced(n: Out, +tok: String, +id: String, live: Bool,
+    +st: Api.Style, +url: String, hdrs: Map<&2, List<&2, String>>,
+    +body: String, +w: Pvp.ProvWait, +rpath: String) -> IO(Out & Got):
+  do IO<Out & Got>:
     +ipath : String <- interrupt_path()
     +cpath : String <- cancel_path()
-    r : Race.Raced<Got> <- Race.until_stop(Got, ipath,
-      call.by_style(tok, cpath, st, url, hdrs, body, w))
-    call.raced.got(r, tok, cpath)
+    +c : Chan(Race.Step<Got>) <- Race.open(Got, +c2 =>
+      call.by_style(c2, Lp.lv0(live, id, st), tok, cpath, st, url, hdrs, body,
+        w, rpath))
+    fr : Result<&1, &1, U32 & String, String> <- IO.get_env("BEND_WIRE_LOG")
+    +wpath : String <- IO.pure(String, P.env_or(fr, ""))
+    x : Race.Next<Got> <- Race.next(Got, c, ipath)
+    call.raced.read(x, n, c, ipath, tok, cpath, wpath)
 
 # the attempt, into the session debug log when it is an incident
 def model_call.log(+call: Nat, +tries: Nat, +model: String, +url: String,
@@ -437,12 +453,14 @@ def model_call.log(+call: Nat, +tries: Nat, +model: String, +url: String,
 
 # the attempt the Core reads (Pvp.attempt_for, BISE-293); on a ChatGPT
 # plan provider, its failures read as the plan's lines (Pvp.attempt_plan)
+# (a model the plan refuses: Plan.refused_line, model = the id called)
 def got_for(+tools: List<&2, W.WTool>, +name: String, +key: String,
-    plan: Bool, +st: Api.Style, g: Got) -> Pvp.Attempt:
+    +plan: Bool, +model: String, +st: Api.Style, g: Got) -> Pvp.Attempt:
   match g:
     case Got{+a, +status, +raw}:
-      Pvp.attempt_plan(plan, status, Api.error_code(st, raw),
-        Pvp.attempt_for(tools, name, key, status, raw, a))
+      Pvp.attempt_plan.line(Plan.refused_line(plan, status, raw, model),
+        Pvp.attempt_plan(plan, status, Api.error_code(st, raw),
+          Pvp.attempt_for(tools, name, key, status, raw, a)))
 
 def got_attempt(g: Got) -> Pvp.Attempt:
   match g:
@@ -468,7 +486,7 @@ def img_cap() -> Nat:
 
 def img_dir() -> IO(String):
   do IO<String>:
-    +d : String <- P.env_path("BEND_IMAGE_DIR", "/.bend-harness/images")
+    +d : String <- P.env_path("BEND_IMAGE_DIR", "/.bise/images")
     IO.pure(String, String.append(d, "/"))
 
 def head_of(r: Result<&1, &1, U32 & String, String>) -> String:
@@ -621,41 +639,75 @@ def unpaired_log(bad: Bool, +call: Nat, +req: U32) -> IO(Unit):
         Dbg.append(d, Dp.ev_line(ts, "unpaired_calls_answered",
           Con{Dp.FNat{"call", call}, Con{Dp.FNat{"req", U32.to_nat(req)}, Nil{}}}) ++ "\n")
 
+# the attempt's result, once its partials are written
+def got_then(ng: Out & Got, f: Out -> Got -> IO(Out & Rem.RemoteRes))
+    -> IO(Out & Rem.RemoteRes):
+  match ng:
+    case (n, g):
+      f(n)(g)
+
+# THE body of a request: what model_call.sent sends and what the render
+# mode prints (BISE_RENDER, runtime/render.bend: /debug completion), one
+# function, so the body /debug shows is the body sent. Beside it, what
+# the call needs: the parsed request, the models file, the cache names
+# and key (BISE-268), the JSON before its images, the images' fill.
+type Built is Data:
+  Built{wreq: W.WReq, mfile: String, names: Pvp.CNames, ckey: String,
+    json: String, fill: Im.IFill, body: String}
+
+@unsafe
+def request_body(+request: String, +pv: Pvp.Prov, +limit: Nat) -> IO(Built):
+  match pv:
+    case Pvp.Prov{+prov, +model, +st, _, _, +facts}:
+      do IO<Built>:
+        # a one-shot call (BISE_ONESHOT, BISE-126) goes out light:
+        # no thinking / effort keys (runtime/oneshot-pure.bend)
+        osr : Result<&1, &1, U32 & String, String> <- IO.get_env("BISE_ONESHOT")
+        +wreq : W.WReq <- IO.pure(W.WReq, W.parse_wire(request))
+        +mfile : String <- models_file()
+        +names : Pvp.CNames <- IO.pure(Pvp.CNames,
+          Pvp.cache_names(mfile, prov, String.concat([prov, "/", model])))
+        +ckey : String <- IO.pure(String, Api.session_key(wreq))
+        +json : String <- IO.pure(String,
+          Osp.light_if(Bool.not(String.is_empty(P.env_or(osr, ""))),
+            Api.wire_body(st, Api.with_cache_key(Pvp.cache_field(names), ckey,
+              Api.api_body_for(st, model, facts, W.pair_wire(wreq))))))
+        +fill : Im.IFill <- img_body(json, limit)
+        IO.pure(Built, Built{wreq, mfile, names, ckey, json, fill,
+          Enc.utf8.encode(fill_body(fill))})
+
 # one call = up to max_attempts attempts; `call` (its start time, ms)
 # names the call in the debug log
 @unsafe
 def model_call.try(fuel: Nat, +tries: Nat, n: Out, +request: String,
     +key: String, +pv: Pvp.Prov, +call: Nat, +req: U32, +limit: Nat,
-    +shrunk: Bool) -> IO(Out & Rem.RemoteRes):
+    +shrunk: Bool, +live: Bool) -> IO(Out & Rem.RemoteRes):
   match fuel:
     case 0n:
       IO.pure(Out & Rem.RemoteRes,
         (n, Rem.RRErr{"provider unreachable: retries exhausted"}))
     case 1n+k:
+      do IO<Out & Rem.RemoteRes>:
+        +b : Built <- request_body(request, pv, limit)
+        model_call.sent(b, k, tries, n, request, key, pv, call, req, limit,
+          shrunk, live)
+
+# one attempt with its body built: logged in the ring (/debug
+# completion, runtime/reqlog.bend) before it goes out, then sent
+@unsafe
+def model_call.sent(b: Built, +k: Nat, +tries: Nat, n: Out,
+    +request: String, +key: String, +pv: Pvp.Prov, +call: Nat, +req: U32,
+    +limit: Nat, +shrunk: Bool, +live: Bool) -> IO(Out & Rem.RemoteRes):
+  match b:
+    case Built{+wreq, +mfile, +names, +ckey, +json, +fill, +body}:
       match pv:
         case Pvp.Prov{+prov, +model, +st, +url, _, +facts}:
           do IO<Out & Rem.RemoteRes>:
-            # a one-shot call (BISE_ONESHOT, BISE-126) goes out light:
-            # no thinking / effort keys (runtime/oneshot-pure.bend)
-            osr : Result<&1, &1, U32 & String, String> <- IO.get_env("BISE_ONESHOT")
             # the last guard (BISE-242): every call answered, logged
             # when it had to answer one
-            +wreq : W.WReq <- IO.pure(W.WReq, W.parse_wire(request))
             og : Unit <- unpaired_log(W.wire_unpaired(wreq), call, req)
-            # BISE-268: the prompt cache's routing key, as the catalog
-            # names it for this provider (a body field and/or a header)
-            +mfile : String <- models_file()
-            +names : Pvp.CNames <- IO.pure(Pvp.CNames,
-              Pvp.cache_names(mfile, prov, String.concat([prov, "/", model])))
-            +ckey : String <- IO.pure(String, Api.session_key(wreq))
-            +json : String <- IO.pure(String,
-              Osp.light_if(Bool.not(String.is_empty(P.env_or(osr, ""))),
-                Api.wire_body(st, Api.with_cache_key(Pvp.cache_field(names), ckey,
-                  Api.api_body_for(st, model, facts, W.pair_wire(wreq))))))
-            +fill : Im.IFill <- img_body(json, limit)
-            +body : String <- IO.pure(String, Enc.utf8.encode(fill_body(fill)))
-            dr : Result<&1, &1, U32 & String, String> <- IO.get_env("BEND_WIRE_DUMP")
-            dump_dbg : Unit <- dump_wire(dump_path(P.env_or(dr, ""), call, tries), body)
+            rl : Unit <- Rl.write(req, live, String.concat([prov, "/", model]),
+              tries, call, fill_body(fill), request)
             # a gateway (headers_env, key_command), read on each call:
             # its extra headers, its key also as a bearer token
             +hvar : String <- IO.pure(String,
@@ -669,31 +721,35 @@ def model_call.try(fuel: Nat, +tries: Nat, n: Out, +request: String,
                 Api.with_bearer(bearer, key,
                   Api.with_cache_header(Pvp.cache_header(names), ckey,
                     Api.headers(st, Api.facts_betas(facts), key)))), Http.empty()))
+            +rpath : String <- Rl.reply_path(req)
             # a slow gateway or local model: its idle_timeout_sec
-            +g : Got <- call.raced(String.concat([Nat.show(call), "-", Nat.show(tries)]),
+            ng : Out & Got <- call.raced(n,
+              String.concat([Nat.show(call), "-", Nat.show(tries)]),
+              String.concat([Nat.show(call), ".", Nat.show(tries)]), live,
               st, url, hdrs, body,
-              Pvp.stream_wait(mfile, prov, String.concat([prov, "/", model])))
-            lg : Unit <- model_call.log(call, tries, model, url, json, g)
-            # the usage line names the full id (the TUI's catalog key)
-            nu : Out <- usage_note(g, n, st, String.concat([prov, "/", model]), req)
-            # big-request: a body over the provider's size limit goes
-            # again once, its images within half its weight
-            # (model_call.sized); else BISE-293: the calls named back
-            # through the request's tools, a refusal in bise's words and
-            # the provider's
-            model_call.sized(Bool.and(Bool.not(shrunk),
-                Bool.and(W.size_refused(got_status(g), got_raw(g)),
-                  Nat.is_lt(0n, fill_img_bytes(fill)))),
-              nu, k, tries, req,
-              Pvp.size_retry_why(Pvp.prov_display(mfile, prov), got_status(g),
-                Nat.div(fill_bytes(fill), 2n)),
-              k4 => n3 => model_call.step(got_for(W.req_tools(wreq),
-                  Pvp.prov_display(mfile, prov), key, Api.facts_plan(facts), st, g),
-                n3, k4, tries, req,
-                k2 => n2 => model_call.try(k2, Nat.add(tries, 1n), n2, request,
-                  key, pv, call, req, limit, shrunk)),
-              k3 => n4 => model_call.try(k3, Nat.add(tries, 1n), n4, request,
-                key, pv, call, req, Nat.div(fill_bytes(fill), 2n), True{}))
+              Pvp.stream_wait(mfile, prov, String.concat([prov, "/", model])), rpath)
+            got_then(ng, n0 => +g => do IO<Out & Rem.RemoteRes>:
+              lg : Unit <- model_call.log(call, tries, model, url, json, g)
+              # the usage line names the full id (the TUI's catalog key)
+              nu : Out <- usage_note(g, n0, st, String.concat([prov, "/", model]), req)
+              # big-request: a body over the provider's size limit goes
+              # again once, its images within half its weight
+              # (model_call.sized); else BISE-293: the calls named back
+              # through the request's tools, a refusal in bise's words and
+              # the provider's
+              model_call.sized(Bool.and(Bool.not(shrunk),
+                  Bool.and(W.size_refused(got_status(g), got_raw(g)),
+                    Nat.is_lt(0n, fill_img_bytes(fill)))),
+                nu, k, tries, req,
+                Pvp.size_retry_why(Pvp.prov_display(mfile, prov), got_status(g),
+                  Nat.div(fill_bytes(fill), 2n)),
+                k4 => n3 => model_call.step(got_for(W.req_tools(wreq),
+                    Pvp.prov_display(mfile, prov), key, Api.facts_plan(facts), model, st, g),
+                  n3, k4, tries, req,
+                  k2 => n2 => model_call.try(k2, Nat.add(tries, 1n), n2, request,
+                    key, pv, call, req, limit, shrunk, live)),
+                k3 => n4 => model_call.try(k3, Nat.add(tries, 1n), n4, request,
+                  key, pv, call, req, Nat.div(fill_bytes(fill), 2n), True{}, live)))
 
 # a request the provider refused for its size, that had images: one line
 # (a retry the TUI shows), then the same request at once with half the
@@ -713,25 +769,25 @@ def model_call.sized(big: Bool, nu: Out, +k: Nat, +tries: Nat, +req: U32,
 
 @unsafe
 def model_call.go(n: Out, +request: String, +key: String, +pv: Pvp.Prov,
-    +req: U32) -> IO(Out & Rem.RemoteRes):
+    +req: U32, +live: Bool) -> IO(Out & Rem.RemoteRes):
   do IO<Out & Rem.RemoteRes>:
     +call : Nat <- IO.now()
     +limit : Nat <- req_limit()
     model_call.try(Pvp.max_attempts(), 0n, n, request, key, pv, call, req,
-      limit, False{})
+      limit, False{}, live)
 
 # a provider with a key_env (or a key_command) needs its key; one with
 # key_env = "" and no key_command (a local server) calls without a key.
 # No key: one line that says what to do (BISE-294: the TUI names the
 # provider and points at /provider; main's thread reads it as is)
 def model_call.key(missing: Bool, n: Out, +request: String, +key: String,
-    +pv: Pvp.Prov, +why: String, +req: U32)
+    +pv: Pvp.Prov, +why: String, +req: U32, +live: Bool)
     -> IO(Out & Rem.RemoteRes):
   match missing:
     case True{}:
       IO.pure(Out & Rem.RemoteRes, (n, Rem.RRErr{why}))
     case False{}:
-      model_call.go(n, request, key, pv, req)
+      model_call.go(n, request, key, pv, req, live)
 
 def key_cmd.max_output() -> U32:
   65536
@@ -783,8 +839,8 @@ def key_of.pick(none: Bool, +cmd: String, +env_key: String) -> IO(String):
 # the missing key's line: Pvp.key_why (a ChatGPT plan's: its sign-in
 # expired; the key_command's, else the key_env's)
 @unsafe
-def model_call.auth(n: Out, +request: String, +pv: Pvp.Prov, +req: U32)
-    -> IO(Out & Rem.RemoteRes):
+def model_call.auth(n: Out, +request: String, +pv: Pvp.Prov, +req: U32,
+    +live: Bool) -> IO(Out & Rem.RemoteRes):
   match pv:
     case Pvp.Prov{+prov, +model, _, _, +key_env, +facts}:
       do IO<Out & Rem.RemoteRes>:
@@ -796,20 +852,21 @@ def model_call.auth(n: Out, +request: String, +pv: Pvp.Prov, +req: U32)
         model_call.key(Bool.and(Bool.not(Bool.and(String.is_empty(key_env),
             String.is_empty(cmd))), String.is_empty(key)), n, request, key, pv,
           Pvp.key_why(Bool.not(String.is_empty(cmd)), Api.facts_plan(facts), prov,
-            key_env), req)
+            key_env), req, live)
 
 @unsafe
 def model_call.headers_ready(missing: Bool, +hvar: String, n: Out,
-    +request: String, +pv: Pvp.Prov, +req: U32) -> IO(Out & Rem.RemoteRes):
+    +request: String, +pv: Pvp.Prov, +req: U32, +live: Bool)
+    -> IO(Out & Rem.RemoteRes):
   match missing:
     case True{}:
       IO.pure(Out & Rem.RemoteRes, (n, Rem.RRErr{Pvp.headers_why(hvar)}))
     case False{}:
-      model_call.auth(n, request, pv, req)
+      model_call.auth(n, request, pv, req, live)
 
 @unsafe
-def model_call.env(n: Out, +request: String, +pv: Pvp.Prov, +req: U32)
-    -> IO(Out & Rem.RemoteRes):
+def model_call.env(n: Out, +request: String, +pv: Pvp.Prov, +req: U32,
+    +live: Bool) -> IO(Out & Rem.RemoteRes):
   match pv:
     case Pvp.Prov{+prov, +model, _, _, +key_env, +facts}:
       do IO<Out & Rem.RemoteRes>:
@@ -818,13 +875,13 @@ def model_call.env(n: Out, +request: String, +pv: Pvp.Prov, +req: U32)
           Pvp.headers_env(mfile, prov, String.concat([prov, "/", model])))
         hr : Result<&1, &1, U32 & String, String> <- IO.get_env(hvar)
         model_call.headers_ready(Pvp.headers_missing(hvar, P.env_or(hr, "")),
-          hvar, n, request, pv, req)
+          hvar, n, request, pv, req, live)
 
 def model_call.resolved(r: Pvp.Resolved, n: Out, +request: String,
-    +req: U32) -> IO(Out & Rem.RemoteRes):
+    +req: U32, +live: Bool) -> IO(Out & Rem.RemoteRes):
   match r:
     case Pvp.ROk{+pv}:
-      model_call.env(n, request, pv, req)
+      model_call.env(n, request, pv, req, live)
     case Pvp.RErr{_, +msg}:
       IO.pure(Out & Rem.RemoteRes, (n, Rem.RRErr{msg}))
 
@@ -901,12 +958,30 @@ def resolved_window() -> IO(U32):
 
 @unsafe
 # req: the Core's action id of the request (the session log's req,
-# core/ev.bend); a call outside a session (one-shot) passes 0
-def model_call.req(n: Out, +request: String, +req: U32)
+# core/ev.bend); a call outside a session (one-shot) passes 0. live: the
+# reply is the agent's answer, so its text streams in as partial lines
+# (runtime/live-pure.bend); a compaction summary or a one-shot: False
+# the id the session asked for, before a plan's swap (Pvp.asked_chosen)
+def asked_model() -> IO(String):
+  do IO<String>:
+    br : Result<&1, &1, U32 & String, String> <- IO.get_env("BISE_MODEL")
+    mr : Result<&1, &1, U32 & String, String> <- IO.get_env("BEND_MODEL")
+    ar : Result<&1, &1, U32 & String, String> <- IO.get_env("BISE_AGENT_MODEL")
+    rr : Result<&1, &1, U32 & String, String> <- IO.get_env("BISE_ROLE")
+    +cfgt : String <- St.read_cfg()
+    +file : String <- models_file()
+    +choice : String <- choice_file()
+    IO.pure(String, Pvp.asked_chosen(choice, P.env_or(br, ""), P.env_or(mr, ""),
+      P.env_or(ar, ""), P.env_or(rr, ""), cfgt, file))
+
+def model_call.req(n: Out, +request: String, +req: U32, +live: Bool)
     -> IO(Out & Rem.RemoteRes):
   do IO<Out & Rem.RemoteRes>:
-    r : Pvp.Resolved <- resolution()
-    model_call.resolved(r, n, request, req)
+    +r : Pvp.Resolved <- resolution()
+    +asked : String <- asked_model()
+    +said : String <- Pl.swap_said(live, asked, Pvp.shown_model(r))
+    n1 : Out <- usage_note.pick(String.is_empty(said), n, said)
+    model_call.resolved(r, n1, request, req, live)
 
 def model_call(n: Out, +request: String) -> IO(Out & Rem.RemoteRes):
-  model_call.req(n, request, 0)
+  model_call.req(n, request, 0, False{})

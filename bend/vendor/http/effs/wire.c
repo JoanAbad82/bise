@@ -134,7 +134,7 @@ Term wire_recv_run(Env e, Term* f, IoWork* w) {
 }
 
 static void __attribute__((constructor)) wire_recv_use(void) {
-  io_eff(CID(recv), wire_recv_run, 0);
+  io_eff(CID(recv), wire_recv_run);
 }
 
 #endif
@@ -151,7 +151,7 @@ Term wire_recv_words_run(Env e, Term* f, IoWork* w) {
 }
 
 static void __attribute__((constructor)) wire_recv_words_use(void) {
-  io_eff(CID(recv.words), wire_recv_words_run, 0);
+  io_eff(CID(recv.words), wire_recv_words_run);
 }
 
 #endif
@@ -187,7 +187,7 @@ Term wire_send_run(Env e, Term* f, IoWork* w) {
 }
 
 static void __attribute__((constructor)) wire_send_use(void) {
-  io_eff(CID(send), wire_send_run, 0);
+  io_eff(CID(send), wire_send_run);
 }
 
 #endif
@@ -204,7 +204,7 @@ Term wire_send_words_run(Env e, Term* f, IoWork* w) {
 }
 
 static void __attribute__((constructor)) wire_send_words_use(void) {
-  io_eff(CID(send.words), wire_send_words_run, 0);
+  io_eff(CID(send.words), wire_send_words_run);
 }
 
 #endif
@@ -254,7 +254,7 @@ Term wire_send_file_run(Env e, Term* f, IoWork* w) {
 }
 
 static void __attribute__((constructor)) wire_send_file_use(void) {
-  io_eff(CID(send.file), wire_send_file_run, 0);
+  io_eff(CID(send.file), wire_send_file_run);
 }
 
 #endif
@@ -291,7 +291,7 @@ Term wire_recv_from_run(Env e, Term* f, IoWork* w) {
 }
 
 static void __attribute__((constructor)) wire_recv_from_use(void) {
-  io_eff(CID(recv_from), wire_recv_from_run, 0);
+  io_eff(CID(recv_from), wire_recv_from_run);
 }
 
 #endif
@@ -329,7 +329,7 @@ Term wire_send_to_run(Env e, Term* f, IoWork* w) {
 }
 
 static void __attribute__((constructor)) wire_send_to_use(void) {
-  io_eff(CID(send_to), wire_send_to_run, 0);
+  io_eff(CID(send_to), wire_send_to_run);
 }
 
 #endif
@@ -394,7 +394,7 @@ Term connect_run(Env e, Term* f, IoWork* w) {
 }
 
 static void __attribute__((constructor)) connect_use(void) {
-  io_eff(CID(connect), connect_run, 0);
+  io_eff(CID(connect), connect_run);
 }
 
 #endif
@@ -561,7 +561,7 @@ Term tls_connect_run(Env e, Term* f, IoWork* w) {
 }
 
 static void __attribute__((constructor)) tls_connect_use(void) {
-  io_eff(CID(tls.connect), tls_connect_run, 0);
+  io_eff(CID(tls.connect), tls_connect_run);
 }
 
 #endif
@@ -609,7 +609,7 @@ Term tls_send_run(Env e, Term* f, IoWork* w) {
 }
 
 static void __attribute__((constructor)) tls_send_use(void) {
-  io_eff(CID(tls.send), tls_send_run, 0);
+  io_eff(CID(tls.send), tls_send_run);
 }
 
 #endif
@@ -626,7 +626,7 @@ Term tls_send_words_run(Env e, Term* f, IoWork* w) {
 }
 
 static void __attribute__((constructor)) tls_send_words_use(void) {
-  io_eff(CID(tls.send.words), tls_send_words_run, 0);
+  io_eff(CID(tls.send.words), tls_send_words_run);
 }
 
 #endif
@@ -643,7 +643,7 @@ Term tls_send_file_run(Env e, Term* f, IoWork* w) {
 }
 
 static void __attribute__((constructor)) tls_send_file_use(void) {
-  io_eff(CID(tls.send.file), tls_send_file_run, 0);
+  io_eff(CID(tls.send.file), tls_send_file_run);
 }
 
 #endif
@@ -695,7 +695,7 @@ Term tls_recv_run(Env e, Term* f, IoWork* w) {
 }
 
 static void __attribute__((constructor)) tls_recv_use(void) {
-  io_eff(CID(tls.recv), tls_recv_run, 0);
+  io_eff(CID(tls.recv), tls_recv_run);
 }
 
 #endif
@@ -712,7 +712,7 @@ Term tls_recv_words_run(Env e, Term* f, IoWork* w) {
 }
 
 static void __attribute__((constructor)) tls_recv_words_use(void) {
-  io_eff(CID(tls.recv.words), tls_recv_words_run, 0);
+  io_eff(CID(tls.recv.words), tls_recv_words_run);
 }
 
 #endif
@@ -732,7 +732,113 @@ Term tls_close_run(Env e, Term* f, IoWork* w) {
 }
 
 static void __attribute__((constructor)) tls_close_use(void) {
-  io_eff(CID(tls.close), tls_close_run, 0);
+  io_eff(CID(tls.close), tls_close_run);
 }
 
+#endif
+
+#ifdef CID(lookup)
+#ifndef WIRE_LOOKUP
+#define WIRE_LOOKUP
+#include <netdb.h>
+
+// Lookup
+// ======
+// The OS resolver (getaddrinfo), on an IO helper thread: the addresses curl
+// and every other program get, /etc/hosts, CNAMEs, scoped and split DNS
+// included. IPv4 and IPv6, in its order, as text; at most WIRE_ADDRS.
+// Fail codes are this effect's own, the same on every OS: 1 the name has no
+// address, 2 the resolver did not answer, 3 another failure.
+
+#define WIRE_ADDRS 16
+#define WIRE_ADDR  46
+
+static u32 wire_lookup_code(int r) {
+  switch (r) {
+    case EAI_NONAME:
+#if defined(EAI_NODATA) && EAI_NODATA != EAI_NONAME
+    case EAI_NODATA:
+#endif
+#if defined(EAI_ADDRFAMILY)
+    case EAI_ADDRFAMILY:
+#endif
+      return 1;
+    case EAI_AGAIN:
+    case EAI_FAIL:
+      return 2;
+    default:
+      return 3;
+  }
+}
+
+static void wire_lookup_call(IoWork* w) {
+  struct addrinfo  hint = { 0 };
+  struct addrinfo* res  = NULL;
+  hint.ai_family   = AF_UNSPEC;
+  hint.ai_socktype = SOCK_STREAM;
+  int r = getaddrinfo(w->data, NULL, &hint, &res);
+  w->made = 0;
+  if (r != 0) {
+    w->code = wire_lookup_code(r);
+    w->word = (u32)r;
+    w->size = r == EAI_SYSTEM ? (u64)errno : 0;
+    return;
+  }
+  w->text = io_mem(calloc(WIRE_ADDRS, WIRE_ADDR));
+  for (struct addrinfo* a = res; a != NULL && w->made < WIRE_ADDRS; a = a->ai_next) {
+    char* at = w->text + w->made * WIRE_ADDR;
+    const void* src = a->ai_family == AF_INET
+      ? (const void*)&((struct sockaddr_in*)a->ai_addr)->sin_addr
+      : a->ai_family == AF_INET6
+      ? (const void*)&((struct sockaddr_in6*)a->ai_addr)->sin6_addr : NULL;
+    if (src == NULL || inet_ntop(a->ai_family, src, at, WIRE_ADDR) == NULL) {
+      continue;
+    }
+    bool seen = false;
+    for (intptr_t i = 0; i < w->made; i += 1) {
+      seen = seen || strcmp(w->text + i * WIRE_ADDR, at) == 0;
+    }
+    w->made += seen ? 0 : 1;
+  }
+  freeaddrinfo(res);
+  w->code = w->made == 0 ? 1 : 0;
+  w->word = (u32)EAI_NONAME;
+}
+
+static Term wire_lookup_pack(Env e, IoWork* w) {
+  Term r;
+  if (w->code != 0) {
+    int         g    = (int)w->word;
+    const char* text = g == EAI_SYSTEM ? strerror((int)w->size) : gai_strerror(g);
+    r = io_fail(e, w->code, text);
+  } else {
+    Term xs = term_pak(CID(Nil), 0);
+    for (intptr_t i = w->made; i > 0; i -= 1) {
+      const char* at = w->text + (i - 1) * WIRE_ADDR;
+      xs = io_node(e, CID(Con), io_str(e, at, strlen(at)), xs);
+    }
+    r = io_done(e, xs);
+  }
+  free(w->text);
+  free(w->data);
+  return r;
+}
+
+Term wire_lookup_run(Env e, Term* f, IoWork* w) {
+  u64 hn  = 0;
+  w->data = io_cstr(e, f[0], &hn);
+  w->text = NULL;
+  if (io_nul(w->data, hn) || hn == 0) {
+    w->code = 3;
+    w->word = (u32)EAI_NONAME;
+    return wire_lookup_pack(e, w);
+  }
+  return io_work(w, wire_lookup_call, wire_lookup_pack);
+}
+
+static void __attribute__((constructor)) wire_lookup_use(void) {
+  io_eff(CID(lookup), wire_lookup_run);
+}
+
+#endif
 #endif

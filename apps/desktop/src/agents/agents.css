@@ -1,0 +1,73 @@
+/* src/agents (nm-pages-b, bise fait mac: page native-mac §6 and §9): the agents and archived pages,
+   an agent's sheet and the new agent sheet. ds tokens only, 4 px grid. The banner, the filters and the
+   rows are the ds's (PageBanner, FilterRow + Filters, ListRow): here only the column, the rows'
+   words and marks, the feed shown in place, and the sheets' fields. */
+.ag-screen { display: flex; flex-direction: column; height: 100%; min-height: 0; outline: none; }
+/* one scroller: the banner scrolls away with the list; the floating composer's room at its foot */
+.ag-scroll { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 0 0 calc(var(--float-room) + var(--s-2)); box-sizing: border-box; }
+/* the banner (ds PageBanner) takes the page's width, 24 from its edges; the rest is the page's column,
+   the thread's place beside the right side (app/pagecol.ts), never under its card (his m_46849) */
+.ag-col { margin-inline: var(--page-col-l, var(--pad-page-x)) var(--page-col-r, var(--pad-page-x)); }
+.ag-n { margin-left: var(--s-1); color: var(--c-text-3); }
+.ag-new { margin-left: auto; }
+.ag-new .b-app-icon { margin-right: var(--s-1); }
+.ag-list { margin-top: var(--s-2); }
+/* the empty state on the rows' text edge (12 in, as a row's), never 4 px left of it */
+.ag-col > .b-empty { padding-inline: var(--s-3); }
+
+/* a row's words: its name in 600, then what it does; its end in the accent only when it asks him */
+.ag-name { margin-right: var(--s-2); font-weight: 600; }
+.ag-what { color: var(--c-text-2); }
+.ag-end.wait { color: var(--c-accent); }
+/* the state column: '?' in the accent when it asks him, a line icon, or the status dot */
+.ag-mark { display: inline-flex; color: var(--c-text-3); }
+
+/* its feed in place (space), read only, under its row on the rows' text edge */
+.ag-peek {
+  margin: var(--s-1) var(--s-3) var(--s-2) calc(var(--s-3) + var(--s-4) + var(--s-3));
+  padding: var(--s-2) var(--s-3);
+  max-height: calc(var(--s-16) * 5);
+  overflow: auto;
+  border-radius: var(--r-2);
+  box-shadow: inset 0 0 0 1px var(--c-line);
+}
+.ag-peek-none,
+.ag-peek-keys { margin: var(--s-1) 0; color: var(--c-text-3); font-size: var(--t-12); }
+
+/* an agent's sheet (Name, Model, Reasoning) and the new agent sheet: label column, then its field */
+.ag-tune,
+.ag-sheet { display: flex; flex-direction: column; gap: var(--s-3); }
+.ag-field { display: flex; align-items: center; gap: var(--s-2); flex-wrap: wrap; }
+.ag-label,
+.ag-field > span:first-child { min-width: calc(var(--s-12) * 2); color: var(--c-text-2); }
+.ag-field input { min-width: calc(var(--s-16) * 3 + var(--s-8)); }
+.ag-sheet-row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-4); }
+.ag-check { display: flex; align-items: center; gap: var(--s-2); }
+.ag-acts { display: flex; gap: var(--s-2); }
+.ag-why { color: var(--c-text-2); font-size: var(--t-12); font-style: normal; }
+.ag-err { margin: 0; color: var(--c-err); }
+
+/* the model list: the TUI's /model rows under their provider (amb-feed 7dfd1c74) */
+.ag-models { align-items: flex-start; }
+.ag-model-list { flex: 1 1 auto; display: flex; flex-direction: column; max-height: calc(var(--s-16) * 3 + var(--s-8)); overflow: auto; }
+.ag-model-head { margin: var(--s-2) 0 var(--s-1); color: var(--c-text-3); font-size: var(--t-12); }
+.ag-model {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  min-height: var(--h-control-sm);
+  padding: 0 var(--s-2);
+  border: none;
+  border-radius: var(--r-2);
+  background: none;
+  color: var(--c-text);
+  font: inherit;
+  text-align: left;
+}
+.ag-model:hover { background: var(--c-hover); }
+.ag-model.on { background: var(--c-active); font-weight: 600; }
+.ag-model:focus-visible { outline: 2px solid var(--c-focus); outline-offset: -2px; }
+.ag-model-mark { display: inline-flex; width: var(--s-4); }
+.ag-model-short,
+.ag-model-def { color: var(--c-text-2); font-weight: 400; }
+.ag-model-def { margin-left: auto; font-size: var(--t-12); }

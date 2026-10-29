@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>bise docs</title>
-<meta name="description" content="bise is a terminal app for multi-agent coding. you talk to one agent, main, and it runs a team of agents for you.">
+<meta name="description" content="bise runs a team of AI agents for you. you talk to one agent, main, and it runs the others. two apps, the same agents.">
 <link rel="canonical" href="https://bise.dev/docs">
 <meta name="theme-color" content="#f2ede2">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
@@ -14,9 +14,10 @@
 <meta property="og:site_name" content="bise">
 <meta property="og:url" content="https://bise.dev/docs">
 <meta property="og:title" content="bise docs">
-<meta property="og:description" content="bise is a terminal app for multi-agent coding. you talk to one agent, main, and it runs a team of agents for you.">
+<meta property="og:description" content="bise runs a team of AI agents for you. you talk to one agent, main, and it runs the others. two apps, the same agents.">
 <meta property="og:image" content="https://bise.dev/og.png?v=paper">
 <meta name="twitter:card" content="summary_large_image">
+<script>{ const q = location.search; let a = /[?&]terminal\b/.test(q) ? 'terminal' : /[?&]desktop\b/.test(q) ? 'desktop' : null; try { if (a) localStorage.setItem('bise-docs-app', a); else a = localStorage.getItem('bise-docs-app'); } catch {} document.documentElement.classList.add('app-' + (a === 'terminal' ? 'terminal' : 'desktop')); }</script>
 <script>{ const q = location.search; let d = null; try { d = localStorage.getItem('bise-theme'); } catch {} if (/[?&]dark\b/.test(q) || (!/[?&]light\b/.test(q) && (d ?? (matchMedia('(prefers-color-scheme: dark)').matches ? '1' : '0')) === '1')) document.documentElement.classList.add('pd'); }</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,600;1,6..72,400&family=Caveat:wght@500;700&display=swap" rel="stylesheet">
@@ -38,9 +39,11 @@
 </header>
 <div class="wrap">
   <aside class="side"><nav aria-label="the docs">
+<div class="appswitch" role="group" aria-label="your app"><button type="button" data-app="desktop" aria-pressed="false">desktop</button><button type="button" data-app="terminal" aria-pressed="false">terminal</button></div>
 <div class="grp">get started</div><ul>
 <li><a href="/docs" class="here" aria-current="page">what bise is</a></li>
-<li><a href="/docs/install">install and first run</a></li>
+<li><a href="/docs/desktop" data-app="desktop">start with bise desktop</a></li>
+<li><a href="/docs/install" data-app="terminal">start with bise terminal</a></li>
 </ul>
 <div class="grp">models</div><ul>
 <li><a href="/docs/providers">providers and keys</a></li>
@@ -50,9 +53,10 @@
 </ul>
 <div class="grp">using bise</div><ul>
 <li><a href="/docs/agents">main and the agents</a></li>
+<li><a href="/docs/window" data-app="desktop">the desktop window <span class="tag">desktop</span></a></li>
 <li><a href="/docs/approvals">approvals</a></li>
 <li><a href="/docs/flow">landing work</a></li>
-<li><a href="/docs/voice">voice</a></li>
+<li><a href="/docs/voice">voice and fn</a></li>
 <li><a href="/docs/computer-use">computer use</a></li>
 </ul>
 <div class="grp">extend</div><ul>
@@ -60,9 +64,11 @@
 <li><a href="/docs/skills">instructions and skills</a></li>
 </ul>
 <div class="grp">reference</div><ul>
+<li><a href="/docs/settings" data-app="desktop">settings <span class="tag">desktop</span></a></li>
 <li><a href="/docs/config">config.toml</a></li>
-<li><a href="/docs/cli">the bise command</a></li>
-<li><a href="/docs/keys">keys and commands</a></li>
+<li><a href="/docs/desktop-keys" data-app="desktop">keys and menus <span class="tag">desktop</span></a></li>
+<li><a href="/docs/keys" data-app="terminal">keys and commands <span class="tag">terminal</span></a></li>
+<li><a href="/docs/cli" data-app="terminal">the bise command <span class="tag">terminal</span></a></li>
 <li><a href="/docs/troubleshooting">troubleshooting</a></li>
 <li><a href="/docs/updates">updates</a></li>
 </ul>
@@ -73,28 +79,29 @@
         <h1>bise docs</h1>
         <button class="copymd" type="button" data-md="/docs/index.md">copy as markdown</button>
       </div>
-      <p class="lede">bise is a terminal app for multi-agent coding. you talk to one agent, main, and it runs a team of agents for you.</p>
-<p>bise runs in your terminal, one window per repo. you talk to <strong>main</strong>, your team lead. main turns what you ask into tasks and starts one <strong>agent</strong> per task. the agents work in parallel, talk to each other, and land their work in your repo. what needs you waits in your <strong>inbox</strong>.</p>
-<p>these docs cover how to install bise, how to give it a model, and how to use and extend it.</p>
+      <p class="lede">bise runs a team of AI agents for you. you talk to one agent, main, and it runs the others. two apps, the same agents.</p>
+
+<p>you talk to <strong>main</strong>, your team lead. main turns what you ask into tasks and starts one <strong>agent</strong> per task. the agents work in parallel, talk to each other, and land their work in your repo. what needs you waits in your <strong>inbox</strong>.</p>
+<h2 id="two-apps-one-bise"><a class="anchor" href="#two-apps-one-bise" aria-hidden="true">#</a>two apps, one bise</h2>
+<div class="table"><table><thead><tr><th></th><th>bise desktop</th><th>bise terminal</th></tr></thead><tbody><tr><td>what it is</td><td>a window on your Mac: every project in one window, an inbox for what needs you, the bims at work</td><td>in your terminal, one thread per repo, keys for everything</td></tr><tr><td>runs on</td><td>Macs with Apple silicon, macOS 14 or later</td><td>macOS and Linux, over SSH too</td></tr><tr><td>how you talk</td><td>type, or hold <code>fn</code> in any app</td><td>type, or <code class="key">ctrl+r</code></td></tr><tr><td>get it</td><td><a href="/docs/desktop">download it</a></td><td><a href="/docs/install">one curl line</a></td></tr></tbody></table></div>
+<p>both apps run the same agents, with the same threads, models, keys and settings. use one, or both at once on the same repo.</p>
+<p>these docs are one set for both. most of it is the same in both apps. where a step differs, the page shows your app's way: pick yours with the <strong>desktop / terminal</strong> switch at the top of the list of pages. a page that exists in one app only says so under its title.</p>
 <h2 id="start-here"><a class="anchor" href="#start-here" aria-hidden="true">#</a>start here</h2>
-<ol><li><a href="/docs/install">install bise</a> and run it in a repo.</li><li>give it a model: an API key from a <a href="/docs/providers">provider</a>, or a plan you already pay for, through a <a href="/docs/subscriptions">subscription</a>.</li><li>ask main for something. read <a href="/docs/agents">main and the agents</a> to see what happens next.</li></ol>
-<div class="code"><div class="box"><pre><code class="lang-sh">curl -fsSL https://bise.dev/install | sh
-cd your-repo
-bise</code></pre><button class="copy" type="button" aria-label="copy the code">copy</button></div></div>
+<ol><li>get bise: <a href="/docs/desktop">bise desktop</a> or <a href="/docs/install">bise terminal</a>.</li><li>give it a model: an API key from a <a href="/docs/providers">provider</a>, or a plan you already pay for, through a <a href="/docs/subscriptions">subscription</a>.</li><li>ask main for something. read <a href="/docs/agents">main and the agents</a> to see what happens next.</li></ol>
 <h2 id="whats-in-these-docs"><a class="anchor" href="#whats-in-these-docs" aria-hidden="true">#</a>what's in these docs</h2>
-<div class="table"><table><thead><tr><th>page</th><th>what you find there</th></tr></thead><tbody><tr><td><a href="/docs/providers">providers and keys</a></td><td>the providers bise knows, where a key goes, <code>bise login</code></td></tr><tr><td><a href="/docs/models">models and roles</a></td><td>which model does what: main, agents, small jobs, voice</td></tr><tr><td><a href="/docs/gateways">gateways and local models</a></td><td>LiteLLM, a company proxy, Ollama, LM Studio, vLLM</td></tr><tr><td><a href="/docs/agents">main and the agents</a></td><td>how a task runs, the inbox, the commands you use</td></tr><tr><td><a href="/docs/approvals">approvals</a></td><td>yolo and auto: what runs without asking</td></tr><tr><td><a href="/docs/flow">landing work</a></td><td>how agents commit, features, pull requests</td></tr><tr><td><a href="/docs/voice">voice</a></td><td>dictation and voice mode</td></tr><tr><td><a href="/docs/computer-use">computer use</a></td><td>agents that drive Chrome and your Mac apps</td></tr><tr><td><a href="/docs/plugins">plugins and MCP</a></td><td>skills, local and remote MCP servers, logins</td></tr><tr><td><a href="/docs/config">config.toml</a></td><td>every setting in one place</td></tr><tr><td><a href="/docs/troubleshooting">troubleshooting</a></td><td><code>bise doctor</code>, logs, the usual fixes</td></tr></tbody></table></div>
+<div class="table"><table><thead><tr><th>page</th><th>what you find there</th></tr></thead><tbody><tr><td><a href="/docs/providers">providers and keys</a></td><td>the providers bise knows, where a key goes</td></tr><tr><td><a href="/docs/models">models and roles</a></td><td>which model does what: main, agents, small jobs, voice</td></tr><tr><td><a href="/docs/gateways">gateways and local models</a></td><td>LiteLLM, a company proxy, Ollama, LM Studio, vLLM</td></tr><tr><td><a href="/docs/agents">main and the agents</a></td><td>how a task runs, the inbox, talking to an agent</td></tr><tr><td><a href="/docs/window">the desktop window</a></td><td>projects, bise, the bims, the menu bar, notifications</td></tr><tr><td><a href="/docs/approvals">approvals</a></td><td>yolo and auto: what runs without asking</td></tr><tr><td><a href="/docs/flow">landing work</a></td><td>how agents commit, features, pull requests</td></tr><tr><td><a href="/docs/voice">voice and fn</a></td><td>dictation, voice mode, and <code>fn</code> from any app</td></tr><tr><td><a href="/docs/computer-use">computer use</a></td><td>agents that drive Chrome and your Mac apps</td></tr><tr><td><a href="/docs/plugins">plugins and MCP</a></td><td>skills, local and remote MCP servers, logins</td></tr><tr><td><a href="/docs/settings">settings</a> and <a href="/docs/config">config.toml</a></td><td>every setting in one place</td></tr><tr><td><a href="/docs/troubleshooting">troubleshooting</a></td><td>the setup check, <code>bise doctor</code>, the usual fixes</td></tr></tbody></table></div>
 <h2 id="for-agents"><a class="anchor" href="#for-agents" aria-hidden="true">#</a>for agents</h2>
-<p>every page is also plain Markdown: add <code>.md</code> to its address, for example <code>bise.dev/docs/providers.md</code>. to have a coding agent install and set up bise for you, give it <a href="https://bise.dev/setup.md" rel="noopener">bise.dev/setup.md</a>.</p>
+<p>every page is also plain Markdown: add <code>.md</code> to its address, for example <code>bise.dev/docs/providers.md</code>. to have a coding agent install and set up bise terminal for you, give it <a href="https://bise.dev/setup.md" rel="noopener">bise.dev/setup.md</a>.</p>
 <h2 id="requirements"><a class="anchor" href="#requirements" aria-hidden="true">#</a>requirements</h2>
-<p>bise runs on macOS (Apple silicon and Intel) and on Linux (x86_64 and arm64, glibc 2.34 or newer). you need git; on Linux, OpenSSL 3 too. NixOS installs it with <a href="/docs/install#nixos">the flake</a>. see <a href="/docs/install#linux">install</a> for the Linux details.</p>
+<p>bise desktop runs on Macs with Apple silicon, macOS 14 or later. bise terminal runs on macOS (Apple silicon and Intel) and on Linux (x86_64 and arm64, glibc 2.34 or newer). you need git; on Linux, OpenSSL 3 too. see <a href="/docs/install#linux">start with bise terminal</a> for the Linux details.</p>
     </article>
-    <nav class="pn"><a class="next" href="/docs/install"><span>next</span>install and first run</a></nav>
+    <nav class="pn"><a class="next" href="/docs/desktop"><span>next</span>start with bise desktop</a></nav>
     <footer>
       <p>for agents: <a href="/docs/index.md">bise.dev/docs/index.md</a></p>
       <p><a href="https://github.com/gvergnaud/bise/blob/main/site/docs/index.md">edit this page on GitHub</a></p>
     </footer>
   </main>
-  <aside class="toc"><div class="toch">on this page</div><ul><li class="l2"><a href="#start-here">start here</a></li><li class="l2"><a href="#whats-in-these-docs">what's in these docs</a></li><li class="l2"><a href="#for-agents">for agents</a></li><li class="l2"><a href="#requirements">requirements</a></li></ul></aside>
+  <aside class="toc"><div class="toch">on this page</div><ul><li class="l2"><a href="#two-apps-one-bise">two apps, one bise</a></li><li class="l2"><a href="#start-here">start here</a></li><li class="l2"><a href="#whats-in-these-docs">what's in these docs</a></li><li class="l2"><a href="#for-agents">for agents</a></li><li class="l2"><a href="#requirements">requirements</a></li></ul></aside>
 </div>
 <script src="/docs/docs.js" defer></script>
 </body>

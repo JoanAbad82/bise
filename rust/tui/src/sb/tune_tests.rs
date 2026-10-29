@@ -124,7 +124,7 @@ fn the_repo_part_offers_a_starter_agents_md() {
     let git = |args: &[&str]| {
         let mut c = Command::new("git");
         c.arg("-C").arg(&repo).args(args).env("GIT_CONFIG_GLOBAL", "/dev/null").env("GIT_CONFIG_NOSYSTEM", "1");
-        output(c, Duration::from_secs(5)).expect("git")
+        output(c, GIT_WAIT).expect("git")
     };
     git(&["init", "-q"]);
     git(&["-c", "user.email=t@t", "-c", "user.name=t", "commit", "-q", "--allow-empty", "-m", "cart: faster checkout"]);

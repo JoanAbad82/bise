@@ -1,0 +1,705 @@
+/* The office in the right bar (page bims-office v7, spec §2): the canvas above the AGENTS section's
+   rows at its natural height, the label overlay over it. Colour is attention: the accent only for
+   the '?' pill (asks you), the error red only for '✗' (failed). Tokens only. Owner: bims-wire. */
+.bims-office {
+  position: relative;
+  /* the renderer sets the height it needs at this width (Office.tsx resize); the bar's whole
+     width, out of the body's padding (.app-rb-body, --s-2 each side) */
+  margin: var(--gap-tight) calc(-1 * var(--s-2));
+  overflow: hidden;
+}
+/* a tab's office (app/panel/Office.tsx): its holder's whole height, the canvas that box (Office fill) */
+.bims-office[data-fill] {
+  flex: 1;
+  min-height: 0;
+  margin: 0;
+  aspect-ratio: auto;
+}
+/* not loaded yet: the office's last shape (Office.tsx lastRatio), empty, so the fold grows to it */
+.bims-office[data-state='loading'] {
+  aspect-ratio: var(--bims-ratio, 1.4);
+}
+/* the scene fades in once drawn and the fold grown (Fold.tsx); out with the fold closing */
+.bims-office > .bims-canvas,
+.bims-office > .bims-overlay {
+  opacity: 0;
+  transition: opacity 220ms var(--ease-out, ease-out);
+}
+.bims-office[data-shown] > .bims-canvas,
+.bims-office[data-shown] > .bims-overlay {
+  opacity: 1;
+}
+.bims-fold:not([data-open]) .bims-office > .bims-canvas,
+.bims-fold:not([data-open]) .bims-office > .bims-overlay {
+  opacity: 0;
+  transition-duration: 160ms;
+}
+/* the accordion (Fold.tsx): grid rows 0fr -> 1fr follow the office's own height */
+.bims-fold {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 280ms var(--ease-out, cubic-bezier(0.2, 0.8, 0.2, 1));
+}
+.bims-fold[data-open] {
+  grid-template-rows: 1fr;
+}
+.bims-fold-in {
+  min-height: 0;
+  overflow: hidden;
+}
+@media (prefers-reduced-motion: reduce) {
+  .bims-fold {
+    transition: none;
+  }
+  .bims-office > .bims-canvas,
+  .bims-office > .bims-overlay {
+    transition-duration: 120ms;
+  }
+}
+.bims-office:focus-visible {
+  outline: 2px solid var(--c-focus);
+  outline-offset: -2px;
+}
+/* zoomed: the floor can be dragged (zoom.ts); a bim under the pointer still says it opens */
+.bims-office[data-zoomed] {
+  cursor: grab;
+}
+.bims-office[data-drag] {
+  cursor: grabbing;
+}
+.bims-office[data-pointer]:not([data-drag]) {
+  cursor: pointer;
+}
+.bims-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+/* the rain or snow (falling.ts): outside the building only (its clip-path, set by Office.tsx), a
+   CSS loop on the compositor, never a WebGL frame; paused when away, none under reduced motion.
+   Two layers of drops (::before near, ::after far), each a tiled mask sliding one tile down. */
+.bims-falling {
+  --fall-rain: #c8d4e6;
+  --fall-snow: #f3f1ec;
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  display: none;
+  /* clipped to the cube (falling.ts); its raised top fades out, never a hard edge in the air */
+  mask-image: linear-gradient(to bottom, transparent 0, #000 22%);
+  transition: opacity 600ms linear;
+}
+[data-theme='light'] .bims-falling {
+  --fall-rain: #7d8ea8;
+  --fall-snow: #aebbd0;
+}
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme='dark']) .bims-falling {
+    --fall-rain: #7d8ea8;
+    --fall-snow: #aebbd0;
+  }
+}
+.bims-falling[data-kind] {
+  display: block;
+}
+.bims-falling::before,
+.bims-falling::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  /* one tile (96px) above, so the slide down never shows an edge */
+  top: calc(-2 * var(--s-12));
+  bottom: 0;
+  will-change: transform;
+  mask-repeat: repeat;
+  animation: bims-fall 0.42s linear infinite;
+}
+.bims-falling[data-kind='rain']::before,
+.bims-falling[data-kind='rain']::after {
+  background: var(--fall-rain);
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='96' height='96'%3E%3Cg stroke='%23000' stroke-width='1.2' stroke-linecap='round'%3E%3Cpath d='M12 4l-2 9M44 30l-2 9M78 12l-2 9M28 62l-2 9M62 70l-2 9M90 50l-2 9M8 84l-2 9'/%3E%3C/g%3E%3C/svg%3E");
+  mask-size: 96px 96px;
+  opacity: 0.55;
+}
+.bims-falling[data-kind='rain']::after {
+  mask-size: 64px 64px;
+  opacity: 0.3;
+  animation-duration: 0.6s;
+}
+.bims-falling[data-kind='snow']::before,
+.bims-falling[data-kind='snow']::after {
+  background: var(--fall-snow);
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='96' height='96'%3E%3Cg fill='%23000'%3E%3Ccircle cx='12' cy='8' r='1.6'/%3E%3Ccircle cx='50' cy='30' r='1.3'/%3E%3Ccircle cx='80' cy='14' r='1.8'/%3E%3Ccircle cx='30' cy='60' r='1.4'/%3E%3Ccircle cx='66' cy='72' r='1.7'/%3E%3Ccircle cx='90' cy='50' r='1.2'/%3E%3Ccircle cx='8' cy='86' r='1.5'/%3E%3C/g%3E%3C/svg%3E");
+  mask-size: 96px 96px;
+  opacity: 0.9;
+  animation: bims-snow 7s linear infinite;
+}
+.bims-falling[data-kind='snow']::after {
+  mask-size: 60px 60px;
+  opacity: 0.55;
+  animation-duration: 11s;
+}
+.bims-office[data-away] .bims-falling::before,
+.bims-office[data-away] .bims-falling::after {
+  animation-play-state: paused;
+}
+@keyframes bims-fall {
+  from { transform: translate(0, 0); }
+  to { transform: translate(-21px, 96px); }
+}
+@keyframes bims-snow {
+  from { transform: translate(0, 0); }
+  to { transform: translate(-12px, 96px); }
+}
+/* reduced motion: the drops held still (he can tell it rains, bims m_33351), never moving */
+@media (prefers-reduced-motion: reduce) {
+  .bims-falling::before,
+  .bims-falling::after { animation: none; }
+}
+/* nothing takes the pointer but the pills (spec §1 rule 6): hover and click go to the canvas */
+.bims-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.bims-tag {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--gap-tight);
+  padding-bottom: var(--s-1);
+  white-space: nowrap;
+  will-change: transform;
+  /* never wider than the office: Office.tsx cuts a long line on a whole word with a glued '…' (tags.ts cutWords) */
+  max-width: calc(100% - 2 * var(--s-1));
+  z-index: 1;
+}
+/* a '?' / '✗' pill alone draws over every label (it is what needs him) */
+.bims-tag[data-mode='pill'] {
+  z-index: 2;
+}
+/* ctrl held and some names had no room: '+3 names · hover a bim', faint, bottom right (designer m_27799) */
+.bims-more {
+  position: absolute;
+  right: var(--s-1);
+  bottom: var(--s-1);
+  color: var(--c-text-3);
+  font: var(--t-12) / 1.5 var(--font-ui);
+  white-space: nowrap;
+}
+.bims-more:empty {
+  display: none;
+}
+/* 320 with a garden past the building (growth.ts): it is cropped, a soft fade at the sides says so */
+.bims-canvas.bims-fade {
+  mask-image: linear-gradient(to right, transparent, #000 7%, #000 93%, transparent);
+}
+/* the ground's corner: hover gives the level tip (growth.ts tipOf); nothing drawn */
+.bims-level {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: var(--h-control);
+  height: var(--h-control);
+  pointer-events: auto;
+}
+/* the unlock moment's 'new: <thing>' over the piece (3 s), centred above it */
+/* a plugin object's '?' / '✗' (objpills.ts): over the object's top, the bims' own pill */
+.bims-pill.bims-objpill {
+  position: absolute;
+  transform: translate(-50%, -100%);
+}
+.bims-pill.bims-objpill:not([role='button']) {
+  cursor: default;
+}
+.bims-label.bims-new {
+  position: absolute;
+  transform: translate(-50%, -100%);
+  white-space: nowrap;
+}
+/* a label moved off its bim (tags.ts placeTags): a 1 px leader back to its head */
+.bims-leaders {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  stroke: var(--c-text-3);
+  stroke-width: 1;
+}
+.bims-label {
+  min-width: 0;
+  overflow: hidden;
+  padding: 0 var(--s-1);
+  border-radius: var(--r-1);
+  background: color-mix(in srgb, var(--c-solid) 85%, transparent);
+  color: var(--c-text);
+  font: var(--t-12) / 1.5 var(--font-ui);
+  animation: bims-in var(--d-base) var(--ease-out, ease-out);
+}
+/* a walking bim's name: small and dim (spec §2) */
+.bims-label[data-mode='name'] {
+  color: var(--c-text-3);
+}
+.bims-pill {
+  display: inline-grid;
+  place-items: center;
+  min-width: var(--s-4);
+  height: var(--s-4);
+  border-radius: var(--r-pill);
+  font: 600 var(--t-11) / 1 var(--font-mono);
+  pointer-events: auto;
+  cursor: pointer;
+}
+.bims-pill.asks {
+  background: var(--c-accent);
+  color: var(--c-on-ink);
+}
+.bims-pill.failed {
+  background: var(--c-err);
+  color: var(--c-on-ink);
+}
+/* the hover card (Gabriel: multi-line, easy to read; designer m_27920): name 600 with its pill, the
+   state dim, the title on up to 3 lines (Office.tsx cuts them). No accent but the pill's. Over
+   every tag and pill: it is what he is looking at */
+.bims-card {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: max-content;
+  padding: var(--s-1) var(--s-2);
+  border-radius: var(--r-2);
+  background: color-mix(in srgb, var(--c-solid) 92%, transparent);
+  box-shadow: var(--e-1);
+  color: var(--c-text);
+  font: var(--t-12) / 1.5 var(--font-ui);
+  white-space: nowrap;
+  will-change: transform;
+  z-index: 3;
+  animation: bims-in var(--d-base) var(--ease-out, ease-out);
+}
+.bims-card-head {
+  display: flex;
+  align-items: center;
+  gap: var(--gap-tight);
+}
+.bims-card-name {
+  font-weight: 600;
+}
+.bims-card-state {
+  color: var(--c-text-2);
+}
+/* the office's two corner chips (brief bims-mapsel): quiet, text-2 on the 85% solid, no border;
+   the map bottom left (MapChip.tsx, the ds Dropdown's trigger), '⤢ fit' bottom right while zoomed */
+.bims-chip {
+  padding: 0 var(--s-1);
+  border: 0;
+  border-radius: var(--r-1);
+  background: color-mix(in srgb, var(--c-solid) 85%, transparent);
+  color: var(--c-text-2);
+  font: var(--t-11) / 1.6 var(--font-ui);
+  pointer-events: auto;
+}
+.bims-chip:hover {
+  color: var(--c-text);
+}
+.bims-chip:focus-visible {
+  outline: 2px solid var(--c-focus);
+  outline-offset: -2px;
+}
+/* the ds trigger's own look gives way to the chip's: its height, its gap, its tint, its ring */
+.b-ptrig.bims-chip {
+  height: auto;
+  gap: var(--s-1);
+  padding: 0 var(--s-1);
+  border-radius: var(--r-1);
+  background: color-mix(in srgb, var(--c-solid) 85%, transparent);
+  font: var(--t-11) / 1.6 var(--font-ui);
+}
+.b-ptrig.bims-chip:hover,
+.b-ptrig.bims-chip[aria-expanded='true'] {
+  background: color-mix(in srgb, var(--c-solid) 85%, transparent);
+  color: var(--c-text);
+}
+.b-ptrig.bims-chip:focus-visible {
+  box-shadow: none;
+}
+.b-ptrig.bims-chip .w {
+  line-height: 1.6;
+}
+.bims-mapsel {
+  position: absolute;
+  left: var(--s-1);
+  bottom: var(--s-1);
+  display: flex;
+  z-index: 4;
+}
+/* zoomed: back to the whole office, bottom right (zoom.ts FIT; esc and a double-click on the floor too) */
+.bims-fit {
+  position: absolute;
+  right: var(--s-1);
+  bottom: var(--s-1);
+  z-index: 4;
+}
+/* ctrl held while zoomed: '+N names' goes over '⤢ fit', never under it */
+.bims-office[data-zoomed] .bims-more {
+  bottom: calc(var(--s-1) + var(--t-11) * 1.6 + var(--s-1));
+}
+/* WebGL lost: one line over the rows (never a blank section) */
+.bims-lost {
+  padding: var(--s-1) var(--pad-row-x);
+  color: var(--c-text-3);
+  font-size: var(--t-12);
+}
+@keyframes bims-in {
+  from {
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .bims-label,
+  .bims-card {
+    animation: none;
+  }
+}
+
+/* the AGENTS head's small toggles: 'bims' (the office above the rows), '320 | wide' */
+.bims-switch {
+  display: inline-flex;
+  flex: none;
+  /* '320 · wide', 12 px, then the cube (designer m_28913) */
+  margin-right: var(--s-3);
+  gap: 0;
+  color: var(--c-text-3);
+  font-size: var(--t-11);
+}
+.bims-switch > .bims-opt {
+  padding: 0 var(--s-1);
+  border: 0;
+  border-radius: var(--r-1);
+  background: none;
+  color: inherit;
+  font: inherit;
+}
+.bims-switch > .bims-opt:hover {
+  background: var(--c-hover);
+  color: var(--c-text-2);
+}
+.bims-switch > .bims-opt[aria-pressed='true'] {
+  color: var(--c-text);
+}
+.bims-switch > .bims-sep {
+  padding: 0 1px;
+  user-select: none;
+}
+.bims-switch > .bims-opt:focus-visible {
+  outline: 2px solid var(--c-focus);
+  outline-offset: -2px;
+}
+
+/* the AGENTS head's cube and 'the bims', left of 'all ›' (his ask, main m_28901; Cube.tsx;
+   designer m_28913): one button, the 16 px cube, 4 px, 'the bims' in sans 12 / 500, lowercase, the
+   accent at rest, hovered and open; hover the hover tint, open the pressed tint; 16 px before
+   'all ›'. One line, never shrunk. Short of room for every part whole (his bug: the label wrapped
+   under a clip and left an empty pill), the cube alone, its pill hugging it; the words stay in its
+   tip and its aria-label (bims-toggle, designer m_31047) */
+.bims-cube {
+  display: inline-flex;
+  flex: none;
+  /* the head lines its parts up on a baseline; the cube has none: centred on the head's line, as 'all ›' */
+  align-self: center;
+  align-items: center;
+  gap: var(--s-1);
+  margin-right: var(--s-4);
+  padding: calc(var(--s-1) / 2) var(--s-1);
+  border: 0;
+  border-radius: var(--r-1);
+  background: none;
+  color: var(--c-accent);
+  font: inherit;
+  font-size: var(--t-12);
+  font-weight: 500;
+  line-height: 16px;
+  text-transform: none;
+  letter-spacing: normal;
+}
+.bims-cube-label {
+  white-space: nowrap;
+}
+/* no room for the label (Cube.tsx measures, headroom.ts decides): the cube alone, the pill hugging
+   it. The label stays laid out, unseen and out of the flow, so its width is still there to measure;
+   it hangs to the left, over the head's own parts, never past the bar's edge */
+.bims-cube[data-room='cube'] {
+  position: relative;
+}
+.bims-cube[data-room='cube'] .bims-cube-label {
+  position: absolute;
+  top: 0;
+  right: 0;
+  visibility: hidden;
+}
+.bims-cube:hover {
+  background: var(--c-hover);
+}
+.bims-cube[aria-pressed='true'] {
+  background: var(--c-press);
+}
+.bims-cube:focus-visible {
+  outline: 2px solid var(--c-focus);
+  outline-offset: -2px;
+}
+.bims-glyph {
+  display: block;
+  overflow: visible;
+}
+/* at rest, now and then (moves.ts): a blink, the eyes shut and open; a hop, up, down, one small
+   bounce, squashed as it lands. Each runs once and leaves: no loop while the cube is still */
+.bims-cube[data-move='blink'] .bims-eye {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: bims-blink 220ms ease-in-out 1;
+}
+.bims-cube[data-move='hop'] .bims-glyph {
+  transform-origin: 50% 100%;
+  animation: bims-hop 900ms ease-out 1;
+}
+@keyframes bims-blink {
+  0%,
+  100% {
+    transform: scaleY(1);
+  }
+  40%,
+  60% {
+    transform: scaleY(0.1);
+  }
+}
+@keyframes bims-hop {
+  0% {
+    transform: translateY(0) scale(1, 1);
+  }
+  12% {
+    transform: translateY(0) scale(1.08, 0.88);
+  }
+  38% {
+    transform: translateY(-5px) scale(0.95, 1.06);
+  }
+  60% {
+    transform: translateY(0) scale(1.06, 0.9);
+  }
+  76% {
+    transform: translateY(-1.5px) scale(1, 1);
+  }
+  88% {
+    transform: translateY(0) scale(1.02, 0.97);
+  }
+  100% {
+    transform: translateY(0) scale(1, 1);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .bims-cube[data-move] .bims-eye,
+  .bims-cube[data-move] .bims-glyph {
+    animation: none;
+  }
+}
+
+/* a '?' / '✗' whose bim is out of the frame (the follow camera, his zoom): held at the frame's edge,
+   an arrow towards its bim (focus.ts edgeOf; bims m_28199) */
+.bims-tag[data-edge]::before {
+  font-size: 11px;
+  line-height: 1;
+  color: var(--fg-2);
+}
+.bims-tag[data-edge='left']::before { content: '←'; }
+.bims-tag[data-edge='right'] { flex-direction: row-reverse; }
+.bims-tag[data-edge='right']::before { content: '→'; }
+.bims-tag[data-edge='up']::before { content: '↑'; }
+.bims-tag[data-edge='down']::before { content: '↓'; }
+
+/* a sleeping bim's 'z z Z' (zzz.ts): over its head, each rising and fading in turn, slowly; a CSS
+   loop, so a still office draws no frame. Reduced motion: one still 'z' */
+.bims-zzzs {
+  position: absolute;
+  inset: 0;
+}
+/* a new project's welcome (pins.tsx): 1, 2, 3 discs in ink on the page's colour, never the accent */
+.bims-pins {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  /* over the bims' labels and pills (.bims-tag 1, a pill 2): a pin is never hidden (designer m_38798) */
+  z-index: 3;
+}
+.bims-pin {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--c-text);
+  color: var(--c-solid);
+  font: 600 var(--t-11) / 18px var(--font-ui);
+  text-align: center;
+  box-shadow: 0 0 0 2px var(--c-solid);
+}
+.bims-zzz {
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+.bims-zzz > span {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  color: var(--c-text-2);
+  font-family: var(--font-ui);
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 1;
+  opacity: 0;
+  /* 7.5 fps (27 steps over 3.6 s; the 1.2 s delays fall on the same steps): a typing bim's loop
+     rate, never the display's (architect m_28263) */
+  animation: bims-z 3.6s steps(27) infinite;
+  will-change: transform, opacity;
+}
+/* the window away (hidden, not in front): the z's hold still, as the renderer's loop stops */
+.bims-office[data-away] .bims-zzz > span {
+  animation-play-state: paused;
+}
+.bims-zzz > span:nth-child(2) {
+  font-size: 11px;
+  animation-delay: 1.2s;
+}
+.bims-zzz > span:nth-child(3) {
+  font-size: 13px;
+  animation-delay: 2.4s;
+}
+@keyframes bims-z {
+  0% { opacity: 0; transform: translate(0, 0); }
+  20% { opacity: 0.85; }
+  70% { opacity: 0.6; }
+  100% { opacity: 0; transform: translate(12px, -26px); }
+}
+/* reduced motion: no z's at all (architect m_28263) */
+@media (prefers-reduced-motion: reduce) {
+  .bims-zzzs { display: none; }
+}
+/* the map's crossfade (/bims, maps-a): the old office drawn over the new one, then faded out; a cut under reduced motion (Office.tsx never shows it) */
+.bims-xfade {
+  position: absolute;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 300ms var(--ease-out, ease-out);
+}
+.bims-xfade[data-on] {
+  opacity: 1;
+  transition: none;
+}
+/* the town on bise's thread (town/Town.tsx, maps-e): the town's canvas over the dived Office while
+   one fades into the other; the signs in front of the offices (name, ∿ working, the pink ? n) */
+.bims-town-box {
+  position: relative;
+  outline: none;
+}
+/* bound (the outer tile, Town maxH): the box is its holder's whole height, a column, so the town's
+   canvas and the dived Office (Office fill: flex 1) take all of it, with none of the right bar's
+   margins (they pushed the town down and past the tile's right edge: ui-review m_47739) */
+.bims-town-box[data-fill] {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.bims-town-box[data-fill] > .bims-office {
+  margin: 0;
+}
+.bims-town-box > .bims-town[data-top] {
+  position: absolute;
+  inset: 0 0 auto 0;
+  z-index: 3;
+  transition: opacity 260ms var(--ease-out, ease-out);
+}
+.bims-town-box > .bims-town[data-fade='out'] {
+  opacity: 0;
+  pointer-events: none;
+}
+.bims-town-box > .bims-town[data-phase='office'] > .bims-canvas {
+  visibility: hidden;
+}
+/* the Office alone: the town's canvas hidden, the dived office's sign (its 'open') stays over it */
+.bims-town-box > .bims-town[data-phase='office'] {
+  pointer-events: none;
+}
+.bims-town[data-pointer] {
+  cursor: pointer;
+}
+.bims-sign {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-1);
+  padding: 0 var(--s-1);
+  border-radius: var(--r-1);
+  background: color-mix(in srgb, var(--c-solid) 88%, transparent);
+  color: var(--c-text);
+  font: var(--t-11) / 1.6 var(--font-ui);
+  white-space: nowrap;
+  pointer-events: auto;
+  box-shadow: 0 1px 2px color-mix(in srgb, var(--c-text) 12%, transparent);
+}
+.bims-sign-name {
+  font-weight: 600;
+}
+.bims-sign-work {
+  color: var(--c-text-2);
+  font-family: var(--font-mono);
+}
+.bims-sign .bims-pill.asks {
+  padding: 0 var(--s-1);
+  height: auto;
+  line-height: 1.5;
+}
+/* no room for the whole sign (town/signs.ts): its name and pills, without ∿ n; never a bare pill */
+.bims-sign[data-compact] .bims-sign-work {
+  display: none;
+}
+.bims-sign-open {
+  padding: 0 0 0 var(--s-1);
+  border: 0;
+  background: none;
+  color: var(--c-text-2);
+  font: var(--t-11) / 1.6 var(--font-ui);
+}
+.bims-sign-open:hover {
+  color: var(--c-text);
+}
+/* the dived office's way back to the town: top left (the Office's own '⤢ fit' is top right) */
+.bims-town-back {
+  position: absolute;
+  top: var(--s-1);
+  left: var(--s-1);
+  padding: 0 var(--s-1);
+  border: 0;
+  border-radius: var(--r-1);
+  background: color-mix(in srgb, var(--c-solid) 85%, transparent);
+  color: var(--c-text-2);
+  font: var(--t-11) / 1.6 var(--font-ui);
+  z-index: 4;
+}
+.bims-town-back:hover {
+  color: var(--c-text);
+}
+@media (prefers-reduced-motion: reduce) {
+  .bims-town-box > .bims-town[data-top] {
+    transition: none;
+  }
+}

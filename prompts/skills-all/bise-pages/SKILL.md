@@ -12,7 +12,7 @@ a screen, its states, looks side by side), draw it: a `ui` block with the kit's 
 terminal cells for the TUI (`ui.md`). Never scripts.
 
 This file is enough for a first version: publish the skeleton before you open anything else.
-Next to it, read only what you need, when you need it: `ui.md` (mocks, states, pickers), `blocks.md` (blocks, plans, the lint),
+Read only what you need, when you need it: `ui.md` (mocks, states, pickers), `blocks.md` (blocks, plans, the lint),
 `leaving.md` (send, post, drafts), `watch.md` (standing orders), `mentions.md` (what's asked of
 him on Slack and mail), `promises.md` (what he said he'd do), `morning.md`, `meetings.md`,
 `feedback.md` (bug reports), `about-you.md` (what bise keeps about the user).
@@ -21,8 +21,7 @@ him on Slack and mail), `promises.md` (what he said he'd do), `morning.md`, `mee
 
 A page is for what the user will read, edit or act on: drafts, lists of items, plans,
 comparisons. A fact, a yes or no, a status, a time is one line in your reply:
-"what's my next meeting" → `14:30, Q3 renewal with Camille.`; "did the deploy pass" →
-`yes, 12:04.` A page: "answer my mails", "the launch post for Slack", "plan the offsite",
+"what's my next meeting" → `14:30, Q3 renewal with Camille.` A page: "answer my mails", "the launch post for Slack", "plan the offsite",
 "which venue".
 
 ## Before you write
@@ -34,7 +33,7 @@ no `--taste`. Who is who: `sb people`.
 ## Publish fast, then fill it
 
 The user should see the page within about 10 seconds, then watch it fill in.
-- **A started page:** when your brief gives a page id (main ran `sb page start`), the page is
+- **A started page:** when your brief gives a page id, the page is
   open and shows each command's one-line description live: say it in the user's words
   (`reading #launch in Slack`). Publish to that id.
 - **Skeleton first**, before you gather anything: the title, the headings you expect and a
@@ -68,6 +67,11 @@ label. Then `leaving.md`. Any other write (close an issue, an invite) is on the 
 its own `action` block (`data-do="close OPS-12"`); on his word, do exactly what he approved.
 Code work is never an action: it is a `start an agent` item.
 
+A question, a drawn pick, his row whose turn comes, the drafts and actions waiting: each becomes
+a notification he reads alone, page closed. Write each to be enough to act on ("notifications"
+in `blocks.md`; page, notification or both: its last table). A question about what you made: a
+`question` block on its page (his notification links it), never asked bare.
+
 ## The blocks
 
 Each block is a `<section data-kit="…" data-id="…">`; ids short, unique, kept across versions.
@@ -76,7 +80,7 @@ Each block is a `<section data-kit="…" data-id="…">`; ids short, unique, kep
 - `table`: one `<table>` with `<thead>`, then an optional `<p>` caption; one number per cell.
 - `callout`: an `<h3>` label + `<p>`; `data-tone` `note`, `good` or `risk`.
 - `question`: a `<p>` + `<ol>` of 2 to 4 short options; answered: `data-answer="2"`. It makes
-  a card; `data-card="none"` when it only waits on the page.
+  a notification; `data-notify="none"` when it only waits on the page.
 - `sources`: `<ol>` of `<li><a href="…">name · tool</a>, when</li>`, last; facts cite `<sup>n</sup>`.
 - `review`: `<ol>` of `<li data-id>` to handle one by one; `data-verb` `send`, `open-reply`,
   `start`, `keep` (`blocks.md`). Items to handle (mails, reports, comments) are always a
@@ -84,13 +88,14 @@ Each block is a `<section data-kit="…" data-id="…">`; ids short, unique, kep
 - `message`: a draft for a channel, `data-to="Slack · #launch"`, `<p>`s; never `<pre>`.
 - `email`: `data-to`, `<p data-field="to">`, `subject`, the body; `data-verb="draft"` for his drafts.
 - `compare`: 2 to 4 `<li data-id>` side by side: `<h3>`, `<ul>` of facts, `<p>` why.
-- `ui`: a mock, terminal cells, states side by side, a rich picker, a timeline: `ui.md`.
+- `ui`: a mock, terminal cells, states side by side, a rich picker (asks like a `question`), a
+  timeline: `ui.md`.
 - `checklist`: `<li data-id data-who data-due="2026-05-20">`, `data-done` when done. A plan
-  worked through with him (buy the domain, set up the offsite): read "a plan" in `blocks.md`
-  before you publish one.
+  worked through with him (buy the domain): "a plan" in `blocks.md`.
+- `plan`: one you propose and run, never a `review`: `blocks.md`.
 
 **A draft of anything that leaves goes in its own block, never in prose:** a Slack message or a
-post in a `message` block (`data-to="Slack · #team"`: `copy` and `open #team`), a mail or a
+post in a `message` block, a mail or a
 newsletter in an `email` block. In prose it can't be copied, sent or put in his drafts.
 
 Words: the user's language and voice, lowercase headings, short sentences, concrete. Times in

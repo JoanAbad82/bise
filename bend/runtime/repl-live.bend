@@ -23,11 +23,13 @@ import ./main.bend as R
 import ../runtime/bash.bend as Sh
 import ../runtime/provider.bend as Pv
 import ../runtime/provider-pure.bend as Pvp
+import ../runtime/threshold-pure.bend as Th
 import ../runtime/settings.bend as St
 import ./repl-core.bend as Rc
 import ./debug.bend as Dbg
 import ./repl-core-pure.bend as Rcp
 import ./oneshot.bend as Os
+import ./render.bend as Rd
 
 # how many tokens of the user's most recent messages a compaction keeps
 # verbatim after the summary, counted from the newest (core/history.bend
@@ -40,17 +42,17 @@ def keep_of_cfg(+envv: String, +cfgt: String) -> Nat:
 # the compaction threshold for real conversations, in approximate
 # tokens. The same precedence as everything else: BEND_THRESHOLD env
 # > config.toml compaction_threshold (tokens or "45%" of the window,
-# BISE-300) > 80 % of the model's context window (from bise's catalog,
-# BISE-150), never above that 80 %: runtime/provider-pure.bend
-# `threshold`
+# BISE-300) > the default, from the model's context window (bise's
+# catalog, BISE-150: 450k from a 1M window, else 85 %, issue #18), never above
+# 85 %: runtime/threshold-pure.bend `threshold`
 def thr_of_cfg(+envv: String, +cfgt: String, +window: U32) -> Nat:
-  U32.to_nat(Pvp.threshold(envv, cfgt, window))
+  U32.to_nat(Th.threshold(envv, cfgt, window))
 
 # the same threshold in the Core's estimate units (Pvp.est_units): what
 # the Core's Cfg carries, so the compaction fires at about the
 # provider's count, not a third later
 def thr_core_of_cfg(+envv: String, +cfgt: String, +window: U32) -> Nat:
-  U32.to_nat(Pvp.est_units(Pvp.threshold(envv, cfgt, window)))
+  U32.to_nat(Pvp.est_units(Th.threshold(envv, cfgt, window)))
 
 # the live system prompt = identity + the exact vibe_sdk sections
 # (tool_use_prompt + current_time_prompt), loaded from prompt-*.txt;
@@ -248,16 +250,12 @@ def live_main() -> IO(Unit):
     IO.print(String.append("bend-harness LIVE REPL on 127.0.0.1:",
       String.append(U32.show(p),
         String.append(" (real model, FS tools, bash) — compaction threshold: ",
-          String.append(Nat.show(threshold), " tokens (at most 80% of the model's context; BEND_THRESHOLD or config.toml compaction_threshold to change)")))))
-    # the plugins bridge, then the skills scan (it reads the plugin
-    # skills), then the prompt (it lists the skills)
+          String.append(Nat.show(threshold), " tokens (450k from a 1M context, else 85% of it, never above 85%; BEND_THRESHOLD or config.toml compaction_threshold to change)")))))
+    # the plugins bridge (it writes the session's skills index before
+    # it is ready), then the prompt (it lists the skills)
     u5 : Unit <- Pl.start()
-    u4 : Unit <- Sk.skills_scan()
     +cfg : T.Cfg <- live_cfg(core_thr, keep)
     +ld : P.Load <- P.load(T.new_session(cfg))
-    kr : Result<&1, &1, U32 & String, String> <- IO.get_env("MISTRAL_API_KEY")
-    +key : String <- IO.pure(String, P.env_or(kr, ""))
-    u : Unit <- Mcp.bootstrap(key)
     u3 : Unit <- Sh.bash_cleanup(U32.show(p))
     w : Unit <- hub_watch_start()
     f : Rc.Flow <- Rc.serve(True{}, l, Rc.ld_greet(ld), Rc.ld_sess(ld))
@@ -278,9 +276,21 @@ def main.pick(empty: Bool, +path: String) -> IO(Unit):
     case False{}:
       Os.run(path)
 
+# BISE_RENDER=<wire file> (/debug completion <provider>): the body
+# Pv.request_body makes of it, written, no call (runtime/render.bend)
+@unsafe
+def main.render(empty: Bool, +render: String, +oneshot: String) -> IO(Unit):
+  match empty:
+    case True{}:
+      main.pick(String.is_empty(oneshot), oneshot)
+    case False{}:
+      Rd.run(render)
+
 @unsafe
 def main() -> IO(Unit):
   do IO<Unit>:
     r : Result<&1, &1, U32 & String, String> <- IO.get_env("BISE_ONESHOT")
+    d : Result<&1, &1, U32 & String, String> <- IO.get_env("BISE_RENDER")
     +path : String <- IO.pure(String, P.env_or(r, ""))
-    main.pick(String.is_empty(path), path)
+    +render : String <- IO.pure(String, P.env_or(d, ""))
+    main.render(String.is_empty(render), render, path)

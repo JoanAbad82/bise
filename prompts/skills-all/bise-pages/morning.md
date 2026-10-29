@@ -16,8 +16,8 @@ opens on that item), a PR or a doc by its https link.
 
 1. `heading`: `<h1>your tuesday</h1>`, then the `<p>` meta line in numbers (`3 need you · 2 done
    overnight · 3 meetings`): write the `<h1>` first, the kit shows the meta above it.
-2. **What needs you**, a `prose` list under `## needs you`: the cards waiting for him, and what
-   waits on him in every open page, cards or not. Run `sb page waiting`: one line per item,
+2. **What needs you**, a `prose` list under `## needs you`: the notifications waiting for him, and what
+   waits on him in every open page, notifications or not. Run `sb page waiting`: one line per item,
    `<page>#<item> · step|draft|question|notes · <text>` (his checklist steps not ticked, drafts
    waiting for his word, unanswered questions, notes he left; `nothing waits on him` when
    empty). A plan waiting on him is there: his first open step and each draft of bise's that

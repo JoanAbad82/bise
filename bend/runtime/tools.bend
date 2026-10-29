@@ -54,15 +54,3 @@ def catalog_short() -> List<&2, T.ToolDef>:
     "Discover callable tool functions for run_typescript. Use mode=best_match first with a capability query; it returns ranked exact function names. If a returned name fits, call mode=details with that exact name before using it.",
     "Executes TypeScript code in a sandbox environment. The sandbox expects an async function main() containing all your code. Tool functions are available under tools.<group>.<function>; no imports needed. The result of main() is the tool output.",
     "Run a real shell command and return its output. Args: the command.")
-
-def exec_cmd.pick(ok: Bool, +out: String, +id: U32) -> T.Cmd:
-  match ok:
-    case True{}:
-      T.ToolOk{id, Xtp.cap_out(out)}
-    case False{}:
-      T.ToolFail{id, Xtp.cap_out(out)}
-
-def exec_cmd(r: Xtp.ExecRes, +id: U32) -> T.Cmd:
-  match r:
-    case Xtp.Ex{+ok, +out}:
-      exec_cmd.pick(ok, out, id)

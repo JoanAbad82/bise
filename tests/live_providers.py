@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """One real tool-call turn per provider whose API key is set (BISE-153).
 Costs real tokens: never in run_all.sh. A provider with no key is
-skipped. Keys come from the env, then ~/.bend-harness/.env and
+skipped. Keys come from the env, then ~/.bise/.env and
 ~/.vibe/.env (like the harness).
 
   live_providers.py                 # the harness (repl-live) on each provider
@@ -28,6 +28,7 @@ ROOT = os.path.abspath(os.path.join(HERE, ".."))
 sys.path.insert(0, HERE)
 import provider_folds as P  # noqa: E402
 import bise_env  # noqa: E402
+import obs_lines  # noqa: E402
 import wait  # noqa: E402
 
 # row -> (catalog provider, model, family override). The cheapest
@@ -58,7 +59,7 @@ SCHEMA = {"type": "object", "properties": {"arg": {"type": "string", "descriptio
 
 def keys_env():
     env = dict(os.environ)
-    for f in (os.path.expanduser("~/.bend-harness/.env"), os.path.expanduser("~/.vibe/.env")):
+    for f in (os.path.expanduser("~/.bise/.env"), os.path.expanduser("~/.vibe/.env")):
         if os.path.exists(f):
             for line in open(f):
                 k, sep, v = line.strip().partition("=")
@@ -207,7 +208,6 @@ def harness_turn(row, prov, model, family, base, key_env, env):
     e.update(HOME=tmp, XDG_STATE_HOME=os.path.join(tmp, "state"), BISE_MODELS_FILE=os.path.join(tmp, "models.toml"),
              BISE_MODEL="%s/%s" % (pid, model), BEND_MODEL=legacy, BEND_REPL_PORT=str(port),
              BEND_SESSION_FILE=session, BEND_WIRE_LOG=os.path.join(tmp, "wire.log"),
-             BEND_MCP_INDEX=os.path.join(tmp, "mcp.txt"), BEND_SKILLS_INDEX=os.path.join(tmp, "sk.txt"),
              BEND_BG_ROOT=os.path.join(tmp, "bg"))
     log, err = os.path.join(tmp, "repl.log"), os.path.join(tmp, "repl.err")
     repl = subprocess.Popen([os.path.join(ROOT, "repl-live")], cwd=ROOT, env=e,
@@ -228,12 +228,12 @@ def harness_turn(row, prov, model, family, base, key_env, env):
             if not line:
                 break
             lines.append(line.decode(errors="replace").rstrip())
-            if line.startswith(b"  obs: turn_done"):
+            if obs_lines.kind(line) == "turn_done":
                 break
         sock.close()
         text = open(session).read() if os.path.exists(session) else ""
         ok = ("tool bash ok: " + token) in text
-        said = [l for l in lines if "obs: assistant:" in l or "ERROR" in l or "obs: error" in l]
+        said = [l for l in lines if obs_lines.kind(l) == "assistant" or "ERROR" in l or obs_lines.kind(l) == "error"]
         return "%s %s: %s/%s (%s) %s" % ("ok  " if ok else "FAIL", row, pid, model, family,
                                         (said[-1] if said else "no reply")[:200] + ("" if ok else " (logs: %s)" % tmp))
     finally:

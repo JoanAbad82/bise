@@ -15,7 +15,7 @@ const TABLE: &[(&str, &str, &str, &str, &str)] = &[
     ("foundry", "claude-opus-5-5", "claude-haiku-4-5", "foundry/claude-haiku-4-5", "-"),
     ("openai", "gpt-6-astra", "gpt-6-luna", "openai/gpt-6-luna", "openai/gpt-transcribe"),
     ("google", "gemini-3.8-flash", "gemini-3.5-flash-lite", "google/gemini-3.5-flash-lite", "-"),
-    ("mistral", "mistral-medium-latest", "mistral-small-latest", "mistral/mistral-small-latest", "mistral/voxtral-transcribe-3"),
+    ("mistral", "mistral-large-4", "mistral-small-latest", "mistral/mistral-small-latest", "mistral/voxtral-mini-transcribe-3"),
     ("openrouter", "anthropic/claude-sonnet-5.5", "google/gemini-3.8-flash", roles::JEV_OPENROUTER, "-"),
     // Groq transcribes, but is hidden from voice (the user, 2026-09-30)
     ("groq", "openai/gpt-oss-120b", "openai/gpt-oss-20b", "groq/openai/gpt-oss-20b", "-"),
@@ -152,7 +152,7 @@ fn a_voice_only_key_gives_voice_its_provider() {
     )
     .unwrap();
     let s = Setup::from_text(None, &|_| None).with_keys(&auth::Keys { env: &|_| None, store: &both, files: &[] });
-    assert_eq!(s.voice.model, "mistral/voxtral-transcribe-3");
+    assert_eq!(s.voice.model, "mistral/voxtral-mini-transcribe-3");
 }
 
 /// A ChatGPT sign-in alone (no key at all): ready when signed in, every
@@ -191,4 +191,29 @@ fn a_chatgpt_sign_in_alone_gives_every_role_a_plan_model() {
         assert_eq!(r.price.input, None, "{m}: the plan pays");
     }
     assert_eq!(s.small_model, "chatgpt/gpt-6-luna");
+}
+
+/// The model a picked provider runs (pick_for): main's when it is of that
+/// provider, else the provider's pick, else its first chat model.
+#[test]
+fn pick_for_keeps_main_of_that_provider_else_the_providers_pick() {
+    let c = Setup::from_text(None, &|_| None).catalog;
+    assert_eq!(roles::pick_for(&c, "anthropic", "").as_deref(), Some("anthropic/claude-opus-5-5"));
+    assert_eq!(roles::pick_for(&c, "anthropic", "openai/gpt-6-astra").as_deref(), Some("anthropic/claude-opus-5-5"));
+    assert_eq!(roles::pick_for(&c, "anthropic", "anthropic/claude-haiku-4-5").as_deref(), Some("anthropic/claude-haiku-4-5"));
+    assert_eq!(roles::pick_for(&c, "no-such", ""), None);
+}
+
+/// What a checked key writes as main (architect m_28532): main empty or
+/// unable to run takes the checked model; a model that runs is never
+/// replaced.
+#[test]
+fn model_to_write_never_replaces_a_main_that_runs() {
+    let w = |main: &str, runs: bool| roles::model_to_write(main, runs, "openai/gpt-6-astra");
+    assert_eq!(w("", false).as_deref(), Some("openai/gpt-6-astra"));
+    assert_eq!(w("none", false).as_deref(), Some("openai/gpt-6-astra"));
+    assert_eq!(w("anthropic/claude-opus-5-5", false).as_deref(), Some("openai/gpt-6-astra"));
+    assert_eq!(w("anthropic/claude-opus-5-5", true), None);
+    assert_eq!(w("openai/gpt-6-astra", false), None);
+    assert_eq!(roles::model_to_write("", false, ""), None);
 }

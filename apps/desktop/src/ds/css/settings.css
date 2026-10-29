@@ -1,0 +1,74 @@
+/* bise desktop window · settings' groups (Group, Check: settings, onboarding, the capsule's perms) and the settings route's page and nav. Owner: r2-settings */
+.b-group{border-radius:var(--r-3);background:var(--c-raised);box-shadow:var(--e-1);margin-bottom:var(--gap-section)}
+.b-gi{display:flex;align-items:center;gap:var(--s-3);min-height:var(--s-12);padding:var(--s-2) var(--pad-card-x)}
+.b-gi+.b-gi{border-top:1px solid var(--c-line)}
+.b-gi .l{flex:1;min-width:0}
+.b-gi .l span{display:block;font-size:var(--t-12);color:var(--c-text-2)}
+.b-gi .v{color:var(--c-text-2);font-size:var(--t-13);white-space:nowrap}
+/* a switch row (Group's toggle): the row is the switch's <label for>, base.css gives it the hand; disabled, its words go text-3 */
+.b-gi.is-disabled .l,.b-gi.is-disabled .l span{color:var(--c-text-3)}
+/* a group the keys walk (Group list): hover 6%, the selection 9%, like every list (designer m_22280) */
+.b-group.is-list .b-gi:hover{background:color-mix(in srgb,var(--c-text) 6%,transparent)}
+.b-group.is-list .b-gi.is-sel{background:color-mix(in srgb,var(--c-text) 9%,transparent)}
+.b-group.is-list .b-gi:first-child{border-radius:var(--r-3) var(--r-3) 0 0}
+.b-group.is-list .b-gi:last-child{border-radius:0 0 var(--r-3) var(--r-3)}
+.b-group.is-list .b-gi:only-child{border-radius:var(--r-3)}
+.b-gt{font-size:var(--t-11);letter-spacing:.07em;color:var(--c-text-3);margin:0 0 var(--s-2) var(--s-1);text-transform:uppercase}
+.b-check{width:16px;height:16px;border-radius:5px;box-shadow:inset 0 0 0 1.5px var(--c-line-strong);display:inline-flex;align-items:center;justify-content:center;font-size:var(--t-11);flex:none}
+.b-check.on{background:var(--c-ink);color:var(--c-on-ink);box-shadow:none}
+
+/* settings, a route of the main window (r2-settings, designer m_44311; the look of mockup 10,
+   nm-settings'). Its nav (settings/nav.tsx) is the frame's sidebar in place of the projects: the
+   back row, then the pages as the ds ListRow at the sidebar's 28 (padding 0 8, r 6, a 20 tile r 5,
+   8, the title). The page beside it scrolls on its own, at most 640 wide, padding 24 24 24 (the bar
+   above says the page: no second title); the page's sentence is its lead line, no banner. Its
+   groups: a label 12/16 in text-3 (padding 0 12 8), a box r 10 with a hairline, rows 44 at least
+   (padding 8 12), switches 32 x 20, buttons 28; groups 20 apart. The accent never marks the
+   selected page. */
+/* the sidebar's head leaves on settings: the nav starts 8 down, the back row 8 above General; a
+   page's tint inset 8 each side, r 6, like the frame sidebar's selected rows (designer m_44447) */
+.b-snav{padding-top:var(--s-2)}
+.b-snav>.app-s-row.back{margin-bottom:var(--s-2)}
+.b-snav .b-lrow{flex:none;height:var(--h-row-tight);margin:0 var(--s-2);padding:0;border-radius:var(--r-1)}
+.b-snav .b-lrow>.body{gap:var(--s-2);padding:0 var(--s-2);border-radius:var(--r-1)}
+.b-snav .b-lrow .state{width:var(--h-kbd)}
+.b-snav-tile{flex:none;display:inline-flex;align-items:center;justify-content:center;width:var(--h-kbd);height:var(--h-kbd);border-radius:5px;background:var(--c-sunken);color:var(--c-text-2)}
+.b-snav .b-lrow.on .b-snav-tile{color:var(--c-text)}
+.b-settings{flex:1 1 auto;min-height:0;overflow-y:auto;color:var(--c-text);outline:none}
+.b-settings-page{box-sizing:border-box;max-width:var(--w-settings-page);margin:0 auto;padding:var(--s-6)}
+.b-settings-lead{margin:0;padding:0 var(--s-3);font:400 var(--t-13)/var(--lh-ui) var(--font-ui);color:var(--c-text-2)}
+.b-settings .b-gt{margin:0;padding:0 var(--s-3) var(--s-2);font:500 var(--t-12)/var(--s-4) var(--font-ui);letter-spacing:normal;text-transform:none;color:var(--c-text-3)}
+.b-settings-page>*:not(.b-settings-lead){margin-top:var(--s-5)}
+.b-settings .b-group{margin-bottom:0;border-radius:var(--r-menu);background:var(--c-raised);box-shadow:inset 0 0 0 1px var(--c-line)}
+.b-settings .b-gi{box-sizing:border-box;min-height:var(--h-setting-row);padding:var(--s-2) var(--s-3);gap:var(--s-3)}
+.b-settings .b-gi .l{font:400 var(--t-13)/var(--lh-ui) var(--font-ui)}
+/* a row never squeezes its label (Gabriel's shot, settings-width; designer m_48077): the label keeps
+   240 at least; a control too wide for the rest of the row goes under it, at the label's left, 8
+   below; a value too long for the row ends in an ellipsis */
+.b-settings .b-gi{flex-wrap:wrap;row-gap:var(--s-2)}
+.b-settings .b-gi>.l{flex:1 1 var(--w-setting-label)}
+.b-settings .b-gi>:not(.l){max-width:100%}
+.b-settings .b-gi>.v{overflow:hidden;text-overflow:ellipsis}
+/* a row with a control (a picker, a switch, a button, a value): the label grows from its 240 and
+   the control ends on the row's right edge, the card's 12 in line, as macOS's settings (Gabriel
+   m_49566, designer m_49597; it replaces designer m_48077/m_48146's one control column 16 after a
+   240-320 label, which left it mid-card); 16 at least between them */
+.b-settings .b-gi:has(>.l+*){column-gap:var(--s-4)}
+.b-settings .b-gi .l span{font-size:var(--t-12);line-height:var(--s-4)}
+.b-settings .b-group.is-list .b-gi:first-child{border-radius:var(--r-menu) var(--r-menu) 0 0}
+.b-settings .b-group.is-list .b-gi:last-child{border-radius:0 0 var(--r-menu) var(--r-menu)}
+.b-settings .b-group.is-list .b-gi:only-child{border-radius:var(--r-menu)}
+/* a done chip (signed in, a key added): the line check in ink, its words in text-2, on the card's ground, both themes (green is a diff's +) */
+.b-settings .settings-done .b-chip{background:var(--c-raised);box-shadow:inset 0 0 0 1px var(--c-line);color:var(--c-text-2)}
+.b-settings .settings-done .b-chip .b-app-icon{color:var(--c-ink)}
+.b-settings .b-btn{height:var(--h-control-sm)}
+/* a note under a card: 12 under it, aligned with the label's words (ui-review m_43805) */
+.b-settings .b-group+.b-help{margin-top:var(--s-3)}
+/* one text edge per page (designer m_48227): the lead and every help line (the sign-in line's words
+   are one) start 12 in, on the group heads' and the row labels' x */
+.b-settings .b-help{padding:0 var(--s-3)}
+/* a page's empty line (approvals' 'bise hasn't sent your approvals yet.', designer m_49597, m_49604):
+   on the same 12 in edge, in the lead's size and text-3, 16 under the lead; never a spinner */
+.b-settings .b-empty{padding:0 var(--s-3)}
+.b-settings .b-empty .say{font:400 var(--t-13)/var(--lh-ui) var(--font-ui);color:var(--c-text-3)}
+.b-settings-page>.b-settings-lead+.b-empty{margin-top:var(--s-4)}

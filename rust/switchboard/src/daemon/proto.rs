@@ -15,29 +15,39 @@
 //! are pure (`crate::proto_view`); this file only wires them: the
 //! connections, hello, the dispatch and a step's errors. Each command's
 //! arm is in `proto/cmds.rs`, the events the hub sends on its own in
-//! `proto/emit.rs` (architect review 10).
+//! `proto/emit.rs` (architect review 10), the project's growth (cached,
+//! one emit point) in `proto/growth.rs`, `turn/send`'s result (its
+//! message's id, or why none was made) in `proto/send.rs`.
+//!
+//! JSON-RPC (`daemon/rpc.rs`, client-protocol step 1) runs the same arms:
+//! `proto_send` gives a JSON-RPC connection its answer or notification,
+//! `proto_note` numbers a hub-wide event once for every connection.
 
 mod cmds;
 mod emit;
+mod find;
+mod growth;
 mod tool_out;
+mod log;
+mod completion;
+mod send;
 
+use super::rpc::Typed;
 use super::*;
 use crate::proto_view::{self, Live, Since};
 use bise_proto::hub::{HubCmd, HubEv};
 use bise_proto::thread::{self as pthread, Ctx, PageRef};
-use bise_proto::PROTO;
 
 /// Every typed connection, by client.
 #[derive(Default)]
 pub(super) struct Proto {
     conns: BTreeMap<ClientId, Conn>,
     since: Since,
-    /// the last `agents` and `cards` sent (sent again only when changed)
+    /// the last `agents` (the live rows, agents-light) and `cards` sent
+    /// (sent again only when changed)
     last: (String, String),
     /// the agents' statuses and folders at the last `worktrees` scan
     worktrees: String,
-    /// the background jobs' ports once found (dev_servers.rs)
-    pub(super) dev_ports: super::dev_servers::Ports,
     /// the last `jobs` sent (S10: sent again only when changed)
     jobs: String,
     /// the last `features` sent (bar A.6: sent again only when changed)
@@ -46,6 +56,8 @@ pub(super) struct Proto {
     prs: String,
     /// the last `scheduled` sent (⌘K: sent again only when changed)
     scheduled: String,
+    /// the last `pages` sent (P4c-5: sent again only when changed)
+    pages: String,
     /// bar A.5: config.toml's and auth.json's mtimes at the last `models`
     /// (a stat on each state broadcast, never a read), and its JSON
     models_at: Option<(Option<std::time::SystemTime>, Option<std::time::SystemTime>)>,
@@ -59,6 +71,17 @@ pub(super) struct Proto {
     /// the agents whose usage was seeded from their transcript's tail
     /// (once each, architect m_10999)
     seeded: BTreeSet<String>,
+    /// P4b: each agent's newest entry (`hub/agents`' `last_pos`)
+    heads: proto_view::heads::Heads,
+    /// P4b: the last `flow` sent (sent again only when changed)
+    flow: String,
+    /// cost-pause: the last `paused` sent (likewise)
+    paused: String,
+    /// the last `switch` sent (likewise; switch.rs's own facts)
+    switch: String,
+    /// les bims: growth's inputs, its cached value, the last sent
+    /// (proto/growth.rs)
+    growth: growth::GrowthCache,
 }
 
 /// G: the typed command being stepped (its connection, its tag, a send's
@@ -72,7 +95,7 @@ struct Stepping {
     notices: Vec<String>,
     undelivered: bool,
     /// its notices are plain lines (`notice`), not failures: a confirm's
-    /// no ("drop of @x cancelled", bar I9)
+    /// no ("@x stays: nothing archived", bar I9)
     as_notice: bool,
 }
 
@@ -80,14 +103,39 @@ struct Stepping {
 struct Conn {
     /// its subscribed threads, by agent
     subs: BTreeMap<String, Live>,
-    /// it said `typed_only`: the hub's older events skip it
-    only: bool,
+    /// the archived list it got last (its hash; none yet: the next
+    /// agents event carries it)
+    archived: Option<u64>,
 }
 
 impl Proto {
-    /// The connection wants typed events only (`broadcast` skips it).
-    pub(super) fn typed_only(&self, id: ClientId) -> bool {
-        self.conns.get(&id).is_some_and(|c| c.only)
+    /// The connection said `initialize`.
+    pub(super) fn has(&self, id: ClientId) -> bool {
+        self.conns.contains_key(&id)
+    }
+
+    /// A JSON-RPC connection after `initialize`: it gets typed events.
+    pub(super) fn typed(&mut self, id: ClientId) {
+        self.conns.entry(id).or_default();
+    }
+
+    /// agents-light: the archived list for connection `id` when it hasn't
+    /// got this one yet (always on its first agents event), and notes it
+    /// sent; `None`: it has it.
+    fn archived_for(&mut self, id: ClientId, list: &[bise_proto::rows::ArchivedAgent], hash: u64) -> Option<Vec<bise_proto::rows::ArchivedAgent>> {
+        let c = self.conns.get_mut(&id)?;
+        (c.archived != Some(hash)).then(|| {
+            c.archived = Some(hash);
+            list.to_vec()
+        })
+    }
+
+    /// Connection `id`'s next agents event carries the archived list
+    /// (hub/read: a resync, the client starts again from it).
+    pub(super) fn forget_archived(&mut self, id: ClientId) {
+        if let Some(c) = self.conns.get_mut(&id) {
+            c.archived = None;
+        }
     }
 }
 
@@ -136,10 +184,18 @@ impl Shell {
         Facts { open: self.hub.st.open_cards().map(|c| c.id).collect(), pages: self.pg.pages.clone() }
     }
 
-    fn proto_send(&mut self, id: ClientId, ev: &HubEv) {
-        if let Some(c) = self.clients.get_mut(&id) {
-            write_line(c, &ev.encode());
-        }
+    /// A typed event for connection `id` (a command's answer, an event
+    /// for it alone): its JSON-RPC answer or notification
+    /// (`daemon/rpc.rs`).
+    pub(super) fn proto_send(&mut self, id: ClientId, ev: &HubEv) {
+        self.rpc_out(id, ev, true);
+    }
+
+    /// A typed event for every typed connection (update-flow's
+    /// `bise_update`).
+    pub(super) fn proto_note_all(&mut self, ev: &HubEv) {
+        let ids: Vec<ClientId> = self.proto.conns.keys().copied().collect();
+        self.proto_note(&ids, ev);
     }
 
     /// Steps sb-core for typed command `cmd` of connection `id`: its
@@ -147,6 +203,17 @@ impl Shell {
     /// `error {cmd, text}`, so a command that does nothing says why.
     fn step_typed(&mut self, id: ClientId, cmd: &str, input: Input) {
         self.stepping(id, cmd, None, |sh| sh.step(input));
+    }
+
+    /// A user command whose words are its result, not an error
+    /// (cost-pause's project/pause, project/resume: `rpc::OWN_RESULTS`).
+    fn said_step(&mut self, id: ClientId, cmd: &str, user: crate::router::UserCmd) {
+        self.stepping(id, cmd, None, |sh| {
+            if let Some(s) = sh.proto.stepping.as_mut() {
+                s.as_notice = true;
+            }
+            sh.step(Input::UserCmd { client: id, focus: MAIN.into(), cmd: user });
+        });
     }
 
     /// Runs `f` (one step of a typed command) with its notices kept and
@@ -182,48 +249,36 @@ impl Shell {
         true
     }
 
-    /// A daemon handler's plain words for `client` (the `version` op's
-    /// `/update` answers): the typed `notice` on a typed connection (its
-    /// `/update` came as a `slash`), the older line to the TUI.
-    pub(super) fn notice_to(&mut self, client: ClientId, text: &str) {
+    /// The hub's plain words for `client` outside a typed command's step
+    /// (`/update`'s answers, a `/flow` or `/model` answer, a page card's,
+    /// an unknown op): the typed `notice` on a typed connection (`cmd`:
+    /// the command it answers, `slash` for `/update`); nothing to a
+    /// connection that never said a typed hello or `initialize` (no older
+    /// line, client-protocol step 5).
+    pub(super) fn notice_out(&mut self, client: ClientId, cmd: Option<&str>, text: &str) {
         if self.proto.conns.contains_key(&client) {
             let project = self.project();
-            self.proto_send(client, &HubEv::Notice { project, cmd: Some("slash".into()), text: text.to_string(), cid: None });
-            if self.proto.typed_only(client) {
-                return;
-            }
+            self.proto_send(client, &HubEv::Notice { project, cmd: cmd.map(str::to_string), text: text.to_string(), cid: None });
         }
-        if let Some(c) = self.clients.get_mut(&client) {
-            super::write_json(c, &json!({"ev": "notice", "text": text}));
-        }
-    }
-
-    /// `Effect::ToClient`'s body for `client` when it is sb-core's yes/no
-    /// question (`confirm`, bar I9) and `client` is a typed connection:
-    /// sent as the typed `confirm`, to that connection only. True: a
-    /// typed-only connection is done with it (another one also gets the
-    /// older line).
-    pub(super) fn typed_confirm(&mut self, client: ClientId, body: &Value) -> bool {
-        if body.get("ev").and_then(Value::as_str) != Some("confirm") || !self.proto.conns.contains_key(&client) {
-            return false;
-        }
-        let id = body.get("id").and_then(Value::as_u64).unwrap_or(0);
-        let text = body.get("text").and_then(Value::as_str).unwrap_or("").to_string();
-        let project = self.project();
-        self.proto_send(client, &HubEv::Confirm { project, id, text });
-        self.proto.typed_only(client)
     }
 
     /// A handler's typed result for `client` when it is the typed
-    /// command being stepped: its `error` when refused, nothing when done
-    /// (the change shows in the events). False: not a typed command.
+    /// command being stepped: its `error` when refused; done, the change
+    /// shows in the events, and a command that answers the hub's words
+    /// (command/run's `/model`: `✓ main now on …`, P3b) gets them as its
+    /// result. False: not a typed command.
     pub(super) fn typed_outcome(&mut self, client: ClientId, r: &Result<String, String>) -> bool {
         let Some((id, cmd)) = self.proto.stepping.as_ref().map(|s| (s.id, s.cmd.clone())) else { return false };
         if id != client {
             return false;
         }
-        if let Err(e) = r {
-            self.proto_error(client, &cmd, e);
+        match r {
+            Err(e) => self.proto_error(client, &cmd, e),
+            Ok(text) if !text.is_empty() && bise_proto::rpc::says(&cmd) => {
+                let project = self.project();
+                self.proto_send(client, &HubEv::Notice { project, cmd: Some(cmd), text: text.clone(), cid: None });
+            }
+            Ok(_) => {}
         }
         true
     }
@@ -242,7 +297,13 @@ impl Shell {
         self.proto.conns.keys().copied().filter(|id| self.clients.contains_key(id)).collect()
     }
 
-    fn proto_error(&mut self, id: ClientId, cmd: &str, text: &str) {
+    /// A thread's event that nobody would get now: a hub-wide one with
+    /// no typed connection open (its scan is not worth starting).
+    pub(super) fn nobody(&self, to: &super::rpc::Typed) -> bool {
+        matches!(to, super::rpc::Typed::All) && self.typed_ids().is_empty()
+    }
+
+    pub(super) fn proto_error(&mut self, id: ClientId, cmd: &str, text: &str) {
         self.proto_error_cid(id, cmd, text, None, None);
     }
 
@@ -254,90 +315,34 @@ impl Shell {
         let reason = reason.map(str::to_string);
         self.proto_send(id, &HubEv::Error { project, cmd, text: text.to_string(), cid, reason, kind: None });
     }
+}
 
-    /// A line on `hub.sock` with a `cmd`: one typed command.
-    pub(super) fn proto_cmd(&mut self, id: ClientId, v: Value) {
-        let tag = v.get("cmd").and_then(Value::as_str).unwrap_or("").to_string();
-        let cmd = match HubCmd::from_value(v) {
-            Ok(c) => c,
-            Err(e) => return self.proto_error(id, &tag, &e),
-        };
-        if let HubCmd::Hello { proto, typed_only } = cmd {
-            if proto != PROTO {
-                return self.proto_error(id, &tag, &format!("this hub speaks proto {PROTO}, not {proto}"));
-            }
-            self.proto.conns.entry(id).or_default().only = typed_only;
-            let ws = self.opts.paths.workspace.clone();
-            let name = ws.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
-            let cmds = HubCmd::TAGS.iter().map(|t| t.to_string()).collect();
-            let welcome = HubEv::Welcome { project: self.project(), proto: PROTO, workspace: ws.to_string_lossy().to_string(), name, cmds };
-            self.proto_send(id, &welcome);
-            let snap = self.snapshot();
-            let (agents, cards) = self.proto_rows(&snap);
-            self.proto_send(id, &agents);
-            self.proto_send(id, &cards);
-            let jobs = HubEv::Jobs { project: self.project(), items: proto_view::jobs(&snap) };
-            self.proto_send(id, &jobs);
-            let arts = self.artifacts_ev();
-            let arts = self.proto_artifacts(&arts);
-            self.proto_send(id, &arts);
-            self.worktrees_typed(vec![id]);
-            self.dev_servers_typed(vec![id]);
-            self.merged_typed(vec![id]);
-            let feats = self.features_ev();
-            self.proto_send(id, &feats);
-            let prs = self.prs_ev();
-            self.proto_send(id, &prs);
-            let sched = self.scheduled_ev();
-            self.proto_send(id, &sched);
-            let models = self.models_ev();
-            self.proto_send(id, &models);
-            let appr = self.approvals_ev(false);
-            let appr = self.proto_approvals(&appr);
-            self.proto_send(id, &appr);
-            return;
-        }
-        if !self.proto.conns.contains_key(&id) {
-            return self.proto_error(id, &tag, "say hello {proto: 1} first");
-        }
-        let project = match &cmd {
-            HubCmd::Subscribe { project, .. }
-            | HubCmd::Unsubscribe { project, .. }
-            | HubCmd::Page { project, .. }
-            | HubCmd::Send { project, .. }
-            | HubCmd::Answer { project, .. }
-            | HubCmd::Close { project, .. }
-            | HubCmd::Confirm { project, .. }
-            | HubCmd::Approvals { project, .. }
-            | HubCmd::RemoveRule { project, .. }
-            | HubCmd::Stop { project, .. }
-            | HubCmd::Archive { project, .. }
-            | HubCmd::Unarchive { project, .. }
-            | HubCmd::ArtifactsSeen { project }
-            | HubCmd::Worktrees { project }
-            | HubCmd::DevServers { project }
-            | HubCmd::Merged { project }
-            | HubCmd::Features { project }
-            | HubCmd::Prs { project }
-            | HubCmd::Scheduled { project }
-            | HubCmd::ScheduledStop { project, .. }
-            | HubCmd::Models { project }
-            | HubCmd::New { project, .. }
-            | HubCmd::Rename { project, .. }
-            | HubCmd::Model { project, .. }
-            | HubCmd::Effort { project, .. }
-            | HubCmd::RouteCorrect { project, .. }
-            | HubCmd::RouteCancel { project, .. }
-            | HubCmd::Follow { project, .. }
-            | HubCmd::Slash { project, .. }
-            | HubCmd::Diff { project, .. }
-            | HubCmd::ToolOut { project, .. } => project.clone(),
-            HubCmd::Hello { .. } => unreachable!(),
-            HubCmd::Unknown { tag, .. } => return self.proto_error(id, tag, &format!("unknown command: {tag}")),
-        };
-        if project != self.project() {
-            return self.proto_error(id, &tag, &format!("this hub is {}, not {project}", self.project()));
-        }
-        self.proto_run(id, &tag, project, cmd);
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use bise_proto::rows::{ArchivedAgent, Status};
+
+    fn row(name: &str) -> ArchivedAgent {
+        ArchivedAgent { name: name.into(), aliases: vec![], dir: name.into(), status: Status::Done, since_ms: 9, about: String::new() }
+    }
+
+    /// agents-light (architect m_37000 2., m_37220 1.): a light
+    /// connection's first agents event carries the list, a live tick with
+    /// the same list doesn't, a changed one does, a resync (hub/read) does
+    /// again; a connection that never said `initialize` gets nothing.
+    #[test]
+    fn the_archived_list_goes_once_per_change_and_on_each_first_event() {
+        let mut p = Proto::default();
+        p.typed(1);
+        let list = vec![row("old")];
+        assert_eq!(p.archived_for(1, &list, 7), Some(list.clone()), "its first: the list");
+        assert_eq!(p.archived_for(1, &list, 7), None, "a usage tick: unchanged, not resent");
+        let two = vec![row("old"), row("api")];
+        assert_eq!(p.archived_for(1, &two, 8), Some(two.clone()), "an archive: the new list");
+        p.forget_archived(1);
+        assert_eq!(p.archived_for(1, &two, 8), Some(two), "hub/read: again");
+        p.forget_archived(1);
+        assert_eq!(p.archived_for(1, &[], 0), Some(vec![]), "an empty list is said too");
+        assert_eq!(p.archived_for(2, &list, 7), None, "not a typed connection: nothing");
     }
 }

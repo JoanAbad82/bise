@@ -15,11 +15,10 @@
 {"ev":"front","app":"Safari","bundle":"com.apple.Safari","title":"checkout: fix the card field on Safari #42","url":"https://github.com/acme/checkout/pull/42"}
 {"ev":"front","app":"Code","bundle":"com.microsoft.VSCode","title":"main.rs — telemetry","path":"/Users/u/w/telemetry/src/main.rs"}
 {"ev":"front","app":null}
-{"ev":"perms","accessibility":"allowed","mic":"ask","screen":"ask","calendar":"ask"}
-{"ev":"perms","accessibility":"ask","mic":"denied","screen":"allowed","calendar":"denied"}
+{"ev":"perms","accessibility":"allowed","mic":"ask","screen":"ask"}
+{"ev":"perms","accessibility":"ask","mic":"denied","screen":"allowed"}
 {"ev":"quiet","on":true,"why":"call"}
 {"ev":"quiet","on":true,"why":"sharing"}
-{"ev":"quiet","on":true,"why":"meeting"}
 {"ev":"quiet","on":true,"why":"full_screen"}
 {"ev":"quiet","on":false,"why":""}
 {"ev":"shot","id":"s1","path":"/Users/u/.bise/run/shots/fn-1791100400000.png","app":"Safari","title":"checkout: fix the card field on Safari #42"}

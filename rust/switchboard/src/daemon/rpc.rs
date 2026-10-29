@@ -1,0 +1,576 @@
+//! The hub's JSON-RPC 2.0 door (client-protocol step 1, architect
+//! m_13089; the envelope and its tables are `bise_proto::rpc`).
+//!
+//! - a connection whose first line is `initialize` (accept.rs judges it
+//!   like `hello`) gets no hello burst: its answer is the hub's identity,
+//!   methods and hub-wide state at the hub's [`Watermark`]; from then on
+//!   it is a typed connection (`proto.rs`'s `Conn`, typed only) whose
+//!   events go out as notifications;
+//! - a request becomes its
+//!   `HubCmd` and runs the typed arm (`proto/cmds.rs`); its answer is
+//!   the event the arm sends that connection (a read's), the arm's error,
+//!   or `{}` once the arm is done (an action); a method that answers the
+//!   hub's words (`rpc::says`: command/run, artifacts/add, version/info...)
+//!   gets the arm's `notice` as its `CommandRunResult`. The thread answers
+//!   (git, lsof, the release plan: [`LATER`]) stay pending until their
+//!   event comes. Lines for that
+//!   connection made while its request runs are held, then sent after its
+//!   response (Vibe's order: the response first);
+//! - hub-wide notifications are numbered: [`Shell::proto_note`] moves the
+//!   watermark once per event and sends it to every typed connection.
+//!   The counter is transport state, never journaled; `epoch` is this
+//!   hub run's start (ms), so a restart or a reload is a new epoch.
+//!
+//! - sb-core's lines for one client become its One notifications
+//!   (`hub/notice`, update-card's `card/open`, the hub's `client/focused`:
+//!   `one_ev`); `hub/flow` is a hub-wide kind of the state (P4b).
+//!
+//! agent.sock is out of scope (agents' `sb` ops, unchanged).
+
+use super::*;
+use bise_proto::hub::HubEv;
+use bise_proto::rpc::{self, code, HubState, Id, InitializeParams, InitializeResult, Message, Response, RpcError, Scope, Watermark};
+use bise_proto::PROTO;
+
+/// sb-core's line for one client (`Effect::ToClient`) as its typed One
+/// notification: `notice`, `open_card`, `focus`; none: an older event
+/// with no typed form for one client.
+fn one_ev(project: &str, body: &Value) -> Option<HubEv> {
+    let s = |k: &str| body.get(k).and_then(Value::as_str).unwrap_or("").to_string();
+    let project = project.to_string();
+    match body.get("ev").and_then(Value::as_str)? {
+        "notice" => Some(HubEv::Notice { project, cmd: None, text: s("text"), cid: None }),
+        "open_card" => Some(HubEv::CardOpen { project, id: body.get("id").and_then(Value::as_u64)? }),
+        "focus" => Some(HubEv::Focused { project, focus: s("focus") }),
+        _ => None,
+    }
+}
+
+/// The methods answered from a thread (git, lsof), after the arm returns.
+const LATER: &[&str] = &["diff/read", "worktrees/list", "processes/list", "process/output", "merged/list", "branches/list", "release/plan", "tool/output", "log/read", "log/completion", "log/body"];
+
+/// The hub-wide kinds sent from a thread: `hub/read` gives their last.
+const SCANNED: &[&str] = &["worktrees", "processes", "merged"];
+
+/// What runs now that a client connecting later must still see in
+/// `initialize`'s and `hub/read`'s state (the older hello's
+/// release_hello / update_hello): a release run, a `/update` build.
+fn in_progress(release: Option<&release::ReleaseRun>, updating: Option<&(String, std::time::Instant)>) -> Vec<Value> {
+    let mut out = Vec::new();
+    if let Some(r) = release {
+        out.push(release::now(r));
+    }
+    if let Some((rev, since)) = updating {
+        out.push(versions::update_now(rev, *since));
+    }
+    out
+}
+
+
+/// The JSON-RPC side of every connection that used it.
+#[derive(Default)]
+pub(super) struct Rpcs {
+    conns: BTreeMap<ClientId, Conn>,
+    wm: Watermark,
+    /// the last hub-wide event of each [`SCANNED`] kind
+    scanned: BTreeMap<String, HubEv>,
+    /// the running action's own result (`turn/send`'s [`rpc::SendResult`]),
+    /// set by its arm; none: `{}`
+    result: Option<Value>,
+    /// each connection's pid and program, judged at its accept (hub.log)
+    peers: BTreeMap<ClientId, String>,
+}
+
+#[derive(Default)]
+struct Conn {
+    /// said `initialize`: notifications go to it
+    init: bool,
+    pending: Vec<Pending>,
+    /// its lines held while one of its requests runs
+    hold: Option<Vec<String>>,
+}
+
+struct Pending {
+    id: Id,
+    cmd: &'static str,
+    result: Option<&'static str>,
+}
+
+/// Where a thread's typed event goes: the answer to one connection's
+/// request (or hello), or a hub-wide notification to every typed
+/// connection open when it reaches the loop. Never the ones open when
+/// the thread started: a connection that said `initialize` while the
+/// scan ran would miss a number the watermark moved past (rpc_e2e's
+/// 'no gap' red: 15, 18 after 13, the worktrees and processes scans).
+pub(super) enum Typed {
+    Answer(ClientId),
+    All,
+}
+
+impl Rpcs {
+    /// The watermark moved by one hub-wide notification.
+    fn bump(&mut self) -> Watermark {
+        if self.wm.epoch == 0 {
+            self.wm.epoch = now_ms();
+        }
+        self.wm.seq += 1;
+        self.wm
+    }
+
+    fn now(&mut self) -> Watermark {
+        if self.wm.epoch == 0 {
+            self.wm.epoch = now_ms();
+        }
+        self.wm
+    }
+
+    /// A connection that said `initialize`.
+    pub(super) fn init(&self, id: ClientId) -> bool {
+        self.conns.get(&id).is_some_and(|c| c.init)
+    }
+
+}
+
+impl Shell {
+    /// A connection whose first line is `initialize` (accept.rs): its
+    /// stream joins the clients, sb-core hears it like a hello, then the
+    /// request is answered. No hello burst.
+    pub(super) fn rpc_new(&mut self, id: ClientId, stream: UnixStream, v: Value, peer: String) {
+        match super::outbox::of_unix(&stream, super::outbox::CLIENT_MAX) {
+            Ok(o) => {
+                self.clients.insert(id, o);
+            }
+            Err(e) => {
+                log_line(&self.opts.paths, &format!("client {peer}: no writer for it: {e}"));
+                return;
+            }
+        }
+        self.rpc.peers.insert(id, peer);
+        self.step(Input::ClientHello { client: id });
+        self.rpc_line(id, v);
+    }
+
+    /// The running action's own result, its `{}` otherwise (A1:
+    /// `turn/send` answers the id of the message sb-core made).
+    pub(super) fn rpc_set_result(&mut self, v: Value) {
+        self.rpc.result = Some(v);
+    }
+
+    /// One JSON-RPC line from client `id`.
+    pub(super) fn rpc_line(&mut self, id: ClientId, v: Value) {
+        match Message::from_value(v) {
+            Err(resp) => self.rpc_write(id, &Message::Response(*resp).encode(), true),
+            Ok(Message::Request(r)) => self.rpc_request(id, r.id, &r.method, r.params),
+            // `initialized`, and no hub -> client request yet
+            Ok(Message::Notification(_) | Message::Response(_)) => {}
+        }
+    }
+
+    fn rpc_respond(&mut self, id: ClientId, resp: Response) {
+        self.rpc_write(id, &Message::Response(resp).encode(), true);
+    }
+
+    fn rpc_request(&mut self, id: ClientId, rid: Id, method: &str, params: Value) {
+        let init = self.rpc.conns.get(&id).map(|c| c.init);
+        if method == rpc::INITIALIZE {
+            if init.is_some() || self.proto.has(id) {
+                return self.rpc_respond(id, Response::err(Some(rid), RpcError::new(code::NOT_INITIALIZED, "initialize comes once, first")));
+            }
+            return self.rpc_initialize(id, rid, params);
+        }
+        if method == rpc::COMMANDS_LIST {
+            return self.rpc_respond(id, Response::ok(rid, serde_json::to_value(rpc::CommandsList::now()).unwrap_or_default()));
+        }
+        if method == rpc::HUB_READ {
+            let state = self.hub_state(id);
+            return self.rpc_respond(id, Response::ok(rid, serde_json::to_value(state).unwrap_or_default()));
+        }
+        if method == rpc::AGENT_GET {
+            let p: rpc::AgentGetParams = match serde_json::from_value(params) {
+                Ok(p) => p,
+                Err(e) => return self.rpc_respond(id, Response::err(Some(rid), RpcError::new(code::INVALID_PARAMS, format!("agent/get: {e}")))),
+            };
+            let snap = self.snapshot();
+            let r = rpc::AgentGetResult { agent: self.agent_row(&snap, &p.name) };
+            return self.rpc_respond(id, Response::ok(rid, serde_json::to_value(r).unwrap_or_default()));
+        }
+        let cmd = match rpc::cmd(method, params) {
+            Ok(c) => c,
+            Err(e) => {
+                // an older app's removed field (bise_proto::REMOVED) or
+                // retired method (bise_proto::RETIRED): its name in the log
+                if let Some(d) = e.data.as_ref().filter(|d| d.field.is_some()) {
+                    let f = d.field.as_deref().unwrap_or_default();
+                    match d.reason.as_deref() {
+                        Some("retired_method") => log_line(&self.opts.paths, &format!("{method}: refused, an older app called the retired method {f}")),
+                        _ => log_line(&self.opts.paths, &format!("{method}: refused, an older app sent the removed field {f}")),
+                    }
+                }
+                return self.rpc_respond(id, Response::err(Some(rid), e));
+            }
+        };
+        let Some(row) = rpc::method_row(method) else { return };
+        if let Some(p) = cmd.project().filter(|p| *p != self.project()) {
+            let e = RpcError::refused(format!("this hub is {}, not {p}", self.project()), None);
+            return self.rpc_respond(id, Response::err(Some(rid), e));
+        }
+        let c = self.rpc.conns.entry(id).or_default();
+        c.pending.push(Pending { id: rid.clone(), cmd: row.cmd, result: row.result });
+        c.hold = Some(Vec::new());
+        let project = self.project();
+        self.rpc.result = None;
+        self.proto_run(id, row.cmd, project, cmd);
+        // done: an action's `{}`, or its own result (turn/send's msg_id),
+        // (a read answered already, a thread's answer comes later), then
+        // what was held
+        let result = self.rpc.result.take().unwrap_or_else(|| Value::Object(Default::default()));
+        if !LATER.contains(&row.method) {
+            if let Some(p) = self.rpc_pending(id, |p| p.id == rid) {
+                self.rpc_respond(id, Response::ok(p.id, result));
+            }
+        }
+        let held = self.rpc.conns.get_mut(&id).and_then(|c| c.hold.take()).unwrap_or_default();
+        for line in held {
+            self.rpc_write(id, &line, true);
+        }
+    }
+
+    fn rpc_initialize(&mut self, id: ClientId, rid: Id, params: Value) {
+        let p: InitializeParams = match serde_json::from_value(params) {
+            Ok(p) => p,
+            Err(e) => return self.rpc_respond(id, Response::err(Some(rid), RpcError::new(code::INVALID_PARAMS, format!("initialize: {e}")))),
+        };
+        if p.proto != PROTO {
+            let e = RpcError::new(code::INVALID_PARAMS, format!("this hub speaks proto {PROTO}, not {}", p.proto));
+            return self.rpc_respond(id, Response::err(Some(rid), e));
+        }
+        crate::util::timing(&format!("rpc initialize from {} {}", p.client.name, p.client.version));
+        self.rpc.conns.insert(id, Conn { init: true, ..Default::default() });
+        self.proto.typed(id);
+        let ws = self.opts.paths.workspace.clone();
+        let result = InitializeResult {
+            project: self.project(),
+            proto: PROTO,
+            workspace: ws.to_string_lossy().to_string(),
+            name: ws.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default(),
+            exe: self.opts.exe.to_string_lossy().to_string(),
+            state_dir: self.opts.paths.state.to_string_lossy().to_string(),
+            version: crate::switch::version_info(&self.opts.app_root),
+            reload: self.reload_id.clone(),
+            pages_url: self.pg.pages.as_ref().map(|p| p.base()),
+            methods: rpc::methods(),
+            notifications: rpc::notifications(),
+            hub: self.hub_state(id),
+        };
+        self.rpc_respond(id, Response::ok(rid, serde_json::to_value(result).unwrap_or_default()));
+    }
+
+    /// The hub-wide state now, at the current watermark (`initialize`,
+    /// `hub/read`): every hub-wide kind, the scanned ones from their last
+    /// scan (none yet: a scan starts, its notification follows). Its
+    /// `agents` always carries the archived list (agents-light: a
+    /// connection's first agents event, or its resync).
+    fn hub_state(&mut self, id: ClientId) -> HubState {
+        let snap = self.snapshot();
+        let (agents, cards) = self.proto_rows(&snap);
+        self.proto.forget_archived(id);
+        let agents = self.agents_for(id, &snap, &agents);
+        let jobs = HubEv::Jobs { project: self.project(), items: crate::proto_view::jobs(&snap) };
+        let arts = self.artifacts_ev();
+        let arts = self.proto_artifacts(&arts);
+        let appr = self.approvals_ev(false);
+        let appr = self.proto_approvals(&appr);
+        let pages = self.pages_ev(&snap);
+        let growth = self.growth_ev(&snap);
+        let pulse = self.pulse_ev();
+        let mut evs = vec![agents, cards, jobs, arts, self.features_ev(), self.prs_ev(), self.scheduled_ev(), self.models_ev(), appr, self.flow_ev(), self.paused_ev(), self.switch_ev(), pages, growth, pulse, self.bise_update_ev()];
+        // the versions (`dev`: the terminal's /release-bise, the /version
+        // picker), as the older hello's burst carried them
+        if let Some(v) = self.typed_of(&self.version_items()) {
+            evs.push(v);
+        }
+        // a release run or a `/update` build going on: where it is (the
+        // older hello's release_hello / update_hello)
+        for v in in_progress(self.release.as_ref(), self.updating.as_ref()) {
+            if let Some(ev) = self.typed_of(&v) {
+                evs.push(ev);
+            }
+        }
+        let mut missing = Vec::new();
+        for kind in SCANNED {
+            match self.rpc.scanned.get(*kind) {
+                Some(ev) => evs.push(ev.clone()),
+                None => missing.push(*kind),
+            }
+        }
+        for kind in missing {
+            match kind {
+                "worktrees" => self.worktrees_typed(Typed::All),
+                "processes" => self.procs.ask(super::processes::Ask::List { to: Typed::All, watch: None }),
+                _ => self.merged_typed(Typed::All),
+            }
+        }
+        let state = evs.iter().filter_map(|e| rpc::note(e, None)).collect();
+        HubState { watermark: self.rpc.now(), state }
+    }
+
+    /// Connection `id` waits for the answer to a request of command `cmd`
+    /// (a thread's answer that has an older line too: `release_plan`).
+    pub(super) fn rpc_waits(&self, id: ClientId, cmd: &str) -> bool {
+        self.rpc.conns.get(&id).is_some_and(|c| c.pending.iter().any(|p| p.cmd == cmd))
+    }
+
+    /// Removes and returns the first pending request of `id` that `f` picks.
+    fn rpc_pending(&mut self, id: ClientId, f: impl Fn(&Pending) -> bool) -> Option<Pending> {
+        let c = self.rpc.conns.get_mut(&id)?;
+        let i = c.pending.iter().position(f)?;
+        Some(c.pending.remove(i))
+    }
+
+    /// One line to `id`; `now`: past its hold (a response).
+    fn rpc_write(&mut self, id: ClientId, line: &str, now: bool) {
+        if !now {
+            if let Some(h) = self.rpc.conns.get_mut(&id).and_then(|c| c.hold.as_mut()) {
+                h.push(line.to_string());
+                return;
+            }
+        }
+        // queued, never written here (daemon/outbox.rs); a client that
+        // reads nothing is closed: its reader sees the end, ClientGone
+        if let Some(c) = self.clients.get(&id) {
+            if c.send(line) == super::outbox::Sent::Full {
+                let peer = self.rpc.peers.get(&id).cloned().unwrap_or_default();
+                log_line(&self.opts.paths, &format!("client {peer} reads nothing ({} bytes wait): closed", c.waiting()));
+                c.close();
+            }
+        }
+    }
+
+    /// A typed event for connection `id`, when it speaks JSON-RPC: the
+    /// answer to its pending request (`answer`: never for a hub-wide
+    /// notification) or, for an initialized one, its notification (a
+    /// hub-wide one at the current watermark). True: done with it.
+    pub(super) fn rpc_out(&mut self, id: ClientId, ev: &HubEv, answer: bool) -> bool {
+        let Some(init) = self.rpc.conns.get(&id).map(|c| c.init) else { return false };
+        let tag = ev.tag().to_string();
+        if answer {
+            if let HubEv::Error { cmd, text, reason, .. } = ev {
+                let cmd = cmd.clone().unwrap_or_default();
+                if let Some(p) = self.rpc_pending(id, |p| p.cmd == cmd) {
+                    let e = RpcError::refused(text.clone(), reason.as_deref());
+                    self.rpc_respond(id, Response::err(Some(p.id), e));
+                    return true;
+                }
+            }
+            // the hub's words for a method that answers them (command/run's
+            // `/help`, `/flow`; artifacts/add; version/info...): its typed
+            // result
+            if let HubEv::Notice { cmd: Some(c), text, .. } = ev {
+                if let Some(p) = self.rpc_pending(id, |p| p.cmd == c.as_str() && rpc::says(p.cmd)) {
+                    let r = rpc::CommandRunResult { notice: Some(text.clone()) };
+                    self.rpc_respond(id, Response::ok(p.id, serde_json::to_value(r).unwrap_or_default()));
+                    return true;
+                }
+            }
+            let tag_cmd = match ev {
+                HubEv::Notice { cmd, .. } => cmd.clone(),
+                _ => None,
+            };
+            if let Some(p) = self.rpc_pending(id, |p| p.result == Some(tag.as_str()) && tag_cmd.as_deref().is_none_or(|c| c == p.cmd)) {
+                self.rpc_respond(id, Response::ok(p.id, rpc::result(ev)));
+                return true;
+            }
+        }
+        if !init {
+            return false;
+        }
+        let ev = match ev {
+            // a refusal outside a request: a notice, never silence
+            HubEv::Error { project, text, .. } => HubEv::Notice { project: project.clone().unwrap_or_else(|| self.project()), cmd: None, text: text.clone(), cid: None },
+            e => e.clone(),
+        };
+        let hub = rpc::note_of_ev(ev.tag()).is_some_and(|r| r.scope == Scope::Hub);
+        let w = hub.then(|| self.rpc.now());
+        if let Some(n) = rpc::note(&ev, w) {
+            self.rpc_write(id, &Message::Notification(n).encode(), false);
+        }
+        true
+    }
+
+    /// A hub-wide event to every connection of `ids`: the watermark moves
+    /// once, every JSON-RPC connection gets it numbered.
+    pub(super) fn proto_note(&mut self, ids: &[ClientId], ev: &HubEv) {
+        self.rpc.bump();
+        if SCANNED.contains(&ev.tag()) {
+            self.rpc.scanned.insert(ev.tag().to_string(), ev.clone());
+        }
+        for id in ids {
+            self.rpc_out(*id, ev, false);
+        }
+    }
+
+    /// One hub-wide event in a shape per connection (agents-light: the
+    /// archived list or not, the older full shape): the watermark moves
+    /// once, as [`Shell::proto_note`]'s, so no client sees a gap.
+    pub(super) fn proto_note_each(&mut self, outs: &[(ClientId, HubEv)]) {
+        if outs.is_empty() {
+            return;
+        }
+        self.rpc.bump();
+        for (id, ev) in outs {
+            self.rpc_out(*id, ev, false);
+        }
+    }
+
+    /// A thread's typed event reached the loop (`Msg::Typed`).
+    pub(super) fn typed_msg(&mut self, to: Typed, v: Value) {
+        let Ok(ev) = HubEv::from_value(v) else { return };
+        match to {
+            Typed::Answer(id) => self.proto_send(id, &ev),
+            Typed::All => {
+                let ids = self.typed_ids();
+                self.proto_note(&ids, &ev);
+            }
+        }
+    }
+
+    /// sb-core's line for client `id` (`Effect::ToClient`) when it is an
+    /// initialized JSON-RPC connection: a notice goes as `hub/notice`,
+    /// update-card's `open_card` as `card/open`, the hub's `focus` as
+    /// `client/focused` (P4b), the rest (the terminal's older events) not
+    /// at all. False: not one.
+    pub(super) fn rpc_effect(&mut self, id: ClientId, body: &Value) -> bool {
+        if !self.rpc.init(id) {
+            return false;
+        }
+        if let Some(ev) = one_ev(&self.project(), body) {
+            self.rpc_out(id, &ev, false);
+        }
+        true
+    }
+
+    /// A connection gone.
+    pub(super) fn rpc_gone(&mut self, id: ClientId) {
+        self.rpc.conns.remove(&id);
+        self.rpc.peers.remove(&id);
+    }
+
+    /// Connection `id`'s pid and program, for hub.log.
+    pub(super) fn rpc_peer(&self, id: ClientId) -> &str {
+        self.rpc.peers.get(&id).map_or("pid unknown", String::as_str)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Client-protocol step 5: no older notice line is written at all
+    /// (architect m_14727's one writer is gone with it): a connection
+    /// gets the typed notice, or nothing.
+    #[test]
+    fn no_older_notice_line_is_written() {
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
+        let mut files = vec![root.join("daemon.rs")];
+        let mut dirs = vec![root.join("daemon")];
+        while let Some(d) = dirs.pop() {
+            for e in std::fs::read_dir(&d).unwrap().flatten() {
+                let p = e.path();
+                if p.is_dir() {
+                    dirs.push(p);
+                } else if p.extension().is_some_and(|x| x == "rs") && !p.to_string_lossy().ends_with("_tests.rs") {
+                    files.push(p);
+                }
+            }
+        }
+        let needle = concat!("\"ev\": ", "\"notice\"");
+        let mut at = Vec::new();
+        for f in &files {
+            let text = std::fs::read_to_string(f).unwrap();
+            // the shell's code, not its tests
+            let code = text.split("#[cfg(test)]").next().unwrap_or("");
+            for (i, l) in code.lines().enumerate() {
+                if l.contains(needle) {
+                    at.push(format!("{}:{}", f.strip_prefix(&root).unwrap().display(), i + 1));
+                }
+            }
+        }
+        assert!(at.is_empty(), "an older notice line is written: {at:?}");
+    }
+
+    /// proto-lead m_16453 (b): every hub-wide notification is either a
+    /// kind of state, which `initialize`'s and `hub/read`'s state carry
+    /// (the older hello burst sent each), or an event of a moment, which
+    /// a client that connects later has no use for. A new Scope::Hub row
+    /// fails here until it is put on one side; a state kind names what
+    /// hub_state calls to make it, and hub_state's body calls it.
+    #[test]
+    fn hub_state_carries_every_hub_wide_kind_of_state() {
+        // what makes each kind in hub_state (`SCANNED`: the last scan's)
+        let state: BTreeMap<&str, &str> = [
+            ("agents", "proto_rows"),
+            ("cards", "proto_rows"),
+            ("jobs", "HubEv::Jobs"),
+            ("artifacts", "artifacts_ev"),
+            ("features", "features_ev"),
+            ("prs", "prs_ev"),
+            ("scheduled", "scheduled_ev"),
+            ("models", "models_ev"),
+            ("approvals", "approvals_ev"),
+            ("flow", "flow_ev"),
+            ("paused", "paused_ev"),
+            ("switch", "switch_ev"),
+            ("pages", "pages_ev"),
+            ("growth", "growth_ev"),
+            ("pulse", "pulse_ev"),
+            ("bise_update", "bise_update_ev"),
+            ("versions", "version_items"),
+            ("release", "in_progress"),
+            ("update", "in_progress"),
+            ("worktrees", "SCANNED"),
+            ("processes", "SCANNED"),
+            ("merged", "SCANNED"),
+        ]
+        .into_iter()
+        .collect();
+        // inbox_recorded: one record that changed; the history is read
+        // with inbox/history, not carried in the state; activity (les
+        // bims): what happens after a client's initialize, never replayed
+        let moments: BTreeSet<&str> =
+            ["job_end", "followed_end", "route", "route_done", "page_changed", "inbox_recorded", "activity"].into_iter().collect();
+        let src = include_str!("rpc.rs");
+        let body = src.split("fn hub_state(&mut self, id: ClientId)").nth(1).and_then(|s| s.split("\n    }\n").next()).unwrap();
+        for row in rpc::NOTIFICATIONS.iter().filter(|r| r.scope == rpc::Scope::Hub) {
+            match state.get(row.ev) {
+                Some(maker) => assert!(body.contains(maker), "{}: hub_state never calls {maker}", row.method),
+                None => assert!(moments.contains(row.ev), "{} ({}): a kind of state (add it to hub_state) or a moment? put it on one side here", row.method, row.ev),
+            }
+        }
+        for kind in SCANNED {
+            assert!(state.get(kind) == Some(&"SCANNED"), "{kind}");
+        }
+    }
+
+    /// The behaviour next to the law above: a hub with a release running
+    /// and a `/update` build going on gives a later client the typed
+    /// release and update events (what hub_state pushes, as the
+    /// terminal's typed readers take them); nothing going on, nothing.
+    #[test]
+    fn a_release_run_and_an_update_build_reach_a_later_client_typed() {
+        let run = release::ReleaseRun::for_tests("v2026.10.3", json!({"ev": "release", "state": "running", "text": "building the apps"}));
+        let building = ("abc1234".to_string(), std::time::Instant::now());
+        let evs: Vec<HubEv> = in_progress(Some(&run), Some(&building))
+            .into_iter()
+            .map(|mut v| {
+                v["project"] = json!("acme");
+                HubEv::from_value(v).unwrap()
+            })
+            .collect();
+        assert!(matches!(evs.as_slice(), [HubEv::Release(_), HubEv::Update(_)]), "{evs:?}");
+        let [HubEv::Release(r), HubEv::Update(u)] = evs.as_slice() else { unreachable!() };
+        let (r, u) = (serde_json::to_value(r).unwrap(), serde_json::to_value(u).unwrap());
+        assert_eq!((r["tag"].as_str(), r["text"].as_str()), (Some("v2026.10.3"), Some("building the apps")));
+        assert_eq!((u["state"].as_str(), u["rev"].as_str()), (Some("building"), Some("abc1234")));
+        assert!(in_progress(None, None).is_empty());
+    }
+}

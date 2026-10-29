@@ -24,13 +24,10 @@ use crate::model::{Lifecycle, Mode, State};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
-/// The id of the shared folder's place.
-pub const SHARED: &str = "shared";
-
-/// The id of the worktree first made for the agent of dir `dir`.
-pub fn worktree_id(dir: &str) -> String {
-    format!("wt:{}", dir)
-}
+/// The id of the shared folder's place, and of the worktree first made
+/// for the agent of a dir (bise_proto's, with the Workspace that reads
+/// them).
+pub use bise_proto::core::state::{worktree_id, SHARED};
 
 /// BISE-136, designer's call 8: the id of a private worktree an agent
 /// told the hub about (`gate.sh new`, `sb worktree <path>`): `pt:<path>`.
@@ -44,6 +41,25 @@ pub fn private_id(path: &str) -> String {
 /// The path of a private worktree's id (None: not one).
 pub fn private_path(id: &str) -> Option<&str> {
     id.strip_prefix("pt:")
+}
+
+/// BISE-136 fallback: the linked git worktree a bash call starts in
+/// (`cd /tmp/x-wt && …`), when it is not `own` (the agent's workspace).
+/// A linked worktree has a `.git` file (the main checkout a directory).
+/// Never asked for main (core.rs): main works in the workspace.
+pub fn bash_worktree(args: &str, own: &str) -> Option<String> {
+    // the bare command, or the JSON of a call with a description (BISE-223)
+    let cmd = match serde_json::from_str::<serde_json::Value>(args) {
+        Ok(v) => v["arg"].as_str()?.to_string(),
+        Err(_) => args.to_string(),
+    };
+    let rest = cmd.trim_start().strip_prefix("cd ")?;
+    let path = rest.split(|c: char| c.is_whitespace() || c == ';' || c == '&' || c == '|').next()?;
+    let path = path.trim_matches(|c| c == '"' || c == '\'').trim_end_matches('/');
+    if !path.starts_with('/') || path == own.trim_end_matches('/') {
+        return None;
+    }
+    std::path::Path::new(path).join(".git").is_file().then(|| path.to_string())
 }
 
 /// The id of the place agent `a` works in: its private worktree when it
@@ -189,6 +205,10 @@ pub struct PlaceView {
     pub agents: Vec<String>,
     pub pr: Option<PrView>,
     pub lid: Option<String>,
+    /// its rank in the land queue's line, 1-based (1: it lands now; the
+    /// lid is `land_queue::lid` of it); None when not in line
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub landing: Option<u32>,
     /// dev-flow §5.1, pr-design §4.1 item 8: a feature branch's place
     /// (`id` = `feature:<name>`, `branch` = the name, never a PR): a box
     /// with 2+ live agents even in separate worktrees. `trying`: its try
@@ -197,6 +217,10 @@ pub struct PlaceView {
     pub feature: bool,
     #[serde(default)]
     pub trying: bool,
+    /// the worktree's folder (wt-sign: the ψ's hover names it); None for
+    /// a feature (its agents' worktrees are theirs)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub path: Option<String>,
 }
 
 /// The PR as the TUI shows it. `stale_ms`: how old the last answer of
@@ -205,10 +229,28 @@ pub struct PlaceView {
 pub struct PrView {
     pub number: u64,
     pub url: String,
+    /// its head branch (P4c-4a: the typed row's, `rows::Pr.branch`)
+    #[serde(default)]
+    pub branch: String,
     pub state: PrState,
     pub review: Review,
     pub checks: Checks,
     pub stale_ms: Option<u64>,
+}
+
+impl PrView {
+    /// The forge's PR as the views carry it, `stale_ms` its age when late.
+    pub fn of(pr: &PrSnapshot, stale_ms: Option<u64>) -> PrView {
+        PrView {
+            number: pr.number,
+            url: pr.url.clone(),
+            branch: pr.branch.clone(),
+            state: pr.state,
+            review: pr.review,
+            checks: pr.checks.clone(),
+            stale_ms,
+        }
+    }
 }
 
 /// The places of a state: the shared folder first (always), then each
@@ -346,7 +388,7 @@ pub fn view_id(a: &crate::model::Agent) -> String {
 
 /// The views the TUI draws: worktrees only. `lids`: the held line of a
 /// place, by id (the land queue's `waits to land · 2nd`, else pr-hub's
-/// `no PR yet · 2 commits`). `stale`: the age of a PR's state, by place
+/// `no PR yet · 2 commits`), `landing` the queue's ranks. `stale`: the age of a PR's state, by place
 /// id, when the forge is late (pr-hub: its last ask failed, or it is
 /// older than `core::PR_STALE_MS`).
 /// Features: `lids` holds their lid too (`feature · 14 commits · not
@@ -355,6 +397,7 @@ pub fn view_id(a: &crate::model::Agent) -> String {
 pub fn views(
     places: &[Place],
     lids: &BTreeMap<String, String>,
+    landing: &BTreeMap<String, u32>,
     stale: &BTreeMap<String, u64>,
     trying: &std::collections::BTreeSet<String>,
 ) -> Vec<PlaceView> {
@@ -365,17 +408,12 @@ pub fn views(
             id: p.id.clone(),
             branch: p.branch.clone(),
             agents: p.agents.clone(),
-            pr: p.pr.as_ref().map(|pr| PrView {
-                number: pr.number,
-                url: pr.url.clone(),
-                state: pr.state,
-                review: pr.review,
-                checks: pr.checks.clone(),
-                stale_ms: stale.get(&p.id).copied(),
-            }),
+            pr: p.pr.as_ref().map(|pr| PrView::of(pr, stale.get(&p.id).copied())),
             lid: lids.get(&p.id).cloned(),
+            landing: landing.get(&p.id).copied(),
             feature: p.kind == PlaceKind::Feature,
             trying: trying.contains(&p.id),
+            path: (p.kind == PlaceKind::Worktree && !p.path.is_empty()).then(|| p.path.clone()),
         })
         .collect()
 }
@@ -394,6 +432,7 @@ mod tests {
             dropped: false,
             place: id.map(Into::into),
             feature: None,
+            state: None,
         }
     }
 
@@ -425,7 +464,7 @@ mod tests {
         assert_eq!(ps[1].agents, ["c"]);
         // the views: worktrees only, the lid by id
         let lids = BTreeMap::from([("wt:a".to_string(), "waits to land · 2nd".to_string())]);
-        let v = views(&ps, &lids, &BTreeMap::new(), &Default::default());
+        let v = views(&ps, &lids, &BTreeMap::new(), &BTreeMap::new(), &Default::default());
         assert_eq!(v.len(), 1);
         assert_eq!(v[0].lid.as_deref(), Some("waits to land · 2nd"));
         assert_eq!(v[0].pr, None);
@@ -456,7 +495,7 @@ mod tests {
         assert_eq!(place_of(&st, "a").as_deref(), Some("wt:a"));
         let trying = std::collections::BTreeSet::from(["feature:cu".to_string()]);
         let lids = BTreeMap::from([("feature:cu".to_string(), "feature · 2 commits · not tried".to_string())]);
-        let v = views(&ps, &lids, &BTreeMap::new(), &trying);
+        let v = views(&ps, &lids, &BTreeMap::new(), &BTreeMap::new(), &trying);
         assert_eq!((v[0].feature, v[0].trying, v[0].lid.as_deref()), (true, true, Some("feature · 2 commits · not tried")));
         // all archived: no place left
         for n in ["a", "b"] {
@@ -501,7 +540,7 @@ mod tests {
         assert_eq!(ps[1].branch.as_deref(), Some("feat/x"));
         assert_eq!(id_of(&st.agents["a"]), "shared");
         // the views: a worktree like any other
-        let v = views(&ps, &BTreeMap::new(), &BTreeMap::new(), &Default::default());
+        let v = views(&ps, &BTreeMap::new(), &BTreeMap::new(), &BTreeMap::new(), &Default::default());
         assert!(v.iter().any(|p| p.id == "pt:/p/a-wt" && p.agents == ["c"]));
     }
 
@@ -531,24 +570,19 @@ mod tests {
             id: "wt:a".into(),
             branch: Some("sb/a".into()),
             agents: vec!["a".into()],
-            pr: Some(PrView {
-                number: pr.number,
-                url: pr.url.clone(),
-                state: pr.state,
-                review: pr.review,
-                checks: pr.checks.clone(),
-                stale_ms: None,
-            }),
+            pr: Some(PrView::of(&pr, None)),
             lid: None,
+            landing: None,
             feature: false,
             trying: false,
+            path: None,
         };
         let j = serde_json::to_value(&v).unwrap();
         assert_eq!(
             j,
             serde_json::json!({"id": "wt:a", "branch": "sb/a", "agents": ["a"], "lid": null,
                 "feature": false, "trying": false,
-                "pr": {"number": 412, "url": "https://github.com/o/r/pull/412", "state": "draft",
+                "pr": {"number": 412, "url": "https://github.com/o/r/pull/412", "branch": pr.branch, "state": "draft",
                        "review": "changes_requested", "checks": {"state": "fail", "failing": ["ci/test"]},
                        "stale_ms": null}})
         );

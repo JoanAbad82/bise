@@ -1,0 +1,51 @@
+# The Developer ID for a macOS job (scripts/mac_sign.py's builds): the
+# certificate in a throwaway keychain (in the search list, prompt-free), the
+# App Store Connect API key in a 0600 file. Used by release.yml (the
+# terminal's darwin jobs) and desktop-release.yml (the desktop app), both
+# in the environment desktop-release (his approval on each run).
+# Sets SIGN_ID (the identity's SHA-1), SIGN_KEYCHAIN and APPLE_API_KEY_PATH
+# in the job's env. The job forgets both in its last step, always:
+#   security delete-keychain "$SIGN_KEYCHAIN"; rm -f "$APPLE_API_KEY_PATH"
+# Secrets come in as inputs (a composite action can't read `secrets`).
+name: mac-signing
+description: the Developer ID in a throwaway keychain, the notary key in a file
+inputs:
+  cert-p12-base64: { description: MAC_CERT_P12_BASE64, required: true }
+  cert-password: { description: MAC_CERT_PASSWORD, required: true }
+  api-key-p8: { description: APPLE_API_KEY_P8, required: true }
+  team-id: { description: APPLE_TEAM_ID, required: true }
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      env:
+        MAC_CERT_P12_BASE64: ${{ inputs.cert-p12-base64 }}
+        MAC_CERT_PASSWORD: ${{ inputs.cert-password }}
+        APPLE_API_KEY_P8: ${{ inputs.api-key-p8 }}
+        APPLE_TEAM_ID: ${{ inputs.team-id }}
+      run: |
+        for s in MAC_CERT_P12_BASE64 MAC_CERT_PASSWORD APPLE_API_KEY_P8 APPLE_TEAM_ID; do
+          [ -n "${!s}" ] || { echo "the environment desktop-release has no secret $s"; exit 1; }
+        done
+        kc="$RUNNER_TEMP/mac-sign.keychain-db"
+        pass="$(openssl rand -hex 24)"
+        security create-keychain -p "$pass" "$kc"
+        security set-keychain-settings -lut 7200 "$kc"
+        security unlock-keychain -p "$pass" "$kc"
+        umask 077
+        printf '%s' "$MAC_CERT_P12_BASE64" | base64 --decode > "$RUNNER_TEMP/cert.p12"
+        security import "$RUNNER_TEMP/cert.p12" -k "$kc" -P "$MAC_CERT_PASSWORD" -f pkcs12 -T /usr/bin/codesign
+        rm -f "$RUNNER_TEMP/cert.p12"
+        curl -fsSL -o "$RUNNER_TEMP/DeveloperIDG2CA.cer" https://www.apple.com/certificateauthority/DeveloperIDG2CA.cer
+        security import "$RUNNER_TEMP/DeveloperIDG2CA.cer" -k "$kc" || true
+        security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$pass" "$kc" > /dev/null
+        read -r -a kcs <<< "$(security list-keychains -d user | tr -d '"' | xargs)"
+        security list-keychains -d user -s "$kc" "${kcs[@]}"
+        id="$(security find-identity -v -p codesigning "$kc" | grep -F "Developer ID Application:" | grep -F "($APPLE_TEAM_ID)" | awk '{print $2}' | head -n 1)"
+        [ -n "$id" ] || { echo "no Developer ID Application identity of team $APPLE_TEAM_ID in MAC_CERT_P12_BASE64"; exit 1; }
+        printf '%s\n' "$APPLE_API_KEY_P8" > "$RUNNER_TEMP/AuthKey.p8"
+        {
+          echo "SIGN_ID=$id"
+          echo "SIGN_KEYCHAIN=$kc"
+          echo "APPLE_API_KEY_PATH=$RUNNER_TEMP/AuthKey.p8"
+        } >> "$GITHUB_ENV"

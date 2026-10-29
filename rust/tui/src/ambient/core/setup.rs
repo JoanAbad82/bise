@@ -1,6 +1,6 @@
 //! The window's setup commands (bise desktop S11, core side; amb-home's
 //! file in amb-core's core, seams agreed m_9134): `prefs_set`,
-//! `sign_in`, `key_set`, `key_remove`, `found_scan`, `project_add`,
+//! `sign_in`, `provider_use`, `key_remove`, `found_scan`, `project_add`,
 //! `project_remove`, `project_move`, `project_rename` (proto::draft's
 //! `AppCmd`), answered by `prefs`, `accounts`, `found`, the projects list
 //! read again, or `error {cmd, text}`; and the agent plugins (P.1):
@@ -16,7 +16,9 @@
 
 use super::Core;
 use crate::ambient::setup::{rank, CuBusy, Done, RegistryOp, SetupPorts};
-use bise_proto::draft::AppCmd;
+use bise_proto::app_cmd::AppCmd;
+use bise_proto::app_rows::CheckState;
+use bise_proto::core_ev::CoreEv;
 use serde_json::{json, Value};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -24,13 +26,44 @@ use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::Arc;
 use std::time::Instant;
 
+/// How often his projects are read again for what they name (the band's
+/// whys; architect m_41049).
+pub(crate) const SIGNALS_EVERY: std::time::Duration = std::time::Duration::from_secs(3600);
+
+/// A check's end: what it found, and how long the call took (ms).
+pub(crate) type CheckEnd<'a> = (Result<&'a crate::firstkey::Works, &'a crate::firstkey::Failed>, u64);
+
+/// A `provider_check` event (bise_proto's CoreEv, draft): the key never
+/// in it. `end`: none while it checks.
+pub(crate) fn provider_check(id: &str, name: &str, state: CheckState, model: &str, pasted: bool, end: Option<CheckEnd<'_>>) -> Value {
+    let works = end.and_then(|(r, _)| r.ok());
+    let failed = end.and_then(|(r, _)| r.err());
+    let ms = end.map(|(_, ms)| ms);
+    let ev = CoreEv::ProviderCheck {
+        id: id.to_string(),
+        name: name.to_string(),
+        state,
+        model: model.to_string(),
+        label: if model.is_empty() { String::new() } else { bise_catalog::names::long_name(model) },
+        pasted,
+        answer: works.map(|w| w.answer.clone()).filter(|a| !a.is_empty()),
+        main: works.map(|w| w.main.clone()).filter(|m| !m.is_empty()),
+        lines: works.map(|w| w.lines.clone()).unwrap_or_default(),
+        why: failed.map(|f| f.why),
+        said: failed.map(|f| f.said.clone()).filter(|t| !t.is_empty()),
+        url: failed.and_then(|f| f.url.clone()),
+        ms,
+    };
+    serde_json::to_value(ev).unwrap_or_else(|_| json!({}))
+}
+
 /// The commands this file answers (never a hub's, never another of the
 /// core's own).
 pub const TAGS: &[&str] = &[
     "prefs_set",
     "sign_in",
     "sign_in_cancel",
-    "key_set",
+    "provider_use",
     "key_remove",
     "found_scan",
     "project_add",
@@ -41,11 +74,18 @@ pub const TAGS: &[&str] = &[
     "plugin_set",
     "plugin_login",
     "plugin_logout",
+    "plugin_connect",
+    "plugins_refresh",
+    "plugin_add",
+    "plugin_add_confirm",
+    "plugin_add_cancel",
+    "plugin_remove",
     "computer_use",
     "setup_check",
     "role_set",
     "app_version",
     "setup_first_cancel",
+    "keychain",
 ];
 
 /// Computer use's setup check stops this long after the page's last
@@ -67,6 +107,18 @@ struct CuLive {
 }
 
 /// The poll has run long enough without a `check`.
+/// His projects read for what they name (the band's whys): the first
+/// time, then at most every [`SIGNALS_EVERY`]; on the port's thread, the
+/// summary meanwhile from the last evidence.
+fn ask_signals(s: &mut Setup, now: Instant) {
+    if s.signals_at.is_some_and(|t| now.saturating_duration_since(t) < SIGNALS_EVERY) {
+        return;
+    }
+    s.signals_at = Some(now);
+    let projects = (s.ports.rows)().into_iter().filter(|r| !r.home).map(|r| (r.path, r.name)).collect();
+    (s.ports.signals)(projects, s.tx.clone());
+}
+
 pub(crate) fn cu_idle(last_check: Instant, now: Instant) -> bool {
     now.saturating_duration_since(last_check) >= CU_IDLE
 }
@@ -77,14 +129,39 @@ pub(crate) struct Setup {
     rx: Receiver<Done>,
     /// the provider whose sign-in runs (one at a time)
     signing: Option<String>,
-    /// the plugin servers whose login runs (their browser is open)
+    /// the plugin servers whose login runs (their browser is open) and
+    /// the connectors whose connect runs (by id): their rows say pending
     logins: Vec<String>,
+    /// the add menu's previews waiting for his click (dropped with the
+    /// core: their staged folders go)
+    staged: bend_plugins::add::Held,
+    /// the other apps' MCP configs (`add::found`): read once with the rows,
+    /// again after a refresh or an add, never at each send
+    found: Option<Vec<bend_plugins::add::Found>>,
+    /// what his projects name (`signals::reasons`, the band's whys) and
+    /// when they were last asked for: read again at most every
+    /// [`SIGNALS_EVERY`], on the port's thread, never at a send
+    evidence: Vec<bend_plugins::signals::Evidence>,
+    signals_at: Option<Instant>,
+    /// the marketplaces read so far, by source (their last `browse`)
+    markets: Vec<(String, Vec<bise_proto::app_rows::Plugin>)>,
+    /// the last `plugins_summary` sent, per project (only a change goes out)
+    summaries: std::collections::HashMap<Option<String>, bise_proto::app_rows::PluginsSummary>,
     /// computer use's page while it is open
     cu: Option<CuLive>,
     /// the desktop app's update check (bar S.6)
     pub(super) update: super::app_update::UpdateCheck,
     /// R8: his `/model` line held until its provider works
     held: Option<Held>,
+    /// N1: a /keychain move runs (a second one is refused, never queued)
+    keychain_moving: bool,
+    /// N1: the last move's lines and whether it failed
+    keychain_said: (Vec<String>, bool),
+    /// `provider_use`: the last seq given, and each provider's newest
+    /// (an older check's end is dropped, architect m_28532)
+    use_seq: u64,
+    /// the check running per provider: its seq and when it started (its end says how long)
+    using: std::collections::HashMap<String, (u64, Instant)>,
 }
 
 /// R8 (the TUI's sb.rs /model, architect m_12214): a `/model <model>`
@@ -114,7 +191,7 @@ impl Core {
     /// The setup's ports (the binary's live ones, or a test's).
     pub fn set_setup(&mut self, ports: SetupPorts) {
         let (tx, rx) = channel();
-        self.setup = Some(Setup { ports, tx, rx, signing: None, logins: Vec::new(), cu: None, update: Default::default(), held: None });
+        self.setup = Some(Setup { ports, tx, rx, signing: None, logins: Vec::new(), staged: Default::default(), found: None, evidence: Vec::new(), signals_at: None, markets: Vec::new(), summaries: Default::default(), cu: None, update: Default::default(), held: None, keychain_moving: false, keychain_said: (Vec::new(), false), use_seq: 0, using: Default::default() });
     }
 
     /// R8: his `/model <model>` in `agent`'s view, before it goes to the
@@ -167,6 +244,46 @@ impl Core {
         self.emit_prefs();
         self.emit_accounts();
         self.emit_roles();
+        self.emit_keychain();
+        self.emit_summary_of(None);
+    }
+
+    /// N1: where his secrets are, and the last move's lines.
+    fn emit_keychain(&mut self) {
+        let Some(s) = &self.setup else { return };
+        let store = (s.ports.keychain.now)();
+        let (lines, failed) = s.keychain_said.clone();
+        let mut ev = json!({"ev": "keychain", "store": store, "moving": s.keychain_moving});
+        if !lines.is_empty() {
+            ev["lines"] = json!(lines);
+        }
+        if failed {
+            ev["failed"] = json!(true);
+        }
+        self.emit(ev);
+    }
+
+    /// N1 (the TUI's /keychain [on|off]): none says where; `on`/`off`
+    /// starts the move on its thread (its end on the tick).
+    fn keychain(&mut self, to: Option<String>) -> Result<(), String> {
+        let on = match to.as_deref() {
+            None => {
+                self.emit_keychain();
+                return Ok(());
+            }
+            Some("on") => true,
+            Some("off") => false,
+            Some(_) => return Err("/keychain takes on or off.".into()),
+        };
+        let Some(s) = self.setup.as_mut() else { return Err("this core has no setup".into()) };
+        if s.keychain_moving {
+            return Err("a move of your keys is still running: wait for its end".into());
+        }
+        s.keychain_moving = true;
+        s.keychain_said = (Vec::new(), false);
+        (s.ports.keychain.switch)(on, s.tx.clone());
+        self.emit_keychain();
+        Ok(())
     }
 
     /// Each role's model and effort (V17).
@@ -185,11 +302,42 @@ impl Core {
     fn emit_accounts(&mut self) {
         let Some(s) = &self.setup else { return };
         let items = (s.ports.accounts)();
-        self.emit(json!({"ev": "accounts", "items": items}));
+        let claude_plan = (s.ports.claude_plan)();
+        self.emit(json!({"ev": "accounts", "items": items, "claude_plan": claude_plan}));
         self.replay_held();
     }
 
-    fn setup_error(&mut self, cmd: &str, text: &str) {
+    /// `provider_use` (firstkey.rs): `checking` at once, the check on
+    /// its own thread, its end on the tick ([`Self::on_used`]).
+    fn provider_use(&mut self, id: String, key: Option<String>, base_url: Option<String>) {
+        let Some(s) = self.setup.as_mut() else { return };
+        s.use_seq += 1;
+        let seq = s.use_seq;
+        s.using.insert(id.clone(), (seq, Instant::now()));
+        let pasted = key.is_some();
+        let (name, model) = (s.ports.provider_use)(&id, key, base_url, seq, s.tx.clone());
+        self.emit(provider_check(&id, &name, CheckState::Checking, &model, pasted, None));
+    }
+
+    /// A check ended: dropped when a newer one for that provider runs;
+    /// else works (then the accounts and roles it changed) or failed.
+    fn on_used(&mut self, seq: u64, used: crate::firstkey::Used) {
+        let Some(s) = self.setup.as_mut() else { return };
+        let Some(&(running, t0)) = s.using.get(&used.id) else { return };
+        if running != seq {
+            return;
+        }
+        s.using.remove(&used.id);
+        let ms = u64::try_from(t0.elapsed().as_millis()).unwrap_or(u64::MAX);
+        let state = if used.res.is_ok() { CheckState::Works } else { CheckState::Failed };
+        self.emit(provider_check(&used.id, &used.name, state, &used.model, used.pasted, Some((used.res.as_ref(), ms))));
+        if used.res.is_ok() {
+            self.emit_accounts();
+            self.emit_roles();
+        }
+    }
+
+    pub(super) fn setup_error(&mut self, cmd: &str, text: &str) {
         self.emit(json!({"ev": "error", "cmd": cmd, "text": text}));
     }
 
@@ -206,6 +354,10 @@ impl Core {
 
     /// One of the window's setup commands.
     pub(super) fn app_cmd(&mut self, c: AppCmd) {
+        // a preview he never answered goes after add::HELD_TTL
+        if let Some(s) = self.setup.as_mut() {
+            s.staged.sweep(Instant::now());
+        }
         let Some(s) = &self.setup else {
             return self.setup_error("setup", "this core has no setup");
         };
@@ -216,16 +368,15 @@ impl Core {
                 let res = bise_home::prefs::set_dotted(&now, &key, value).and_then(|v| (p.write_prefs)(&v));
                 if res.is_ok() {
                     self.emit_prefs();
+                    self.update_pref_set(&key);
                 }
                 ("prefs_set", res)
             }
-            AppCmd::KeySet { id, key } => {
-                let res = (p.key_set)(&id, &key);
-                if res.is_ok() {
-                    self.emit_accounts();
-                }
-                ("key_set", res)
+            AppCmd::ProviderUse { id, key, base_url } => {
+                self.provider_use(id, key, base_url);
+                return;
             }
+            AppCmd::Keychain { to } => ("keychain", self.keychain(to)),
             AppCmd::KeyRemove { id } => {
                 let res = (p.key_remove)(&id);
                 if res.is_ok() {
@@ -259,6 +410,14 @@ impl Core {
                 self.app_version(id, built);
                 return;
             }
+            // update-flow: his click on the pill's `update`, to one hub
+            AppCmd::BiseUpdate {} => {
+                let res = match self.bise_update_now() {
+                    true => Ok(()),
+                    false => Err("no project's bise is running to update it".to_string()),
+                };
+                ("bise_update", res)
+            }
             AppCmd::FoundScan { dir } => {
                 let dir = dir.filter(|d| !d.trim().is_empty()).map(PathBuf::from).unwrap_or_else(|| p.home_dir.clone());
                 (p.scan)(dir, s.tx.clone());
@@ -272,7 +431,10 @@ impl Core {
                     }
                     (r, _) => r,
                 };
-                self.poll_projects(true);
+                if let Err(e) = &res {
+                    eprintln!("ambient-core: project_add {path}: {e}");
+                }
+                self.projects_now();
                 ("project_add", res)
             }
             AppCmd::ProjectRemove { project } => {
@@ -314,6 +476,63 @@ impl Core {
                 let res = self.workspace_of(project.as_deref()).and_then(|ws| (p.plugin_logout)(&ws, &name));
                 let shown = self.emit_plugins(project);
                 ("plugin_logout", res.and(shown))
+            }
+            AppCmd::PluginConnect { project, id } => {
+                let res = (p.plugin_connect)(&id, project.clone(), s.tx.clone());
+                // its row shows login: pending until the connect ends
+                if res.is_ok() {
+                    if let Some(s) = self.setup.as_mut() {
+                        s.logins.push(id);
+                    }
+                    let _ = self.emit_plugins(project);
+                }
+                ("plugin_connect", res)
+            }
+            AppCmd::PluginsRefresh { project } => {
+                // the other apps' configs are read again with the next rows
+                if let Some(s) = self.setup.as_mut() {
+                    s.found = None;
+                }
+                let Some(s) = self.setup.as_ref() else { return };
+                let p = &s.ports;
+                (p.plugins_refresh)(project, s.tx.clone());
+                ("plugins_refresh", Ok(()))
+            }
+            AppCmd::PluginAdd { project: _, add } => ("plugin_add", self.plugin_add(add)),
+            AppCmd::PluginAddConfirm { token, secrets } => {
+                let ctx = (p.add_ctx)();
+                let res = match self.setup.as_mut() {
+                    Some(s) => {
+                        // an import changes what's left to import
+                        s.found = None;
+                        s.staged.confirm(&token, &secrets, &ctx).map_err(|e| e.to_string())
+                    }
+                    None => Err("this core has no setup".into()),
+                };
+                // installed: its servers tried once, after his click only
+                let res = res.map(|dir| {
+                    if let Some(s) = self.setup.as_ref() {
+                        (s.ports.plugin_try)(dir, ctx, s.tx.clone());
+                    }
+                });
+                let shown = self.emit_plugins(None);
+                ("plugin_add_confirm", res.and(shown))
+            }
+            AppCmd::PluginRemove { project, name } => {
+                let ctx = (p.add_ctx)();
+                let res = self.workspace_of(project.as_deref()).and_then(|ws| {
+                    let id = bend_plugins::id::PluginId::parse(&name)?;
+                    bend_plugins::remove::remove(&ctx, Some(&ws), &id).map_err(|e| e.to_string())
+                });
+                let shown = self.emit_plugins(project);
+                ("plugin_remove", res.and(shown))
+            }
+            AppCmd::PluginAddCancel { token } => {
+                let res = match self.setup.as_mut() {
+                    Some(s) => s.staged.cancel(&token).map_err(|e| e.to_string()),
+                    None => Err("this core has no setup".into()),
+                };
+                ("plugin_add_cancel", res)
             }
             AppCmd::RoleSet { role, model, effort } => {
                 let res = (p.role_set)(&role, model.as_deref(), effort.as_deref());
@@ -429,16 +648,62 @@ impl Core {
         Ok(row.path.clone())
     }
 
-    /// `plugins` for that workspace (its logins still open marked pending).
+    /// `plugins` for that workspace (its logins still open marked pending:
+    /// bend_plugins::catalog::rows, the one builder), then `browse` of the
+    /// Mistral connectors not connected yet (the same rows, `available`).
     fn emit_plugins(&mut self, project: Option<String>) -> Result<(), String> {
         let ws = self.workspace_of(project.as_deref())?;
         let s = self.setup.as_ref().ok_or("this core has no setup")?;
-        let items = (s.ports.plugins)(&ws, &s.logins);
-        let mut ev = json!({"ev": "plugins", "items": items});
-        if let Some(p) = project {
-            ev["project"] = json!(p);
+        let rows = (s.ports.plugins)(&ws, &s.logins);
+        let connectors = (s.ports.connectors_problem)();
+        self.emit_summary(project.clone(), &rows);
+        let (browse, items): (Vec<_>, Vec<_>) = rows.into_iter().partition(|r| r.state == bise_proto::app_rows::PluginState::Available);
+        self.ev(CoreEv::Plugins { project, items, connectors: connectors.clone() });
+        self.ev(CoreEv::Browse { source: MISTRAL.into(), items: browse, connectors });
+        Ok(())
+    }
+
+    /// `plugins_summary` of that workspace, its rows read now (the core's
+    /// start, a marketplace read): only when it changed.
+    fn emit_summary_of(&mut self, project: Option<String>) {
+        let Ok(ws) = self.workspace_of(project.as_deref()) else { return };
+        let Some(s) = self.setup.as_ref() else { return };
+        let rows = (s.ports.plugins)(&ws, &s.logins);
+        self.emit_summary(project, &rows);
+    }
+
+    /// `plugins_summary` from these rows (all of them, Browse's too:
+    /// bend_plugins::catalog::summary, the one builder), sent only when it
+    /// differs from the last one sent for that project.
+    fn emit_summary(&mut self, project: Option<String>, rows: &[bise_proto::app_rows::Plugin]) {
+        let Some(s) = self.setup.as_mut() else { return };
+        if s.found.is_none() {
+            s.found = Some(bend_plugins::add::found(&(s.ports.add_ctx)()));
         }
-        self.emit(ev);
+        ask_signals(s, Instant::now());
+        let markets: Vec<bend_plugins::catalog::Market> =
+            s.markets.iter().map(|(source, items)| bend_plugins::catalog::Market { source, items }).collect();
+        let summary = bend_plugins::catalog::summary(rows, s.found.as_deref().unwrap_or_default(), &markets, &s.evidence, project.is_some());
+        if s.summaries.get(&project) == Some(&summary) {
+            return;
+        }
+        s.summaries.insert(project.clone(), summary.clone());
+        self.ev(CoreEv::PluginsSummary { project, summary });
+    }
+
+    /// The add menu's item: staged off the loop (then a preview), a
+    /// marketplace read (then `browse`), or a brief to main.
+    fn plugin_add(&mut self, add: bise_proto::app_cmd::PluginAddKind) -> Result<(), String> {
+        use bise_proto::app_cmd::PluginAddKind as K;
+        let s = self.setup.as_ref().ok_or("this core has no setup")?;
+        match add {
+            K::Marketplace { url } => (s.ports.plugin_market)(url, s.tx.clone()),
+            K::Agent { words } => self.send_via(bend_plugins::add::agent_brief(&words), false, "capsule-start"),
+            other => {
+                let req = bend_plugins::add::Request::from_wire(&other).ok_or("plugin_add: not something to add")?;
+                (s.ports.plugin_stage)(req, s.tx.clone());
+            }
+        }
         Ok(())
     }
 
@@ -483,6 +748,7 @@ impl Core {
                     }
                     self.emit_accounts();
                 }
+                Done::Used { seq, used } => self.on_used(seq, used),
                 Done::CuCheck(v) => {
                     if let Some(c) = self.setup.as_mut().and_then(|s| s.cu.as_mut()) {
                         c.check = v;
@@ -496,6 +762,70 @@ impl Core {
                     self.emit_cu(false);
                 }
                 Done::Manifest { text, base, target } => self.on_manifest(text, &base, &target),
+                Done::Keychain { lines, failed } => {
+                    if let Some(s) = self.setup.as_mut() {
+                        s.keychain_moving = false;
+                        s.keychain_said = (lines, failed);
+                    }
+                    self.emit_keychain();
+                }
+                Done::Staged { res } => match res {
+                    Ok(staged) => {
+                        let Some(s) = self.setup.as_mut() else { continue };
+                        let (token, preview) = s.staged.hold(staged.0);
+                        self.ev(CoreEv::PluginPreview { token, preview });
+                    }
+                    Err(e) => self.setup_error("plugin_add", &e),
+                },
+                // a step's line goes to the core's log (no window event
+                // carries it yet); its end, the list again
+                Done::Connecting { id, project, said, res } => {
+                    if let Some(l) = said {
+                        eprintln!("ambient-core: plugin_connect: {l}");
+                    }
+                    match res {
+                        Some(Err(e)) => self.setup_error("plugin_connect", &e),
+                        Some(Ok(())) => {}
+                        None => continue,
+                    }
+                    if let Some(s) = self.setup.as_mut() {
+                        s.logins.retain(|n| *n != id);
+                    }
+                    let _ = self.emit_plugins(project);
+                }
+                Done::Tried => {
+                    let _ = self.emit_plugins(None);
+                }
+                Done::Refreshed { project, res } => {
+                    if let Err(e) = res {
+                        self.setup_error("plugins_refresh", &e);
+                    }
+                    let _ = self.emit_plugins(project);
+                }
+                Done::Signals { inputs } => {
+                    let projects: Vec<Option<String>> = match self.setup.as_mut() {
+                        Some(s) => {
+                            s.evidence = bend_plugins::signals::reasons(&inputs);
+                            s.summaries.keys().cloned().collect()
+                        }
+                        None => Vec::new(),
+                    };
+                    // each summary sent so far, ranked and said again
+                    for p in projects {
+                        self.emit_summary_of(p);
+                    }
+                }
+                Done::Market { source, res } => match res {
+                    Ok(items) => {
+                        if let Some(s) = self.setup.as_mut() {
+                            s.markets.retain(|(src, _)| *src != source);
+                            s.markets.push((source.clone(), items.clone()));
+                        }
+                        self.ev(CoreEv::Browse { source, items, connectors: None });
+                        self.emit_summary_of(None);
+                    }
+                    Err(e) => self.setup_error("plugin_add", &format!("{source}: {e}")),
+                },
                 Done::LoggedIn { name, project, res } => {
                     if let Some(s) = self.setup.as_mut() {
                         s.logins.retain(|n| *n != name);
@@ -511,6 +841,11 @@ impl Core {
         self.update_tick();
     }
 }
+
+
+/// The `browse` source of his Mistral connectors not connected yet.
+const MISTRAL: &str = "mistral";
+
 
 #[cfg(test)]
 mod tests {

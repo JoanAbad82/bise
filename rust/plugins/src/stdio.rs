@@ -16,6 +16,14 @@ use crate::resolve::StdioServer;
 
 pub const PROTOCOL: &str = "2025-06-18";
 
+/// The params of our `initialize`: what a server may answer by (its
+/// tools too), so the tools cache's key holds them
+/// (`crate::tools_cache::key`).
+pub fn init_params() -> Value {
+    json!({"protocolVersion": PROTOCOL, "capabilities": {},
+           "clientInfo": {"name": "bend-harness", "version": "1.0"}})
+}
+
 type Pending = Arc<Mutex<HashMap<u64, Sender<Value>>>>;
 
 pub struct Client {
@@ -37,7 +45,10 @@ fn send(stdin: &Mutex<ChildStdin>, v: &Value) -> std::io::Result<()> {
 
 impl Client {
     /// Spawn the server and run the handshake (`initialize`,
-    /// `notifications/initialized`). stderr is appended to `log`.
+    /// `notifications/initialized`). stderr is appended to `log`. A
+    /// `${VAR}` (`${VAR:-default}`) in an `env` value is filled from
+    /// `vars` (the bridge's: the env, then his MCP secrets); one with no
+    /// value and no default is an error naming it, never a value.
     pub fn start(
         s: &StdioServer,
         plugin_root: &Path,
@@ -45,7 +56,13 @@ impl Client {
         log: &Path,
         timeout: Duration,
         on_change: Option<crate::remote::OnChange>,
+        vars: &dyn Fn(&str) -> Option<String>,
     ) -> Result<Client, String> {
+        let mut env = Vec::new();
+        for (k, v) in &s.env {
+            let v = crate::resolve::expand_env(v, vars).map_err(|e| format!("env {} uses {}, which is not set", k, e.trim_end_matches(" is not set")))?;
+            env.push((k, v));
+        }
         let _ = std::fs::create_dir_all(data_root);
         let err = std::fs::OpenOptions::new()
             .create(true)
@@ -61,7 +78,7 @@ impl Client {
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(err);
-        for (k, v) in &s.env {
+        for (k, v) in env {
             cmd.env(k, v);
         }
         let mut child = cmd.spawn().map_err(|e| format!("cannot start {:?}: {}", s.command, e))?;
@@ -121,12 +138,7 @@ impl Client {
             next: Mutex::new(1),
             init: Value::Null,
         };
-        let init = c.request(
-            "initialize",
-            json!({"protocolVersion": PROTOCOL, "capabilities": {},
-                   "clientInfo": {"name": "bend-harness", "version": "1.0"}}),
-            timeout,
-        );
+        let init = c.request("initialize", init_params(), timeout);
         match init {
             Ok(v) => c.init = v,
             Err(e) => {

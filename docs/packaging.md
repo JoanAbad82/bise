@@ -43,7 +43,7 @@ changes, so no-strip costs little. (The versions dirs today hold the
 110 MB *debug* jsrt: shipping the release one is already a big saving.)
 
 **Not needed at run time**: the Bend compiler, cargo, the `.bend` sources,
-`LAWS.bend`/`PROOF.bend`. The Bend outputs are plain native executables.
+`bend/laws/`, `bend/proofs/`. The Bend outputs are plain native executables.
 Without sources, `/reload` restarts the REPL on the shipped binary (the
 recompile step logs "source not found, keeping the binary") — fine.
 
@@ -116,6 +116,21 @@ rule as `versions.sh`: "rebuilding never changes a running system, only
 an explicit switch does"). The installer keeps the last 3 versions, never
 the current one nor one a running process uses.
 
+The desktop app (`apps/desktop`, electron-builder) carries its own
+runtime: `Contents/Resources/bin/` holds bise next to a version dir's
+files (VERSION, repl-live, sb-core, bend-jsrt, prompts/, plugins/, kit/,
+computer-use/extension), so `open bise.app` finds them with no env
+(approot: VERSION next to the executable). They come from
+`BISE_PACK_ROOT`, a pack-time input read only by the packaging scripts
+(`scripts/desktop_try.py`, `scripts/desktop_app.py`: a snapshot made like
+`versions.sh` makes a version dir); the pack fails without it. Hubs never
+run from inside the `.app` (an app update renames it to `.old`, then
+deletes it): the core installs that runtime once as
+`$PREFIX/versions/<its VERSION id>` (`BISE_PREFIX`, else
+`~/.local/share/bise`; update.rs `place`, the same code a release
+install uses), without touching `current`, and starts hubs from there.
+`BISE_APP_ROOT` is internal: an app never gets it.
+
 ## 5. The prototype
 
 `packaging/`:
@@ -127,7 +142,9 @@ the current one nor one a running process uses.
   adds `target=`/`channel=`, **never strips**, signs
   (`BISE_SIGN_ID` = a Developer ID → hardened runtime + timestamp; ad-hoc
   otherwise), waits 2 s and verifies every piece (a quarantine shows up
-  as a missing file), writes
+  as a missing file), runs `check-dist-pages.sh` on the app root (its hub
+  on a throwaway HOME serves every stylesheet and script a page links,
+  200 with its type: -31 and -32 shipped without `app/kit`), writes
   `bend-harness-<id>-<os>-<arch>.tar.gz` + `.sha256`. 20 s on a warm cache.
 - **`install.sh`** — from an extracted bundle, `--from <tarball|dir>`,
   or (unpublished) `BISE_DIST_URL` download + sha256 check. Checks the
@@ -189,6 +206,13 @@ the old `release.sh` ("an EDR quarantine … must FAIL LOUDLY"). Consequences:
 - Run the packaging tests in CI (a GitHub macOS runner) or a VM by
   default; `test-install.sh` is written for that (it also works locally,
   unstripped).
+- **Done (cli-sign, docs/issues/15-tcc-one-grant.md "Releases")**: the
+  terminal release's darwin app root is `bise.app` (dev.bise.cli) + the
+  `bise` link, signed by `scripts/dist_sign.py` (the signing core
+  `scripts/mac_sign.py`, shared with the desktop's `desktop_sign.py`;
+  entitlements in `packaging/entitlements/`), notarized in one submission
+  (`scripts/notary.py`), bise.app and the helper stapled. The bullets
+  below are the requirement it meets.
 - **Every macOS binary is signed with a Developer ID Application
   certificate, hardened runtime, secure timestamp, then notarized**
   (`xcrun notarytool submit … --wait`, with an App Store Connect API
@@ -198,7 +222,12 @@ the old `release.sh` ("an EDR quarantine … must FAIL LOUDLY"). Consequences:
 - Entitlements under hardened runtime: `bend-jsrt` needs
   `com.apple.security.cs.allow-jit` (V8; maybe
   `allow-unsigned-executable-memory` — to verify); `bend-harness` needs
-  `com.apple.security.device.audio-input` for voice.
+  `com.apple.security.device.audio-input` for voice; `repl-live` and
+  `repl-scripted` need `com.apple.security.cs.disable-library-validation`
+  (`packaging/entitlements/runtime.plist`, both products): their TLS
+  dlopens Homebrew's `libssl.3`, which library validation refuses (-41
+  shipped without it: every HTTPS provider call failed;
+  `test-install.sh`'s TLS turn is the check).
 - **Microphone**: a CLI has no Info.plist; macOS asks for the permission
   on behalf of the *terminal app* (Terminal, iTerm2, Ghostty) — the
   prompt says "Ghostty would like to access the microphone". Document it
@@ -214,7 +243,9 @@ the old `release.sh` ("an EDR quarantine … must FAIL LOUDLY"). Consequences:
 ## 7. Build matrix / CI (GitHub Actions)
 
 Done for macOS (BISE-168): `.github/workflows/release.yml`, `darwin-arm64`
-(macos-15) and `darwin-x86_64` (macos-15-intel), ad-hoc signed, a
+(macos-15) and `darwin-x86_64` (macos-15-intel), Developer ID signed and
+notarized on a `v*` tag once the variable `RELEASE_SIGN` is `on` (else ad
+hoc; release.yml's header), a
 draft release made by make-release.sh on a `v*` tag (§11, BISE-220); the plan below still holds for
 Linux (`linux-x86_64` ubuntu-24.04, `linux-arm64` ubuntu-24.04-arm) and
 signing (BISE-169). Per job:
@@ -222,8 +253,10 @@ signing (BISE-169). Per job:
 1. checkout the tag/commit; install a **pinned** Bend (`bend update`
    is `curl | sh`: pin the version/hash instead) and the Rust toolchain;
 2. cache: cargo registry + target dirs, the Bend compile cache keyed by
-   `bend_hash`, the jsrt target (deno_core downloads a prebuilt
-   `librusty_v8` per target; the jsrt build is the long one);
+   `bend_hash`, bins.sh's jsrt target `$SB_BUILD_DIR/target-jsrt`
+   (deno_core downloads a prebuilt `librusty_v8` per target; the jsrt
+   build is the long one; restored only when bins.sh's cache lacks the
+   engine); saved on main only;
 3. build = `build-dist.sh` (`versions.sh` under the hood, so CI and
    `/version` build the same thing);
 4. macOS: sign (keychain from a base64 .p12 secret), notarize; Linux:
@@ -341,6 +374,42 @@ the default paths.
 User decision: the releases are GitHub Releases of `gvergnaud/bise`; the
 repo stays private for now (friends are collaborators), public later.
 
+**Two release cycles from one main** (desktop-on-main, architect
+m_19472). The desktop app's code (`apps/desktop`) lives on main, but it
+releases apart from the terminal:
+
+| | terminal (`bise`) | desktop app |
+|---|---|---|
+| tags | `vYYYY.M.D-N` (`v*`) | `desktop-vYYYY.M.N` |
+| workflow | `release.yml` | `desktop-release.yml`, OFF until the repo variable `DESKTOP_RELEASE` is `on` |
+| channel | `releases/latest/download/latest.json` | `releases/download/desktop-latest/desktop.json` (a rolling tag) |
+| reader | `bise update`, the hub's hourly check | the desktop core (`app_update`), `release::parse_desktop` |
+
+The rules (`tests/release_split_test.py`, `check-release.py`, the
+`release.rs` tests): the terminal's app root and tarball never hold
+`apps/`, `dev/`, `node_modules` or Electron; `latest.json` never has a
+`desktop` key; a desktop release is a draft and never GitHub's 'latest'
+(that would move every terminal's channel); `desktop.json` has `kind:
+desktop` and names the terminal version of the runtime it carries
+(`runtime_id`). A terminal release never waits on the desktop app, and
+the desktop app ships only when the user says so.
+
+**The desktop app's own updates** (desktop-dist v7, his picks). Two
+rolling tags, same `desktop.json` shape (dist-ci's
+`scripts/desktop_feed.py` writes it): `desktop-latest` (stable) and
+`desktop-beta`. Every build goes to beta first and "promote" moves
+`desktop-latest` to the same build, so beta is always stable or newer
+and a beta app reads `desktop-beta` alone (his pref `desktop_channel`,
+Settings › General's 'beta builds'). `"paused": true` offers nothing.
+The app downloads in the background, checks the zip's sha256 and the
+new app's signature against its own designated requirement (a Developer
+ID app also needs Gatekeeper's yes), then installs at the first of: his
+quit, a quiet moment (`apps/desktop/src/main/update/moment.ts`), his
+click. `<name>.app.old` stays until the new app ran; the hubs never stop.
+A hub newer than the app's runtime makes the core read the channel at
+once. A self-signed test build refuses the first Developer ID one: it is
+downloaded once by hand.
+
 - **The channel** is the latest release's download URL,
   `https://github.com/gvergnaud/bise/releases/latest/download` (the
   Rust const `release::DIST_URL`, stamped into install.sh by
@@ -355,7 +424,14 @@ repo stays private for now (friends are collaborators), public later.
      make-release.sh (install.sh stamped with the channel, latest.json,
      tarballs + .sha256: the files install.sh and `bise update` read),
      `check-release.py`, a **draft** release. A rerun replaces a draft's
-     files; a published release is never touched.
+     files; a published release is never touched. The draft has
+     darwin-arm64 + linux (fast-release: the desktop reads darwin-arm64);
+     darwin-x86_64, ~2x slower, joins it when done (`ci-release.sh
+     --attach`: its archive, then latest.json with the 4 targets, notes
+     kept, even on a release published already). The run ends after it,
+     so publish-release.sh's watch sees the 4 targets. Caches are saved
+     by main's runs only (a push that changes rust/, bend/, packaging/,
+     and a nightly run); tags restore them.
   3. `publish-release.sh vX.Y.Z --publish` (or `gh release edit vX.Y.Z
      -R gvergnaud/bise --draft=false`): the draft becomes the latest
      release. A draft is not "latest": no install or update sees it before.
@@ -381,13 +457,34 @@ repo stays private for now (friends are collaborators), public later.
   `--local ... --whats-new <file>` (make-release.sh `--whats-new`).
   Forgotten, or to fix them: `publish-release.sh vX.Y.Z --whats-new
   <file>` on the published release. An installed bise checks latest.json
-  at its hub's start and every hour (`bise update --manifest`, one small
-  GET; `BISE_RELEASE_CHECK_SECS`; off with `BISE_NO_UPDATE=1`; never in
-  bise's source tree) and, for a newer release, opens ONE quiet inbox
-  item: `bise vX.Y.Z is out`, the lines, `you're on v…`, then `1 update
-  now` (`bise update` + a switch onto it, probation, agents kept), `2
-  later` (not again for this release), `3 release notes ↗`. `/update`
-  checks now. No notes: the item has no body.
+  once an hour for the whole machine (`bise update --manifest`, one small
+  GET, one hub at a time under a flock; `BISE_RELEASE_CHECK_SECS`; off
+  with `BISE_NO_UPDATE=1`; never in bise's source tree). The offer is the
+  machine's (update-flow, `bise_home::release_offer`): every hub plans it
+  from the same files every 30 s. A newer release is ONE inbox card
+  for the machine (update-dot, Gabriel m_46040, architect m_46059): each
+  hub opens its own `update` card for it (place `release:<id>`, its
+  changelog typed on the card: `Card.release`, the manifest's notes cut
+  at 16 KB, and `Card.link` the release page) and the window lists one
+  of them (bise's own when the home hub has one; grouped by that place
+  for the list, the badge and the notifications: `shared/update.ts`).
+  `1 update now · your agents keep running` answers that one hub: it
+  installs the release once, its card closes at once (`updating`), then
+  every project switches to it one at a time (probation, agents kept),
+  and the app's own update installs with it and reopens the window where
+  he is. `2 later` writes `update-later`: no card for that release
+  again, in any project. Each hub closes its own card when the machine's
+  offer leaves ready (`updating`, `later`, `update failed`, `updated`),
+  so an answer anywhere clears every card within 30 s. While it runs,
+  each hub says it on `hub/bise_update` (rows::BiseUpdate: installing,
+  updating, failed); the desktop core folds every project's into the
+  machine's one line (`core/machine_update`), drawn in the window's
+  status pill and the TUI's status line. A project whose switch rolled
+  back doesn't retry that release. `/update auto on` (Settings ›
+  general, `Update automatically`, prefs `auto_update`, off by default)
+  installs a ready release by itself. `/update` forgets `later`, checks
+  now and opens the card. The desktop app's own
+  updater still swaps the app alone when no newer bise waits.
 - **Private repo**: a plain download of an asset answers 404. install.sh
   and `bise update` (the daily check, `/restart latest`) then ask
   `gh release download` (the GitHub CLI, `gh auth login`), else the API
@@ -409,3 +506,64 @@ repo stays private for now (friends are collaborators), public later.
   against a stateful stub `gh` whose `run watch` runs ci-release.sh
   (tag, draft, `--publish`, a failed run, `--local`), then an install
   and an update from the published files.
+
+## 12. The desktop app's release: signed, notarized, two channels (desktop-dist)
+
+The page desktop-dist (his go). One workflow, `.github/workflows/desktop-release.yml`,
+OFF until the repository variable `DESKTOP_RELEASE` is `on`.
+
+- **The runtime**: a desktop release carries a published terminal release, the
+  `v*` tag on its commit (or the input `runtime`): its darwin-arm64 archive,
+  sha256 checked (`scripts/desktop-release.sh runtime`). Its commit is in the
+  app's history and the seams (`rust/proto`, `rust/home`,
+  `rust/tui/src/ambient`) are unchanged since, else refused (a dry run says it
+  and goes on).
+- **The build** (`scripts/desktop-release.sh build`, `scripts/desktop_release.py`):
+  the native helper (macOS 14 floor), `pnpm build`, electron-builder `--dir`
+  (ad hoc), then `scripts/desktop_sign.py`: every piece of code signed on its
+  own, deepest first, never `--deep`, hardened runtime, a timestamp, the
+  entitlements (`packaging/entitlements/desktop.plist`: JIT, the
+  microphone, Apple Events) on the executables and the apps; before it,
+  `cli_bundle` makes the runtime's `bin/bise.app` (dev.bise.cli, the
+  terminal release's bundle, its `bise.plist`) with `bin/bise` a link into
+  it, bend-jsrt gets `bend-jsrt.plist`, repl-live `runtime.plist`
+  (`scripts/mac_sign.py`). Then
+  notarytool (App Store Connect API key) and stapler on the app, the zip for the
+  updater (`ditto`), the DMG (dmgbuild: the designer's window,
+  `apps/desktop/resources/dmg/layout.json` and `background.png` + `@2x`),
+  signed, notarized, stapled. Gates: `codesign --verify --deep --strict`, the
+  runtime flag, the mounted DMG; signed: `spctl` on the app and the DMG,
+  `stapler validate`, `syspolicy_check distribution`.
+- **The tag**: only from `scripts/desktop_tag.py <desktop-vYYYY.M.N> [<sha>]
+  [--notes-file <f>]`, in a clean checkout at that sha: the desktop app's
+  full end-to-end (`scripts/nightly_desktop.sh`, docs/desktop-try.md) run
+  on that exact sha (its last line in `~/.bise/run/nightly/desktop-runs.tsv`,
+  else it runs then, in a heavy slot) with every step run and every red
+  owned: in `tests/known_reds.txt` as it is at that sha, with its owner. A
+  red outside the file refuses the tag, naming it. Then an annotated tag:
+  the notes, then `nightly-desktop: green <sha> <when>` or
+  `nightly-desktop: owned-reds <N> <sha> <when> (owners: …)`. It prints the
+  run's verdict and the open known-reds count, and never pushes. The build
+  job's first step (`desktop_tag.py check`) fails a lightweight tag or one
+  without one of those lines for its own commit: 'cut desktop tags with
+  scripts/desktop_tag.py'; it prints the line. The release body drops it.
+- **Runs**: a `desktop-vYYYY.M.N` tag (or action `build`): signed + a DRAFT
+  release (prerelease, never latest; its body the annotated tag's message).
+  Action `dry-run`: ad hoc, no secret, no release, the files as a run
+  artifact. Action `publish` (tag, beta|stable), `pause`, `resume` (channel):
+  `scripts/desktop_publish.py`.
+- **The feed** (`scripts/desktop_feed.py`, agreed with dist-updater and
+  dist-site): `desktop.json` on two rolling releases, `desktop-beta` and
+  `desktop-latest`, each with `bise-mac-arm64.dmg` (the site's static link)
+  uploaded before the feed. A build goes to beta first; stable never ahead of
+  beta; no channel goes back (N+1 from N's commit instead); `paused: true`
+  stops every offer. `built` is the app's VERSION `built=` byte for byte.
+  Every `gh release create/edit` says `--latest=false`: GitHub's latest is
+  the terminal's channel.
+- **Secrets** (environment `desktop-release`, his approval on each run):
+  `MAC_CERT_P12_BASE64`, `MAC_CERT_PASSWORD`, `APPLE_API_KEY_P8`,
+  `APPLE_API_KEY_ID`, `APPLE_API_ISSUER`, `APPLE_TEAM_ID`. The certificate
+  lives in a throwaway keychain, the key in a 0600 file, both deleted at the
+  end of the run.
+- **Test**: `tests/desktop_release_test.py` (pure parts + an ad hoc signing of
+  a fake bundle), `tests/release_split_test.py`.

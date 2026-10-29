@@ -1,7 +1,5 @@
-//! The user's preferences: one `prefs.json` in the bise layout, the
-//! old files in the legacy one (`tui.json`, `hints.json`, `tip`,
-//! `onboarded`). A [`Slot`] hides which: a JSON value in a file, the
-//! whole file or one key of its object.
+//! The user's preferences: one `prefs.json`. A [`Slot`] is a JSON value
+//! in a file: the whole file (a test store) or one key of its object.
 
 use std::io;
 use std::path::{Path, PathBuf};
@@ -55,9 +53,87 @@ pub fn excluded_apps(v: Option<Value>) -> Vec<String> {
     }
 }
 
+/// `shots_keep_days`: the days an image stays in bise's image store
+/// (bend_images::prune). Unset: [`KEEP_DAYS_DEFAULT`], what settings ›
+/// privacy shows.
+pub const KEEP_DAYS: &str = "shots_keep_days";
+pub const KEEP_DAYS_DEFAULT: u64 = 7;
+
+/// `auto_update`: bise updates itself when a release is out, at a quiet
+/// moment (update-flow; settings › update, `/update auto on|off`). Off
+/// unless he turned it on.
+pub const AUTO_UPDATE: &str = "auto_update";
+
+/// Whether bise updates itself, from `prefs.json`'s object.
+pub fn auto_update(prefs: Option<&Value>) -> bool {
+    prefs.and_then(|p| p.get(AUTO_UPDATE)).and_then(Value::as_bool).unwrap_or(false)
+}
+
+/// The image store's retention in days, from `prefs.json`'s object: his
+/// number when it is one of at least 1, else the default.
+pub fn keep_days(prefs: Option<&Value>) -> u64 {
+    prefs.and_then(|p| p.get(KEEP_DAYS)).and_then(Value::as_u64).filter(|d| *d >= 1).unwrap_or(KEEP_DAYS_DEFAULT)
+}
+
 /// The top keys of `prefs.json` the window may set (`prefs_set`,
 /// architect m_9130): anything else is refused, never written.
-pub const WINDOW_KEYS: &[&str] = &["onboarded", "theme", "voice", "context", "excluded_apps", "quiet", "shots_keep_days"];
+pub const WINDOW_KEYS: &[&str] = &["onboarded", "theme", "voice", "context", "excluded_apps", "quiet", "shots_keep_days", "desktop_channel", "bims", "bim", "seen", AUTO_UPDATE];
+
+/// `seen.<hub id>`: when he last looked at that project, in ms (the
+/// desktop's app/seen.ts markSeen; bise_proto::rows::seen_key builds the
+/// key, its SEEN_PREFIX is this top key and a dot). The sidebar's unread
+/// dot and new counts are what came after it. Only that path, the id with
+/// [`crate::hub_id`]'s shape, the value a whole number of ms (null: never).
+fn seen_key(parts: &[&str], v: &Value) -> Result<(), String> {
+    match parts {
+        ["seen", id] if crate::hub_id::is_hub_id(id) => {
+            if v.is_null() || v.as_u64().is_some() {
+                Ok(())
+            } else {
+                Err(format!("seen.{id} can't be {v}"))
+            }
+        }
+        _ => Err(format!("{} is not a seen preference", parts.join("."))),
+    }
+}
+
+/// `bim`: what his own bim looks like (the desktop's onboarding and
+/// settings › general, page bim-pick): `{skin, hair, color, wear, hat}`,
+/// skin, color and hat (the accessory's colour) small indexes, hair and
+/// wear short slugs; a look without `hat` (picked before the accessory
+/// colour) is one too, its hat today's sky blue. The looks are the
+/// desktop's drawing table (bims/look.ts: an unknown one draws today's),
+/// never listed here; only the shape is checked. Set whole, never a part.
+fn bim_look(v: &Value) -> bool {
+    let slug = |s: Option<&Value>| s.and_then(Value::as_str).is_some_and(|s| (1..=24).contains(&s.len()) && s.bytes().all(|b| b.is_ascii_lowercase() || b == b'-'));
+    let small = |n: Option<&Value>| n.and_then(Value::as_u64).is_some_and(|n| n < 32);
+    v.as_object().is_some_and(|o| {
+        let hat = match o.get("hat") {
+            None => o.len() == 4,
+            h => o.len() == 5 && small(h),
+        };
+        hat && small(o.get("skin")) && small(o.get("color")) && slug(o.get("hair")) && slug(o.get("wear"))
+    })
+}
+
+/// `bims.map.<hub id>`: the office's map he picked for that project (the
+/// desktop's /bims, architect m_28589). Only that path, the id with
+/// [`crate::hub_id`]'s shape, the value a short slug: the map names are the
+/// desktop's drawing table (an unknown one draws the loft), never listed
+/// here. Unset reads as the loft; nothing writes a default.
+fn bims_key(parts: &[&str], v: &Value) -> Result<(), String> {
+    let slug = |s: &str| (1..=32).contains(&s.len()) && s.bytes().all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-');
+    match parts {
+        ["bims", "map", id] if crate::hub_id::is_hub_id(id) => {
+            if v.is_null() || v.as_str().is_some_and(slug) {
+                Ok(())
+            } else {
+                Err(format!("bims.map.{id} can't be {v}"))
+            }
+        }
+        _ => Err(format!("{} is not a bims preference", parts.join("."))),
+    }
+}
 
 /// The one-time hints the window may mark seen (`prefs_set {key:
 /// "hints.<name>", value: true}`, S36): the TUI's own keys (tui hints.rs
@@ -66,13 +142,25 @@ pub const WINDOW_KEYS: &[&str] = &["onboarded", "theme", "voice", "context", "ex
 /// another value (unseeing one is not the window's).
 pub const WINDOW_HINTS: &[&str] = &["first_agent", "first_level3", "first_card", "first_steer", "first_yolo", "first_auto"];
 
+/// The desktop's own one-time things, in the same `hints` object, marked
+/// seen the same way (only true): the TUI never shows them.
+///   - `fn_perms`: the capsule's permissions sheet was shown once, at his
+///     first fn hold with a permission missing (desktop onboarding v3). It
+///     means shown, never granted: whether one is missing comes from the
+///     helper's perms each time, so one he revokes later shows in settings ›
+///     privacy and in the capsule's state, never in this sheet again.
+pub const DESKTOP_HINTS: &[&str] = &["fn_perms"];
+
 /// The type a typed key keeps (a wrong one is refused).
 fn typed(key: &str, v: &Value) -> Result<(), String> {
     let ok = match key {
-        "onboarded" => v.is_boolean(),
+        "onboarded" | AUTO_UPDATE => v.is_boolean(),
         "theme" => v.as_str().is_some_and(|t| ["auto", "light", "dark", "system"].contains(&t)),
         "shots_keep_days" => v.as_u64().is_some(),
+        // the desktop app's update channel (release::DesktopChannel)
+        "desktop_channel" => v.as_str().is_some_and(|c| ["stable", "beta"].contains(&c)),
         "excluded_apps" => v.as_array().is_some_and(|a| a.iter().all(Value::is_string)),
+        "bim" => bim_look(v),
         _ => true,
     };
     if ok {
@@ -93,18 +181,24 @@ pub fn set_dotted(obj: &Value, key: &str, value: Value) -> Result<Value, String>
     let top = parts[0];
     if top == "hints" {
         match parts[..] {
-            [_, name] if WINDOW_HINTS.contains(&name) && value == Value::Bool(true) => {}
-            [_, name] if WINDOW_HINTS.contains(&name) => return Err(format!("hints.{name} can only be true")),
+            [_, name] if (WINDOW_HINTS.contains(&name) || DESKTOP_HINTS.contains(&name)) && value == Value::Bool(true) => {}
+            [_, name] if WINDOW_HINTS.contains(&name) || DESKTOP_HINTS.contains(&name) => return Err(format!("hints.{name} can only be true")),
             _ => return Err(format!("{key} is not a hint the window marks")),
         }
     } else if !WINDOW_KEYS.contains(&top) {
         return Err(format!("{top} is not a preference the window sets"));
     }
+    if top == "bims" {
+        bims_key(&parts, &value)?;
+    }
+    if top == "seen" {
+        seen_key(&parts, &value)?;
+    }
     if parts.len() == 1 {
         if !value.is_null() {
             typed(top, &value)?;
         }
-    } else if ["onboarded", "theme", "shots_keep_days", "excluded_apps"].contains(&top) {
+    } else if ["onboarded", "theme", "shots_keep_days", "excluded_apps", "desktop_channel", "bim"].contains(&top) {
         return Err(format!("{top} has no {}", parts[1..].join(".")));
     }
     let mut out = if obj.is_object() { obj.clone() } else { Value::Object(Default::default()) };

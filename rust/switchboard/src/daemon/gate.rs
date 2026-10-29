@@ -12,8 +12,8 @@
 //! writes the verdict, saves the rule on "always", and folds the card.
 //! Identical calls from several agents share one card.
 //!
-//! The feed lines the TUI reads (`sb gate : …`, `sb approval : …`) are
-//! [`gate_line`] and [`fold_line`].
+//! The feed records the TUI reads (`gate`, `approval`) are [`gate_line`]
+//! and [`fold_line`].
 
 use super::{log_line, Msg, Shell};
 use crate::approvals::check::{CheckOut, CheckReq, Runner};
@@ -21,6 +21,7 @@ use crate::approvals::sandbox::{self, Denial, Rerun};
 use crate::approvals::{self, mode, rules, Cache, CacheKey, Call, Checker, Mode, Part, Verdict};
 use crate::core::Input;
 use crate::model::MAIN;
+use bise_proto::core::{feed, Feed};
 use serde_json::{json, Value};
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
@@ -135,7 +136,7 @@ fn rule_json(r: &rules::Rule) -> Value {
     })
 }
 
-/// The rule a `remove_rule` op names (the fields `rule_json` gave).
+/// The rule approvals/removeRule names (the fields `rule_json` gave).
 pub(super) fn rule_of_json(v: &Value) -> Option<rules::Rule> {
     let s = |k: &str| v.get(k).and_then(|x| x.as_str()).map(str::to_string);
     Some(rules::Rule {
@@ -201,13 +202,11 @@ pub(super) fn verdict_line(n: &str, nonce: &str, allow: bool, reason: &str) -> S
     }
 }
 
-/// A gate state line of an agent's feed: `sb gate : check <n>` (the
-/// checker runs), `card <n> <id>` (it waits on you), `done <n>`.
-pub(super) fn gate_line(what: &str, n: &str, card: Option<u64>) -> String {
-    match card {
-        Some(c) => format!("sb gate : {what} {n} {c}"),
-        None => format!("sb gate : {what} {n}"),
-    }
+/// A gate state record of an agent's feed: `check` (the checker runs),
+/// `card` (it waits on you), `done`; `n` (the call) and `card` (its card)
+/// are not part of it: no reader needs them.
+pub(super) fn gate_line(what: &str) -> String {
+    Feed::Gate(feed::Gate { step: what.into() }).line()
 }
 
 /// How a card was answered, for its fold.
@@ -221,20 +220,19 @@ pub(super) enum Fold {
     OutsideAlways,
 }
 
-/// The folded card (design §9): `sb approval : allowed : <agent> :
-/// <summary>`, `no : <agent> : <summary> : <note>`, a sandbox card's
-/// `outside : <agent> : <summary>` or `outside-always : <agent> :
-/// <rules>` (designer: the fold says the sandbox was off for it; fields
-/// escaped).
+/// The folded card (design §9), an `approval` record: `allowed`, `no`
+/// (with his note), a sandbox card's `outside` or `outside-always` (its
+/// rules; designer: the fold says the sandbox was off for it); who and
+/// what on one line each.
 pub(super) fn fold_line(how: Fold, agents: &[String], summary: &str, note: &str) -> String {
-    let esc = |s: &str| crate::util::one_line(s).replace(" : ", " \\: ");
-    let who = agents.join(", ");
-    match how {
-        Fold::Allowed => format!("sb approval : allowed : {} : {}", esc(&who), esc(summary)),
-        Fold::Outside => format!("sb approval : outside : {} : {}", esc(&who), esc(summary)),
-        Fold::OutsideAlways => format!("sb approval : outside-always : {} : {}", esc(&who), esc(summary)),
-        Fold::No => format!("sb approval : no : {} : {} : {}", esc(&who), esc(summary), esc(note)),
-    }
+    let one = crate::util::one_line;
+    let (how, note) = match how {
+        Fold::Allowed => ("allowed", String::new()),
+        Fold::Outside => ("outside", String::new()),
+        Fold::OutsideAlways => ("outside-always", String::new()),
+        Fold::No => ("no", one(note)),
+    };
+    Feed::Approval(feed::Approval { v: 1, how: how.into(), who: one(&agents.join(", ")), what: one(summary), note }).line()
 }
 
 /// What the user's answer says: allow, allow always, or no with a note.
@@ -301,7 +299,7 @@ fn bash_cmd(args: &Value) -> String {
 
 /// The card's text (design §9), line by line so the TUI draws it and
 /// main's board reads it: the title, `| ` the lines that need you, `= `
-/// the parts already allowed (dim), `reason: `, one `always: ` per rule.
+/// the parts already allowed (dim), `reason: ` (`warn: ` if it deletes, ▲), one `always: ` per rule.
 pub(super) fn card_text(call: &Call, needs: &[Part], reason: &str, always: Option<&[String]>) -> String {
     let mut out: Vec<String> = Vec::new();
     let body: Vec<String> = match call.tool.as_str() {
@@ -342,7 +340,7 @@ pub(super) fn card_text(call: &Call, needs: &[Part], reason: &str, always: Optio
     if body.len() > 40 {
         out.push(format!("| … {} more lines", body.len() - 40));
     }
-    out.push(format!("reason: {reason}"));
+    out.push(format!("{}: {reason}", if approvals::connector::warns(&call.tool) { "warn" } else { "reason" }));
     for r in always.into_iter().flatten() {
         out.push(format!("always: {r}"));
     }
@@ -380,7 +378,7 @@ fn summary_of(call: &Call) -> String {
 
 /// The rule "always" saves for this card, as the rules file holds it; a
 /// sandbox card's runs outside the sandbox (`sandbox = false`). `from`:
-/// `card #12, api-v2, web` (what `/approvals` says of it).
+/// `notification #12, api-v2, web` (what `/approvals` says of it).
 fn rule_of(tool: &str, repo: &Path, text: &str, outside: bool, from: &str) -> rules::Rule {
     let mut r = rules::Rule {
         project: Some(repo.to_path_buf()),
@@ -400,10 +398,9 @@ fn rule_of(tool: &str, repo: &Path, text: &str, outside: bool, from: &str) -> ru
 
 /// The git common root of `dir` (its repo), or `dir`.
 fn repo_of(dir: &str) -> PathBuf {
-    std::process::Command::new("git")
-        .args(["-C", dir, "rev-parse", "--path-format=absolute", "--git-common-dir"])
-        .output()
+    crate::tools_env::git_command()
         .ok()
+        .and_then(|mut c| c.args(["-C", dir, "rev-parse", "--path-format=absolute", "--git-common-dir"]).output().ok())
         .filter(|o| o.status.success())
         .map(|o| PathBuf::from(String::from_utf8_lossy(&o.stdout).trim()))
         .map(|g| if g.ends_with(".git") { g.parent().map(Path::to_path_buf).unwrap_or(g) } else { g })
@@ -498,8 +495,7 @@ impl Shell {
         }
         if w.card.is_some() {
             self.hub.set_on_you(&w.agent, false);
-            let snap = self.snapshot();
-            self.broadcast(&snap);
+            self.state_now();
         }
     }
 
@@ -625,7 +621,7 @@ impl Shell {
         }
         let Some(w) = self.gates.waiting.get(dir) else { return };
         let (agent, n) = (w.agent.clone(), w.n.clone());
-        self.feed(&agent, &gate_line("check", &n, None));
+        self.feed(&agent, &gate_line("check"));
         let task = self.hub.st.agents.get(&agent).map(|a| a.brief.objective.clone()).unwrap_or_default();
         let req = CheckReq {
             call,
@@ -664,7 +660,7 @@ impl Shell {
                 }
                 let Some(w) = self.gates.waiting.get(dir) else { return };
                 let (agent, n) = (w.agent.clone(), w.n.clone());
-                self.feed(&agent, &gate_line("check", &n, None));
+                self.feed(&agent, &gate_line("check"));
                 let task = self
                     .hub
                     .st
@@ -815,9 +811,8 @@ impl Shell {
             w.card = Some(id);
         }
         self.hub.set_on_you(&w.agent, true);
-        self.feed(&w.agent, &gate_line("card", &w.n, Some(id)));
-        let snap = self.snapshot();
-        self.broadcast(&snap);
+        self.feed(&w.agent, &gate_line("card"));
+        self.state_now();
     }
 
     /// The user answered card `id` (the `confirm` effect of sb-core, which
@@ -831,7 +826,7 @@ impl Shell {
             Answer::Allow => (true, String::new()),
             Answer::Always => {
                 let bise = self.bise_root();
-                let from = std::iter::once(format!("card #{id}")).chain(names.iter().cloned()).collect::<Vec<_>>().join(", ");
+                let from = std::iter::once(format!("notification #{id}")).chain(names.iter().cloned()).collect::<Vec<_>>().join(", ");
                 for r in c.always.iter().flatten() {
                     if let Err(e) = rules::save(&rules::file(&bise), &rule_of(&c.tool, &c.repo, r, c.rerun.is_some(), &from)) {
                         log_line(&self.opts.paths, &format!("approvals: {e}"));
@@ -899,22 +894,21 @@ impl Shell {
                     self.gates.cards.remove(&id);
                     self.step(Input::ConfirmClose { card: id, res: "interrupted".into() });
                 }
-                let snap = self.snapshot();
-                self.broadcast(&snap);
+                self.state_now();
             }
         }
         let _ = how;
-        self.feed(name, &gate_line("done", &n, None));
+        self.feed(name, &gate_line("done"));
     }
 
     /// The snapshot's gate cards held by several agents: `agent` lists
     /// them (`t10a, t10b`: the TUI's "2 agents want to run").
-    pub(super) fn gate_card_agents(&self, snap: &mut Value) {
-        for c in snap["cards"].as_array_mut().into_iter().flatten() {
-            let Some(g) = c["id"].as_u64().and_then(|id| self.gates.cards.get(&id)) else { continue };
+    pub(super) fn gate_card_agents(&self, snap: &mut crate::snapshot::Snapshot) {
+        for c in &mut snap.cards {
+            let Some(g) = self.gates.cards.get(&c.id) else { continue };
             let names: Vec<String> = g.dirs.iter().filter_map(|d| self.gates.waiting.get(d).map(|w| w.agent.clone())).collect();
             if names.len() > 1 {
-                c["agent"] = json!(names.join(", "));
+                c.agent = names.join(", ");
             }
         }
     }
@@ -1066,8 +1060,7 @@ impl Shell {
             },
         );
         self.hub.set_on_you(name, true);
-        let snap = self.snapshot();
-        self.broadcast(&snap);
+        self.state_now();
     }
 }
 
@@ -1108,10 +1101,10 @@ mod tests {
         // brief 1e: an allow carries the sandbox's flags
         assert_eq!(verdict_line("7", "x1", true, "sandbox net"), "7 x1 allow sandbox net\n");
         assert_eq!(verdict_line("7", "x1", false, "the user\nsaid no."), "7 x1 deny the user said no.\n");
-        assert_eq!(gate_line("card", "7", Some(12)), "sb gate : card 7 12");
+        assert_eq!(gate_line("card"), r#"sb gate :: {"step":"card"}"#);
         assert_eq!(
-            fold_line(Fold::No, &["api-v2".into()], "git push : x", "use a branch"),
-            "sb approval : no : api-v2 : git push \\: x : use a branch"
+            fold_line(Fold::No, &["api-v2".into()], "git push : x", "use a\nbranch"),
+            r#"sb approval :: {"how":"no","note":"use a branch","v":1,"what":"git push : x","who":"api-v2"}"#
         );
     }
 

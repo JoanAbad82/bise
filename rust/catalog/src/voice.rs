@@ -18,7 +18,7 @@
 //!
 //! ```toml
 //! [voice]
-//! model = "mistral/voxtral-transcribe-3"
+//! model = "mistral/voxtral-mini-transcribe-3"
 //! language = "fr"                       # optional; unset: detected
 //! vocabulary = ["bise", "config.toml"]  # optional: words to spell right
 //! ```
@@ -46,6 +46,16 @@ pub struct VoiceConfig {
 }
 
 impl VoiceConfig {
+    /// `[roles.voice]` over `[voice]`: its keys win; an empty vocabulary
+    /// keeps `[voice]`'s.
+    pub fn over(self, base: VoiceConfig) -> VoiceConfig {
+        VoiceConfig {
+            model: self.model.or(base.model),
+            language: self.language.or(base.language),
+            vocabulary: if self.vocabulary.is_empty() { base.vocabulary } else { self.vocabulary },
+        }
+    }
+
     /// Read `[voice]`; what is wrong becomes a warning.
     pub fn read(t: &toml::Table, warnings: &mut Vec<String>) -> VoiceConfig {
         let mut c = VoiceConfig::default();
@@ -272,21 +282,6 @@ pub fn speed_written(speed: f32) -> String {
     format!("{:.1}", speed.clamp(SPEED_MIN, SPEED_MAX))
 }
 
-/// The default voice model, dictation and voice mode (models.toml's
-/// `default_voice_model`, Mistral's voice pick).
-pub const TRANSCRIBE_3: &str = "mistral/voxtral-transcribe-3";
-
-/// Voxtral Mini's ids (`voxtral-mini-latest`, `voxtral-mini-2602`, the
-/// realtime `voxtral-mini-transcribe-realtime-2602`…): not offered, it got
-/// too many words wrong (the user, voice mode round 2). A config or
-/// `BISE_VOICE_MODEL` naming one reads as [`TRANSCRIBE_3`].
-pub const RETIRED_STT_PREFIX: &str = "mistral/voxtral-mini-";
-
-/// `name` ("provider/id") is a retired voice model.
-pub fn retired_stt(name: &str) -> bool {
-    name.trim().to_ascii_lowercase().starts_with(RETIRED_STT_PREFIX)
-}
-
 /// A provider's realtime transcription model, its id; None for every
 /// provider now: the only one was Voxtral Mini's (retired), so voice mode
 /// transcribes each turn with the voice role's batch model (the end of a
@@ -478,20 +473,59 @@ pub struct SttResolved {
 
 impl Catalog {
     /// A bare voice model name goes to the default voice model's provider;
-    /// a retired one (Voxtral Mini, [`RETIRED_STT_PREFIX`]) reads as
-    /// [`TRANSCRIBE_3`], with no error.
+    /// a full one is used as written (a model the provider took away
+    /// falls back at the call: [`VoiceJob::fallback`]).
     pub fn canonical_stt(&self, name: &str) -> String {
         let name = name.trim();
-        let full = if split_name(name).is_some() {
+        if split_name(name).is_some() {
             name.to_string()
         } else {
             let p = split_name(&self.default_voice_model).map(|(p, _)| p).unwrap_or("mistral");
             format!("{}/{}", p, name)
-        };
-        if retired_stt(&full) {
-            return TRANSCRIBE_3.to_string();
         }
-        full
+    }
+
+    /// The model id to try when the provider says it doesn't know `id`
+    /// (Mistral took voxtral-transcribe-3 away, 2026-10-19): the
+    /// provider's voice pick, else its next listed voice model; None
+    /// when it has no other one.
+    pub fn stt_fallback(&self, provider: &str, id: &str) -> Option<String> {
+        let pick = self.provider(provider).map(|p| p.voice_model.clone()).unwrap_or_default();
+        let listed = self.models.iter().filter(|m| m.stt && m.provider == provider).map(|m| m.id.clone());
+        std::iter::once(pick).chain(listed).find(|m| !m.is_empty() && m != id)
+    }
+
+    /// The providers' lists of what they transcribe now
+    /// ([`crate::voice_live`]) over the table: a provider's voice models
+    /// it no longer lists leave (pickers, fallback), its voice pick and
+    /// the default voice model move to one it lists (the table's first
+    /// still listed, else its list's first, added as a voice model). No
+    /// list, or an empty one: the table as it is.
+    pub fn with_live_stt(mut self, lists: &[(String, Vec<String>)]) -> Catalog {
+        for (pid, ids) in lists.iter().filter(|(_, ids)| !ids.is_empty()) {
+            let Some(p) = self.providers.iter().position(|p| p.id == *pid && !p.stt.is_empty()) else { continue };
+            self.models.retain(|m| !(m.stt && m.provider == *pid && !ids.contains(&m.id)));
+            let first = self.models.iter().find(|m| m.stt && m.provider == *pid).map(|m| m.id.clone());
+            let first = first.unwrap_or_else(|| {
+                self.models.push(crate::Model {
+                    provider: pid.clone(),
+                    id: ids[0].clone(),
+                    api: None,
+                    stt: true,
+                    caps: Default::default(),
+                    source: crate::Source::Builtin,
+                });
+                ids[0].clone()
+            });
+            if !ids.contains(&self.providers[p].voice_model) {
+                self.providers[p].voice_model = first;
+            }
+            let pick = format!("{}/{}", pid, self.providers[p].voice_model);
+            if split_name(&self.default_voice_model).is_some_and(|(dp, id)| dp == pid && !ids.iter().any(|x| x == id)) {
+                self.default_voice_model = pick;
+            }
+        }
+        self
     }
 
     pub fn resolve_stt(&self, name: &str) -> SttResolved {
@@ -544,13 +578,16 @@ pub struct VoiceJob {
     pub key: String,
     pub language: Option<String>,
     pub vocabulary: Vec<String>,
+    /// the model id tried once when the provider says it doesn't know
+    /// `model` (a 404 / model_not_found): [`Catalog::stt_fallback`]
+    pub fallback: Option<String>,
 }
 
 impl std::fmt::Debug for VoiceJob {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "VoiceJob {{ name: {:?}, provider_name: {:?}, billing_url: {:?}, api: {:?}, base_url: {:?}, model: {:?}, key: <{} bytes>, language: {:?}, vocabulary: {:?} }}",
+            "VoiceJob {{ name: {:?}, provider_name: {:?}, billing_url: {:?}, api: {:?}, base_url: {:?}, model: {:?}, key: <{} bytes>, language: {:?}, vocabulary: {:?}, fallback: {:?} }}",
             self.name,
             self.provider_name,
             self.billing_url,
@@ -559,12 +596,24 @@ impl std::fmt::Debug for VoiceJob {
             self.model,
             self.key.len(),
             self.language,
-            self.vocabulary
+            self.vocabulary,
+            self.fallback
         )
     }
 }
 
 impl Setup {
+    /// [`Catalog::with_live_stt`], before [`Setup::with_keys`]: a voice
+    /// model left to the default follows it; one he wrote stays as
+    /// written (a failed take falls back: [`VoiceJob::fallback`]).
+    pub fn with_live_stt(mut self, lists: &[(String, Vec<String>)]) -> Setup {
+        self.catalog = std::mem::replace(&mut self.catalog, Catalog::empty()).with_live_stt(lists);
+        if self.voice.from == "default" {
+            self.voice.model = self.catalog.canonical_stt(&self.catalog.default_voice_model);
+        }
+        self
+    }
+
     /// The voice model's call, with its key (the chat keys' resolution:
     /// env > auth.json > the old .env files). Err: one line saying what
     /// to do.
@@ -606,7 +655,9 @@ impl Setup {
             .provider(&r.provider)
             .map(|p| (p.name.clone(), p.billing_url.clone()))
             .unwrap_or_default();
+        let fallback = self.catalog.stt_fallback(&r.provider, &r.id);
         Ok(VoiceJob {
+            fallback,
             name: r.name,
             provider_name,
             billing_url,

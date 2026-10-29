@@ -42,7 +42,7 @@ pub(super) struct PageState {
     /// `sb card --page`: an agent's card → its page link (card_link.rs),
     /// shown on the card while it is open; its answer goes to the agent
     /// as usual (unlike `page_cards`, whose answers take the page's path)
-    pub(super) card_links: BTreeMap<u64, Value>,
+    pub(super) card_links: BTreeMap<u64, crate::card_link::CardLink>,
 }
 
 impl PageState {
@@ -57,8 +57,11 @@ impl Shell {
     /// The page server (docs/ambient-pages.md §2.4): 127.0.0.1, a stable
     /// port per workspace; its notes come back to the loop.
     pub(super) fn start_pages(&mut self, paths: &Paths, tx: &Sender<Msg>) {
-        match crate::pages::start(&paths.state, &crate::paths::workspace_id(&paths.workspace), self.opts.app_root.join("kit"), self.holds.clone()) {
-            Ok(p) => {
+        match crate::pages::start(&paths.state, &crate::paths::workspace_id(&paths.workspace), &self.opts.app_root, self.holds.clone()) {
+            Ok((p, moved_from)) => {
+                if let Some(old) = moved_from {
+                    log_line(paths, &format!("pages: port {old} stayed busy {} s, moved to {}: links to {old} are dead", crate::pages::KEPT_WAIT.as_secs(), p.port));
+                }
                 let tx = std::sync::Mutex::new(tx.clone());
                 p.connect_hub(Box::new(move |m| {
                     if let Ok(t) = tx.lock() {
@@ -88,9 +91,9 @@ impl Shell {
     /// the home workspace bise keeps about the user, one `- ` line each;
     /// after a change the `about-you` page, when there is one, is redrawn
     /// from them and republished by its own agent (no model turn).
-    pub(super) fn keeps_op(&mut self, cmd: &str, v: &Value) -> Value {
+    pub(super) fn keeps_op(&mut self, cmd: &str, k: &bise_proto::sb::Keep) -> Value {
         use crate::keeps;
-        let s = |k: &str| v.get(k).and_then(|x| x.as_str()).unwrap_or("").to_string();
+        use bise_proto::sb::Keep;
         let name = if cmd == "taste" { keeps::TASTE } else { keeps::PEOPLE };
         let path = match keeps::file(name) {
             Ok(p) => p,
@@ -102,9 +105,8 @@ impl Shell {
             let n = keeps::items(t).len();
             format!("{n} {}", if n == 1 { what } else { noun })
         };
-        let step = s("step");
-        let changed = match (cmd, step.as_str()) {
-            (_, "list") => {
+        let changed = match (cmd, k) {
+            (_, Keep::List) => {
                 let items = keeps::items(&text);
                 let body = if items.is_empty() {
                     format!("nothing kept yet ({}): sb {cmd} {}", path.display(), if cmd == "taste" { "add \"<rule>\"" } else { "set <name> \"<who>\"" })
@@ -114,14 +116,14 @@ impl Shell {
                 };
                 return json!({"ok": true, "text": body, "items": items});
             }
-            ("taste", "add") => keeps::taste_add(&text, &s("rule"), Some(s("source")).filter(|f| !f.trim().is_empty()).as_deref()).map(|t| {
-                let line = format!("kept: {}", s("rule").split_whitespace().collect::<Vec<_>>().join(" "));
+            ("taste", Keep::Add { rule, source }) => keeps::taste_add(&text, rule, Some(source.as_str()).filter(|f| !f.trim().is_empty())).map(|t| {
+                let line = format!("kept: {}", rule.split_whitespace().collect::<Vec<_>>().join(" "));
                 (t, line)
             }),
-            ("taste", "remove") => keeps::taste_remove(&text, &s("which")).map(|(t, gone)| (t, format!("removed: {gone}"))),
-            ("people", "set") => keeps::people_set(&text, &s("name"), &s("who")).map(|t| (t, format!("kept: {}", s("name").trim()))),
-            ("people", "remove") => keeps::people_remove(&text, &s("name")).map(|t| (t, format!("removed: {}", s("name").trim()))),
-            _ => Err(format!("sb {cmd}: unknown step {step:?}")),
+            ("taste", Keep::Remove { which, .. }) => keeps::taste_remove(&text, which).map(|(t, gone)| (t, format!("removed: {gone}"))),
+            ("people", Keep::Set { name, who }) => keeps::people_set(&text, name, who).map(|t| (t, format!("kept: {}", name.trim()))),
+            ("people", Keep::Remove { name, .. }) => keeps::people_remove(&text, name).map(|t| (t, format!("removed: {}", name.trim()))),
+            _ => Err(format!("sb {cmd}: unknown step")),
         };
         let (new, line) = match changed {
             Ok(x) => x,
@@ -180,8 +182,7 @@ impl Shell {
         match pages.publish(&p, now_ms(), &is_gone) {
             Ok((meta, _)) => {
                 self.broadcast(&pages.page_ev(&meta));
-                let snap = self.snapshot();
-                self.broadcast(&snap);
+                self.state_now();
                 Some(meta.version())
             }
             Err(lines) => {
@@ -191,49 +192,45 @@ impl Shell {
         }
     }
 
-    pub(super) fn page_op(&mut self, cmd: &str, from: &str, v: &Value) -> Value {
+    pub(super) fn page_op(&mut self, from: &str, req: AgentReq) -> Value {
         let Some(pages) = self.pg.pages.clone() else {
             return json!({"ok": false, "error": "the page server is not running (see the hub log)"});
         };
-        let s = |k: &str| v.get(k).and_then(|x| x.as_str()).map(String::from);
-        match cmd {
-            "page_list" => json!({"ok": true, "pages": pages.list_json()}),
-            "page_notes" => {
-                let id = s("id").unwrap_or_default();
+        match req {
+            AgentReq::PageList => json!({"ok": true, "pages": pages.list_json()}),
+            AgentReq::PageNotes { id } => {
                 match pages.store.meta(&id) {
                     Some(_) => json!({"ok": true, "id": id, "notes": pages.store.notes(&id)}),
                     None => json!({"ok": false, "error": format!("no page {id}")}),
                 }
             }
-            "page_waiting" => {
+            AgentReq::PageWaiting => {
                 let items = pages.waiting();
                 json!({"ok": true, "waiting": items, "lines": items.iter().map(|w| w.line()).collect::<Vec<_>>()})
             }
-            "page_tick" => {
+            AgentReq::PageTick { id, item, text } => {
                 // a step of his he says is done (by voice, through main):
                 // the same path as its card's answer (roadmap D)
-                let (id, item) = (s("id").unwrap_or_default(), s("item").unwrap_or_default());
-                let words = s("text").filter(|t| !t.trim().is_empty()).unwrap_or_else(|| "done".into());
+                let words = text.filter(|t| !t.trim().is_empty()).unwrap_or_else(|| "done".into());
                 if pages.store.meta(&id).is_none() {
                     return json!({"ok": false, "error": format!("no page {id}")});
                 }
-                if self.page_tick(&id, &item, &words) {
+                if self.page_tick(&id, &item, &words, &[]) {
                     json!({"ok": true, "id": id, "item": item, "ticked": crate::pages::checklist::is_done_word(&words)})
                 } else {
                     json!({"ok": false, "error": format!("{id} has no checklist row {item}")})
                 }
             }
-            "page_start" => {
+            AgentReq::PageStart { id, title, agent, ask } => {
                 // the page shows within seconds of the ask; the first
                 // publish is v1 (ambient-lead m_5000)
-                let id = s("id").unwrap_or_default();
-                let agent = s("agent").filter(|a| !a.is_empty()).unwrap_or_else(|| from.to_string());
+                let agent = agent.filter(|a| !a.is_empty()).unwrap_or_else(|| from.to_string());
                 if agent != from && !self.hub.st.agents.contains_key(&agent) {
                     return json!({"ok": false, "error": format!("no agent {agent}")});
                 }
                 let gone: Vec<String> = self.hub.st.agents.keys().filter(|n| self.page_agent_gone(n)).cloned().collect();
                 let is_gone = |n: &str| gone.iter().any(|g| g == n) || !self.hub.st.agents.contains_key(n);
-                match pages.start(&id, s("title").as_deref(), s("ask").as_deref(), &agent, now_ms(), &is_gone) {
+                match pages.start(&id, title.as_deref(), ask.as_deref(), &agent, now_ms(), &is_gone) {
                     Ok(meta) => {
                         // its writer's turn: the caller's runs now; another
                         // agent's is the next one (its end without a
@@ -246,33 +243,24 @@ impl Shell {
                             e.1 = true;
                         }
                         self.broadcast(&pages.page_ev(&meta));
-                        let snap = self.snapshot();
-                        self.broadcast(&snap);
+                        self.state_now();
                         json!({"ok": true, "id": meta.id, "version": 0, "url": pages.url(&meta.id), "state": "writing", "agent": agent})
                     }
                     Err(e) => json!({"ok": false, "error": e}),
                 }
             }
-            _ => {
-                let list = |k: &str| -> Vec<String> {
-                    v.get(k).and_then(|x| x.as_array()).map(|a| a.iter().filter_map(|x| x.as_str().map(String::from)).collect()).unwrap_or_default()
-                };
-                let answers: Vec<(String, String)> = v
-                    .get("answers")
-                    .and_then(|x| x.as_object())
-                    .map(|o| o.iter().map(|(k, a)| (k.clone(), a.as_str().unwrap_or("").to_string())).collect())
-                    .unwrap_or_default();
+            AgentReq::PagePublish(r) => {
                 // --went (docs/ambient-roadmap.md A): the CLI read them
                 let mut went = Vec::new();
-                for w in v.get("went").and_then(|x| x.as_array()).into_iter().flatten() {
-                    match serde_json::from_value::<crate::pages::store::Went>(w.clone()) {
+                for w in r.went {
+                    match serde_json::from_value::<crate::pages::store::Went>(w) {
                         Ok(w) => went.push(w),
                         Err(e) => return json!({"ok": false, "error": format!("--went: {e}")}),
                     }
                 }
                 // --taste: the rules of ~/bise/taste.md now (the frame says
                 // 'following your taste · N rules'); no file: nothing
-                let taste = v.get("taste").and_then(|x| x.as_bool()).unwrap_or(false).then(|| {
+                let taste = r.taste.then(|| {
                     std::fs::read_to_string(crate::paths::home_workspace().join("taste.md")).ok().map(|t| crate::pages::store::taste_rules(&t))
                 });
                 if taste == Some(None) {
@@ -281,14 +269,14 @@ impl Shell {
                 let p = crate::pages::store::Publish {
                     taste: taste.flatten(),
                     agent: from.to_string(),
-                    id: s("id").filter(|x| !x.is_empty()),
-                    title: s("title").filter(|x| !x.is_empty()),
-                    html: s("html").unwrap_or_default(),
-                    done: list("done"),
-                    answers,
+                    id: r.id.filter(|x| !x.is_empty()),
+                    title: r.title.filter(|x| !x.is_empty()),
+                    html: r.html,
+                    done: r.done,
+                    answers: r.answers.into_iter().collect(),
                     went,
                     // --public / --private (pages-ui): the static export and the user's mirror
-                    public: v.get("public").and_then(Value::as_bool),
+                    public: r.public,
                 };
                 let gone: Vec<String> = self.hub.st.agents.keys().filter(|n| self.page_agent_gone(n)).cloned().collect();
                 let is_gone = |n: &str| gone.iter().any(|g| g == n) || !self.hub.st.agents.contains_key(n);
@@ -321,14 +309,14 @@ impl Shell {
                         self.page_questions(&meta.id, &meta.agent, &p.html);
                         // its checklists: the step of his whose turn came
                         self.page_steps(&meta.id);
-                        let snap = self.snapshot();
-                        self.broadcast(&snap);
+                        self.state_now();
                         let url = pages.url(&meta.id);
                         json!({"ok": true, "id": meta.id, "version": meta.version(), "url": url, "unknown_notes": unknown})
                     }
                     Err(lines) => json!({"ok": false, "error": lines.join("\n"), "lint": lines}),
                 }
             }
+            r => json!({"ok": false, "error": format!("sb {}: not a page request", r.tag())}),
         }
     }
 
@@ -339,18 +327,36 @@ impl Shell {
             crate::pages::PageMsg::Notes { id } => {
                 // a tick on the page (a draft too) closes its step's card
                 self.page_steps(&id);
-                let snap = self.snapshot();
-                self.broadcast(&snap);
+                self.state_now();
             }
             crate::pages::PageMsg::Opened { .. } => {
-                let snap = self.snapshot();
-                self.broadcast(&snap);
+                self.state_now();
+            }
+            // his edits in the viewer's grid: the file and the version (daemon/art.rs)
+            crate::pages::PageMsg::Save { id, req, reply } => {
+                let (status, body) = self.art_save(&pages, &id, req);
+                reply.send(status, body);
+            }
+            // a local site's door found its port free: its recipe again (daemon/revive.rs)
+            crate::pages::PageMsg::Revive { id, reply } => {
+                let (status, body) = self.revive.answer(&self.art_store(), &self.opts.paths.revive_dir(), &id);
+                reply.send(status, body);
             }
             crate::pages::PageMsg::Mirror { id, error } => {
                 // the last good public copy stays up; main hears it once (designer m_7509)
-                self.feed(MAIN, &format!("sb warn : {}", wire_escape(&format!("▲ couldn't publish {id} to the public mirror: {error}"))));
+                self.feed_rec(MAIN, Feed::warn(format!("▲ couldn't publish {id} to the public mirror: {error}")));
             }
-            crate::pages::PageMsg::Sent { id, agent, text } => {
+            // notes on an artifact (office-artifacts §9b): to its maker, main
+            // when it is gone, as from the user, with their anchor parts
+            crate::pages::PageMsg::Sent { target: crate::pages::store::Target::Artifact(id), agent, text, notes } => {
+                if !text.is_empty() {
+                    let to = if self.page_agent_gone(&agent) { MAIN.to_string() } else { agent };
+                    let parts = crate::pages::artifact::notes::parts_json(&pages, &id, &notes);
+                    self.step(Input::ClientInput { client: 0, focus: to, text, queued: false, parts, from: String::new() });
+                }
+                self.state_now();
+            }
+            crate::pages::PageMsg::Sent { target: crate::pages::store::Target::Page(id), agent, text, notes } => {
                 // start notes (an item the user wants an agent on): main's,
                 // never the page's agent's (ambient-lead m_5006)
                 // a stop note (the frame's 'stop' of a watched page): the hub
@@ -364,11 +370,14 @@ impl Shell {
                     pages.push(&id, "notes", &json!({"notes": pages.store.notes(&id)}));
                     self.page_watch_push();
                 }
-                let starts = pages.locked(|s| s.route_starts(&id)).unwrap_or_default();
+                // a plan's start goes to its agent (plan-ok), the others to main
+                self.page_plan_starts(&id);
+                let starts = pages.locked(|s| s.route_starts(&id, &|_| true, MAIN)).unwrap_or_default();
                 if let (false, Some(meta)) = (starts.is_empty(), pages.store.meta(&id)) {
                     let msg = crate::pages::store::start_message(&meta, &pages.url(&id), &starts);
                     let msg = Self::page_hint(MAIN, msg);
-                    self.step(Input::ClientInput { client: 0, focus: MAIN.to_string(), text: msg, queued: false });
+                    let parts = Self::page_parts(&pages, &meta, &starts, MAIN, &msg);
+                    self.step(Input::ClientInput { client: 0, focus: MAIN.to_string(), text: msg, queued: false, parts, from: String::new() });
                     pages.push(&id, "notes", &json!({"notes": pages.store.notes(&id)}));
                 }
                 // the other notes: the page's agent, main when it is gone
@@ -384,24 +393,57 @@ impl Shell {
                     let w = self.pg.page_waits.entry(to.clone()).or_insert_with(|| (now_ms(), Vec::new()));
                     w.1.push((id.clone(), text.clone()));
                     let text = Self::page_hint(&to, text);
-                    self.step(Input::ClientInput { client: 0, focus: to, text, queued: false });
+                    let sent: Vec<_> = notes.into_iter().filter(|n| n.kind != "start" && n.kind != "stop").collect();
+                    let parts = pages.store.meta(&id).map(|m| Self::page_parts(&pages, &m, &sent, &to, &text)).unwrap_or_default();
+                    self.step(Input::ClientInput { client: 0, focus: to, text, queued: false, parts, from: String::new() });
                 }
-                let snap = self.snapshot();
-                self.broadcast(&snap);
+                self.state_now();
             }
             crate::pages::PageMsg::Answer { id, block, reply } => {
                 // the same path as the capsule's and the TUI's answer
                 if let Some(card) = self.page_card(&id, &block) {
-                    self.page_question_answer(&id, &block, card, &reply);
+                    self.page_question_answer(&id, &block, card, &reply, &[], "page");
                 } else {
                     // no open card for it (it never opened, or the store
                     // was written another way): the loop still closes,
                     // the answer to the page's agent as from the user
-                    self.page_answer_without_card(&id, &block, &reply);
+                    self.page_answer_without_card(&id, &block, &reply, &[], "page");
                 }
                 self.page_answers();
             }
         }
+    }
+
+    /// The desktop door of the notes on an artifact (office-artifacts
+    /// §9b): his message's anchor parts, taken at the door, become sent
+    /// notes of their artifacts; their open viewers hear it.
+    pub(super) fn artifact_notes_said(&mut self, parts_json: &str) {
+        let Some(pages) = self.pg.pages.clone() else { return };
+        if !parts_json.contains("\"anchor\"") {
+            return;
+        }
+        let Ok(ps) = serde_json::from_str::<Vec<bise_proto::parts::Part>>(parts_json) else { return };
+        for id in crate::pages::artifact::notes::record_said(&pages, &ps, now_ms()) {
+            crate::pages::artifact::notes::push(&pages, &id);
+        }
+    }
+
+    /// Version `v` of artifact `id` is here (`parts_in::said`'s check of
+    /// an anchor part), or his words why not; no page server: none is.
+    pub(super) fn artifact_known(&self) -> impl Fn(&str, u64) -> Result<u32, String> + 'static {
+        let pages = self.pg.pages.clone();
+        move |id: &str, v: u64| match pages.as_ref() {
+            Some(p) => crate::pages::artifact::notes::known(p.store.dir.parent().unwrap_or(&p.store.dir), id, v),
+            None => Err(format!("{id} has no version {v} here, so the note can't go on it")),
+        }
+    }
+
+    /// The parts' JSON of a page's message `text` to `to` (its one
+    /// `Part::Page`, architect m_20833): what the clients draw his words
+    /// from, while the model reads `text` (render(parts) == text).
+    fn page_parts(pages: &crate::pages::Pages, meta: &crate::pages::store::Meta, sent: &[crate::pages::store::Note], to: &str, text: &str) -> String {
+        let part = crate::pages::store::page_part(meta, &pages.store.questions(&meta.id), sent, to, text);
+        serde_json::to_string(&[part]).unwrap_or_default()
     }
 
     /// The agents each page's latest version names, read from the store
@@ -432,9 +474,8 @@ impl Shell {
             Status::Failed => "failed",
         };
         let note = a
-            .declared
-            .as_ref()
-            .map(|(_, n)| n.trim().to_string())
+            .declared()
+            .map(|d| d.note.trim().to_string())
             .filter(|n| !n.is_empty())
             .or_else(|| self.pg.last_intent.get(&a.name).cloned());
         let mut f = json!({"name": name, "status": status});
@@ -447,6 +488,8 @@ impl Shell {
     /// Push the `agent` frames that changed, on every page naming them;
     /// each page keeps its last frames for a new stream.
     pub(super) fn page_agent_push(&mut self) {
+        // the same typed state moves the artifacts' live words (art.rs)
+        self.art_live_watch();
         let Some(pages) = self.pg.pages.clone() else { return };
         let list: Vec<(String, Vec<String>)> = self.page_agents_now().iter().map(|(k, v)| (k.clone(), v.clone())).collect();
         // the agents at work on page items: their drafts wait; when one
@@ -568,12 +611,12 @@ impl Shell {
                     let w = self.pg.page_waits.entry(MAIN.to_string()).or_insert_with(|| (now, Vec::new()));
                     w.1.extend(pages.iter().map(|p| (p.clone(), String::new())));
                     let text = Self::page_hint(MAIN, text);
-                    self.step(Input::ClientInput { client: 0, focus: MAIN.to_string(), text, queued: false });
+                    self.step(Input::ClientInput { client: 0, focus: MAIN.to_string(), text, queued: false, parts: String::new(), from: String::new() });
                 }
                 Untaken::Warn => {
                     let text = format!("his notes on the page {} reached no one: main took no turn on them", pages.join(", "));
                     log_line(&self.opts.paths, &text);
-                    self.feed(MAIN, &format!("sb warn : {}", crate::util::wire_escape(&text)));
+                    self.feed_rec(MAIN, Feed::warn(text));
                 }
                 Untaken::Wait => {}
             }
@@ -595,15 +638,16 @@ impl Shell {
             }
             return;
         }
-        let o = line.strip_prefix("  obs: ").unwrap_or("");
-        if o == "turn_started" || o.starts_with("steering_received: ") || o.starts_with("steered: ") {
+        if crate::pages::took_input(line) {
             *seen = true;
             return;
         }
-        if !(o.starts_with("turn_done: ") && *seen) {
+        use bise_proto::thread::lines::{read, Obs, Rec};
+        let Rec::Obs(Obs::TurnDone(end)) = read(line) else { return };
+        if !*seen {
             return;
         }
-        let how = o.trim_start_matches("turn_done: ").trim().to_string();
+        let how = end.text().trim().to_string();
         let ids = std::mem::take(ids);
         self.pg.page_turns.remove(name);
         let Some(pages) = self.pg.pages.clone() else { return };
@@ -619,7 +663,6 @@ impl Shell {
                 self.broadcast(&pages.page_ev(&meta));
             }
         }
-        let snap = self.snapshot();
-        self.broadcast(&snap);
+        self.state_now();
     }
 }

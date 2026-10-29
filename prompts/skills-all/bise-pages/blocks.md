@@ -17,13 +17,31 @@ unique, and stay the same across versions (the user's notes anchor on them): `p1
 | `email` | one mail, or a newsletter | `data-to="Gmail · reply to Camille Roux"`, `data-verb="draft"` when it goes to his drafts (`leaving.md`), `<p data-field="to">`, optional `cc`, `<p data-field="subject">`, optional `preview` (a newsletter), then the body as `<p>`s and `<ul>` |
 
 A `data-to` is a short label in the user's language, whatever language the draft itself is in:
-`Slack · reply to Benjamin, on French`, never `on français` (cards and batch lines read it).
+`Slack · reply to Benjamin, on French`, never `on français` (notifications and batch lines read it).
 | `compare` | 2 to 4 options side by side (venues, drafts, tools) | `<ol>` of `<li data-id="moulin">`: an `<h3>` name, a `<ul>` of facts, a `<p>` with the why |
-| `checklist` | what's left to do, who, by when | `<ol>` of `<li data-id="t1" data-who="Camille" data-due="2026-05-20">` the task `</li>`; `data-done` when done; the kit shows `Camille · friday` and what is late. `data-who="yours"`: a step only the user can do (a payment, a login): `you · friday`, and a card when every step before it is done; your own steps: `data-who="bise"` or none |
+| `plan` | a plan you propose and run yourself (PRs, a migration) | `data-agent="<your name>"`, `data-do="start the plan"`; an `<h3>` name, one `<p>`: what it does and gains in one or two whole sentences, then `<ol>` of `<li data-id="p1"><strong>part</strong> what it does</li>`; `data-optional` on a part that can go |
+| `checklist` | what's left to do, who, by when | `<ol>` of `<li data-id="t1" data-who="Camille" data-due="2026-05-20">` the task `</li>`; `data-done` when done; the kit shows `Camille · friday` and what is late. `data-who="yours"`: a step only the user can do (a payment, a login): `you · friday`, and a notification when every step before it is done; your own steps: `data-who="bise"` or none |
+
+**A plan you propose** (you run it: PRs, a migration, a fix in parts): one `plan` block, never a
+`review`. Review is for items he handles one by one (mails, tickets, comments); a plan is one pick.
+`data-agent` is you (who runs it), `data-do` its verb (`start the plan`). Its `<p>` is what the
+notification says, whole: what it does and gains in one or two sentences (`3 PRs, about −2.6 GB a
+worktree: pnpm installs lean by default, AGENTS.md says which install to run, and win32 leaves the
+platform binaries`), never a list cut short. The other ways worth a pick (1 to 3) go right after it
+in a `compare` with `data-for="<the plan's id>"`, each `<li data-id data-do="start it, but keep
+win32">` with an `<h3>` name and a `<p>` why: `data-do` is the notification's choice, words that
+say what happens. The hub makes one notification, from you: `<page>: start the plan <you>
+recommends?`, your `<p>`, `1 start the plan`, one choice per other way, `open the plan and its
+alternatives`; what he types instead comes to you as his words: change the plan and publish the
+next version (it replaces the notification). His start (the notification or the page's button)
+comes to you as `the user started your plan …` or `… the other way …`: start it now, then publish
+again with `data-started="11:42"` on the plan (or on the way he picked) and `data-done="12:10"` (the
+time) on each part as it lands; the page shows `∿ <you> is on 2 · started 11:42`, then `✓ done 12:10`.
+See `examples/lean-plan.html`.
 
 **A plan you work through with him** (buy the domain, set up the offsite): its checklist is
 marked `data-plan` (`<section data-kit="checklist" data-id="steps" data-plan>`): only then do
-his rows become cards, each in its turn. Any other checklist (a meeting's open items, promises)
+his rows become notifications, each in its turn. Any other checklist (a meeting's open items, promises)
 never has it: his rows there reach him through the morning page. Take every step you
 can yourself, and mark `data-who="yours"` only what needs his hands or his word (signing in, a
 2FA code, a payment, a decision). Publish the rows first, before any draft or check: every step
@@ -41,20 +59,20 @@ has open steps, stay on it: end each turn with `sb report progress "<one line>"`
 and never a plain last answer, so his answers and ticks come to you; then do the next step and
 publish again. His `send` or `approve` on a row or on its draft is his word: send it now with
 the tool, then publish the row `data-done` with `--went` (`leaving.md`). His `send all` (one
-card for 2+ drafts) approves them all in one message: send each, then one publish with every row
+notification for 2+ drafts) approves them all in one message: send each, then one publish with every row
 `data-done` and a `--went` per draft.
 A step that is a decision of his (how many years, which venue) is the `question` only, and its
 row points at it: `<li data-id="s2" data-who="yours" data-question="years">`; never a row and a
 question that both ask him. His answer ticks it: republish the row `data-done` with his pick
 (`2 years`) in the turn his answer reaches you (once the question is answered, an open row of
-his becomes his next card). When he says he'll do something ("i'll leave a note with legal's address"), never
+his becomes his next notification). When he says he'll do something ("i'll leave a note with legal's address"), never
 ask it again: the row says it in one line (`waiting for your note: legal's address`). When his
 note comes, republish in one version both the row (no more `waiting for your note`) and every
 draft it fills (the mail's To), before the next step becomes his turn: his `send the draft?`
 never asks him to send a draft that still says it's waiting.
 Whatever you need from him to go on is ALWAYS a `question` (`who is legal?` · `i'll leave a
 note` · `ask Marc` · `skip this step`), its row pointing at it with `data-question`: never only
-row text or a callout, which give him no card and stall the plan. A draft missing what it needs
+row text or a callout, which give him no notification and stall the plan. A draft missing what it needs
 to leave (no address in its To) is not drafted: no `data-did`, and its row asks that question;
 the lint refuses it otherwise. Once he answers, the row says what's next in one line (`waiting
 for your note: legal's address`) until you republish the draft complete.
@@ -71,12 +89,21 @@ Also allowed inside blocks: `<br>`, `<kbd>`, `<del>`, `<ins>`, `<mark>`, `<small
   new)` is two columns (`total`, `new today`). In prose, a key number in `<code>`.
 - **Items** (review, compare, checklist) keep their `data-id` across versions. Each reaction
   comes back to you as a note with the item's id: review `approve` / `skip`, email `approve` /
-  `skip`, compare `keep` / `drop` / `pick`, checklist `tick`. Sending, replying or booking is
+  `skip`, compare `keep` / `drop` / `pick`, checklist `tick`, a plan's `start` (to you). Sending, replying or booking is
   still your tool call, after the user's word.
 - **Drafts** (a Slack message, a post, a reply) go in a `message` block, a mail in an `email`
   block: never in `<pre>` or `<code>`, those are for code.
 - **Questions:** one per decision, options short enough for a button; the pick comes back as a
   note.
+- **Notifications:** a question, his row whose turn comes, the drafts and actions waiting each
+  make one, read alone with the page closed. So: the decision in the first words, naming the
+  thing (`quel updater pour l'app desktop ?`, never `choisir l'updater`); in the block, what it
+  is, why now, what each option does; a decision is a `question` with options, never a row to
+  tick `done`; his row says what to do and where (`créer la clé API : App Store Connect › Users
+  › Keys, rôle Developer`). An action's `data-do` is a verb he can say yes to (`create the
+  desktop-release env`), its `<p>` the line that says what it changes. Actions are asked one at
+  a time, in page order: put them in the order they must run, and one whose input doesn't exist
+  yet (a secret before its cert) is a step of his, not an action.
 - **Words:** the user's language and voice; lowercase headings, short sentences, concrete.
 
 ## The lint
@@ -139,3 +166,20 @@ More examples, each passing the lint, in the bise app's `kit/examples/`:
 writing), `launch-post.html` (a Slack post), `offsite-plan.html` (venues to compare, what's left),
 `offsite-todo.html` (who does what by when), `launch-watch.html`, `feedback-bridge.html`,
 `newsletter.html`, `morning.html`, `about-you.html`.
+
+## A page and its notification
+
+| what you have | what you make |
+|---|---|
+| a decision with trade-offs, designs or more than 3 facts | a page with the pick (a `question`, or a `k-pick` in a `ui` block): the pick makes its notification, linked to the page |
+| a page with a question for him | the notification comes with it: `data-notify="none"` only when it can wait for his next visit |
+| a yes or no, or a short choice the card can carry whole | a notification alone (main's `sb notify`), no page |
+| something to read or keep, no decision | a page alone: its chip in the thread |
+| a notification about something complex, with no page | never: make the page first |
+
+The notification and the page are one thing: it carries the page as a chip and the page's own
+options, `o` opens the page beside the thread, and one answer, in the inbox or on the page,
+closes both. A question about something you made goes on its page as a `question` block: never
+a bare one he must go find the page for. A notification main opens by hand about a page or any
+artifact links it, so one click opens it: `sb notify --page <id>#<block> "…"` or
+`sb notify --artifact <id> "…"` (a site, a doc, a prototype).

@@ -6,11 +6,11 @@ free disk), HEAD 9b8ad22 (applied on 6bf6a86+), with other agents working at the
 
 ## 0. Gating rules for agents (applied)
 
-1. Start a task with `tests/gate.sh new <name>` (from any tree; `<name>` defaults to `$SB_AGENT`): its folder `~/.bise/worktrees/<project-id>/<name>/` (BISE-230, like Codex's `~/.codex/worktrees`) holds a worktree of HEAD (`harness/`) and its own target (`target/`), an APFS clone of the warm seed for the current deps (~3-10 s, 0 bytes; the seed, `~/.bise/cache/gate-seed/<key>`, one at a time, ~7 GB of blocks the clones share, is built once per Cargo.lock/Cargo.toml/.cargo/config.toml/rustc change, ~2 min, by the first task that needs it). Run what it prints (`cd` + `export CARGO_TARGET_DIR`). End it with `gate.sh done <name>` (refused while the worktree has uncommitted changes or commits on no branch). The hub removes the folder too, at the task's /drop and, for an orphan (a task archived or unknown), at its start, never when the worktree has such work (it says so in main's thread). Never clone another task's target: they grow to 15 GB (see §8). Never share a CARGO_TARGET_DIR between worktrees either: a build of main there overwrote a branch's binary (proto-lead).
-2. Each commit: `tests/gate.sh` (quick), in the foreground. It runs clippy -D warnings (in `$CARGO_TARGET_DIR/clippy`, next to the tests) and the tests of the changed crates and their users; no `cargo build` any more (the full gate builds the binary). A change to a `.bend` file of core/ hub/ vendor/ or LAWS/PROOF runs PROOF.bend in 4 shards in parallel; the tests run `scripts/bins.sh path sb-core`, the cache file itself (SB_CORE_BIN; on a hub/ vendor/ change it compiles next to cargo, once per source hash for every worktree and the full gate). PROOF is cached by content in `$CARGO_TARGET_DIR/gate-cache`. An sb-core gone after its build (the EDR of a company Mac deletes fresh unsigned copies at their first spawn) is one line: `sb-core vanished after it was built: an antivirus (EDR) may have removed it`. Warm: **~5 s** for a Rust change, **~11 s** for a hub change, 16 s the first time in a new worktree with a cloned target.
-3. Once per task, on the last commit: `gate.sh full` (one at a time on the machine, rule 5; cargo build; ./repl-live ./repl-scripted ./sb-core put in place by `./bins.sh`, compiled when their sources changed; run_all.sh with FUZZ_RUNS=2000: every Rust test, the whole PROOF.bend, e2e and the 14 tmux tests, 4 jobs in parallel), ~55 s warm.
+1. Start a task with `tests/gate.sh new <name>` (from any tree; `<name>` defaults to `$SB_AGENT`): its folder `~/.bise/worktrees/<project-id>/<name>/` (BISE-230, like Codex's `~/.codex/worktrees`) holds a worktree of HEAD (`harness/`) and its own target (`target/`), an APFS clone of the warm seed for the current deps (~3-10 s, 0 bytes; the seed, `~/.bise/cache/gate-seed/<key>`, one at a time, ~7 GB of blocks the clones share, is built once per Cargo.lock/Cargo.toml/.cargo/config.toml/rustc change, ~2 min, by the first task that needs it). Run what it prints (`cd` + `export CARGO_TARGET_DIR`). End it with `gate.sh done <name>` (refused while the worktree has uncommitted changes or commits on no branch). The hub removes the folder too, at the task's /drop and, for an orphan (a task archived or unknown), at its start, never when the worktree has such work (it says so in main's thread). A task worktree the hub made (`<task dir>/<repo>` with `<task dir>/owner`, no `rust/target` yet) needs nothing: `gate.sh quick|full` use `<task dir>/target`, a clone of the seed, by themselves (§10). Never clone another task's target: they grow to 15 GB (see §8). Never share a CARGO_TARGET_DIR between worktrees either: a build of main there overwrote a branch's binary (proto-lead).
+2. Each commit: `tests/gate.sh` (quick), in the foreground. It runs clippy -D warnings (in `$CARGO_TARGET_DIR/clippy`, next to the tests) and the tests of the changed crates and their users; no `cargo build` any more (the full gate builds the binary). A change to a `.bend` file of core/ hub/ vendor/ laws/ proofs/ runs PROOF: every `bend/proofs/*.bend`, 4 at once (`tests/proof_run.py`; until 2026-10-12, PROOF.bend in 4 shards); the tests run `scripts/bins.sh path sb-core`, the cache file itself (SB_CORE_BIN; on a hub/ vendor/ change it compiles next to cargo, once per source hash for every worktree and the full gate). PROOF is cached by content in `$CARGO_TARGET_DIR/gate-cache`. An sb-core gone after its build (the EDR of a company Mac deletes fresh unsigned copies at their first spawn) is one line: `sb-core vanished after it was built: an antivirus (EDR) may have removed it`. Warm: **~5 s** for a Rust change, **~11 s** for a hub change, 16 s the first time in a new worktree with a cloned target.
+3. The full gate runs after the land, on main's tip (rule 11), never before it. Run it yourself only to debug a tip red, after your land: `gate.sh full` (the Rust part, then only the e2e/tmux tests your change can break, §11; `gate.sh full --all` for every one; a release always runs every one) (one at a time on the machine, rule 5; cargo build; ./repl-live ./repl-scripted ./sb-core put in place by `./bins.sh`, compiled when their sources changed; run_all.sh with FUZZ_RUNS=2000: every Rust test, the whole PROOF.bend, e2e and the 14 tmux tests, 4 jobs in parallel), ~55 s warm.
 4. Never `sleep N; tail log`. A gate the bash tool put in the background: `gate.sh wait <its .out file or pid>` (blocks until it ends, at most 25 s, then shows the result).
-5. One full gate at a time on the machine (BISE-244, §9): `gate.sh full` takes a lock; a second one prints `waiting for the gate: <agent>'s full gate runs` and sets your note to `waiting for the gate`, then runs. Do not kill it to retry, and do not run `run_all.sh` by hand to skip the queue: two full gates at once take as long as two in a row and load the machine for everyone. Quick gates never wait. Iterate with the quick gate; the full gate once, before the last commit. If a full gate fails on a tmux timing, rerun that test alone (`python3 -u tests/<t>.py`) before blaming your change.
+5. One full gate at a time on the machine (BISE-244, §9): `gate.sh full` takes a lock; a second one prints `waiting for the gate: <agent>'s full gate runs` and sets your note to `waiting for the gate`, then runs. Do not kill it to retry, and do not run `run_all.sh` by hand to skip the queue: two full gates at once take as long as two in a row and load the machine for everyone. Quick gates never wait. Iterate with the quick gate; the full gate once, before the last commit. A full gate red only on e2e/tmux tests: `gate.sh rerun` runs those tests alone, one by one, on the same tree (it says which ones were flaky; §10); never a whole new full gate for a flake, never by hand.
 6. `run_all.sh --serial` runs e2e/tmux one by one (debugging a flake); `SB_TEST_JOBS=n` changes the parallelism; `FUZZ_RUNS=2000` for the long fuzz run.
 7. A red gate: fix forward, rerun the same gate; say in your report which gate you ran (quick/full) and its time.
 8. The Bend binaries (repl-live, repl-scripted, sb-core, harness-demo) are **not in git** (BISE-114, since 2026-09-30): never commit them, even with a hub/ or runtime/ change. `./bins.sh <name>...` puts the build of your tree's sources in place, from a cache keyed by the content of the sources and shared by every worktree and versions.sh (`${XDG_STATE_HOME:-~/.local/state}/switchboard/build/cache`): a hit is a copy (~0.3 s), a miss a compile (sb-core ~15 s, a REPL 1-2 min, once per source state for everyone). run.sh, run_all.sh, gate.sh (full, and quick without a hub change) and move-live.sh call it; a fresh worktree needs nothing else. A binary the EDR ate: `./bins.sh <name>` again. A version (versions.sh) gets the RELEASE engine of its sources, `bins.sh path bend-jsrt` (same cache, BISE-133). The V8 engine goes to the runtime as BEND_JSRT_BIN (the harness finds `bend-jsrt` in its app root, else rust/jsrt/target/debug, else release); run.sh rebuilds it when rust/jsrt or rust/images is newer, and always runs `cargo build` for bend-harness (~0.2 s when nothing changed).
@@ -21,6 +21,7 @@ free disk), HEAD 9b8ad22 (applied on 6bf6a86+), with other agents working at the
    - edit with one patch per file (or one script for many), then one gate; no read-back of an edit the tool confirmed;
    - message another agent only when you change an interface it uses (a function signature, a file format, a gate rule); otherwise, just rebase at commit time and fix conflicts then.
 10. A commit subject is at most 72 characters; the details go in the body (`git commit -m "<subject>" -m "<body>"`). The hub lists the versions by subject: 2 KB one-line subjects made that list ~39 KB and blocked its hello.
+11. Land first, end-to-end after, on main only (Gabriel 2026-10-21 10:55: « merger et tester après sur main pour gagner du temps »; then 15:xx: « Fais en sorte que les agents mergent leur changements avant de faire passer des tests end to end. les e2e ne devraient tourner que sur main avant une release car ils sont bcp trop lents »; main m_36485). Before a land, only the fast checks of your area: `gate.sh quick` GREEN on your sha (clippy, the tests of the crates you changed and their users, PROOF on a .bend change, line/word/pick gates, and for apps/desktop typecheck, lint, the related vitest units and the build). Then `sb land`, which runs no check of its own since 2026-10-22 (Gabriel: « On supprime seulement le contrôle 3 et sa file »; bise.toml has no `[land] check`): the quick gate is the only check before main moves, and a break it misses is fixed on main by the agents together. Neither runs an end-to-end step, and you run none yourself before a land: no `tests/*_e2e.py`, `*_tmux.py`, `run_all.sh`, `gate.sh full`, `pnpm test:land`, Playwright spec, desktop harness check or as-he-does row, even when a brief or a reviewer names one (that check then runs on main after your land). The end-to-end tests run on main only. The tip gate (`scripts/nightly_gate.sh --tip`: `gate.sh full --all` on main's newest tip, once per sha, as a land check in heavy-run, capped at `TIP_MAX_MIN` 120 min) runs run_all's e2e and tmux tests. It runs by hand, on a release's cut: the launchd jobs `dev.bise.tip-gate` and `dev.bise.nightly-gate` are off by Gabriel's choice (2026-10-24, main m_38624); never re-install them or any launchd or login item without his word. Until a release agent runs it, nothing checks main after a land: a break the quick gate misses lives on main until that release's run finds it. The desktop Playwright checks (`covmap.mts checks`), their coverage map and audit, core-record and the desktop app's full end-to-end (as-he-does, test:land, the DMG: `nightly_desktop.sh`) run only in the nightly and before a release: `scripts/desktop_tag.py` needs both on the release's exact sha (`checks-verdicts.tsv`, `desktop-runs.tsv`; it runs a missing one itself), every red owned in `tests/known_reds.txt`. A red tip writes `~/.bise/run/nightly/tip-red` (scripts/tip_blame.py: the commits since the last green, each with the agent that landed it, the failing tests, the log); main forwards it to those agents. Yours: revert your land on main first, then fix on your branch, then land again. Screenshots and shots are signed after the land, on the landed sha. A release is cut only from a sha the tip gate found green (`~/.bise/gate/green-shas.tsv`; scripts/tip_green.py, `--not-tip-green "<why>"` only when main names the sha). This holds for every land, product code included. The root AGENTS.md restates this rule for every agent's prompt: change both in the same commit (architect m_35600).
 
 ## 1. Where the time goes
 
@@ -408,3 +409,131 @@ gate`, wait (`gate.sh wait <.out>`), do not kill it and do not run
 `run_all.sh` by hand to jump the queue; a test that failed during a full
 gate: rerun it alone before blaming the change (`tui_queue_tmux` failed
 once at load 24 and passed twice alone).
+
+## 10. Round 5 (loop-speed-4): measured from the agents' traces
+
+Measured on 2026-10-11/12 from the agents' sessions, the hub's wake journal,
+the gate logs and heavy-run's new log, with `scripts/loop_audit.py`
+(rerunnable: docs/loop-speed-audit.md). Load 20-22 on 12 cores.
+
+Change written → landed, tonight's 8 code tasks (468 min): 53 % waiting on
+their own builds and gates, 25 % model, 15 % waiting on other agents, 7 %
+tool time. Measured against the doc above:
+
+| | doc | measured |
+|---|---:|---:|
+| quick gate, green, p50 / p90 | 5-11 s | 40 / 99 s |
+| full gate, green | ~55 s | 502 s (1 green of 7 in 4 days; 0 of 7 in 24 h) |
+| full-gate lock wait p50 (tonight) | | 7.4 min, holding a heavy-run slot idle |
+| hub-made task worktrees with a seed clone | all | none: cold rust/target, 3-13 GB each (disk full on 2026-10-11) |
+| sccache hits (live servers) | | 0 of 41 |
+
+What changed (no test dropped, no coverage lost):
+
+1. **Task targets**: `gate.sh quick|full` in a hub-made task worktree with
+   no CARGO_TARGET_DIR and no rust/target use `<task dir>/target`, a clone
+   of the seed of these deps (else the newest one: only the changed deps
+   rebuild). The hub removes the task dir, target included.
+2. **Open files**: quick and full raise `ulimit -n` to 10240: a launchd job
+   (`launchctl submit`) starts at 256 and bend-tui's tests failed with
+   EMFILE (core-b: 25 red tests).
+3. **`gate.sh rerun`**: a full gate red only on e2e/tmux tests writes them
+   to `<gate dir>/red-<tree state>`; `gate.sh rerun` runs them alone on the
+   same tree (HEAD + diff + untracked) and says which were flaky.
+4. **Slowest tests first**: run_all.sh records each e2e/tmux test's wall
+   and CPU in `~/.bise/gate/timings.tsv` and starts the slowest first
+   (`tests/slow_first.py`): on the measured medians the 4-job batch ends at
+   508 s instead of 588 s.
+5. **PROOF.bend whole, cached by content**: the full gate's unsharded run
+   (2.5-3 min of one core) is skipped when the same .bend files and bend
+   version passed whole before, in any worktree
+   (`~/.bise/gate/proof-cache`).
+6. **heavy-run** (`scripts/heavy-run`, installed as `~/.bise/run/heavy-run`
+   by `scripts/heavy-run --install`): a `gate.sh full` job waits for the
+   full-gate lock before it takes a slot, and every job logs its submit and
+   start times, then its end and rc, to `~/.bise/run/heavy.log`. Since
+   flow-time (2026-10-20) the waiters queue: by rank, then first come.
+   Rank 0 `--prio` (his own ask) and `--alone` (the nightly: nothing else
+   starts while it waits), 1 a land check (`gate.sh full|rerun`,
+   `test:land`, or `--land` for a script that wraps one), 2 the rest, 3
+   `--low`: experiments, load tests, shots, repacks. Before, every waiter
+   polled the slots every 2 s and the luckiest won: a land check waited
+   behind jobs submitted after it (25 % of the tasks' spawn-to-main time
+   was this queue). A load test never runs as `--prio`. Since fast-loop
+   (2026-10-20, his pick on page loop-4min) a 5th slot, `heavy5.lock`, is
+   the release lane: only a `--prio` job takes it, first, so a release's
+   verdict (scripts/desktop_tag.py runs its nightly `--prio`) never waits
+   for the agents' 4 slots and never takes one of them while it is free.
+   So `--prio` is only for a release main names (loop_audit lists every
+   heavy5 job by command: another use shows the next day). `--alone` never
+   takes the lane: an `--alone` job's end line in heavy.log says `lane=busy`
+   when a lane job ran meanwhile, and the nightly's log a `LANE` line (a
+   timing red that night may come from the lane's load).
+   Wait on a heavy job by running it as the bash tool's background
+   command (`~/.bise/run/heavy-run <cmd> > $TMPDIR/x.log 2>&1`, its end
+   wakes you, its queue included), not with `nohup` and a file wake: a
+   slot can take 40 min at p90 and over 2 h at the worst (10-19), so a
+   1 h `--max` fires while the job still waits (8 of 10 `--max` wakes
+   that day, gate-reds). A file wake needs a `--max` over the queue (3h).
+7. **The disk and CPU budget** (mac-budget, 2026-10-21; the night of 10-20
+   the disk hit 1.3 GB free, 2 jobs hung 12.7 h in their slots and the
+   queue's restart put the load at 113). A job starts only when the data
+   volume has 15 GB free + its reserve (3 GB for cargo on a warm target,
+   10 cold, for a full gate or `--alone`, 2 otherwise; cold targets measured
+   7.1-11 GB on 10-21, a gate's task-dir seed clone counts warm) + what the
+   running jobs may still write: their reserves (`~/.bise/run/reserve/`)
+   minus what the disk lost since the oldest of them started. Short of it, heavy-run starts
+   `scripts/disk_reclaim.py` (installed next to it): it deletes the agents'
+   worktree cargo targets, least recently used first, never one whose cargo
+   lock is held or used in the last 30 min; any target unused for 6 h goes
+   anyway (checked at each job start, every 10 min at most). The owner's
+   next job there prints the new target's `RECLAIMED.txt`; each deletion is
+   a line in `~/.bise/run/reclaim.log`. A running job reclaims under 15 GB
+   and is stopped under 5 (rc 28). A job that ran awake longer than its
+   limit is stopped, rc 124: about twice the longest run of its kind in
+   heavy.log (full gate 150 min, `test:land` 180, desktop_tag 240,
+   `--alone` and the nightly 360, the rest 120; `HEAVY_MAX_MIN` wins). No
+   job starts on battery under 30 % (10-20: the Mac ran its jobs on battery
+   to 1 %, slept at 21:43 and hibernated to 10:20). CPU: a slot gets `CARGO_BUILD_JOBS=4`,
+   `RUST_TEST_THREADS=4`, `SB_TEST_JOBS=2` (an `--alone` job keeps the
+   defaults); while a heavy job runs, a new one (not `--prio`) starts only
+   under load 2 x cores (the hub's own "loaded", send-fast's load.rs) and
+   20 s after the last start, so the 1-min load has seen it; 600 s at most
+   (`HEAVY_LOAD_WAIT_MAX`), then it goes in its turn: the load that is not
+   heavy-run's (50-90 on 10-21 with no rustc running) never starves it.
+
+## 11. Change-based test selection (loop-speed-4, the user's yes on q1)
+
+`gate.sh full` runs the Rust part (build, every Rust test, clippy) always,
+then only the e2e/tmux tests the tree's change can break, vs its merge-base
+with main (`GATE_FULL_BASE`). `tests/test_map.py` decides, per changed path:
+docs/ site/ nix/ .github/ and the notices run no test unless a test names
+the very file; rust/tui/ and the crossterm patch run the 68 TUI tests (every
+`*_tmux`, and the tests naming tmux or the TUI crate); bend/laws/ and
+bend/proofs/ run PROOF; tests/<x>.py runs every test naming it, transitively
+(e2e.py: 110 tests); anything else (rust/ but the TUI, bend/, prompts/,
+plugins/, .agents/, scripts/, packaging/, kit/, the gate itself, an unknown
+path) runs all of them. Its self-test, in the quick gate, fails when
+run_all.sh names a test with no file or when the repo has a top-level path
+the map does not know.
+
+Every test still runs: `gate.sh full --all`, a release agent's full gate
+(SB_AGENT release*), main's tip (no change), and every night:
+`scripts/nightly_gate.sh` (launchd `dev.bise.nightly-gate`, 01:30, installed
+with `--install`) runs `gate.sh full --all` on main's tip in its own tree
+and writes `~/.bise/run/nightly/last`, and `red` only while main is red
+(main watches it: `sb wake --on-file ~/.bise/run/nightly/red`). It holds
+both heavy slots, so it ends by 06:00 (review-gates m_32494): nothing new
+starts after it (the gate, a step, a batch of 8 desktop checks, a
+desktop-full step); what it cut is `none`, never green (`last` names it,
+`cut:<steps>`; cut checks go in the coverage map complete:false), and the
+second night in a row with the checks cut, or with nothing run, is red.
+
+Measured: a change to tests/every_e2e.py, full gate green in 285 s (1 test
+picked) instead of 743 s for all 118.
+
+Also learned: `launchctl submit` relaunches a job when it exits (end a job
+script with `launchctl remove <label>`); an edit in place of a script that
+jobs are waiting in breaks them (bash reads as it goes): heavy-run's body is
+now one function, read before it runs.
+

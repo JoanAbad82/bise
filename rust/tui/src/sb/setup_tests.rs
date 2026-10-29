@@ -131,7 +131,7 @@ fn the_card_waits_in_the_strip_and_not_now_leaves_one_row() {
     std::fs::create_dir_all(&repo).unwrap();
     let mut c = std::process::Command::new("git");
     c.arg("-C").arg(&repo).args(["init", "-q"]);
-    tune::output(c, Duration::from_secs(5)).unwrap();
+    tune::output(c, tune::GIT_WAIT).unwrap();
     let app = launched(&repo, v.clone());
     assert_eq!(setup_cards(&app), vec!["new repo: can i set bise up for it?"]);
 }

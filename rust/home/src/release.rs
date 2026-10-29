@@ -3,6 +3,10 @@
 //! (`latest.json`). Shared by `bise update` (the harness) and the hub
 //! (`/version`, `/restart latest`, the "update ready" notice).
 //!
+//! A `versions/<id>` dir in use is leased ([`lease`]: a shared flock on
+//! its `.in-use`, by the desktop core and each hub that runs from it);
+//! `bise update`'s prune never deletes a leased dir ([`in_use`]).
+//!
 //! An install (install.sh):
 //!   <prefix>/versions/<id>/   immutable app roots (VERSION has no `repo=`)
 //!   <prefix>/current -> versions/<id>
@@ -33,6 +37,16 @@ pub const DIST_URL_ENV: &str = "BISE_DIST_URL";
 pub const NO_UPDATE_ENV: &str = "BISE_NO_UPDATE";
 /// The manifest's name at the channel's base URL.
 pub const MANIFEST: &str = "latest.json";
+
+/// Overrides install.sh's prefix (install.sh reads it too).
+pub const PREFIX_ENV: &str = "BISE_PREFIX";
+
+/// install.sh's prefix: `BISE_PREFIX`, else `<user home>/.local/share/bise`
+/// (install.sh's default). The desktop app installs its runtime under its
+/// `versions/` (the binary's `update::from_bundle`).
+pub fn default_prefix(env: crate::Lookup, user_home: &Path) -> PathBuf {
+    env(PREFIX_ENV).filter(|p| !p.is_empty()).map(PathBuf::from).unwrap_or_else(|| user_home.join(".local/share/bise"))
+}
 
 /// The `key=value` lines of a VERSION file.
 pub fn version_fields(text: &str) -> BTreeMap<String, String> {
@@ -145,6 +159,43 @@ impl Install {
     }
 }
 
+/// The lease file of a version dir: a shared flock on it says "a process
+/// runs from this dir" (architect m_27423).
+pub const IN_USE: &str = ".in-use";
+
+/// A held lease on a version dir: released when dropped (or by the
+/// kernel when its holder dies).
+pub struct Lease(#[allow(dead_code)] std::fs::File);
+
+/// A shared lease on `root` for whoever runs from it or holds it (the
+/// desktop core for its lifetime, each hub): `bise update`'s prune never
+/// deletes a leased dir ([`in_use`]). Only a `versions/<id>` dir is
+/// leased (never a dev tree, never a dir inside an app bundle: its
+/// signature covers its files); None for any other root or an error.
+pub fn lease(root: &Path) -> Option<Lease> {
+    use std::os::unix::io::AsRawFd;
+    let in_versions = root.parent().and_then(Path::file_name).is_some_and(|n| n == "versions");
+    if !in_versions || root.to_string_lossy().contains(".app/Contents/") {
+        return None;
+    }
+    let f = std::fs::OpenOptions::new().create(true).truncate(false).write(true).open(root.join(IN_USE)).ok()?;
+    // SAFETY: flock on a descriptor this function owns; never blocks long
+    // (an exclusive holder is a prune's check, released at once)
+    (unsafe { libc::flock(f.as_raw_fd(), libc::LOCK_SH) } == 0).then_some(Lease(f))
+}
+
+/// Whether a process holds a [`lease`] on `dir` now: its lease file is
+/// there and an exclusive flock on it would block.
+pub fn in_use(dir: &Path) -> bool {
+    use std::os::unix::io::AsRawFd;
+    let Ok(f) = std::fs::File::open(dir.join(IN_USE)) else { return false };
+    // SAFETY: flock on a descriptor this function owns; LOCK_NB never blocks
+    if unsafe { libc::flock(f.as_raw_fd(), libc::LOCK_EX | libc::LOCK_NB) } == 0 {
+        return false;
+    }
+    std::io::Error::last_os_error().kind() == std::io::ErrorKind::WouldBlock
+}
+
 /// What kind of app root a bise runs from: the one answer to "who
 /// updates it" (`bise update`, the hub's `/restart`, a launch that
 /// moves the hub along).
@@ -254,13 +305,55 @@ pub fn is_update(release: &Release, current_id: &str, current_built: Option<&str
     }
 }
 
-/// The desktop app's build for one target (bar S.6): `latest.json`'s
-/// optional `desktop: {<os-arch>: {version, id, url, sha256, built}}`, the
-/// app's zip next to bise's tarballs on the same channel. One reader:
-/// this module; the window's core hands the app a typed `app_update`.
+/// The desktop app's own release channel (desktop-on-main, architect
+/// m_19472): its cycle is not the terminal's. `desktop.json` sits on a
+/// rolling GitHub tag that only the desktop's publish step moves; it
+/// points at the immutable assets of a `desktop-v*` release. A desktop
+/// release is never GitHub's 'latest' (that is [`DIST_URL`], every
+/// terminal's `bise update`), and `latest.json` never names the app.
+pub const DESKTOP_DIST_URL: &str = "https://github.com/gvergnaud/bise/releases/download/desktop-latest";
+/// The desktop's beta channel (desktop-dist v7, his pick: stable + beta):
+/// the rolling `desktop-beta` tag. Every build goes there first and
+/// `promote` moves `desktop-latest` to the same build (dist-ci m_25179),
+/// so beta is always the same as stable or newer: a beta app reads this
+/// one alone.
+pub const DESKTOP_BETA_DIST_URL: &str = "https://github.com/gvergnaud/bise/releases/download/desktop-beta";
+/// Overrides the desktop channel (tests). Never under `BISE_DESKTOP_`: the
+/// app keeps those names for itself and never hands one to the core
+/// (apps/desktop/src/main/childenv.ts), which is who reads this one.
+pub const DESKTOP_DIST_URL_ENV: &str = "BISE_DIST_URL_DESKTOP";
+/// Overrides the desktop's beta channel (tests), as [`DESKTOP_DIST_URL_ENV`].
+pub const DESKTOP_BETA_DIST_URL_ENV: &str = "BISE_DIST_URL_DESKTOP_BETA";
+
+/// The desktop channel he follows (prefs.json `desktop_channel`, Settings ›
+/// General's beta toggle): stable unless he said beta.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum DesktopChannel {
+    #[default]
+    Stable,
+    Beta,
+}
+
+impl DesktopChannel {
+    /// prefs.json's word: `beta` is beta, anything else (none, junk) stable.
+    pub fn from_pref(v: Option<&str>) -> DesktopChannel {
+        if v == Some("beta") {
+            DesktopChannel::Beta
+        } else {
+            DesktopChannel::Stable
+        }
+    }
+}
+/// The desktop manifest's name at its channel's base URL.
+pub const DESKTOP_MANIFEST: &str = "desktop.json";
+
+/// The desktop app's build for one target (bar S.6), from `desktop.json`:
+/// `{kind: "desktop", version, runtime_id, targets: {<os-arch>: {id, url,
+/// sha256, built, version?}}}`. One reader: this module; the window's core
+/// hands the app a typed `app_update`.
 #[derive(Clone, Debug, PartialEq)]
 pub struct DesktopRelease {
-    /// its name (`2026.10.2-26`), else its id
+    /// its name (`desktop-v2026.11.1`), else its id
     pub version: String,
     pub id: String,
     /// the zip: absolute, or relative to the channel's base URL
@@ -268,24 +361,66 @@ pub struct DesktopRelease {
     pub sha256: String,
     /// when it was built (the app's VERSION `built=`)
     pub built: String,
+    /// the terminal version of the runtime it carries (its hubs' bise):
+    /// the skew with his terminal is visible, never guessed
+    pub runtime_id: Option<String>,
 }
 
-/// `latest.json`'s desktop build for `target`. Err: one line (no desktop
-/// build in this release, or not for this Mac, or a field missing).
+/// `desktop.json`'s build for `target`. Err: one line (not a desktop
+/// manifest, the channel paused, no build for this Mac, or a field
+/// missing). A terminal `latest.json` is refused: it has no `kind:
+/// "desktop"`. `paused: true` (set while a release is looked at) offers
+/// nothing, whatever its targets say. Other keys (`channel`, `pub_date`,
+/// `notes_url`, a target's `size`, `dmg`, `min_macos`: the site's and
+/// the CI's) are not read here.
 pub fn parse_desktop(text: &str, target: &str) -> Result<DesktopRelease, String> {
-    let v: Value = serde_json::from_str(text).map_err(|e| format!("{} is not valid JSON: {}", MANIFEST, e))?;
+    let v: Value = serde_json::from_str(text).map_err(|e| format!("{} is not valid JSON: {}", DESKTOP_MANIFEST, e))?;
+    if v.get("kind").and_then(Value::as_str) != Some("desktop") {
+        return Err(format!("{} is not the desktop app's manifest (no kind: desktop)", DESKTOP_MANIFEST));
+    }
+    if v.get("paused").and_then(Value::as_bool) == Some(true) {
+        return Err("the desktop channel is paused".into());
+    }
     let t = v
-        .pointer(&format!("/desktop/{}", target))
+        .pointer(&format!("/targets/{}", target))
         .ok_or_else(|| format!("the release has no desktop app for {}", target))?;
-    let s = |k: &str| t.get(k).and_then(|y| y.as_str()).map(str::trim).filter(|y| !y.is_empty()).map(str::to_string);
-    let id = s("id").ok_or("the desktop release has no id")?;
-    let url = s("url").ok_or("the desktop release has no url")?;
-    let built = s("built").ok_or("the desktop release has no build time")?;
-    let sha256 = s("sha256").ok_or("the desktop release has no sha256")?;
+    let s = |x: &Value, k: &str| x.get(k).and_then(|y| y.as_str()).map(str::trim).filter(|y| !y.is_empty()).map(str::to_string);
+    let id = s(t, "id").ok_or("the desktop release has no id")?;
+    let url = s(t, "url").ok_or("the desktop release has no url")?;
+    let built = s(t, "built").ok_or("the desktop release has no build time")?;
+    let sha256 = s(t, "sha256").ok_or("the desktop release has no sha256")?;
     if sha256.len() != 64 || !sha256.bytes().all(|b| b.is_ascii_hexdigit()) {
         return Err(format!("bad sha256 in the desktop release: {}", sha256));
     }
-    Ok(DesktopRelease { version: s("version").unwrap_or_else(|| id.clone()), id, url, sha256: sha256.to_ascii_lowercase(), built })
+    Ok(DesktopRelease {
+        version: s(t, "version").or_else(|| s(&v, "version")).unwrap_or_else(|| id.clone()),
+        id,
+        url,
+        sha256: sha256.to_ascii_lowercase(),
+        built,
+        runtime_id: s(&v, "runtime_id"),
+    })
+}
+
+/// The desktop channel's base URL: stable `BISE_DIST_URL_DESKTOP`, else
+/// [`DESKTOP_DIST_URL`]; beta `BISE_DIST_URL_DESKTOP_BETA`, else
+/// [`DESKTOP_BETA_DIST_URL`] (never the terminal's channel, nor an
+/// install's recorded one).
+pub fn desktop_dist_url(env: crate::Lookup, channel: DesktopChannel) -> String {
+    let (var, default) = match channel {
+        DesktopChannel::Stable => (DESKTOP_DIST_URL_ENV, DESKTOP_DIST_URL),
+        DesktopChannel::Beta => (DESKTOP_BETA_DIST_URL_ENV, DESKTOP_BETA_DIST_URL),
+    };
+    env(var).map(|u| u.trim().trim_end_matches('/').to_string()).filter(|u| !u.is_empty()).unwrap_or_else(|| default.to_string())
+}
+
+/// Whether a build made at `a` (VERSION `built=`) is later than one made
+/// at `b`: the one ordering of two builds of bise, for an install's hub
+/// moving to the launched bise (switchboard's should_follow_install) and
+/// for a hub newer than the desktop app's own runtime. An unknown `a` (a
+/// dev build) is never later; an unknown `b` is older than any.
+pub fn built_after(a: &str, b: &str) -> bool {
+    !a.is_empty() && a > b
 }
 
 /// Whether the desktop `release` replaces the running app (`current_id`,
@@ -405,6 +540,37 @@ pub fn asset_api_url(release_json: &str, name: &str) -> Result<String, String> {
         .ok_or_else(|| format!("the release has no asset {}", name))
 }
 
+/// A hub from before client-protocol that runs from an install.sh root
+/// (ambient-lead m_23937, architect m_24004): only its own bise still
+/// speaks to it, so the steps differ by whether `current` is still that
+/// hub's version (its prefix's `bise` stops it, then `bise update`) or
+/// has moved on (the hub's own binary, by its path, stops it). The words
+/// are bise_proto's (`rpc::hub_older_steps`).
+#[derive(Clone, Debug, PartialEq)]
+pub struct OlderHub {
+    /// the prefix's `current` is the hub's own version
+    pub current: bool,
+    /// the hub's own bise
+    pub exe: PathBuf,
+}
+
+/// [`OlderHub`] for a hub root that is an install's version dir; None
+/// for any other root (the caller keeps `rpc::HUB_OLDER`).
+pub fn older_hub(hub_root: &Path) -> Option<OlderHub> {
+    let RootKind::Install(install) = root_kind(hub_root) else { return None };
+    let root = hub_root.canonicalize().ok()?;
+    Some(OlderHub { current: install.current().as_ref() == Some(&root), exe: root.join("bise") })
+}
+
+/// `path` as he types it: under his home with `~/`, else whole.
+pub fn tilde(path: &Path, user_home: &Path) -> String {
+    let home = user_home.canonicalize().unwrap_or_else(|_| user_home.to_path_buf());
+    match path.strip_prefix(&home) {
+        Ok(rest) => format!("~/{}", rest.display()),
+        Err(_) => path.display().to_string(),
+    }
+}
+
 impl crate::Home {
     /// The last `latest.json` read by `bise update` (the hub reads it).
     pub fn release_manifest(&self) -> PathBuf {
@@ -453,6 +619,36 @@ mod tests {
         std::os::unix::fs::symlink("versions/abc", t.join("current")).unwrap();
         let canon = t.canonicalize().unwrap();
         assert_eq!(root_kind(&v), RootKind::Install(Install { prefix: canon }));
+        let _ = std::fs::remove_dir_all(&t);
+    }
+
+    /// architect m_24004: an older hub of an install, with `current` its
+    /// own version or moved on; any other root: None (HUB_OLDER).
+    #[test]
+    fn an_older_hub_of_an_install_is_known() {
+        let t = std::env::temp_dir().join(format!("bise-olderhub-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&t);
+        let prefix = t.join(".local/share/bise");
+        for id in ["v29", "v35"] {
+            let v = prefix.join("versions").join(id);
+            std::fs::create_dir_all(&v).unwrap();
+            std::fs::write(v.join("VERSION"), format!("id={id}\n")).unwrap();
+        }
+        std::os::unix::fs::symlink("versions/v29", prefix.join("current")).unwrap();
+        let old = prefix.join("versions/v29");
+        let exe = old.canonicalize().unwrap().join("bise");
+        assert_eq!(older_hub(&old), Some(OlderHub { current: true, exe: exe.clone() }));
+        std::fs::remove_file(prefix.join("current")).unwrap();
+        std::os::unix::fs::symlink("versions/v35", prefix.join("current")).unwrap();
+        assert_eq!(older_hub(&old), Some(OlderHub { current: false, exe: exe.clone() }));
+        assert_eq!(tilde(&exe, &t), "~/.local/share/bise/versions/v29/bise");
+        assert_eq!(tilde(Path::new("/opt/x/bise"), &t), "/opt/x/bise");
+        // a dev root (repo=), a folder of no prefix
+        let dev = t.join("src");
+        std::fs::create_dir_all(&dev).unwrap();
+        std::fs::write(dev.join("VERSION"), "id=dev\nrepo=/x\n").unwrap();
+        assert_eq!(older_hub(&dev), None);
+        assert_eq!(older_hub(&t.join("nowhere")), None);
         let _ = std::fs::remove_dir_all(&t);
     }
 
@@ -546,36 +742,98 @@ mod tests {
         let _ = std::fs::remove_dir_all(&t);
     }
 
-    fn with_desktop(desktop: &str) -> String {
-        format!(r#"{{"version":"0.2.0","id":"top","targets":{{"darwin-arm64":{{"url":"b.tar.gz","sha256":"{SHA}","id":"top"}}}},"desktop":{desktop}}}"#)
+    /// `desktop.json` with these targets (its own channel, not latest.json)
+    fn desktop_json(targets: &str) -> String {
+        format!(r#"{{"kind":"desktop","version":"desktop-v2026.11.1","runtime_id":"abc1234","targets":{targets}}}"#)
     }
 
     #[test]
     fn the_desktop_entry_is_read_for_this_mac_only() {
         let up = SHA.to_ascii_uppercase();
-        let text = with_desktop(&format!(
-            r#"{{"darwin-arm64":{{"version":"2026.10.2-26","id":"d26","url":"bise-desktop-arm64.zip","sha256":"{up}","built":"2026-10-08T10:00:00Z"}}}}"#
+        let text = desktop_json(&format!(
+            r#"{{"darwin-arm64":{{"id":"d26","url":"bise-desktop-arm64.zip","sha256":"{up}","built":"2026-10-08T10:00:00Z"}}}}"#
         ));
         let d = parse_desktop(&text, "darwin-arm64").unwrap();
         assert_eq!(
             d,
             DesktopRelease {
-                version: "2026.10.2-26".into(),
+                version: "desktop-v2026.11.1".into(),
                 id: "d26".into(),
                 url: "bise-desktop-arm64.zip".into(),
                 sha256: SHA.into(),
-                built: "2026-10-08T10:00:00Z".into()
+                built: "2026-10-08T10:00:00Z".into(),
+                runtime_id: Some("abc1234".into()),
             }
         );
         assert_eq!(parse_desktop(&text, "darwin-x86_64").unwrap_err(), "the release has no desktop app for darwin-x86_64");
-        // today's manifests (bise only) still parse for bise, and say no app
-        assert!(parse_manifest(&text, "darwin-arm64").is_ok());
-        assert!(parse_desktop(&manifest("darwin-arm64", "x"), "darwin-arm64").unwrap_err().contains("no desktop app"));
+    }
+
+    /// The two cycles never read each other's manifest (desktop-on-main):
+    /// a terminal latest.json is no desktop release, even one carrying the
+    /// old `desktop` key, and `bise update` reads its own `targets` only.
+    #[test]
+    fn the_terminal_and_desktop_manifests_never_cross() {
+        let old = format!(
+            r#"{{"version":"0.2.0","id":"top","targets":{{"darwin-arm64":{{"url":"b.tar.gz","sha256":"{SHA}","id":"top"}}}},"desktop":{{"darwin-arm64":{{"id":"d26","url":"app.zip","sha256":"{SHA}","built":"2026-10-08T10:00:00Z"}}}}}}"#
+        );
+        assert!(parse_desktop(&old, "darwin-arm64").unwrap_err().contains("not the desktop app's manifest"));
+        assert!(parse_desktop(&manifest("darwin-arm64", "x"), "darwin-arm64").unwrap_err().contains("not the desktop app's manifest"));
+        let r = parse_manifest(&old, "darwin-arm64").unwrap();
+        assert_eq!((r.id.as_str(), r.url.as_str()), ("top", "b.tar.gz"), "bise update: the tarball, never the app");
+        // the channels: the desktop's own, never the terminal's
+        let none = |_: &str| None;
+        assert_eq!(desktop_dist_url(&none, DesktopChannel::Stable), DESKTOP_DIST_URL);
+        assert!(!DESKTOP_DIST_URL.contains("/latest/"), "a desktop release is never GitHub's latest");
+        let term = |k: &str| (k == DIST_URL_ENV).then(|| "https://x".to_string());
+        assert_eq!(desktop_dist_url(&term, DesktopChannel::Stable), DESKTOP_DIST_URL);
+        let ours = |k: &str| (k == DESKTOP_DIST_URL_ENV).then(|| "file:///d/ ".to_string());
+        assert_eq!(desktop_dist_url(&ours, DesktopChannel::Stable), "file:///d");
+    }
+
+    /// Stable and beta are two rolling tags, each with its own test
+    /// override; the pref's word picks one, anything but `beta` is stable.
+    #[test]
+    fn beta_reads_its_own_tag_and_only_beta_is_beta() {
+        let none = |_: &str| None;
+        assert_eq!(desktop_dist_url(&none, DesktopChannel::Beta), DESKTOP_BETA_DIST_URL);
+        assert!(DESKTOP_BETA_DIST_URL.ends_with("/download/desktop-beta"));
+        let both = |k: &str| match k {
+            DESKTOP_DIST_URL_ENV => Some("file:///s".to_string()),
+            DESKTOP_BETA_DIST_URL_ENV => Some("file:///b/".to_string()),
+            _ => None,
+        };
+        assert_eq!(desktop_dist_url(&both, DesktopChannel::Stable), "file:///s");
+        assert_eq!(desktop_dist_url(&both, DesktopChannel::Beta), "file:///b");
+        assert_eq!(DesktopChannel::from_pref(Some("beta")), DesktopChannel::Beta);
+        for w in [None, Some("stable"), Some("Beta"), Some("")] {
+            assert_eq!(DesktopChannel::from_pref(w), DesktopChannel::Stable, "{w:?}");
+        }
+    }
+
+    /// `paused: true` offers nothing, whatever its targets; the CI's and
+    /// the site's extra keys are ignored.
+    #[test]
+    fn a_paused_channel_offers_nothing_and_extra_keys_are_ignored() {
+        let entry = format!(
+            r#"{{"darwin-arm64":{{"id":"d26","url":"a.zip","sha256":"{SHA}","built":"2026-10-08T10:00:00Z","size":1,"min_macos":"13.0","dmg":{{"url":"a.dmg","sha256":"{SHA}","size":2}}}}}}"#
+        );
+        let with = |extra: &str| format!(r#"{{"kind":"desktop","channel":"beta","pub_date":"x","notes_url":"y",{extra}"version":"v","targets":{entry}}}"#);
+        assert_eq!(parse_desktop(&with(r#""paused":true,"#), "darwin-arm64").unwrap_err(), "the desktop channel is paused");
+        assert_eq!(parse_desktop(&with(r#""paused":false,"#), "darwin-arm64").unwrap().id, "d26");
+        assert_eq!(parse_desktop(&with(""), "darwin-arm64").unwrap().id, "d26");
+    }
+
+    #[test]
+    fn a_build_is_after_another_only_when_its_time_is_known_and_later() {
+        assert!(built_after("2026-10-08T10:00:00Z", "2026-10-07T10:00:00Z"));
+        assert!(built_after("2026-10-08T10:00:00Z", ""), "an unknown other is older");
+        assert!(!built_after("", "2026-10-07T10:00:00Z"), "a dev build is never later");
+        assert!(!built_after("2026-10-07T10:00:00Z", "2026-10-07T10:00:00Z"));
     }
 
     #[test]
     fn a_desktop_entry_missing_a_field_or_with_a_bad_sha_is_refused() {
-        let e = |entry: &str| parse_desktop(&with_desktop(&format!(r#"{{"darwin-arm64":{entry}}}"#)), "darwin-arm64").unwrap_err();
+        let e = |entry: &str| parse_desktop(&desktop_json(&format!(r#"{{"darwin-arm64":{entry}}}"#)), "darwin-arm64").unwrap_err();
         assert!(e(&format!(r#"{{"url":"a","sha256":"{SHA}","built":"t"}}"#)).contains("no id"));
         assert!(e(&format!(r#"{{"id":"d","sha256":"{SHA}","built":"t"}}"#)).contains("no url"));
         assert!(e(&format!(r#"{{"id":"d","url":"a","sha256":"{SHA}"}}"#)).contains("no build time"));
@@ -585,7 +843,7 @@ mod tests {
 
     #[test]
     fn a_desktop_update_is_another_id_built_later_never_the_same_or_a_downgrade() {
-        let r = |id: &str, built: &str| DesktopRelease { version: id.into(), id: id.into(), url: "u".into(), sha256: SHA.into(), built: built.into() };
+        let r = |id: &str, built: &str| DesktopRelease { version: id.into(), id: id.into(), url: "u".into(), sha256: SHA.into(), built: built.into(), runtime_id: None };
         let now = Some("2026-10-07T10:00:00Z");
         assert!(is_desktop_update(&r("d26", "2026-10-08T10:00:00Z"), "d25", now));
         assert!(!is_desktop_update(&r("d25", "2026-10-08T10:00:00Z"), "d25", now), "the same id");
@@ -597,7 +855,7 @@ mod tests {
 
     #[test]
     fn a_build_time_in_another_form_is_refused_never_a_downgrade() {
-        let r = |built: &str| DesktopRelease { version: "v".into(), id: "d26".into(), url: "u".into(), sha256: SHA.into(), built: built.into() };
+        let r = |built: &str| DesktopRelease { version: "v".into(), id: "d26".into(), url: "u".into(), sha256: SHA.into(), built: built.into(), runtime_id: None };
         // the same instant, the other form, on either side: refused
         assert!(!is_desktop_update(&r("2026-10-07T10:00:00Z"), "d25", Some("2026-10-07T10:00:00+00:00")));
         assert!(!is_desktop_update(&r("2026-10-07T10:00:00+00:00"), "d25", Some("2026-10-07T10:00:00Z")));

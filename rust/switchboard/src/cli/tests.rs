@@ -1,5 +1,15 @@
 use super::*;
 
+/// The request's JSON, as it goes on the wire.
+fn build(args: &[String]) -> Result<Value, String> {
+    super::build(args).map(|r| r.to_value())
+}
+
+/// The hub's read of it.
+fn decode(v: &Value) -> Result<crate::core::AgentReq, String> {
+    crate::core::AgentReq::decode(v.clone()).and_then(|r| if r.tag() == v["cmd"] { Ok(r) } else { Err(format!("read as {}", r.tag())) })
+}
+
 fn a(s: &[&str]) -> Vec<String> {
     s.iter().map(|x| x.to_string()).collect()
 }
@@ -63,7 +73,7 @@ fn send_flags() {
     assert_eq!(r["text"], "v2 please");
     assert_eq!(r["expect_reply"], true);
     assert_eq!(r["reply_to"], "m_4");
-    assert!(r.get("mode").is_none());
+    assert_eq!(r["mode"], "steer");
     assert!(r.get("why").is_none());
     let w = build(&a(&["send", "docs", "v2", "--reply-to", "m_4", "--why", "the brief says v2"])).unwrap();
     assert_eq!(w["why"], "the brief says v2");
@@ -127,6 +137,16 @@ fn spawn_repeats_constraints() {
     assert_eq!(r["constraints"], json!(["no push", "tests"]));
     assert_eq!(r["worktree"], true);
     assert!(build(&a(&["spawn", "fix"])).is_err());
+    // artifact-folders: no --folder, no key (an older hub reads it)
+    assert!(r.get("folder").is_none());
+}
+
+#[test]
+fn spawn_names_its_folder() {
+    let r = build(&a(&["spawn", "fix", "--objective", "o", "--folder", "launch › hero film"])).unwrap();
+    assert_eq!(r["folder"], "launch/hero film");
+    let e = build(&a(&["spawn", "fix", "--objective", "o", "--folder", "a/b/c"])).unwrap_err();
+    assert!(e.contains("two levels at most"), "{e}");
 }
 
 #[test]
@@ -137,7 +157,7 @@ fn requests_parse_in_the_core() {
         vec!["wait", "m_3"],
         vec!["status", "blocked", "--note", "need key"],
         vec!["report", "done", "all good", "--decision", "v2"],
-        vec!["card", "--for", "m_2", "v1 or v2?"],
+        vec!["notify", "--for", "m_2", "v1 or v2?"],
         vec!["stop", "x", "no", "longer", "needed"],
         vec!["close", "#3", "handled"],
         vec!["close", "4"],
@@ -146,18 +166,47 @@ fn requests_parse_in_the_core() {
         vec!["isolate", "a"],
     ] {
         let r = build(&a(&args)).unwrap();
-        crate::core::AgentReq::from_json(&r).unwrap_or_else(|e| panic!("{:?}: {}", args, e));
+        let req = decode(&r).unwrap_or_else(|e| panic!("{:?}: {}", args, e));
+        assert!(!matches!(req, crate::core::AgentReq::Unknown { .. }), "{:?}", args);
     }
+}
+
+/// notif-rename (architect m_24654): `sb notify` is the agents' word; a
+/// notification is a card on the wire, so the hub's command keeps its name;
+/// `sb card`, the old word, is gone (issue 27, issue 31).
+#[test]
+fn notify_is_a_card_on_the_wire_and_sb_card_is_unknown() {
+    let r = build(&a(&["notify", "--for", "m_2", "v1 or v2?"])).unwrap();
+    assert_eq!((r["cmd"].as_str(), r["text"].as_str(), r["for"].as_str()), (Some("card"), Some("v1 or v2?"), Some("m_2")));
+    let w = build(&a(&["notify", "--withdraw", "#4", "answered", "in", "chat"])).unwrap();
+    assert_eq!((w["cmd"].as_str(), w["card"].as_u64(), w["why"].as_str()), (Some("withdraw"), Some(4), Some("answered in chat")));
+    assert_eq!(render("notify", &json!({"ok": true, "card": 7})).1, "notification #7 opened for the user");
+    assert!(build(&a(&["card", "v1 or v2?"])).is_err(), "sb card is an unknown command");
+    assert!(build(&a(&["card", "--withdraw", "#4", "why"])).is_err(), "sb card --withdraw is an unknown command");
+    assert_eq!(render("withdraw", &json!({"ok": true, "card": 4})).1, "notification #4 withdrawn: the user sees why; the question is yours again");
+    assert_eq!(render("close", &json!({"ok": true, "card": 3})).1, "notification #3 closed");
+    let u = usage();
+    assert!(u.contains("sb notify \"<question for the user>\" [--for <id>]") && u.contains("sb notify --withdraw <notification>"), "{u}");
+    assert!(!u.contains("sb card"), "the old word is a hidden alias: {u}");
 }
 
 #[test]
 fn a_card_can_link_its_page_and_item() {
-    let r = build(&a(&["card", "--page", "launch-watch#hn-41", "reply to tptacek?"])).unwrap();
+    let r = build(&a(&["notify", "--page", "launch-watch#hn-41", "reply to tptacek?"])).unwrap();
     assert_eq!((r["page"].as_str(), r["text"].as_str()), (Some("launch-watch#hn-41"), Some("reply to tptacek?")));
-    crate::core::AgentReq::from_json(&r).unwrap();
-    assert_eq!(build(&a(&["card", "--page", "w", "q?"])).unwrap()["page"], "w");
-    assert!(build(&a(&["card", "q?"])).unwrap().get("page").is_none());
-    assert!(build(&a(&["card", "--page", "#hn-41", "q?"])).is_err(), "an item needs its page");
+    decode(&r).unwrap();
+    assert_eq!(build(&a(&["notify", "--page", "w", "q?"])).unwrap()["page"], "w");
+    assert!(build(&a(&["notify", "q?"])).unwrap().get("page").is_none());
+    assert!(build(&a(&["notify", "--page", "#hn-41", "q?"])).is_err(), "an item needs its page");
+}
+
+#[test]
+fn a_notification_links_any_artifact() {
+    let r = build(&a(&["notify", "--artifact", "les-bims-prototype", "which look?"])).unwrap();
+    assert_eq!((r["artifact"].as_str(), r["text"].as_str()), (Some("les-bims-prototype"), Some("which look?")));
+    decode(&r).unwrap();
+    assert!(build(&a(&["notify", "--artifact", "#x", "q?"])).is_err(), "an item needs its artifact");
+    assert!(build(&a(&["notify", "--artifact", "a", "--page", "b", "q?"])).is_err(), "one link");
 }
 
 #[test]

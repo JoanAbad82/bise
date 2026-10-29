@@ -1,0 +1,151 @@
+// bims/idle · what the office costs when nothing changes (his Mac, main m_28475: two GPU helpers at
+// ~29% CPU for an hour while he worked elsewhere). On FakeCore rows, off screen. Passes when, over
+// 3 s each:
+//   (1) the office open on a still world (asleep, failed, blocked, stopped, main idle) draws 0 WebGL
+//       frames under reduced motion; else only its sleepers' rare idle moves (render/idle.ts) at the
+//       loop's 8 fps at most; its only CSS motion is the sleepers' z's (a CSS loop, 7.5 fps at most);
+//   (2) the office closed: no renderer, no frame, no animation of the bims' left running;
+//   (3) the window hidden: 0 frames and the z's paused, the office open with typing bims;
+//   (4) the office open with typing bims (the fixture's): the loop's ~8 fps, never the display's;
+//   (5) a crowd of done bims standing at rest: they breathe at the loop's ~8 fps (bim-alive), never
+//       the display's; under reduced motion 0 frames.
+// It also writes what else animates in the window (document.getAnimations()) to
+// .harness-cache/bims-shots/idle-animations.json: what keeps the compositor busy when it isn't
+// the bims. Owner: bims-fix.
+import { test, expect } from '../../harness';
+import type { Session } from '../../harness';
+import { agent, office, snap, watch } from '../../../src/bims/fixtures';
+import { mkdirSync, writeFileSync } from 'node:fs';
+import path from 'node:path';
+import { SHOTS, hideOffice, open, probe, setHidden, settle, showOffice, sleep } from './world';
+
+// 3 s a window, both tests under 30 s (Gabriel's pick on page e2e-desktop): at the display's
+// 60 fps a drawing office shows ~180 frames there, at the loop's 8 fps ~24: 0 still says it
+const IDLE_MS = 3_000;
+
+/** asleep, failed, blocked, stopped, main idle: no pose loops (model.ts Motion); no done bim: one standing
+ * breathes at the loop's 8 fps (bim-alive, his m_48065: no bim stands frozen), measured by (5) */
+const STILL = snap([
+  agent('main', { main: true, place_id: '', status: 'idle' }),
+  agent('login-test', { status: 'waiting', watching: [watch('cargo test')] }),
+  agent('cookie-banner', { status: 'blocked' }),
+  agent('search-index', { status: 'failed' }),
+  agent('import', { status: 'done', phase: 'stopped' }),
+]);
+
+/** the renderer's frames in ms (0 when there is no renderer) */
+async function framesIn(s: Session, ms: number): Promise<number> {
+  const f0 = (await probe(s.page))?.frames ?? 0;
+  await sleep(ms);
+  return ((await probe(s.page))?.frames ?? 0) - f0;
+}
+
+interface Running {
+  readonly name: string;
+  readonly target: string;
+  readonly bims: boolean;
+  readonly paused: boolean;
+}
+
+/** every CSS animation or transition running in the window now, its target as tag.class, and whether it is the office's */
+const running = (s: Session): Promise<Running[]> =>
+  s.page.evaluate(() =>
+    document.getAnimations().map((a) => {
+      const t = (a.effect as KeyframeEffect | null)?.target ?? null;
+      const el = t instanceof Element ? t : null;
+      const name = 'animationName' in a ? (a as CSSAnimation).animationName : a.constructor.name;
+      const cls = el === null ? '' : `${el.tagName.toLowerCase()}.${(el.getAttribute('class') ?? '').split(' ').join('.')}`;
+      return { name, target: cls, bims: el?.closest('.bims-office, [data-testid="app.outer.world"]') != null, paused: a.playState !== 'running' };
+    }),
+  );
+
+const found: Record<string, Running[]> = {};
+test.afterAll(() => {
+  mkdirSync(SHOTS, { recursive: true });
+  writeFileSync(path.join(SHOTS, 'idle-animations.json'), JSON.stringify(found, null, 2));
+});
+
+test.describe.configure({ timeout: 180_000 });
+
+test('(1)(2) a still office draws nothing for 3 s; closed, nothing of the bims runs', async () => {
+  // reduced motion: no idle move, nothing at all to draw
+  {
+    const { s } = await open(STILL, { reduced: true });
+    try {
+      await showOffice(s);
+      await settle(s);
+      expect(await framesIn(s, IDLE_MS), 'a still office, reduced motion: 0 WebGL frames in 3 s').toBe(0);
+    } finally {
+      await s.close();
+    }
+  }
+  const { s } = await open(STILL);
+  try {
+    // the card's office is on at start (bise fait mac): hidden first, so 'before any open' is closed
+    if ((await s.page.getByTestId('app.outer.world').count()) > 0) await hideOffice(s);
+    found['closed, before any open'] = await running(s);
+    await showOffice(s);
+    await settle(s);
+    // only a sleeper's rare idle move (render/idle.ts: a breath, a twitch, a turn, 12-35 s apart), at
+    // the loop's 8 fps at most: never the display's (a frame each 2 s on average)
+    const n = await framesIn(s, IDLE_MS);
+    expect(n / (IDLE_MS / 1000), 'a still office: its sleepers\' rare moves only, at the loop\'s rate').toBeLessThan(12);
+    found['open, still world'] = await running(s);
+    const mine = found['open, still world'].filter((a) => a.bims && !a.paused);
+    expect(mine.every((a) => a.name === 'bims-z'), `the office's only motion is the z's: ${JSON.stringify(mine)}`).toBe(true);
+
+    await hideOffice(s);
+    await sleep(500);
+    expect(await probe(s.page), 'closed: the renderer is gone').toBeNull();
+    found['closed after open'] = await running(s);
+    expect(found['closed after open'].filter((a) => a.bims), 'closed: nothing of the bims animates').toEqual([]);
+  } finally {
+    await s.close();
+  }
+});
+
+test('(3)(4) typing bims loop at ~8 fps; hidden, 0 frames and the z\'s paused', async () => {
+  const { s } = await open(office);
+  try {
+    await showOffice(s);
+    await settle(s, 800, 6000);
+    const n = await framesIn(s, IDLE_MS);
+    expect(n / (IDLE_MS / 1000), 'typing bims: the loop, ~8 fps').toBeLessThan(12);
+    found['open, typing bims'] = await running(s);
+
+    await setHidden(s.page, true);
+    await sleep(500);
+    expect(await framesIn(s, IDLE_MS), 'hidden: 0 frames in 3 s').toBe(0);
+    const z = (await running(s)).filter((a) => a.bims && a.name === 'bims-z');
+    expect(z.every((a) => a.paused), "hidden: the z's paused").toBe(true);
+    found['open, hidden'] = await running(s);
+    await setHidden(s.page, false);
+  } finally {
+    await s.close();
+  }
+});
+
+/** done bims, more than the terrace has deck chairs: a crowd standing at rest (his m_48065's shot); a new office (stage 0: no park, so none goes skating) */
+const NEW = { jobs_done: 0, days_used: 0, artifacts_made: 0 };
+const CROWD = snap([
+  agent('main', { main: true, place_id: '', status: 'idle' }),
+  ...['signup-perf', 'dark-mode', 'login-test', 'nightly', 'pricing', 'empty-state', 'onboarding', 'deploy', 'cookie', 'search', 'changelog', 'release'].map((n) => agent(n, { status: 'done' })),
+]);
+
+test('(5) a crowd standing at rest breathes at the loop\'s ~8 fps (bim-alive); reduced motion, 0 frames', async () => {
+  for (const reduced of [false, true]) {
+    const { s } = await open(CROWD, { reduced, growth: NEW });
+    try {
+      await showOffice(s);
+      await settle(s, 800, 8000);
+      const fps = (await framesIn(s, IDLE_MS)) / (IDLE_MS / 1000);
+      if (reduced) expect(fps, 'reduced motion: a resting crowd draws nothing').toBe(0);
+      else {
+        expect(fps, 'standing bims: never still').toBeGreaterThan(4);
+        expect(fps, 'standing bims: the loop, ~8 fps, never the display rate').toBeLessThan(12);
+      }
+    } finally {
+      await s.close();
+    }
+  }
+});

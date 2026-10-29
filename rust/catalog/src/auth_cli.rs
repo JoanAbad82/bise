@@ -101,13 +101,6 @@ pub struct CheckFail {
     pub said: String,
 }
 
-impl CheckKind {
-    /// The key itself works (only the account or the model is the matter).
-    pub fn key_works(&self) -> bool {
-        matches!(self, CheckKind::NoCredit | CheckKind::Model | CheckKind::NoAccess)
-    }
-}
-
 /// A failed check in lines, the key step's words (BISE-282): the verdict
 /// (✗, or ? when the key works), the provider's words dim, and the fix.
 /// `found`: where a key found (not pasted) came from.
@@ -501,9 +494,19 @@ fn event(v: serde_json::Value) {
     let _ = std::io::stdout().flush();
 }
 
+/// `--events`' first line: the sign-in's link (the desktop core opens or shows it). Pure.
+pub(crate) fn open_ev(url: &str) -> serde_json::Value {
+    serde_json::json!({"ev": "open", "url": url})
+}
+
+/// `--events`' last line when the sign-in fails: his words, never the prose. Pure.
+pub(crate) fn error_ev(text: &str) -> serde_json::Value {
+    serde_json::json!({"ev": "error", "text": text})
+}
+
 /// `--events`' start: the link, then the browser (unless `--no-browser`).
 fn events_open(url: &str, no_browser: bool) {
-    event(serde_json::json!({"ev": "open", "url": url}));
+    event(open_ev(url));
     if !no_browser {
         let _ = open_url(url);
     }
@@ -535,7 +538,7 @@ fn chatgpt_login_main(paths: &Paths, setup: &Setup, no_browser: bool, events: bo
     let (out, err) = (Style::stdout(), Style::stderr());
     let fail = |text: &str| {
         if events {
-            event(serde_json::json!({"ev": "error", "text": text}));
+            event(error_ev(text));
         } else {
             eprintln!("{}", warn_line(&err, text));
         }
@@ -554,17 +557,8 @@ fn chatgpt_login_main(paths: &Paths, setup: &Setup, no_browser: bool, events: bo
         Poll::Done(a) if events => {
             // the same default role as the terminal's, without the prose
             let listed: Vec<String> = chatgpt::fetch_models(paths).map(|m| m.into_iter().map(|m| m.slug).collect()).unwrap_or_default();
-            if setup.model.trim().is_empty() {
-                if let Some((main, _)) = crate::roles::one_login_defaults(&setup.catalog, chatgpt::ID, "openai", &listed) {
-                    let text = std::fs::read_to_string(&paths.config).unwrap_or_default();
-                    let new = crate::roles::with_role(&text, crate::roles::MAIN, &main);
-                    if let Some(d) = paths.config.parent() {
-                        let _ = std::fs::create_dir_all(d);
-                    }
-                    let _ = std::fs::write(&paths.config, new);
-                }
-            }
-            event(serde_json::json!({"ev": "done", "email": a.email}));
+            let note = chatgpt_main(paths, setup, &listed).and_then(|(_, line)| line);
+            event(serde_json::json!({"ev": "done", "email": a.email, "note": note}));
             0
         }
         Poll::Done(a) => {
@@ -572,17 +566,10 @@ fn chatgpt_login_main(paths: &Paths, setup: &Setup, no_browser: bool, events: bo
             println!("{}", out.ok(&format!("signed in as {}{}.", a.email, plan)));
             // the account's models for /models (best effort, the cache)
             let listed: Vec<String> = chatgpt::fetch_models(paths).map(|m| m.into_iter().map(|m| m.slug).collect()).unwrap_or_default();
-            if setup.model.trim().is_empty() {
-                if let Some((main, _)) = crate::roles::one_login_defaults(&setup.catalog, chatgpt::ID, "openai", &listed) {
-                    let text = std::fs::read_to_string(&paths.config).unwrap_or_default();
-                    let new = crate::roles::with_role(&text, crate::roles::MAIN, &main);
-                    if let Some(d) = paths.config.parent() {
-                        let _ = std::fs::create_dir_all(d);
-                    }
-                    if std::fs::write(&paths.config, new).is_ok() {
-                        println!("{}", out.dim(&format!("main and your agents use {} now, on your plan.", main)));
-                    }
-                }
+            match chatgpt_main(paths, setup, &listed) {
+                Some((_, Some(line))) => println!("{}", out.dim(&line)),
+                Some((main, None)) => println!("{}", out.dim(&format!("main and your agents use {} now, on your plan.", main))),
+                None => {}
             }
             println!("{}", out.dim("bise is running? the next agents it starts use it."));
             0
@@ -591,6 +578,21 @@ fn chatgpt_login_main(paths: &Paths, setup: &Setup, no_browser: bool, events: bo
         Poll::Unfinished | Poll::Waiting => fail(UNFINISHED),
         Poll::Failed(e) => fail(&e),
     }
+}
+
+/// The main a ChatGPT sign-in writes ([`crate::plan_list::sign_in_main`]:
+/// unset, or one of the plan's models its list lacks), with the line
+/// that says a swap; None: main stays (or the write failed). The main
+/// read is the one written (config.toml, env), before any swap.
+fn chatgpt_main(paths: &Paths, setup: &Setup, listed: &[String]) -> Option<(String, Option<String>)> {
+    let text = std::fs::read_to_string(&paths.config).unwrap_or_default();
+    let written = Setup::from_text(Some(&text), &|k| std::env::var(k).ok()).model;
+    let (main, line) = crate::plan_list::sign_in_main(&setup.catalog, crate::chatgpt::ID, "openai", &written, listed)?;
+    if let Some(d) = paths.config.parent() {
+        let _ = std::fs::create_dir_all(d);
+    }
+    std::fs::write(&paths.config, crate::roles::with_role(&text, crate::roles::MAIN, &main)).ok()?;
+    Some((main, line))
 }
 
 /// OpenRouter on a terminal: `1 sign in with your browser   2 paste a
@@ -614,7 +616,7 @@ fn openrouter_login_main(paths: &Paths, no_browser: bool, events: bool) -> i32 {
     let (out, err) = (Style::stdout(), Style::stderr());
     let fail = |text: &str| {
         if events {
-            event(serde_json::json!({"ev": "error", "text": text}));
+            event(error_ev(text));
         } else {
             eprintln!("{}", warn_line(&err, text));
         }
@@ -803,7 +805,7 @@ pub fn render_status(list: &[Status], d: &crate::detect::Detected, st: &Style) -
         found.push(format!("codex: signed in with ChatGPT. bise signs in on its own: {} login chatgpt", CLI));
     }
     if d.claude_plan {
-        found.push("claude code: signed in with a Claude plan. that plan doesn't run in bise (Anthropic's terms): use an Anthropic API key.".to_string());
+        found.push(format!("claude code: {}", bise_proto::words::settings::claude_code_seen(CLI)));
     }
     if !found.is_empty() {
         o.push('\n');
@@ -941,6 +943,7 @@ pub fn login_main(args: &[String], paths: &Paths, check: Checker) -> i32 {
         if !p.signup_url.is_empty() {
             rows.push(("no account yet?", err.link(&p.signup_url)));
         }
+        rows.extend(claude_credit_rows(&p.id, &err));
         rows.push(("saved in", format!("{}, only you can read it", tilde(&paths.auth_file, paths.home.as_deref()))));
         eprint!("{}", err.rows(2, &rows));
         eprintln!();
@@ -1023,6 +1026,21 @@ pub fn login_main(args: &[String], paths: &Paths, check: Checker) -> i32 {
         println!("{}", out.next(&next_after_login(&setup, p, model.as_deref(), credit.is_some())));
     }
     0
+}
+
+/// Anthropic's help article on the Max and Team plans' monthly API credits.
+pub const CLAUDE_CREDITS_URL: &str = "https://support.claude.com/en/articles/17154008";
+
+/// `bise login anthropic`'s rows on a Claude plan's monthly API credits
+/// (a Console org linked on claude.ai pays for its keys); none for the
+/// other providers. The text wraps under its column.
+pub fn claude_credit_rows(id: &str, st: &Style) -> Vec<(&'static str, String)> {
+    use bise_proto::words::settings;
+    if id != "anthropic" {
+        return Vec::new();
+    }
+    let text = bise_home::style::wrap(settings::login_claude_credits, 60).join("\n");
+    vec![(settings::login_claude_plan, text), (settings::login_claude_how, st.link(CLAUDE_CREDITS_URL))]
 }
 
 /// "mistral-medium-latest" of "mistral/mistral-medium-latest".

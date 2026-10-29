@@ -83,6 +83,95 @@ impl Churn {
     }
 }
 
+/// Main's idle REPL is not restarted now (hub-stall, @bise m_25297: main
+/// was recycled as he wrote to it). Only the hub's own recycle holds
+/// (`explicit` false), and only while a message is queued for main
+/// (`queued`): it goes once that message is delivered and main is idle
+/// again. An explicit relaunch (/reload's switch to another binary, a
+/// plugin, skill or key change) goes at main's next idle like any
+/// agent's. The 4.5 min main was down then was its wait for a start
+/// slot, which `repl_start::admit` removed (main never waits for one).
+/// hub-tick: it also holds while his last line to main is less than
+/// [`HIS_LINE_HOLD_MS`] old (`since_his_line_ms`, None: none since the
+/// hub started): main answered, went idle, and was recycled while he
+/// was still talking to it (2026-10-17 00:06, again later).
+pub fn main_holds(explicit: bool, queued: usize, since_his_line_ms: Option<u64>) -> bool {
+    !explicit && (queued > 0 || since_his_line_ms.is_some_and(|ms| ms < HIS_LINE_HOLD_MS))
+}
+
+/// How long after his last line to main its own recycle waits.
+pub const HIS_LINE_HOLD_MS: u64 = 10 * 60 * 1000;
+
+/// The longest a due recycle waits for the machine (main m_36148).
+pub const LOAD_HOLD_MAX_MS: u64 = 30 * 60 * 1000;
+
+/// A due recycle waits while the machine is loaded (`factor`,
+/// crate::load): a restart costs ~2.4 cpu-s and a start at load 90
+/// stalls. But the recycle is here because the REPL's heap grows
+/// (architect m_36171): the hold ends after [`LOAD_HOLD_MAX_MS`] since
+/// it was due (`due_ms`), or once the REPL read twice the `budget`
+/// (`read`), whichever comes first. Only the hub's own recycle holds
+/// (`explicit` false): /reload, a new binary, plugins, skills, keys go.
+pub fn load_holds(explicit: bool, factor: f64, due_ms: u64, read: u64, budget: u64) -> bool {
+    !explicit && crate::load::is_loaded(factor) && due_ms < LOAD_HOLD_MAX_MS && read < budget.saturating_mul(2)
+}
+
+#[cfg(test)]
+mod main_holds_tests {
+    use super::*;
+
+    /// main m_36148, architect m_36171: at load x2+ the hub's own
+    /// recycle waits, at most 30 min, and never past twice the budget.
+    #[test]
+    fn a_recycle_waits_for_a_loaded_machine_up_to_30_min_or_twice_the_budget() {
+        let (min, b) = (60 * 1000, 3_000_000);
+        assert!(load_holds(false, 2.0, 0, b, b), "loaded: waits");
+        assert!(!load_holds(false, 1.9, 0, b, b), "not loaded: goes");
+        assert!(!load_holds(true, 8.0, 0, b, b), "an explicit relaunch goes");
+        assert!(load_holds(false, 8.0, 29 * min, b, b));
+        assert!(!load_holds(false, 8.0, 30 * min, b, b), "30 min since due: goes");
+        assert!(load_holds(false, 8.0, min, 2 * b - 1, b));
+        assert!(!load_holds(false, 8.0, min, 2 * b, b), "twice the budget read: goes");
+    }
+
+    /// relaunch-fix: a8aaddeed held main 2 min after any line of his,
+    /// for every relaunch, so /reload and a plugin change never
+    /// relaunched it while he talked to it.
+    #[test]
+    fn only_the_hubs_own_recycle_waits_and_only_for_a_queued_message() {
+        assert!(!main_holds(true, 0, None));
+        assert!(!main_holds(true, 1, None));
+        assert!(!main_holds(false, 0, None));
+        assert!(main_holds(false, 1, None));
+    }
+
+    /// hub-tick: his line to main holds its own recycle 10 min; an
+    /// explicit relaunch beats the hold.
+    #[test]
+    fn his_recent_line_holds_mains_own_recycle_for_10_min() {
+        let min = 60 * 1000;
+        assert!(main_holds(false, 0, Some(9 * min)), "9 min old: held");
+        assert!(!main_holds(false, 0, Some(11 * min)), "11 min old: goes");
+        assert!(main_holds(false, 0, Some(0)), "just said: held");
+        assert!(!main_holds(true, 0, Some(0)), "explicit beats the hold");
+        assert!(!main_holds(true, 1, Some(9 * min)), "explicit beats both");
+    }
+
+    /// A due recycle with a message queued for main waits; the message
+    /// is delivered (queued 0), and the recycle goes at the next idle.
+    #[test]
+    fn a_held_recycle_goes_once_the_queued_message_is_delivered() {
+        let mut c = Churn::default();
+        c.started("main");
+        c.line("main", "  obs: usage: model=fake/claude-x in=3000000 out=10 cache_read=0 cache_write=0");
+        assert!(c.idle("main", 1_000_000));
+        let due = c.is_due("main");
+        assert!(due && main_holds(false, 1, None));
+        assert!(c.is_due("main"), "still due while it waits");
+        assert!(!main_holds(false, 0, None));
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

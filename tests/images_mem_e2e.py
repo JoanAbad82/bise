@@ -16,6 +16,7 @@ import os, socket, subprocess, sys, tempfile, time, base64, random, json
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.abspath(os.path.join(HERE, ".."))
 sys.path.insert(0, HERE)
+import obs_lines  # noqa: E402
 import wait  # noqa: E402
 N = 20
 LIMIT_MB = 300
@@ -28,14 +29,16 @@ for k in range(N):
     p = os.path.join(imgs, "%032x.b64" % k)
     open(p, "w").write(data)
     markers.append('<image name="[Image #%d]" path="shot%d.png" mime="image/png" b64="%s">' % (k + 1, k, p))
-env = {k: v for k, v in os.environ.items() if not k.startswith(("BEND_", "SB_"))}
+# BISE_ too: an agent's shell exports BISE_SESSION_CHOICE (its session's
+# model), which wins over BEND_MODEL; the REPL then sent that model's
+# request and the fake answered 400 (tool name pattern), with no image
+env = {k: v for k, v in os.environ.items() if not k.startswith(("BEND_", "SB_", "BISE_"))}
 env.update(HOME=tmp, XDG_STATE_HOME=os.path.join(tmp, "state"))
 fake = subprocess.Popen([sys.executable, "-u", os.path.join(HERE, "fake_provider.py")], stdout=subprocess.PIPE, text=True,
                         env={**env, "FAKE_LOG": os.path.join(tmp, "fake.log")})
 s = socket.socket(); s.bind(("127.0.0.1", 0)); port = s.getsockname()[1]; s.close()
 env.update({"BEND_PROVIDER_URL": "http://127.0.0.1:%s/v1/chat/completions" % fake.stdout.readline().split()[1],
             "BEND_MODEL": "mistral-small-latest", "MISTRAL_API_KEY": "fake-key", "BEND_IMAGE_DIR": imgs,
-            "BEND_MCP_INDEX": os.path.join(tmp, "mcp.txt"), "BEND_SKILLS_INDEX": os.path.join(tmp, "sk.txt"),
             "BEND_BG_ROOT": os.path.join(tmp, "bg"), "BEND_REPL_PORT": str(port),
             "BEND_SESSION_FILE": os.path.join(tmp, "session.txt"), "BEND_WIRE_LOG": os.path.join(tmp, "wire.log")})
 log = os.path.join(tmp, "repl.log")
@@ -64,7 +67,7 @@ try:
     f = sock.makefile("rb")
     while True:
         line = f.readline()
-        if not line or line.startswith(b"  obs: turn_done"): break
+        if not line or obs_lines.kind(line) == "turn_done": break
     took = time.time() - t1
     after = mb()
     # the fake provider logs the request after its reply's stream ends:

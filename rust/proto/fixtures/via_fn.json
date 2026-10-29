@@ -1,0 +1,14 @@
+[
+  {"why": "typed with fn space", "said": false, "via_fn": true,
+   "parts": [{"kind": "text", "text": "what's running?"}, {"kind": "hint", "of": "capsule", "text": "\n\n[from the capsule: answer in one short line]"}]},
+  {"why": "fn space + tab: start an agent", "said": false, "via_fn": true,
+   "parts": [{"kind": "text", "text": "fix the login loop"}, {"kind": "hint", "of": "capsule_start", "text": "\n\n[from the capsule: start an agent; answer in one short line]"}]},
+  {"why": "a fn talk keeps its 'said'", "said": true, "via_fn": false,
+   "parts": [{"kind": "text", "text": "what's running?"}, {"kind": "hint", "of": "capsule", "text": "\n\n[from the capsule: answer in one short line]"}]},
+  {"why": "his steps alone: not fn", "said": false, "via_fn": false,
+   "parts": [{"kind": "text", "text": "done"}, {"kind": "hint", "of": "steps", "text": "\n[his open steps: p i \"pay\"; when he says one is done: sb page tick <page> <item>]"}]},
+  {"why": "a plain message", "said": false, "via_fn": false,
+   "parts": [{"kind": "text", "text": "hi"}]},
+  {"why": "a hint of a kind this client doesn't know", "said": false, "via_fn": false,
+   "parts": [{"kind": "text", "text": "hi"}, {"kind": "hint", "of": "later", "text": "\n\n[later]"}]}
+]

@@ -23,7 +23,8 @@ pub enum EntryKind {
     You,
     /// the agent's own words
     Agent,
-    /// a message from another agent (`from`)
+    /// a message from another agent (`from`; `msg`: its id; `to_you`:
+    /// an old direct reply to him, `msg-in` from `@name`)
     FromAgent,
     /// its tool calls in a row
     Tools,
@@ -70,9 +71,68 @@ pub enum EntryKind {
     /// the text the TUI's words for it. An interrupt is not one (a
     /// `stopped` entry or a notice, as before)
     TurnFailed,
+    /// event-wake: a watch of the agent ended (`wake`: the event happened,
+    /// still running at its max, or it stopped waiting), from the hub's
+    /// `sb wake : <json>` line; the wake's own message (bise's) folds
+    /// into it by its id
+    Wake,
     /// a kind this reader doesn't know (a newer hub)
     #[serde(other)]
     Unknown,
+}
+
+impl EntryKind {
+    /// An entry written for him in main's thread (rows::Pulse's
+    /// `said_at`, "unread"), by the thread's tiers (designer m_45206):
+    /// main's answers to him, his cards, pages and reports, the news
+    /// (landed, a PR, an artifact, a failed turn), and his own words that
+    /// didn't arrive (he must know). Never his own words or answers, the
+    /// work under them (tools, thinking, compaction), the agents talking
+    /// to each other (from_agent, answered for him), nor the ignorable
+    /// tier (notices, wakes, scheduled runs). The one rule (architect
+    /// m_44825): every kind is decided here, no wildcard, so a new kind
+    /// must be.
+    pub fn for_him(self) -> bool {
+        match self {
+            EntryKind::Agent
+            | EntryKind::Card
+            | EntryKind::Page
+            | EntryKind::Report
+            | EntryKind::Landed
+            | EntryKind::Pr
+            | EntryKind::Artifact
+            | EntryKind::TurnFailed
+            | EntryKind::NotDelivered => true,
+            EntryKind::You
+            | EntryKind::FromAgent
+            | EntryKind::Tools
+            | EntryKind::Stopped
+            | EntryKind::ToAgent
+            | EntryKind::Thinking
+            | EntryKind::Compacting
+            | EntryKind::Compacted
+            | EntryKind::Notice
+            | EntryKind::Answered
+            | EntryKind::Approval
+            | EntryKind::Wake
+            | EntryKind::Scheduled
+            | EntryKind::Unknown => false,
+        }
+    }
+}
+
+#[cfg(test)]
+#[test]
+fn unread_is_what_is_for_him_by_the_tiers() {
+    // designer m_45206: news and his undelivered words count; the agents'
+    // talk, his own answers and the ignorable tier don't
+    use EntryKind as K;
+    for k in [K::Agent, K::Card, K::Page, K::Report, K::Landed, K::Pr, K::Artifact, K::TurnFailed, K::NotDelivered] {
+        assert!(k.for_him(), "{k:?} is for him");
+    }
+    for k in [K::You, K::FromAgent, K::Answered, K::Notice, K::Wake, K::Scheduled, K::Approval] {
+        assert!(!k.for_him(), "{k:?} is not");
+    }
 }
 
 /// A `turn_failed` entry (R12): why the turn failed, the runtime's words
@@ -90,6 +150,23 @@ pub struct TurnFailed {
 pub struct Thinking {
     pub ms: u64,
     pub text: String,
+}
+
+/// Where his message is (contract C3, BISE-86): `sent` (·), `received`
+/// by the agent (✓, steering), `read` by the model (✓✓: steered, or its
+/// turn started), `failed`: the hub could not deliver it (✗). Only ever
+/// moves up, in that order ([`lines::deliver`], the one rule).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[serde(rename_all = "snake_case")]
+pub enum Delivery {
+    Sent,
+    Received,
+    Read,
+    Failed,
+    /// a mark this reader doesn't know (a newer hub): never moved
+    #[serde(other)]
+    Unknown,
 }
 
 /// How a notice reads: info (dim), warn (▲, what to do), err (✗).
@@ -110,6 +187,40 @@ pub enum NoticeLevel {
 pub struct Notice {
     pub level: NoticeLevel,
     pub text: String,
+    /// H9 (ambient-lead m_19827, architect m_19836): a model call that
+    /// failed and waits to retry, as data. A run of them in one turn is one
+    /// entry, updated at its pos ([`lines::is_same_retry_run`])
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub retry: Option<Retry>,
+}
+
+/// A model call's retry (`provider_retry: 2/10 · <why> · retry in 4s`,
+/// [`lines::retry`]): the attempt that failed, out of how many, why, the
+/// wait before the next one, and how the run ended once it did.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+pub struct Retry {
+    pub attempt: u32,
+    pub max: u32,
+    pub why: String,
+    pub wait_ms: u64,
+    /// set by the fold when the run ends (the entry is sent again at its
+    /// pos): the window dims a recovered run, never guessing from the rows
+    /// after it
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub end: Option<RetryEnd>,
+}
+
+/// How a run of retries ended: the agent's text, its thinking or a tool
+/// came in the same turn (recovered), or the turn failed.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[serde(rename_all = "snake_case")]
+pub enum RetryEnd {
+    Recovered,
+    Failed,
+    #[serde(other)]
+    Unknown,
 }
 
 /// A `not_delivered` entry: the agent his message didn't reach, and his
@@ -220,7 +331,13 @@ impl Attached {
 }
 
 /// An `approval` entry: his answer, folded (`you allowed api: rm -rf
-/// target`, `you answered perf: both`); `note` the words under it.
+/// target`, `you answered perf: both`); `note` the words under it;
+/// `card`: the item it answers, for an answer to an item (the hub's
+/// `route` line, BISE-305/307), so a client that folded the answer
+/// itself knows it is the same one; `to`: the agent that answer went to
+/// (the route line's asker), so a click on the row opens that agent's
+/// thread at the answer (answered-link, architect m_24206); none for a
+/// gate's approval.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct ApprovalFold {
@@ -228,13 +345,10 @@ pub struct ApprovalFold {
     pub text: String,
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub note: String,
-    /// an answer's pasted images (`you answered gift-ui` + his words,
-    /// R41): each the window's chip, never a marker in `text`/`note`
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub images: Vec<ImageRef>,
-    /// an answer's other files (absolute paths)
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub files: Vec<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub card: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub to: Option<String>,
 }
 
 /// A `scheduled` entry (batch 3b): a task set or ended (the hub's
@@ -252,6 +366,60 @@ pub struct Scheduled {
     pub words: String,
 }
 
+/// How a watch ended, as its thread says it (event-wake).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[serde(rename_all = "snake_case")]
+pub enum WakeEv {
+    /// its event happened: `cargo test ended · rc 0 · after 2m04s`
+    Ended,
+    /// past its max, still running: `the reindex still running after 1h00m`
+    Still,
+    /// the agent stopped it (`sb wake --stop`): `stopped waiting for …`
+    Stopped,
+    /// a bash command's day ran out, no wake: `stopped waiting for npm
+    /// run dev after 24h`
+    Expired,
+    /// a way this version doesn't know (a newer hub)
+    #[serde(other)]
+    Unknown,
+}
+
+/// A `wake` entry (event-wake): what ended and how; [`words::wake_head`]
+/// says it.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+pub struct WakeFold {
+    /// the watch's id
+    pub id: u64,
+    pub ev: WakeEv,
+    pub kind: crate::rows::WatchKind,
+    /// its name (the agents row's `watching[].what`)
+    pub what: String,
+    /// `what` is the agent's note (the row's `noted`)
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub noted: bool,
+    /// its rc, when known (an ended bash command, a job, an rc file)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub rc: Option<i64>,
+    /// how long it waited
+    pub after_ms: u64,
+    /// the last lines of its output (at most 20, folded: `▸ its last 3
+    /// lines`); empty: none or no output file
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub tail: Vec<String>,
+    /// the id of bise's message that woke the agent (folded into this
+    /// entry); none when nothing woke it
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub msg: Option<u64>,
+    /// the agent the wake is for, when that is not this thread's own:
+    /// another agent's wake shown in main's thread (the hub writes the
+    /// same line there, core_wake.rs; the window folds it, tier 4). Empty:
+    /// this thread's own wake (and every line written before the field)
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub agent: String,
+}
+
 /// Where a tool call is: running, done, failed (R11, amb-win S9).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS))]
@@ -265,6 +433,29 @@ pub enum ToolState {
     #[default]
     #[serde(other)]
     Unknown,
+}
+
+/// What the approvals gate holds a running call for (the hub's `sb gate :
+/// check|card <n>` lines, approvals-design.md §3.1): the checker judges
+/// it (`checking…` after 250 ms), or a card waits on him (`? waiting for
+/// you`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[serde(rename_all = "snake_case")]
+pub enum GateWait {
+    Check,
+    Card,
+    /// a wait this version doesn't know (a newer hub)
+    #[serde(other)]
+    Unknown,
+}
+
+/// A running call held by the gate, since `at_ms` (its gate line's time).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+pub struct ToolGate {
+    pub wait: GateWait,
+    pub at_ms: u64,
 }
 
 /// A file an edit touched, with its lines added and removed (the TUI's
@@ -326,6 +517,16 @@ pub struct ToolItem {
     #[serde(default)]
     pub id: u64,
     pub at_ms: u64,
+    /// the tool's name (`bash`); "" until the call's `tool` line
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub name: String,
+    /// its args as the call line gives them, unescaped, [`cap`]ped
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub args: String,
+    /// the model's one line for it (`tool_intent`, bash and TypeScript
+    /// calls: "running the tests")
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub intent: Option<String>,
     /// its intent ("running the tests"), else `name: first line of args`
     pub text: String,
     pub kind: ToolKind,
@@ -335,6 +536,10 @@ pub struct ToolItem {
     /// running until its result line, then ok or err
     #[serde(default)]
     pub state: ToolState,
+    /// the approvals gate holds it (running only: the gate's `done` line
+    /// and the call's end clear it)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub gate: Option<ToolGate>,
     /// its duration: the result line's time minus the call line's
     /// ([`words::tool_ms`]); none while it runs or on a replay
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -373,6 +578,19 @@ pub struct EntryCard {
     pub question: String,
     pub options: Vec<Opt>,
     pub answered: bool,
+    /// its kind, the same word as the hub's card row (`rows::Card.kind`:
+    /// `question`, `blocked`, `done`, …, an open set; `rows::card_rank`
+    /// reads it); none from an older hub
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub kind: Option<String>,
+    /// who asked (`rows::Card.agent`, the line's `@name`)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub agent: Option<String>,
+    /// how it was closed, the hub's word on its `card-closed` line
+    /// (`answered`, `answered via @docs`, `accepted`, `refused`, …, BISE-31):
+    /// the card fades with it; none while that line hasn't come
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub closed: Option<String>,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -416,6 +634,29 @@ pub struct Entry {
     /// line (the window draws the shot and the app on his message)
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub context: Option<FnContext>,
+    /// a `you` entry's mark (G1): where his message is, by the fold's one
+    /// rule ([`lines::deliver`], the TUI's too)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub delivery: Option<Delivery>,
+    /// a `you` entry: his message's id (`m_12` is 12), from the
+    /// `sb you-id : m_12` line sb-core writes right after his 'you' line.
+    /// None for an older transcript (nothing guessed). A `from_agent`
+    /// entry's id is its `msg`, as before
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub msg_id: Option<u64>,
+    /// the message reached the agent mid-turn (steered): the transcript
+    /// position of the `sb steered` receipt that names it, i.e. where in
+    /// the turn the agent read it (always after this entry's `pos`; one
+    /// receipt gives all its ids the same). None: not steered, or an
+    /// older transcript
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub steered_at: Option<u64>,
+    /// an agent wrote this to him (G5, the TUI's level 2): an `agent`
+    /// entry from the hub's `msg-you` (`from`: who), or a `from_agent`
+    /// one that is an old direct reply. A superset: those lines fold to
+    /// the kinds they always did (architect m_14424)
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub to_you: bool,
     /// a `to_agent` entry: who it went to
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub to: Option<String>,
@@ -448,6 +689,52 @@ pub struct Entry {
     pub scheduled: Option<Scheduled>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub turn_failed: Option<TurnFailed>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub wake: Option<WakeFold>,
+    /// the first entry after a `turn_started` line: a turn starts here
+    /// (the TUI's turn row; a reply's turn ends before the next start)
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub turn_start: bool,
+    /// the newest entry when its turn ended (any end: completed,
+    /// interrupted, failed), with the `turn_done` line's time (BISE-271:
+    /// the hover of the turn's replies); none for a replayed end (no
+    /// time) or one with no entry of its own to carry it
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub turn_end_ms: Option<u64>,
+    /// his message as typed parts (msg-parts, [`crate::parts`]): on a
+    /// `you` entry, and on an `approval` entry that is his answer to a
+    /// card (the note's parts). From the `you-parts` / `route-parts` line
+    /// sb-core writes after it. When this is not empty, no client draws
+    /// his message from `text` (the model's templated text, kept for
+    /// older clients, search and copy)
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub parts: Vec<crate::parts::Part>,
+    /// an `agent` entry cut off: the text he read as it streamed in,
+    /// kept when its turn failed before the answer came (the hub's `sb
+    /// kept` line); drawn dim, the failure's notice after it
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub cut: bool,
+    /// a `you` entry: the view that brought his words (`bise`: bise's
+    /// home hub routed them here, his own words; the window and the TUI
+    /// say 'via bise'), from the `you` line's `via`
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub via: Option<String>,
+    /// a `you` entry in bise's main: his words went to a project, not
+    /// to main (the `routed` line with its id)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub went: Option<Went>,
+}
+
+/// Where bise sent his words (a `you` entry's `went`): the project's hub
+/// id and its name; with `agent`, an agent of this project instead (his
+/// `@agent …` typed in this thread, at-start), `to` and `name` its name.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+pub struct Went {
+    pub to: String,
+    pub name: String,
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub agent: bool,
 }
 
 impl Entry {
@@ -463,6 +750,10 @@ impl Entry {
             page: None,
             report: None,
             context: None,
+            delivery: (kind == EntryKind::You).then_some(Delivery::Sent),
+            msg_id: None,
+            steered_at: None,
+            to_you: false,
             to: None,
             asks: false,
             msg: None,
@@ -476,6 +767,13 @@ impl Entry {
             approval: None,
             scheduled: None,
             turn_failed: None,
+            wake: None,
+            turn_start: false,
+            turn_end_ms: None,
+            parts: Vec::new(),
+            cut: false,
+            via: None,
+            went: None,
         }
     }
 
@@ -483,8 +781,12 @@ impl Entry {
     /// exactly that payload, and no other kind's: `pr` never comes with
     /// `pr: None`. The kinds without a payload carry none, but for an
     /// `agent` reply's own thinking (one line, one entry: pos is the key).
+    /// A `you` entry has its mark; a message from an agent (to another
+    /// one, or to him) says who wrote it, and no other entry does; only
+    /// an `agent` or a `from_agent` entry is written to him.
     pub fn payload_matches_kind(&self) -> bool {
         let has = [
+            (EntryKind::You, self.delivery.is_some()),
             (EntryKind::Tools, self.tools.is_some()),
             (EntryKind::Card, self.card.is_some()),
             (EntryKind::Page, self.page.is_some()),
@@ -498,13 +800,19 @@ impl Entry {
             (EntryKind::Approval, self.approval.is_some()),
             (EntryKind::Scheduled, self.scheduled.is_some()),
             (EntryKind::TurnFailed, self.turn_failed.is_some()),
+            (EntryKind::Wake, self.wake.is_some()),
         ];
         let thinking = match self.kind {
             EntryKind::Thinking => self.thinking.is_some(),
             EntryKind::Agent => true,
             _ => self.thinking.is_none(),
         };
-        thinking && has.iter().all(|(k, set)| *set == (self.kind == *k))
+        let from = self.from.is_some() == (self.kind == EntryKind::FromAgent || self.to_you);
+        let from = from && (!self.to_you || matches!(self.kind, EntryKind::Agent | EntryKind::FromAgent));
+        // his message's id is his entry's; steered: a message the agent got
+        let ids = (self.msg_id.is_none() || self.kind == EntryKind::You)
+            && (self.steered_at.is_none() || matches!(self.kind, EntryKind::You | EntryKind::FromAgent));
+        thinking && from && ids && has.iter().all(|(k, set)| *set == (self.kind == *k))
     }
 }
 
@@ -536,9 +844,12 @@ pub struct Ctx<'a> {
 /// lines don't start the transcript (the oldest entry, maybe cut, is
 /// dropped) or entries were left out; `before`: the oldest entry's pos
 /// when there is more (ask `page {before}` for the ones before it).
-pub fn page(lines: &[Line], ctx: &Ctx, limit: usize) -> (Vec<Entry>, Option<Pos>, bool) {
+/// `ahead`: the transcript's lines after `lines` (none for the newest
+/// page), read for the steered receipts of its last turn ([`mark_ahead`]).
+pub fn page(lines: &[Line], ahead: &[Line], ctx: &Ctx, limit: usize) -> (Vec<Entry>, Option<Pos>, bool) {
     let older = lines.first().is_some_and(|l| l.0 > 1);
     let mut entries = fold(lines, ctx);
+    mark_ahead(&mut entries, ahead);
     if older && entries.len() > 1 {
         entries.remove(0);
     }
@@ -548,9 +859,13 @@ pub fn page(lines: &[Line], ctx: &Ctx, limit: usize) -> (Vec<Entry>, Option<Pos>
     (entries, before, more)
 }
 
+pub mod find;
 pub mod fold;
+pub mod legacy;
 pub mod lines;
+pub mod obs;
 pub mod scheduled;
+pub mod think;
 pub mod when;
 pub mod words;
-pub use fold::fold;
+pub use fold::{fold, mark_ahead, tail_start};

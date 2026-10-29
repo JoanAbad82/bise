@@ -32,6 +32,7 @@
 //! and the per-view drafts keep it like an image, with no new state.
 
 use crate::app::App;
+use bise_proto::words::composer;
 use crate::attach::Attachment;
 
 /// Quotes in one message, at most.
@@ -41,8 +42,6 @@ pub(crate) const MAX_CHARS: usize = 8_000;
 /// How the label of a quote starts (`[Quote #2]`).
 pub(crate) const OPEN: &str = "[Quote #";
 
-const TAG_OPEN: &str = "<selection from=\"";
-const TAG_CLOSE: &str = "</selection>";
 
 /// The label of quote `n`.
 pub(crate) fn label(n: usize) -> String {
@@ -74,15 +73,8 @@ pub(crate) struct Where {
 /// file="src/a.rs" new="12-14" old="11-12">`, an attribute only when
 /// it has a value.
 pub(crate) fn tag_at(from: &str, at: &Where, text: &str) -> String {
-    let attr = |s: &str| s.replace('"', "'").replace('\n', " ");
-    let mut head = format!("{TAG_OPEN}{}\"", attr(from));
-    for (k, v) in [("file", &at.file), ("new", &at.new), ("old", &at.old)] {
-        if !v.is_empty() {
-            head.push_str(&format!(" {k}=\"{}\"", attr(v)));
-        }
-    }
-    let text = text.replace(TAG_CLOSE, "</selection >");
-    format!("{head}>\n{text}\n{TAG_CLOSE}")
+    // the one template (msg-parts): bise_proto's, the hub's and desktop's
+    bise_proto::parts::quote_tag(from, &at.file, &at.new, &at.old, None, text)
 }
 
 /// A quote read back from its tag.
@@ -92,50 +84,6 @@ pub(crate) struct Quote {
     pub(crate) text: String,
     /// from a diff: where (else all empty)
     pub(crate) at: Where,
-}
-
-/// The tag at the start of `s` (spaces and newlines before it allowed):
-/// the quote and the rest after it.
-fn parse_one(s: &str) -> Option<(Quote, &str)> {
-    let s = s.trim_start();
-    let rest = s.strip_prefix(TAG_OPEN)?;
-    let (head, rest) = rest.split_once("\">")?;
-    if head.contains('\n') {
-        return None;
-    }
-    // `from` up to its quote, then ` key="value"` pairs
-    let (from, mut attrs) = head.split_once('"').unwrap_or((head, ""));
-    let mut at = Where::default();
-    while !attrs.trim_start().is_empty() {
-        let (k, v) = attrs.trim_start().split_once("=\"")?;
-        let (v, more) = v.split_once('"').unwrap_or((v, ""));
-        match k {
-            "file" => at.file = v.to_string(),
-            "new" => at.new = v.to_string(),
-            "old" => at.old = v.to_string(),
-            _ => {}
-        }
-        attrs = more;
-    }
-    let (text, rest) = rest.split_once(TAG_CLOSE)?;
-    let text = text.strip_prefix('\n').unwrap_or(text);
-    let text = text.strip_suffix('\n').unwrap_or(text);
-    Some((Quote { from: from.to_string(), text: text.to_string(), at }, rest))
-}
-
-/// The tags in front of a message, and its text after them (the newline
-/// after the last tag dropped). No tag: none, the whole message.
-pub(crate) fn split(msg: &str) -> (Vec<Quote>, &str) {
-    let mut out = Vec::new();
-    let mut rest = msg;
-    while let Some((q, r)) = parse_one(rest) {
-        out.push(q);
-        rest = r;
-    }
-    if out.is_empty() {
-        return (out, msg);
-    }
-    (out, rest.strip_prefix('\n').unwrap_or(rest))
 }
 
 /// Lines in `text` (a last empty line not counted; at least 1).
@@ -178,12 +126,11 @@ pub(crate) fn words(q: &Quote) -> String {
 /// `src/quote.rs:192-194 · 3 lines`, `src/a.rs:40-41 · 2 removed lines`.
 pub(crate) fn about(q: &Quote) -> String {
     let n = line_count(&q.text);
-    let s = if n == 1 { "" } else { "s" };
     match (&q.at.file, &q.at.new, &q.at.old) {
-        (f, _, _) if f.is_empty() => format!("{} · {} line{}", q.from, n, s),
-        (f, new, _) if !new.is_empty() => format!("{}:{} · {} line{}", f, new, n, s),
-        (f, _, old) if !old.is_empty() => format!("{}:{} · {} removed line{}", f, old, n, s),
-        (f, _, _) => format!("{} · {} line{}", f, n, s),
+        (f, _, _) if f.is_empty() => composer::quote_about(&q.from, n),
+        (f, new, _) if !new.is_empty() => composer::quote_about(format!("{f}:{new}"), n),
+        (f, _, old) if !old.is_empty() => composer::quote_about_removed(format!("{f}:{old}"), n),
+        (f, _, _) => composer::quote_about(f, n),
     }
 }
 
@@ -192,7 +139,21 @@ pub(crate) fn of(a: &Attachment) -> Option<Quote> {
     if !is_quote(&a.label) {
         return None;
     }
-    parse_one(&a.marker).map(|(q, _)| q)
+    // its tag read back as its part (msg-parts: bise_proto's one read)
+    match bise_proto::parts::parse(&a.marker).as_slice() {
+        [bise_proto::parts::Part::Quote { from, text, file, new, old, .. }] => {
+            Some(Quote { from: from.clone(), text: text.clone(), at: Where { file: file.clone(), new: new.clone(), old: old.clone() } })
+        }
+        _ => None,
+    }
+}
+
+/// The quotes in front of a sent message and its words after them, as
+/// the history reads them (tests: the old `split`'s cases).
+#[cfg(test)]
+fn split(msg: &str) -> (Vec<Quote>, String) {
+    let v = crate::said::view(&crate::said::Said::from(msg));
+    (v.quotes, v.body)
 }
 
 /// The quote chips in `text` (first char, past it, N).
@@ -211,10 +172,10 @@ pub(crate) fn add(app: &mut App, from: &str, text: &str) -> Result<String, Strin
 pub(crate) fn add_at(app: &mut App, from: &str, at: &Where, text: &str) -> Result<String, String> {
     let text = text.trim_matches('\n').trim_end();
     if text.trim().is_empty() {
-        return Err("nothing selected".into());
+        return Err(composer::nothing_selected.into());
     }
     if chips(&app.ed.text).len() >= MAX {
-        return Err(format!("{MAX} quotes at most: backspace on one to make room"));
+        return Err(composer::quotes_at_most(MAX));
     }
     let text: String = match text.char_indices().nth(MAX_CHARS) {
         Some((b, _)) => format!("{}…", &text[..b]),
@@ -292,11 +253,11 @@ pub(crate) fn take_selection(app: &mut App) -> Option<Result<String, String>> {
 /// not fit; empty: none (the thread's).
 pub(crate) fn hint_line(width: usize, no_color: bool, who: &str) -> Option<ratatui::text::Line<'static>> {
     if !who.is_empty() {
-        if let Some(l) = hint_words(width, no_color, &format!(" to ask {who} about it")) {
+        if let Some(l) = hint_words(width, no_color, &format!(" {}", composer::bar_ask_who(who))) {
             return Some(l);
         }
     }
-    hint_words(width, no_color, " to ask about it")
+    hint_words(width, no_color, &format!(" {}", composer::bar_ask))
 }
 
 fn hint_words(width: usize, no_color: bool, words: &str) -> Option<ratatui::text::Line<'static>> {
@@ -314,8 +275,8 @@ fn hint_words(width: usize, no_color: bool, words: &str) -> Option<ratatui::text
     };
     let (open, close) = if no_color { ("[ ", " ]") } else { (" ", " ") };
     let ask_pair = [Span::styled(open, bg), Span::styled("type", key), Span::styled(words.to_string(), ask)];
-    let tab_pair = [Span::styled(" · ", sep), Span::styled(TAB_KEY, copy_key), Span::styled(" quote", copy)];
-    let copy_pair = [Span::styled(" · ", sep), Span::styled(COPY_KEY, copy_key), Span::styled(" copy", copy)];
+    let tab_pair = [Span::styled(" · ", sep), Span::styled(TAB_KEY, copy_key), Span::styled(format!(" {}", composer::bar_quote), copy)];
+    let copy_pair = [Span::styled(" · ", sep), Span::styled(COPY_KEY, copy_key), Span::styled(format!(" {}", composer::bar_copy), copy)];
     let end = [Span::styled(close, bg)];
     // designer m_11973: narrower, `cmd+c copy` goes first, then `tab quote`
     let long: Vec<Span<'static>> = ask_pair.iter().chain(&tab_pair).chain(&copy_pair).chain(&end).cloned().collect();
@@ -344,7 +305,7 @@ pub(crate) fn hint_part(line: &ratatui::text::Line<'_>, x: u16) -> HintPart {
     for (i, s) in line.spans.iter().enumerate() {
         let w = s.width();
         if (x as usize) < at + w {
-            let copy = s.content == COPY_KEY || s.content == " copy" || line.spans.get(i + 1).is_some_and(|n| n.content == COPY_KEY);
+            let copy = s.content == COPY_KEY || s.content.strip_prefix(' ') == Some(composer::bar_copy) || line.spans.get(i + 1).is_some_and(|n| n.content == COPY_KEY);
             return if copy { HintPart::Copy } else { HintPart::Quote };
         }
         at += w;
@@ -411,7 +372,7 @@ pub(crate) fn hint_click(app: &App, col: u16, row: u16) -> Option<HintPart> {
 /// the composer's cursor, the flash says it. False: no selection.
 pub(crate) fn quote_now(app: &mut App) -> bool {
     match take_selection(app) {
-        Some(Ok(chip)) => crate::input::flash(app, format!("quoted {chip} · backspace on it removes it")),
+        Some(Ok(chip)) => crate::input::flash(app, composer::quoted(chip)),
         Some(Err(e)) => crate::input::flash(app, e),
         None => return false,
     }
@@ -432,8 +393,8 @@ mod tests {
         assert_eq!(rest, "why?");
         assert_eq!(qs[0], Quote { from: "main".into(), text: "fn a() {}\n  b".into(), ..Default::default() });
         assert_eq!(qs[1], Quote { from: "you, docs".into(), text: "x </selection > y".into(), ..Default::default() });
-        assert_eq!(split("hello <selection from=\"x\">"), (vec![], "hello <selection from=\"x\">"));
-        assert_eq!(split("<selection from=\"x\">\nno end"), (vec![], "<selection from=\"x\">\nno end"));
+        assert_eq!(split("hello <selection from=\"x\">"), (vec![], "hello <selection from=\"x\">".to_string()));
+        assert_eq!(split("<selection from=\"x\">\nno end"), (vec![], "<selection from=\"x\">\nno end".to_string()));
     }
 
     use crate::wire::Ev;
@@ -534,8 +495,9 @@ mod tests {
         assert_eq!(app.ed.text.matches('b').count(), 1, "the key still types");
     }
 
-    /// ⏎: the tags first, one per quote, then the text; the history
-    /// draws a dim quote line over your words.
+    /// ⏎: each quote's tag where its chip was, with its number (his
+    /// m_22231); the history draws a dim quote line over your words,
+    /// '❝ 1' at its place in them.
     #[test]
     fn the_sent_message_carries_the_tag() {
         let mut app = selected();
@@ -545,24 +507,21 @@ mod tests {
         press(&mut app, KeyCode::Enter);
         let sent = app.history[0].clone();
         let (qs, rest) = split(&sent);
-        assert!(sent.starts_with("<selection from=\"main\">\n"), "{sent}");
-        assert!(sent.contains("\n</selection>\nwhy?"), "{sent}");
-        assert_eq!(rest, "why?");
+        assert!(sent.starts_with("<selection from=\"main\" n=\"1\">\n"), "{sent}");
+        assert!(sent.ends_with("\n</selection>why?") || sent.ends_with("\n</selection> why?"), "{sent}");
+        assert!(rest.starts_with("❝ 1") && rest.ends_with("why?"), "{rest}");
         assert_eq!(qs.len(), 1);
         assert!(app.attachments.is_empty());
-        let rows: Vec<String> = crate::render::user_block_lines(&sent, crate::wire::Mark::Sent, false, 60)
+        let rows: Vec<String> = crate::render::user_block_lines(&sent.as_str().into(), crate::wire::Mark::Sent, false, 60)
             .iter()
             .map(|l| l.spans.iter().map(|s| s.content.as_ref()).collect())
             .collect();
         assert_eq!(rows.len(), 2, "{rows:?}");
         assert!(rows[0].contains("❝ ") && rows[0].contains("safari · main · 1 line"), "{rows:?}");
         assert!(rows[1].contains("why?"), "{rows:?}");
-        // a quote in the middle of the text still goes first, its label gone
+        // a quote in the middle of the text sits there, with its number
         app.attachments.push(Attachment { label: label(1), marker: tag("you", "q"), info: Default::default() });
-        assert_eq!(
-            crate::attach::expand(&mut app, "look [Quote #1] here"),
-            "<selection from=\"you\">\nq\n</selection>\nlook here"
-        );
+        assert_eq!(crate::attach::expand(&mut app, "look [Quote #1] here"), "look <selection from=\"you\" n=\"1\">\nq\n</selection> here");
     }
 
     #[test]
@@ -570,7 +529,7 @@ mod tests {
         let mut app = crate::sb::bench::test_app();
         app.sb.focus = "docs".into();
         app.events = vec![
-            Ev::You("hi".into(), crate::wire::Mark::Read, false),
+            Ev::You("hi".into(), crate::wire::Mark::Read, false, None),
             Ev::Assistant("a".into()),
             Ev::TimeMark("14:02".into()),
             Ev::Assistant("b".into()),
@@ -799,5 +758,21 @@ mod tests {
         assert!(app.feed_sel.is_none() && !app.quote_hint);
         assert!(of(&app.attachments[0]).unwrap().text.contains("number"), "{:?}", app.attachments);
         assert!(!frame_text(&mut app, 100, 30).iter().any(|r| r.contains("ask about it ·")));
+    }
+
+    /// One typed message, the same parts from both composers (architect
+    /// m_22426): the shared fixture's TUI text through expand gives its
+    /// parts; the window's vitest runs its segments through buildMessage
+    /// (composer/pure.test.ts).
+    #[test]
+    fn both_composers_give_the_same_parts() {
+        let cases: Vec<serde_json::Value> = serde_json::from_str(include_str!("../../proto/fixtures/composer_parts.json")).unwrap();
+        for c in cases {
+            let mut app = crate::sb::bench::test_app();
+            app.attachments.push(Attachment { label: label(1), marker: tag("main", "q"), info: Default::default() });
+            let said = crate::attach::expand(&mut app, c["tui"].as_str().unwrap());
+            let want: Vec<bise_proto::parts::Part> = serde_json::from_value(c["parts"].clone()).unwrap();
+            assert_eq!(said.parts, want, "{}", c["name"]);
+        }
     }
 }

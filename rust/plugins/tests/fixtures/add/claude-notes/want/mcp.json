@@ -1,0 +1,24 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/mcp.schema.json",
+  "mcpServers": {
+    "notes": {
+      "args": [
+        "--dir",
+        "${PLUGIN_ROOT}/data"
+      ],
+      "command": "${PLUGIN_ROOT}/bin/notes-mcp",
+      "env": {
+        "NOTES_TOKEN": "${NOTES_TOKEN}"
+      },
+      "type": "stdio"
+    },
+    "search": {
+      "args": [
+        "-y",
+        "notes-search-mcp"
+      ],
+      "command": "npx",
+      "type": "stdio"
+    }
+  }
+}

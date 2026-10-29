@@ -27,6 +27,7 @@ python3 -u tests/tui_mcp_login_tmux.py
 """
 import json
 import os
+import re
 import shlex
 import subprocess
 import sys
@@ -37,6 +38,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import e2e  # noqa: E402
 import wait  # noqa: E402
 from tui_tmux import tui_session, run  # noqa: E402
+from words import w, w_re  # noqa: E402
 
 COLS, ROWS = 120, 36
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -145,7 +147,7 @@ def login_elsewhere(cols):
             # the long lines wrap in the thread: the needles fit one row
             sc = t.wait("/plugins login fake <address>")
             flat = " ".join(sc.replace("│", " ").split())
-            for want in ("opening your browser to log in to fake…", "or open this link:", "http://%s/authorize?" % host,
+            for want in (w("settings.plugins_login_opening", name="fake"), "or open this link:", "http://%s/authorize?" % host,
                          "browser on another machine? log in there. the last page won't load: copy its address,"):
                 assert want in flat, (want, sc)
             shot(t, "link", sc)
@@ -198,7 +200,7 @@ def login_here():
     try:
         with tui_session(COLS, ROWS, env=env, E=E) as t:
             t.wait("bise :*")
-            sc = t.wait("fake needs a login: /plugins login")
+            sc = t.wait(w("settings.plugins_needs_login", name="fake"))
             shot(t, "quiet-line", sc)
             # the popup wants an argument: esc closes it, ⏎ runs the line
             t.typed("/plugins list")
@@ -211,16 +213,17 @@ def login_here():
             sc = t.wait("mcp fake · %s · needs a login · /plugins login" % host)
             shot(t, "plugins-needs-login", sc)
             t.typed("/plugins login ")
-            sc = t.wait_re(r"fake\s+%s · needs a login" % host.replace(".", r"\."))
+            # the row's desc: `<host> · ` and the part's login word
+            sc = t.wait_re(r"fake\s+" + re.escape("%s · %s" % (host, w("settings.plugins_part_needs_login"))))
             shot(t, "popup-needs-login", sc)
             t.keys("Enter")
             sc = t.wait("logged in to fake: 3 tools, your agents have them now.")
-            assert "opening your browser to log in to fake…" in sc, sc
+            assert w("settings.plugins_login_opening", name="fake") in sc, sc
             shot(t, "logged-in", sc)
             html = page(1)
             assert "bise <b>:*</b> is logged in to fake." in html, html
             t.typed("/plugins login ")
-            sc = t.wait_re(r"fake\s+%s · logged in · 3 tools" % host.replace(".", r"\."))
+            sc = t.wait_re(r"fake\s+" + re.escape("%s · logged in · 3 tools" % host))
             shot(t, "popup-logged-in", sc)
             t.keys("Escape")
             t.keys("C-u")

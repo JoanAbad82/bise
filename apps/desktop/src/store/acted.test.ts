@@ -1,0 +1,169 @@
+// card-state's laws: the cards he answered or closed have one owner, the store, and only the
+// hub's rows take them out (his #384 came back on a project switch: a view's own copy). Owner: amb-home.
+import { describe, expect, it } from "vitest";
+import type { Card, ProjectRow } from "@/proto";
+import { ACTED_KEPT, ACTED_STALE_MS, actedAdd, actedAnswered, actedKeys, actedOf, actedPrune } from "./acted";
+import { Store } from "./store";
+
+const card = (project: string, id: number): Card => ({ id, project, kind: "question", agent: "docs", question: "?", options: [], urgent: false, since_ms: 0 });
+const row = (project: string, ids: number[]): ProjectRow => ({ project, name: project, cards: ids.map((i) => card(project, i)) }) as unknown as ProjectRow;
+
+function keepOf(): { read: (k: string) => unknown; write: (k: string, v: unknown) => void } {
+  const kept = new Map<string, unknown>();
+  return { read: (k) => kept.get(k), write: (k, v) => kept.set(k, v) };
+}
+
+describe("acted: the cards he answered or closed, one owner", () => {
+  it("adds once per card, the newest last, at most ACTED_KEPT", () => {
+    const a = actedAdd(actedAdd([], "shop", 2, 1), "shop", 2, 5);
+    expect(a).toEqual([{ key: "shop-2", project: "shop", card: 2, at_ms: 5 }]);
+    let many: ReturnType<typeof actedAdd> = [];
+    for (let i = 0; i < ACTED_KEPT + 4; i += 1) many = actedAdd(many, "shop", i, i);
+    expect(many).toHaveLength(ACTED_KEPT);
+    expect(many[0]?.card).toBe(4);
+  });
+
+  it("only a loaded row that no longer lists the card takes it out; the same list when nothing goes", () => {
+    const a = actedAdd(actedAdd([], "shop", 2, 1), "ts-pattern", 384, 2);
+    // the hub still lists both: nothing goes, the same reference
+    expect(actedPrune(a, [row("shop", [2]), row("ts-pattern", [384])], 10)).toBe(a);
+    // ts-pattern not loaded yet (a reload), or its row without its cards yet: its entry stays
+    expect(actedPrune(a, [row("shop", [])], 10).map((x) => x.key)).toEqual(["ts-pattern-384"]);
+    expect(actedPrune(a, [row("shop", []), { project: "ts-pattern" }], 10).map((x) => x.key)).toEqual(["ts-pattern-384"]);
+    // its row came without the card: the hub closed it
+    expect(actedPrune(a, [row("shop", []), row("ts-pattern", [])], 10)).toEqual([]);
+    expect(actedKeys(a)).toEqual(new Set(["shop-2", "ts-pattern-384"]));
+  });
+
+  it("ghost-badge: an entry never hides a card the hub kept open (the sidebar's 1, an empty inbox)", () => {
+    const a = actedAdd(actedAdd([], "ai-docs", 19, 1_000), "shop", 2, 1_000);
+    // the hub's answer came while its rows still list the card: it kept it open, the entry goes
+    expect(actedAnswered(a, "ai-docs", 19, [row("ai-docs", [19])]).map((x) => x.key)).toEqual(["shop-2"]);
+    // its rows had dropped it before the answer: nothing to undo (the next rows prune it)
+    expect(actedAnswered(a, "ai-docs", 19, [row("ai-docs", [])])).toBe(a);
+    // not loaded, or a card he never acted on: the same list
+    expect(actedAnswered(a, "ai-docs", 19, [])).toBe(a);
+    expect(actedAnswered(a, "ai-docs", 20, [row("ai-docs", [19, 20])])).toBe(a);
+    // no answer ever came (a set kept by an older build, his live keep): past ACTED_STALE_MS the
+    // hub's rows win; a row not loaded keeps its entry still
+    const rows = [row("ai-docs", [19]), row("shop", [2])];
+    expect(actedPrune(a, rows, 1_000 + ACTED_STALE_MS - 1)).toBe(a);
+    expect(actedPrune(a, rows, 1_000 + ACTED_STALE_MS)).toEqual([]);
+    expect(actedPrune(a, [row("ai-docs", [19])], 1_000 + ACTED_STALE_MS).map((x) => x.key)).toEqual(["shop-2"]);
+  });
+
+  it("reads the kept list back, junk dropped", () => {
+    const ok = { key: "shop-2", project: "shop", card: 2, at_ms: 1 };
+    expect(actedOf([ok, { key: "shop-3", project: "shop", card: 2, at_ms: 1 }, "x", null])).toEqual([ok]);
+    expect(actedOf("nope")).toEqual([]);
+  });
+
+  it("the store: answer and close put it in, every reader sees the same set, rows take it out", () => {
+    const sent: unknown[] = [];
+    const s = new Store({ send: (c) => sent.push(c) }, { now: () => 7 });
+    s.apply({ ev: "projects", projects: [row("ts-pattern", [384, 385])] });
+    s.do({ i: "answer", project: "ts-pattern", card: 384, reply: "1" });
+    s.do({ i: "close", project: "ts-pattern", card: 385 });
+    expect(s.acted().map((a) => a.key)).toEqual(["ts-pattern-384", "ts-pattern-385"]);
+    expect(sent).toEqual([
+      { cmd: "answer", project: "ts-pattern", card: 384, reply: "1" },
+      { cmd: "close", project: "ts-pattern", card: 385 },
+    ]);
+    // the hub's next rows still list 384 (a merge running): it stays out; 385 closed: gone
+    const before = s.acted();
+    s.apply({ ev: "projects", projects: [row("ts-pattern", [384])] });
+    expect(s.acted().map((a) => a.key)).toEqual(["ts-pattern-384"]);
+    expect(s.acted()).not.toBe(before);
+    // another project's rows (a project switch) never bring it back
+    const same = s.acted();
+    s.apply({ ev: "projects", projects: [row("ts-pattern", [384]), row("shop", [1])] });
+    expect(s.acted()).toBe(same);
+  });
+
+  it("a refused answer or close shows that very card again with the words (architect m_23524)", () => {
+    const s = new Store({ send: () => undefined }, { now: () => 7 });
+    s.apply({ ev: "projects", projects: [row("shop", [2, 3, 4])] });
+    s.do({ i: "answer", project: "shop", card: 2, reply: "1" });
+    s.do({ i: "answer", project: "shop", card: 3, reply: "1" });
+    s.do({ i: "close", project: "shop", card: 4 });
+    // the first answer's result came after rows that dropped card 2 (the hub broadcasts a step's
+    // cards before it answers): the hub took it, the entry goes with those rows
+    s.apply({ ev: "projects", projects: [row("shop", [3, 4])] });
+    s.apply({ ev: "card_answered", project: "shop", card: 2, answer: null });
+    expect(s.acted().map((a) => a.key)).toEqual(["shop-3", "shop-4"]);
+    // card 4's close is refused (an older request than card 3's, answered later): card 4 alone is back
+    s.apply({ ev: "card_refused", project: "shop", card: 4, text: "no such card" });
+    expect(s.acted().map((a) => a.key)).toEqual(["shop-3"]);
+    // the words go on that card (refused.ts), never on the project's line (try-gate-f2a7)
+    expect(s.notice("shop")).toBeNull();
+    // the error event every window gets un-hides nothing and says nothing: only its request names the card
+    s.apply({ ev: "error", project: "shop", cmd: "answer", text: "card 3 isn't open" });
+    expect(s.acted().map((a) => a.key)).toEqual(["shop-3"]);
+    expect(s.notice("shop")).toBeNull();
+    s.apply({ ev: "card_refused", project: "shop", card: 3, text: "card 3 isn't open" });
+    expect(s.acted()).toEqual([]);
+    // another project's refusal touches nothing here
+    s.do({ i: "answer", project: "shop", card: 2, reply: "1" });
+    s.apply({ ev: "card_refused", project: "other", card: 2, text: "no" });
+    expect(s.acted().map((a) => a.key)).toEqual(["shop-2"]);
+  });
+
+  it("ghost-badge: answered on the page, then from the inbox: the hub keeps the card, every view shows it again", () => {
+    // his live ai-docs #19 (a page's '2 drafts wait for you'): he answered the page, then the
+    // re-asked card from the inbox; the hub answered ok and kept it open
+    const s = new Store({ send: () => undefined }, { now: () => 5_000 });
+    s.apply({ ev: "projects", projects: [row("ai-docs", [19])] });
+    s.do({ i: "answer", project: "ai-docs", card: 19, reply: "the words he typed" });
+    expect(s.acted().map((a) => a.key)).toEqual(["ai-docs-19"]);
+    // the step's rows (still #19), then the hub's answer
+    s.apply({ ev: "projects", projects: [row("ai-docs", [19])] });
+    s.apply({ ev: "card_answered", project: "ai-docs", card: 19, answer: null });
+    expect(s.acted()).toEqual([]);
+  });
+
+  it("inbox-reappear (his #780): a card whose answer the hub carries out (running) stays answered until the hub closes it", () => {
+    // his 'merge native-mac into main?': he picks merge, the hub keeps the item open while the merge runs
+    let now = 1_000;
+    const merging = (ids: number[], running: boolean): ProjectRow =>
+      ({ project: "harness", name: "harness", cards: ids.map((i) => ({ ...card("harness", i), kind: "feature_merge", ...(running ? { running: true } : {}) })) }) as unknown as ProjectRow;
+    const s = new Store({ send: () => undefined }, { now: () => now });
+    s.apply({ ev: "projects", projects: [merging([780], false)] });
+    s.do({ i: "answer", project: "harness", card: 780, reply: "1" });
+    // the step's rows (running), then the hub's answer: still his answered card
+    s.apply({ ev: "projects", projects: [merging([780], true)] });
+    s.apply({ ev: "card_answered", project: "harness", card: 780, answer: null });
+    expect(s.acted().map((a) => a.key)).toEqual(["harness-780"]);
+    // minutes into the merge, past ACTED_STALE_MS
+    now += ACTED_STALE_MS * 5;
+    s.apply({ ev: "projects", projects: [merging([780], true)] });
+    expect(s.acted().map((a) => a.key)).toEqual(["harness-780"]);
+    // the merge ends: the hub closes it, the entry goes
+    s.apply({ ev: "projects", projects: [merging([], false)] });
+    expect(s.acted()).toEqual([]);
+    // the pure rules: running keeps it; listed and not running stays the ghost-badge rule (shown again)
+    const a = actedAdd([], "harness", 780, 0);
+    expect(actedAnswered(a, "harness", 780, [merging([780], true)])).toBe(a);
+    expect(actedAnswered(a, "harness", 780, [merging([780], false)])).toEqual([]);
+    expect(actedPrune(a, [merging([780], true)], ACTED_STALE_MS + 1)).toBe(a);
+    expect(actedPrune(a, [merging([780], false)], ACTED_STALE_MS + 1)).toEqual([]);
+  });
+
+  it("ghost-badge: a set kept by an older build no longer hides a card the hub still lists", () => {
+    const keep = keepOf();
+    keep.write("acted", [{ key: "ai-docs-19", project: "ai-docs", card: 19, at_ms: 1_000 }]);
+    const s = new Store({ send: () => undefined }, { now: () => 1_000 + ACTED_STALE_MS, asides: keep });
+    s.apply({ ev: "projects", projects: [row("ai-docs", [19])] });
+    expect(s.acted()).toEqual([]);
+  });
+
+  it("a reload keeps it until the rows drop it (his #384: never back once answered)", () => {
+    const keep = keepOf();
+    const s = new Store({ send: () => undefined }, { now: () => 7, asides: keep });
+    s.do({ i: "answer", project: "ts-pattern", card: 384, reply: "1" });
+    const again = new Store({ send: () => undefined }, { asides: keep });
+    expect(again.acted().map((a) => a.key)).toEqual(["ts-pattern-384"]);
+    again.apply({ ev: "projects", projects: [row("ts-pattern", [])] });
+    expect(again.acted()).toEqual([]);
+    expect(new Store({ send: () => undefined }, { asides: keep }).acted()).toEqual([]);
+  });
+});

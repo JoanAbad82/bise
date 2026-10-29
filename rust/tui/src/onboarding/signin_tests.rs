@@ -162,6 +162,17 @@ fn fake_check(c: &crate::keycheck::Call, _: Option<String>) -> Result<(), crate:
     }
 }
 
+/// Held by a test while it looks at `Sub::Checking`: the check's thread
+/// answers only once the test lets go (else a fast thread answers in the
+/// same tick that started it, and the screen goes straight to Works).
+static CHECK_HELD: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+/// [`fake_check`], once [`CHECK_HELD`] is free.
+fn held_check(c: &crate::keycheck::Call, url: Option<String>) -> Result<(), crate::keycheck::Fail> {
+    drop(CHECK_HELD.lock().unwrap_or_else(|e| e.into_inner()));
+    fake_check(c, url)
+}
+
 /// The first run's key step on a temp HOME, the fake sign-in in.
 fn first_run(e: Env) -> Onb {
     let mut o = Onb::new(e);
@@ -171,9 +182,12 @@ fn first_run(e: Env) -> Onb {
     o
 }
 
-/// Each frame: the sign-in, the check and the sign out answer.
+/// Each frame: the sign-in, the check and the sign out answer. Their
+/// threads get 30 s of wall time: under the gate's load (1469 tests, load
+/// 20+) a 2 s budget ran out before the plan check's thread ran (r38).
 fn settle(o: &mut Onb, e: Env) {
-    for _ in 0..400 {
+    let t0 = std::time::Instant::now();
+    while t0.elapsed() < std::time::Duration::from_secs(30) {
         o.tick(e);
         if !matches!(o.sub, Sub::Checking(..) | Sub::SignIn(..)) && o.signing_out.is_none() {
             return;
@@ -235,20 +249,38 @@ fn codex_signed_in_marks_the_chatgpt_row() {
 }
 
 #[test]
-fn claude_code_plan_says_why_once_and_only_without_an_anthropic_key() {
+fn claude_code_plan_points_at_its_api_credits_once_and_only_without_an_anthropic_key() {
+    use bise_proto::words::settings;
     let h = tmp("claude");
     let e = home_env(&h, &[]);
-    let line = "your Claude plan works only in Claude Code (Anthropic's terms). for Claude here, use an API key.";
+    let lines = [settings::first_claude_plan, settings::first_claude_credits_how];
     script(PlanState::NotSetUp, Detected { codex_chatgpt: false, claude_plan: true }, vec![]);
     let o = first_run(&e);
     let sc = screen(&o);
-    has(&sc, &[line]);
+    has(&sc, &lines);
     assert_eq!(flat(&sc).matches("Claude Code").count(), 1, "{sc}");
-    has(&screen_at(&o, 80, 36), &[line]);
+    has(&screen_at(&o, 80, 36), &lines);
     // an Anthropic key: nothing to say
     let e = home_env(&h, &[("ANTHROPIC_API_KEY", "sk-ant-x")]);
     let o = first_run(&e);
     assert!(!flat(&screen(&o)).contains("Claude Code"), "{}", screen(&o));
+}
+
+#[test]
+fn the_anthropic_key_step_says_a_claude_plan_s_credits_pay_for_it_only_when_one_is_seen() {
+    use bise_proto::words::settings;
+    let h = tmp("claude-key");
+    let e = home_env(&h, &[]);
+    for (seen, shown) in [(true, true), (false, false)] {
+        script(PlanState::NotSetUp, Detected { codex_chatgpt: false, claude_plan: seen }, vec![]);
+        let mut o = first_run(&e);
+        o.sub = Sub::Paste(o.every_of("anthropic"), String::new(), String::new());
+        let sc = screen(&o);
+        assert_eq!(flat(&sc).contains(settings::first_claude_credits_key), shown, "{sc}");
+        // another provider's key: nothing about Claude
+        o.sub = Sub::Paste(o.every_of("openai"), String::new(), String::new());
+        assert!(!flat(&screen(&o)).contains(settings::first_claude_credits_key));
+    }
 }
 
 #[test]
@@ -269,13 +301,17 @@ fn continue_with_chatgpt_waits_then_signs_in_checks_and_runs_main_on_the_plan() 
     assert_eq!(crate::clipboard::test_clipboard().as_deref(), Some(URL));
     has(&screen(&o), &["c copied   esc cancel"]);
     assert!(matches!(o.sub, Sub::SignIn(Kind::ChatGpt, Some(_))));
-    // still waiting, then back from the browser: signed in, the plan checked
+    // still waiting, then back from the browser: signed in, the plan
+    // checked (its answer held until the checking screen is seen)
+    o.checker = held_check;
+    let held = CHECK_HELD.lock().unwrap_or_else(|e| e.into_inner());
     o.tick(&e);
     assert!(matches!(o.sub, Sub::SignIn(..)));
     o.tick(&e);
     assert!(matches!(o.sub, Sub::Checking(_, _, Tried::Plan(_))), "{:?}", o.sub);
     assert!(o.flow.is_none());
     has(&screen(&o), &["✓ signed in as you@example.com · ChatGPT Plus", "checking your plan…"]);
+    drop(held);
     settle(&mut o, &e);
     assert_eq!(o.sub, Sub::Works(o.plan_provider().unwrap(), "chatgpt/gpt-6.1-sol".into()));
     let sc = screen(&o);

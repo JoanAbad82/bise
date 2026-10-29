@@ -6,6 +6,9 @@ use std::path::{Path, PathBuf};
 
 use serde_json::{Map, Value};
 
+use crate::id::{PartKind, PluginId};
+use crate::model::StateV2;
+
 pub const PLUGIN_SCHEMA: &str = "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json";
 pub const MCP_SCHEMA: &str = "https://agent-plugins.org/schemas/1.0.0/mcp.schema.json";
 pub const RESERVED: [&str; 6] = ["file_system", "process", "self", "skill", "subagent", "vibe"];
@@ -278,8 +281,19 @@ pub struct Plugin {
     pub servers: Vec<StdioServer>,
     /// remote servers (Streamable HTTP, SSE)
     pub remotes: Vec<HttpServer>,
+    /// its skills turned off in plugins.json (`<name>#skill:<skill>`):
+    /// listed, never in `skills`, so never in a prompt
+    pub off_skills: Vec<Skill>,
+    /// its MCP servers turned off in plugins.json (`<name>#mcp:<id>`,
+    /// stdio or remote): listed, never in `servers`/`remotes`
+    pub off_servers: Vec<crate::id::PluginId>,
+    /// what to try it with (`dev.bise.prompts`, cut: [`cut_prompts`])
+    pub prompts: Vec<String>,
     /// components present on disk but not supported yet
     pub unsupported: Vec<String>,
+    /// opt-in (`"dev.bise": {"default": "off"}`): on only when named in
+    /// `enabled`; the `opt_in` of every `StateV2::is_on` about it
+    pub opt_in: bool,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -303,11 +317,9 @@ pub struct Roots {
     pub workspace: Option<PathBuf>,
     /// where `${PLUGIN_DATA}` roots live (one folder per plugin name)
     pub data: PathBuf,
-    pub disabled: Vec<String>,
-    /// the opt-in plugins turned on (a manifest with
-    /// `"extensions": {"dev.bise": {"default": "off"}}` loads only when
-    /// its name is here)
-    pub enabled: Vec<String>,
+    /// the on/off state (`crate::state::read`): a plugin off is listed
+    /// as disabled, its skills and servers off are listed, not loaded
+    pub state: StateV2,
 }
 
 impl Roots {
@@ -325,8 +337,7 @@ impl Roots {
             user: Some(user),
             workspace: workspace.map(|w| w.join(".agents").join("plugins")),
             data,
-            disabled: crate::state::disabled(&crate::state::state_path()),
-            enabled: crate::state::enabled(&crate::state::state_path()),
+            state: crate::state::read(&crate::state::state_path()),
         }
     }
 }
@@ -340,8 +351,15 @@ impl Roots {
 pub fn fingerprint(roots: &Roots) -> u64 {
     use std::hash::{Hash, Hasher};
     let mut h = std::collections::hash_map::DefaultHasher::new();
-    roots.disabled.hash(&mut h);
-    roots.enabled.hash(&mut h);
+    // the plugins and the skills on or off (a skill is in the prompt); a
+    // server or a tool toggled moves nothing: the bridge applies it
+    let st = &roots.state;
+    st.disabled.hash(&mut h);
+    st.enabled.hash(&mut h);
+    for l in [&st.parts_off, &st.parts_on] {
+        l.iter().filter(|id| matches!(id, PluginId::Part { kind: PartKind::Skill, .. })).for_each(|id| id.hash(&mut h));
+        0u8.hash(&mut h);
+    }
     let stat = |p: &Path, h: &mut std::collections::hash_map::DefaultHasher| {
         if let Ok(m) = std::fs::metadata(p) {
             m.len().hash(h);
@@ -356,7 +374,7 @@ pub fn fingerprint(roots: &Roots) -> u64 {
     for root in [&roots.builtin, &roots.user, &roots.workspace].into_iter().flatten() {
         root.hash(&mut h);
         for p in sorted(root) {
-            if !p.is_dir() {
+            if !p.is_dir() || is_dot(&p) {
                 continue;
             }
             p.hash(&mut h);
@@ -382,7 +400,8 @@ pub fn builtin_root() -> Option<PathBuf> {
         return has(&r).then(|| r.join("plugins"));
     }
     let exe = std::env::current_exe().ok().map(|e| e.canonicalize().unwrap_or(e));
-    if let Some(dir) = exe.as_deref().and_then(Path::parent) {
+    if let Some(dir) = exe.as_deref().and_then(Path::parent).map(bise_home::exe_home_dir) {
+        let dir = dir.as_path();
         if dir.join("VERSION").exists() {
             return has(dir).then(|| dir.join("plugins"));
         }
@@ -457,10 +476,18 @@ pub struct Manifest {
     /// `"extensions": {"dev.bise": {"default": "off"}}`: opt-in, loaded
     /// only once enabled (computer use: /computer-use turns it on)
     pub default_off: bool,
+    /// `"extensions": {"dev.bise": {"prompts": [...]}}`: what to try it
+    /// with, as written (cut at load, [`MAX_PROMPTS`] of [`PROMPT_CHARS`])
+    pub prompts: Vec<String>,
 }
 
 /// bise's own manifest extension.
 pub const BISE_EXTENSION: &str = "dev.bise";
+/// At most this many `dev.bise.prompts` are kept, each at most
+/// [`PROMPT_CHARS`] characters (a longer list or line: a warning).
+pub const MAX_PROMPTS: usize = 3;
+pub const PROMPT_CHARS: usize = 120;
+
 
 fn opt_string(o: &Map<String, Value>, k: &str) -> Result<Option<String>, String> {
     match o.get(k) {
@@ -521,6 +548,7 @@ pub fn parse_manifest(text: &str) -> Result<Manifest, String> {
     }
     let mut extensions = Vec::new();
     let mut default_off = false;
+    let mut prompts = Vec::new();
     if let Some(ex) = o.get("extensions") {
         let ex = ex.as_object().ok_or("/extensions must be an object")?;
         for (k, v) in ex {
@@ -533,6 +561,13 @@ pub fn parse_manifest(text: &str) -> Result<Manifest, String> {
                         ("default", Some("off")) => default_off = true,
                         ("default", Some("on")) => {}
                         ("default", _) => return Err(format!("/extensions/{}/default must be \"on\" or \"off\"", k)),
+                        ("prompts", _) => {
+                            let list = fv.as_array().filter(|a| a.iter().all(Value::is_string));
+                            let Some(list) = list else {
+                                return Err(format!("/extensions/{}/prompts must be an array of strings", k));
+                            };
+                            prompts = list.iter().filter_map(|s| s.as_str().map(String::from)).collect();
+                        }
                         _ => return Err(format!("unknown field /extensions/{}/{}", k, f)),
                     }
                 }
@@ -547,6 +582,7 @@ pub fn parse_manifest(text: &str) -> Result<Manifest, String> {
         description: opt_string(o, "description")?,
         extensions,
         default_off,
+        prompts,
     })
 }
 
@@ -895,10 +931,37 @@ fn load_unsupported(p: &mut Plugin, extensions: &[String], out: &mut Vec<Diagnos
     }
 }
 
+/// The prompts kept (blank ones out, at most [`MAX_PROMPTS`], each cut
+/// at [`PROMPT_CHARS`] characters), and whether any was cut.
+pub fn cut_prompts(list: &[String]) -> (Vec<String>, bool) {
+    let plain: Vec<&str> = list.iter().map(|p| p.trim()).filter(|p| !p.is_empty()).collect();
+    let mut cut = plain.len() > MAX_PROMPTS;
+    let kept = plain
+        .into_iter()
+        .take(MAX_PROMPTS)
+        .map(|p| {
+            if p.chars().count() > PROMPT_CHARS {
+                cut = true;
+                p.chars().take(PROMPT_CHARS).collect::<String>().trim_end().to_string()
+            } else {
+                p.to_string()
+            }
+        })
+        .collect();
+    (kept, cut)
+}
+
 struct Candidate {
     plugin: Plugin,
     extensions: Vec<String>,
     default_off: bool,
+}
+
+/// A dot folder in a root is never a plugin (a plugin name can't start
+/// with '.'): the add menu's staging folder (`add::staging_dir`) lives
+/// there, unseen by discovery and the fingerprint.
+fn is_dot(p: &Path) -> bool {
+    p.file_name().is_some_and(|n| n.to_string_lossy().starts_with('.'))
 }
 
 fn discover(root: &Path, scope: Scope, data: &Path, out: &mut Vec<Diagnostic>) -> Vec<Candidate> {
@@ -911,7 +974,7 @@ fn discover(root: &Path, scope: Scope, data: &Path, out: &mut Vec<Diagnostic>) -
             return Vec::new();
         }
     };
-    let mut dirs: Vec<PathBuf> = rd.filter_map(|e| e.ok().map(|e| e.path())).filter(|p| p.is_dir()).collect();
+    let mut dirs: Vec<PathBuf> = rd.filter_map(|e| e.ok().map(|e| e.path())).filter(|p| p.is_dir() && !is_dot(p)).collect();
     dirs.sort();
     let mut found = Vec::new();
     for dir in dirs {
@@ -933,7 +996,11 @@ fn discover(root: &Path, scope: Scope, data: &Path, out: &mut Vec<Diagnostic>) -
             skills: Vec::new(),
             servers: Vec::new(),
             remotes: Vec::new(),
+            off_skills: Vec::new(),
+            off_servers: Vec::new(),
+            prompts: Vec::new(),
             unsupported: Vec::new(),
+            opt_in: false,
         };
         let parsed = std::fs::read_to_string(&manifest)
             .map_err(|e| format!("unreadable: {}", e))
@@ -950,6 +1017,13 @@ fn discover(root: &Path, scope: Scope, data: &Path, out: &mut Vec<Diagnostic>) -
                 p.state = State::Loaded;
                 extensions = m.extensions;
                 default_off = m.default_off;
+                p.opt_in = m.default_off;
+                let (kept, cut) = cut_prompts(&m.prompts);
+                if cut {
+                    out.push(diag("plugin.prompts.cut", Severity::Warning, &p.name,
+                        format!("dev.bise prompts: at most {} of {} characters each; the rest is cut", MAX_PROMPTS, PROMPT_CHARS)));
+                }
+                p.prompts = kept;
             }
             Err(e) => out.push(diag("plugin.manifest.invalid", Severity::Error, &folder,
                 format!("{}: {}", manifest.display(), e))),
@@ -957,6 +1031,35 @@ fn discover(root: &Path, scope: Scope, data: &Path, out: &mut Vec<Diagnostic>) -
         found.push(Candidate { plugin: p, extensions, default_off });
     }
     found
+}
+
+/// Move a loaded plugin's skills and MCP servers that `state` turns off
+/// to `off_skills` / `off_servers` (listed, not loaded), each with an
+/// Info diagnostic, like a server's own `"enabled": false`.
+fn parts_off(p: &mut Plugin, state: &StateV2, opt_in: bool, out: &mut Vec<Diagnostic>) {
+    let me = PluginId::plugin(&p.name);
+    let prefix = format!("{}:", p.namespace);
+    let (on, off): (Vec<Skill>, Vec<Skill>) = std::mem::take(&mut p.skills).into_iter().partition(|s| {
+        let bare = s.name.strip_prefix(&prefix).unwrap_or(&s.name);
+        state.is_on(&me.part(PartKind::Skill, None, bare), opt_in)
+    });
+    for s in &off {
+        out.push(diag("plugin.skill.off", Severity::Info, &p.name, format!("skill {:?} is off in plugins", s.name)));
+    }
+    (p.skills, p.off_skills) = (on, off);
+    let mut off_ids = Vec::new();
+    let mut keep = |id: &str| {
+        let part = me.part(PartKind::Mcp, None, id);
+        let on = state.is_on(&part, opt_in);
+        if !on {
+            out.push(diag("plugin.mcp.server_off", Severity::Info, &p.name, format!("mcp.json server {:?} is off in plugins", id)));
+            off_ids.push(part);
+        }
+        on
+    };
+    p.servers.retain(|s| keep(&s.id));
+    p.remotes.retain(|s| keep(&s.id));
+    p.off_servers = off_ids;
 }
 
 /// Discover, validate and load every plugin under `roots`.
@@ -1026,13 +1129,14 @@ pub fn resolve(roots: &Roots) -> Resolution {
     }
     // enable state, then components
     for c in cands.iter_mut() {
-        let off = roots.disabled.contains(&c.plugin.name) || (c.default_off && !roots.enabled.contains(&c.plugin.name));
+        let off = !roots.state.is_on(&PluginId::plugin(&c.plugin.name), c.default_off);
         if c.plugin.state == State::Loaded && off {
             c.plugin.state = State::Disabled;
         }
         if c.plugin.state == State::Loaded {
             load_skills(&mut c.plugin, &mut diags);
             load_mcp(&mut c.plugin, &mut diags);
+            parts_off(&mut c.plugin, &roots.state, c.default_off, &mut diags);
             if c.plugin.scope == Scope::BuiltIn {
                 for s in c.plugin.servers.iter_mut().filter(|s| s.command == "bise") {
                     s.command = bise_exe();

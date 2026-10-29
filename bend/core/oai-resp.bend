@@ -489,6 +489,64 @@ def fin(lines: List<&2, String>, +prev: Maybe<&2, J.Json>)
 def final_of(+sse: String) -> Maybe<&2, J.Json>:
   fin(String.split(sse, Tx.newline()), None{})
 
+# ---- the stream's items, when its terminal event has none ----
+# ChatGPT's plan route (chatgpt.com/backend-api/codex/responses) ends
+# with a response.completed whose output is [] (its status and usage
+# only): the items ride in the response.output_item.done events, each
+# whole, in order. Codex reads its reply from those and never from the
+# terminal event (codex-api sse/responses.rs). A terminal response with
+# no output gets them (issue 15: every plan turn read as empty); one
+# with its output (the API key route) is read as before, and only then
+# are the item lines parsed.
+
+def items.parsed(r: Result<&2, &2, String, J.Json>,
+    +acc: List<&2, J.Json>) -> List<&2, J.Json>:
+  match r:
+    case Done{+e}:
+      Con{W.field_or(e, "item", J.JNull{}), acc}
+    case Fail{_}:
+      acc
+
+def items.data(is_done: Bool, +data: String, +acc: List<&2, J.Json>)
+    -> List<&2, J.Json>:
+  match is_done:
+    case True{}:
+      items.parsed(J.parse(data), acc)
+    case False{}:
+      acc
+
+def items.line(is_data: Bool, +l: String, +acc: List<&2, J.Json>)
+    -> List<&2, J.Json>:
+  match is_data:
+    case True{}:
+      +data = String.trim(String.drop(l, 5n))
+      items.data(String.contains(String.take(data, 96n),
+          "\"response.output_item.done\""), data, acc)
+    case False{}:
+      acc
+
+def items(lines: List<&2, String>, +acc: List<&2, J.Json>)
+    -> List<&2, J.Json>:
+  match lines:
+    case Nil{}:
+      List.reverse(&2, J.Json, acc)
+    case Con{+l, rest}:
+      items(rest, items.line(String.starts_with(l, "data:"), l, acc))
+
+def filled.pick(os: List<&2, J.Json>, +r: J.Json, +sse: String) -> J.Json:
+  match os:
+    case Nil{}:
+      J.set(r, "output", J.arr(items(String.split(sse, Tx.newline()), Nil{})))
+    case Con{_, _}:
+      r
+
+def filled(m: Maybe<&2, J.Json>, +sse: String) -> Maybe<&2, J.Json>:
+  match m:
+    case Some{+r}:
+      Some{filled.pick(W.arr_field_or(r, "output"), r, sse)}
+    case None{}:
+      None{}
+
 def reply.of(m: Maybe<&2, J.Json>) -> String:
   match m:
     case Some{+r}:
@@ -497,7 +555,7 @@ def reply.of(m: Maybe<&2, J.Json>) -> String:
       "ERROR provider 200: the stream ended before the response was complete\nEND\n"
 
 def reply(+sse: String) -> String:
-  reply.of(final_of(sse))
+  reply.of(filled(final_of(sse), sse))
 
 # a 200 is a stream, or a whole JSON (a server that ignored "stream")
 def reply_any.pick(is_json: Bool, +body: String) -> String:

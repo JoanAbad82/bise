@@ -12,8 +12,8 @@
 //! detects). `/theme` calls [`choose`]: it applies and saves.
 //!
 //! BISE-62: the choice is saved in the `theme` preference (`"light" |
-//! "dark" | "auto"`; bise_home keeps it in `prefs.json`, or the old
-//! `~/.bend-harness/tui.json` next to `/voice`'s key) and reused at the
+//! "dark" | "auto"`; bise_home keeps it in `prefs.json`, next to
+//! `/voice`'s key) and reused at the
 //! next launch. Precedence: `BISE_THEME` > the saved choice > detection.
 
 use crate::theme::{self, Mode};
@@ -458,20 +458,19 @@ mod tests {
     fn the_choice_is_saved_next_to_the_other_settings() {
         let d = std::env::temp_dir().join(format!("bise-theme-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&d);
-        // the old layout: ~/.bend-harness/tui.json, /voice's key kept
+        // prefs.json, /voice's key kept
         let hs = d.to_string_lossy().to_string();
         let h = bise_home::Home::from_lookup(&|k: &str| (k == "HOME").then(|| hs.clone()));
         assert_eq!(load_in(&h), None);
-        let tui = d.join(".bend-harness/tui.json");
-        std::fs::create_dir_all(tui.parent().unwrap()).unwrap();
-        std::fs::write(&tui, "{\"voice_mode_enabled\": true}").unwrap();
+        let prefs = d.join(".bise/prefs.json");
+        std::fs::create_dir_all(prefs.parent().unwrap()).unwrap();
+        std::fs::write(&prefs, "{\"voice_mode_enabled\": true}").unwrap();
         save_in(&h, Choice::Light).unwrap();
         assert_eq!(load_in(&h), Some(Choice::Light));
-        let v: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(&tui).unwrap()).unwrap();
+        let v: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(&prefs).unwrap()).unwrap();
         assert_eq!(v["voice_mode_enabled"], serde_json::Value::Bool(true));
         save_in(&h, Choice::Auto).unwrap();
         assert_eq!(load_in(&h), Some(Choice::Auto));
-        // the bise layout: prefs.json
         let b = bise_home::Home::at(d.join("bise"));
         save_in(&b, Choice::Dark).unwrap();
         assert_eq!(load_in(&b), Some(Choice::Dark));

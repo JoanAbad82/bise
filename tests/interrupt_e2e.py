@@ -6,7 +6,7 @@ A real repl-live on the fake provider (anthropic family, streamed). The
 stop is what the hub's `fx interrupt` writes: the REPL's interrupt flag
 (run/bend-interrupt-<port>.txt) with who asked; the TUI's esc, the
 desktop app's stop and `sb interrupt` all end there. Each case measures
-from the flag write to `obs: turn_done: interrupted`:
+from the flag write to the turn_done record that says interrupted:
 
 A) a model call that has not answered yet ([[slow: 20]]: nothing for
    20 s, not even the head);
@@ -30,6 +30,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.abspath(os.path.join(HERE, ".."))
 sys.path.insert(0, HERE)
 import fake_provider as F  # noqa: E402
+import obs_lines  # noqa: E402
 import wait  # noqa: E402
 
 FAILS = []
@@ -64,11 +65,11 @@ def main():
     port = s.getsockname()[1]
     s.close()
     session = os.path.join(tmp, "session.txt")
-    dump = os.path.join(tmp, "wire-dump")
+    dump = os.path.join(tmp, "requests") + "/"
+    os.makedirs(dump, exist_ok=True)
     env = {k: v for k, v in os.environ.items() if not k.startswith(("BEND_", "SB_", "BISE_"))}
     env.update(HOME=tmp, XDG_STATE_HOME=os.path.join(tmp, "state"), BISE_MODELS_FILE=models, BEND_CONFIG=cfg,
                BEND_REPL_PORT=str(port), BEND_SESSION_FILE=session, BEND_WIRE_LOG=os.path.join(tmp, "wire.log"),
-               BEND_MCP_INDEX=os.path.join(tmp, "mcp.txt"), BEND_SKILLS_INDEX=os.path.join(tmp, "sk.txt"),
                BEND_BG_ROOT=os.path.join(tmp, "bg"), BEND_BG_AFTER="3", SB_AGENT="probe", TMPDIR=tmp,
                BEND_WIRE_DUMP=dump)
     log, err = os.path.join(tmp, "repl.log"), os.path.join(tmp, "repl.err")
@@ -92,6 +93,11 @@ def main():
         with F.State.lock:
             return any(k[2] == text or text in k[2] for k in F.State.seen)
 
+    def interrupted(out):
+        # the turn's end record (obs_lines reads both forms: `obs turn_done
+        # :: {"end":"interrupted",...}` since issue 38 sha 2b, e27071cbd)
+        return any(obs_lines.turn_end(l) == "interrupted" for l in out)
+
     def turn(text, stop_when=None, who="main"):
         """one message; stop_when(): when true, the flag is written.
         Returns (lines, seconds from the flag to turn_done or None)."""
@@ -108,7 +114,7 @@ def main():
             if not line:
                 break
             out.append(line.decode(errors="replace").rstrip())
-            if line.startswith(b"  obs: turn_done"):
+            if obs_lines.kind(line) == "turn_done":
                 if t0 is not None:
                     took = time.time() - t0
                 break
@@ -122,7 +128,7 @@ def main():
         # A) a model call with no answer yet
         out, took = turn("[[slow: 20]] tell me a long story", lambda: seen("tell me a long story"))
         times["model"] = took
-        check(took is not None and took < LIMIT and any("turn_done: interrupted" in l for l in out),
+        check(took is not None and took < LIMIT and interrupted(out),
               "A model call that has not answered: the turn ends %.2f s after the stop (< %.1f s)"
               % (took or -1, LIMIT))
 
@@ -130,7 +136,7 @@ def main():
         n0 = len(open(F.LOG).read().splitlines())
         out, took = turn("[[drip: 100 0.2]] think for a long time", lambda: seen("think for a long time"))
         times["stream"] = took
-        check(took is not None and took < LIMIT and any("turn_done: interrupted" in l for l in out),
+        check(took is not None and took < LIMIT and interrupted(out),
               "B a streaming model call: the turn ends %.2f s after the stop" % (took or -1))
 
         def drip_rec():
@@ -154,7 +160,11 @@ def main():
                 if r.get("split_sha"):
                     return r
         rec = wait.until(split_rec, 10, "the fake's log line of the split reply")
-        got = hashlib.sha256(open(dump + ".reply", "rb").read()).hexdigest()
+        # the request ring (runtime/reqlog.bend): this call's reply is the
+        # newest <slot>.json.reply
+        replies = [os.path.join(dump, n) for n in os.listdir(dump) if n.endswith(".json.reply")]
+        newest = max(replies, key=os.path.getmtime) if replies else None
+        got = newest and hashlib.sha256(open(newest, "rb").read()).hexdigest()
         check(got == rec["split_sha"] and any("ack:" in l and "two halves" in l for l in out),
               "B' a reply paused 0.5 s inside an event arrives byte for byte")
 
@@ -166,7 +176,7 @@ def main():
         out, took = turn("[[bash: sleep 37.125; echo never]] [[bash: echo second-call]]",
                          lambda: pids("sleep 37.125"))
         times["bash"] = took
-        check(took is not None and took < LIMIT and any("turn_done: interrupted" in l for l in out),
+        check(took is not None and took < LIMIT and interrupted(out),
               "C a running bash sleep: the turn ends %.2f s after the stop" % (took or -1))
         check(not pids("sleep 37.125"), "C the stopped sleep is gone (its process group got TERM)")
         check(bool(pids("sleep 41.25")), "C the background job of the earlier turn is still alive")
@@ -177,7 +187,7 @@ def main():
 
         # D) the next message is answered; a restart keeps the one result
         out, _ = turn("hello again")
-        said = [l for l in out if "obs: assistant:" in l]
+        said = [l for l in out if obs_lines.kind(l) == "assistant"]
         check(bool(said) and "ack: hello again" in said[-1] and not os.path.getsize(flag),
               "D the next message gets its answer, the flag is cleared: %r" % said[-1:])
         procs[-1].terminate()

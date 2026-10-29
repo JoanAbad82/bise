@@ -627,23 +627,11 @@ pub struct PlanModel {
     pub slug: String,
     /// the name to show
     pub display_name: String,
+    /// its reasoning levels (`supported_reasoning_levels`; live_efforts)
+    pub efforts: Vec<String>,
 }
 
-fn models_of(v: &Value) -> Vec<PlanModel> {
-    v.get("models")
-        .and_then(Value::as_array)
-        .map(|a| {
-            a.iter()
-                .filter(|m| m.get("visibility").and_then(Value::as_str).is_none_or(|x| x == "list"))
-                .filter_map(|m| {
-                    let slug = m.get("slug").and_then(Value::as_str)?.to_string();
-                    let display_name = m.get("display_name").and_then(Value::as_str).unwrap_or(&slug).to_string();
-                    Some(PlanModel { slug, display_name })
-                })
-                .collect()
-        })
-        .unwrap_or_default()
-}
+use crate::live_efforts::plan_models as models_of;
 
 /// `GET <base_url>/models` with the token: the account's list (only
 /// `visibility == "list"`, the server's order), written to the cache.
@@ -662,7 +650,7 @@ pub fn fetch_models_ctx(ctx: &Ctx) -> Result<Vec<PlanModel>, String> {
     let models = models_of(&v);
     let cache = json!({
         "fetched_at": now_secs(),
-        "models": models.iter().map(|m| json!({"slug": m.slug, "display_name": m.display_name})).collect::<Vec<_>>(),
+        "models": models.iter().map(|m| json!({"slug": m.slug, "display_name": m.display_name, "efforts": m.efforts})).collect::<Vec<_>>(),
     });
     let path = ctx.models_cache();
     if let Some(d) = path.parent() {

@@ -3,8 +3,9 @@
 #
 # A version is an immutable app root built from one git commit (or from
 # the working tree, uncommitted changes included):
-#   $SB_VERSIONS_DIR/<id>/  bise (+ bend-harness -> bise, one release;
-#                           sb -> bise, the agents' command),
+#   $SB_VERSIONS_DIR/<id>/  bise (+ sb -> bise, the agents' command; with the dev
+#                           identity, bise -> bise.app/Contents/MacOS/bise,
+#                           a signed bundle: scripts/dev-sign.sh),
 #                           repl-live, prompts/ (tool-desc-*.txt,
 #                           prompt-*.txt; at the top before the root
 #                           cleanup), sb-core (when bend/hub/ exists),
@@ -16,30 +17,35 @@
 # A hub runs FROM a version dir: rebuilding the tree never changes a
 # running system, only an explicit switch does.
 #
-#   scripts/versions.sh build [<rev>|--tree]   # build (cached), print the version dir
+#   scripts/versions.sh build [<rev>|--tree] [--also <name>]...
+#                                        # build (cached), print the version dir;
+#                                        # --also: one more of bins.sh's binaries
+#                                        # into its cache, compiled with the others
+#                                        # (build-dist.sh: repl-scripted)
 #   scripts/versions.sh id [<rev>|--tree]      # the id a build would get
 #   scripts/versions.sh list                   # built versions, newest first
 #   scripts/versions.sh prune [<n>]            # keep the n (3) newest versions and
 #                                        # those a hub marks or runs (after
 #                                        # each new build too)
 #
-# Defaults: SB_VERSIONS_DIR=~/.local/state/switchboard/versions; the
-# cargo target dir and bins.sh's cache of the Bend binaries (one per
-# source hash, a Bend compile is 1-2 min) live in
-# SB_BUILD_DIR=~/.local/state/switchboard/build.
-# Commits are built in a temporary git worktree under /tmp (removed after).
+# Defaults: SB_VERSIONS_DIR=~/.bise/dev/versions; the cargo target dir
+# and bins.sh's cache of the Bend binaries (one per source hash, a Bend
+# compile is 1-2 min) live in SB_BUILD_DIR=~/.bise/dev/build.
+# Commits are built in a temporary git worktree under /tmp (removed after),
+# into one cargo target (target-commits) whose unchanged crates are kept
+# (scripts/cargo_mtimes.py); bins.sh's misses compile beside the cargo build.
 
 set -euo pipefail
 cd "$(dirname "$0")/.."
 REPO="$PWD"
-# the same dirs as bise_home (rust/home): $BISE_HOME/dev, ~/.bise/dev once
-# migrated, else today's ~/.local/state/switchboard (XDG_STATE_HOME unread)
-if [ -n "${BISE_HOME:-}" ]; then STATE="$BISE_HOME/dev"
-elif [ -e "$HOME/.bise/migrated.json" ]; then STATE="$HOME/.bise/dev"
-else STATE="$HOME/.local/state/switchboard"; fi
+# the same dir as bise_home (rust/home): $BISE_HOME/dev, else ~/.bise/dev
+STATE="${BISE_HOME:-$HOME/.bise}/dev"
 VERSIONS="${SB_VERSIONS_DIR:-$STATE/versions}"
 BUILD="${SB_BUILD_DIR:-$STATE/build}"
-export PATH="$HOME/.cargo/bin:$HOME/.bend/bin:$PATH"
+BINS_ALSO=""
+# bend: no direct call here; bins.sh runs the one each --src pins
+# (bend/VERSION, scripts/bend-pin.sh)
+export PATH="$HOME/.cargo/bin:$PATH"
 # the oldest macOS the binaries run on (BISE-164), this repo's value
 # (rust/.cargo/config.toml) for every commit: an old one has no
 # rust/.cargo/config.toml, cargo takes it from the environment
@@ -88,24 +94,54 @@ build_from() {
   rm -rf "$tmp"; mkdir -p "$tmp/rust/jsrt/target/debug"
   CLEAN_TMP="$tmp"
 
+  # the Bend binaries and the V8 engine that miss bins.sh's cache, compiled
+  # all at once while cargo builds the command (a release's miss was 680 s
+  # on CI's darwin-arm64, one after the other). A failure here is told
+  # again, loudly, by bin_path below (it compiles the missing one alone)
+  local want=(repl-live bend-jsrt) pf
+  if [ -f "$src/bend/hub/main.bend" ] || [ -f "$src/hub/main.bend" ]; then want+=(sb-core); fi
+  if [ -f "$src/office/sdk/src/view/sheet.ts" ]; then want+=(office-sheet); fi
+  "$REPO/scripts/bins.sh" prefetch --src "$src" "${want[@]}" $BINS_ALSO &
+  pf=$!
+
   # release: the TUI draws ~10x faster than the debug build
   say "cargo build --release $id..."
   # one cargo target dir per SOURCE: cargo decides freshness by mtime,
   # and a commit checked out in a worktree (fresh mtimes) would otherwise
   # leave artifacts newer than the tree's edited files - the next --tree
   # build would ship stale Rust code. Worktrees are always freshly checked
-  # out, so they can share theirs.
-  local target="$BUILD/target-commits"
-  [ "$src" = "$REPO" ] && target="$BUILD/target-tree"
-  (cd "$src/rust" && CARGO_TARGET_DIR="$target" cargo build -q --release -p bend-harness)
+  # out, so they share theirs, and cargo_mtimes.py gives the files that did
+  # not change since its last build their mtime back: only the changed
+  # crates rebuild (a fresh worktree rebuilt all of them on each commit)
+  local target="$BUILD/target-commits" cargo_ok=1
+  if [ "$src" = "$REPO" ]; then
+    (cd "$src/rust" && CARGO_TARGET_DIR="$BUILD/target-tree" cargo build -q --release -p bend-harness) || cargo_ok=0
+    target="$BUILD/target-tree"
+  else
+    (cd "$src/rust" && CARGO_TARGET_DIR="$target" python3 -B "$REPO/scripts/cargo_mtimes.py" run --src "$src" --target "$target" -- cargo build -q --release -p bend-harness) || cargo_ok=0
+  fi
+  wait "$pf" || say "bins.sh prefetch failed: compiling one by one"
+  [ "$cargo_ok" = 1 ] || { say "cargo build failed"; exit 1; }
   # the command is bise since BISE-165: a commit before it builds
   # bend-harness (decided by its sources: the shared target dir may hold
-  # both names); either way the version dir has bise, and a bend-harness
-  # link for the switchers and scripts that still look for it
+  # both names); either way the version dir has bise
   local exe=bend-harness
   grep -q '^name = "bise"' "$src/rust/harness/Cargo.toml" && exe=bise
-  cp "$target/release/$exe" "$tmp/bise"
-  ln -s bise "$tmp/bend-harness"
+  # bise = a link to bise.app/Contents/MacOS/bise (dev-sign.sh app: bundle
+  # id dev.bise.bise, the stable 'bise ambient dev' identity): macOS keys a
+  # Documents/Desktop grant on the bundle id and signature, the same for
+  # every version, so the user grants it once (a plain bise is a new path
+  # each version: asked again). Everything runs that one file (TUI, hub,
+  # the agents' sb); bise_home::exe_home_dir finds <root> from it. Only a
+  # source that has exe_home_dir (an older bise can't find its root from
+  # the bundle), and only with the identity: else a plain bise, as before.
+  # The Bend binaries and bend-jsrt come signed from bins.sh's cache.
+  if grep -q 'pub fn exe_home_dir' "$src/rust/home/src/lib.rs" 2>/dev/null \
+     && "$REPO/scripts/dev-sign.sh" app "$tmp/bise.app" "$target/release/$exe" "$id"; then
+    ln -s bise.app/Contents/MacOS/bise "$tmp/bise"
+  else
+    cp "$target/release/$exe" "$tmp/bise"
+  fi
   # sb: the agents' command, the same binary called by that name
   ln -s bise "$tmp/sb"
 
@@ -139,6 +175,15 @@ build_from() {
   elif [ -d "$src/apps/ambient/kit" ]; then
     mkdir -p "$tmp/apps/ambient"; cp -R "$src/apps/ambient/kit" "$tmp/apps/ambient/kit"
   fi
+  # the office SDK's bundles: `bise office run` hands bend-jsrt
+  # <app root>/office/dist/office.js; the page server serves office.js and
+  # office-view.js to the viewer at /kit/office/ (docs/office.md)
+  if [ -d "$src/office/dist" ]; then mkdir -p "$tmp/office"; cp -R "$src/office/dist" "$tmp/office/dist"; fi
+  # and the xlsx grid (Univer), built, never committed: bins.sh's cache (xlsx-univer)
+  if [ -f "$src/office/sdk/src/view/sheet.ts" ]; then
+    local grid; grid="$("$REPO/scripts/bins.sh" path --src "$src" office-sheet)" || { say "bins.sh path office-sheet failed"; exit 1; }
+    cp "$grid" "$tmp/office/dist/office-sheet.js"; rm -f "$tmp/office/dist/office-sheet.js.key"
+  fi
   if [ -d "$src/computer-use/extension" ]; then
     mkdir -p "$tmp/computer-use"; cp -R "$src/computer-use/extension" "$tmp/computer-use/extension"
     rm -rf "$tmp/computer-use/extension/test"
@@ -148,12 +193,10 @@ build_from() {
   # ~60 MB, the debug one was 110 MB, 93% of a version), from bins.sh's
   # cache (one per jsrt source hash): a hard link, so the versions of one
   # engine share it. $tmp/bend-jsrt: the harness passes it to the runtime
-  # (BEND_JSRT_BIN); the same file at the old path too: a runtime before
-  # BISE-114 (an old commit) runs rust/jsrt/target/debug/bend-jsrt
+  # (BEND_JSRT_BIN)
   local js jk; jk="$("$REPO/scripts/bins.sh" key --src "$src" bend-jsrt)"
   js="$(bin_path "$src" bend-jsrt)"
   ln -f "$js" "$tmp/bend-jsrt" 2>/dev/null || cp -c "$js" "$tmp/bend-jsrt" 2>/dev/null || cp "$js" "$tmp/bend-jsrt"
-  ln -f "$tmp/bend-jsrt" "$tmp/rust/jsrt/target/debug/bend-jsrt"
 
   {
     echo "id=$id"
@@ -165,6 +208,8 @@ build_from() {
     echo "macos=$MACOSX_DEPLOYMENT_TARGET"
     echo "repo=$REPO"
   } > "$tmp/VERSION"
+  # whole for the viewer (the xlsx grid above): never a version dir without it
+  "$REPO/scripts/runtime_check.sh" "$tmp" || { say "version $id is not whole (runtime_check.sh)"; exit 1; }
   rm -rf "$vdir"; mv "$tmp" "$vdir"
   CLEAN_TMP=""
   say "version $id built: $vdir ($(du -sh "$vdir" | cut -f1))"
@@ -172,15 +217,14 @@ build_from() {
 
 # the ids of the versions the hubs name: their marks (versions.json:
 # current, good, previous, failed) and the root each one runs (hub.root),
-# in the legacy state dir and in ~/.bise/hubs; one per line (the last
-# component of every path in them). No `[ -f ] && ...` as the loop's last
-# command: with pipefail a missing last file (always $STATE/*/hub.root in
-# the bise layout) failed the pipe, set -e ended prune, and the build
+# in ~/.bise/hubs; one per line (the last component of every path in
+# them). No `[ -f ] && ...` as the loop's last command: with pipefail a
+# missing last file (always $STATE/*/hub.root) failed the pipe, set -e
+# ended prune, and the build
 # exited 1 after "built": the hub did not switch (bug-restart)
 marks() {
   local h="${BISE_HOME:-$HOME/.bise}" f
-  for f in "$HOME/.local/state/switchboard"/*/versions.json "$HOME/.local/state/switchboard"/*/hub.root \
-           "$h"/hubs/*/versions.json "$h"/hubs/*/hub.root "$STATE"/*/versions.json "$STATE"/*/hub.root; do
+  for f in "$h"/hubs/*/versions.json "$h"/hubs/*/hub.root "$STATE"/*/versions.json "$STATE"/*/hub.root; do
     if [ -f "$f" ]; then cat "$f"; echo; fi
   done | tr '",{}' '\n\n\n\n' | sed -n 's|^.*/\([^/]*\)/*$|\1|p'
 }
@@ -247,7 +291,16 @@ build() {
 }
 
 case "${1:-}" in
-  build) build "${2:---tree}" ;;
+  build)
+    shift; what=--tree BINS_ALSO=""
+    while [ $# -gt 0 ]; do
+      case "$1" in
+        --also) BINS_ALSO="$BINS_ALSO $2"; shift ;;
+        *) what="$1" ;;
+      esac
+      shift
+    done
+    build "$what" ;;
   prune) prune "${2:-}" ;;
   id) if [ "${2:---tree}" = "--tree" ]; then tree_id; else rev_id "$2"; fi ;;
   list)
@@ -257,5 +310,5 @@ case "${1:-}" in
       printf '%s\t%s\t%s\n' "$d" "$(sed -n 's/^built=//p' "$VERSIONS/$d/VERSION")" \
         "$(sed -n 's/^subject=//p' "$VERSIONS/$d/VERSION")"
     done ;;
-  *) sed -n '2,26p' "$0" | sed 's/^# \{0,1\}//'; exit 1 ;;
+  *) sed -n '2,35p' "$0" | sed 's/^# \{0,1\}//'; exit 1 ;;
 esac

@@ -16,7 +16,7 @@ repo (the `bise-implement` skill sends you here).
 | `sb` CLI | `rust/switchboard/src/cli.rs` (busybox link) | nothing | `hub.sock`, one request, one reply |
 | computer-use broker | `rust/computer-use` | browser links, `state.json` | `run/computer-use.sock`, Chrome host, helper app |
 | bend-jsrt | `rust/jsrt` | the `run_typescript` sandbox | the REPL |
-| ambient app (branch) | `apps/ambient/{mac,web,kit}`, `rust/tui/src/ambient/` | the capsule's UI state | `bise ambient-core` → `hub.sock`; the page server |
+| desktop app (branch) | `apps/desktop` (+ `native/mac`, the helper), `rust/tui/src/ambient/` | the capsule's UI state | `bise ambient-core` → `hub.sock`; the page server |
 
 Crates: `home` (every path) ← `session`, `plugins`, `images` ← `catalog` ←
 `switchboard`, `tui` ← `harness` (the `bise` binary). `tui` does not depend on
@@ -27,13 +27,20 @@ Crates: `home` (every path) ← `session`, `plugins`, `images` ← `catalog` ←
 - **Rust ↔ sb-core** (`switchboard/src/core.rs` ↔ `bend/hub/main.bend`): one
   JSON input per line; sb-core answers `{fx, dirty}`, or `{need}` for a git
   query (the hub runs it through `Env` and sends the input again with the
-  answer). The laws in `bend/LAWS.bend` cover it; `PROOF.bend` runs in the
-  gate.
+  answer). The laws in `bend/laws/*.bend` cover it (the hub's in
+  `bend/laws/hub.bend`); each is closed by its `bend/proofs/<area>.bend`,
+  every one checked in the gate (`tests/proof_run.py`). Every kind that crosses it is declared once in `bise_proto::core`
+  (`In`, `Link`, `Fx`, `Answer`, and `Feed` for the transcript records
+  `sb <kind> :: <json>`); the Rust types are serde, sb-core's codecs are
+  generated into `bend/hub/gen/` (`BISE_PROTO_BLESS=1 cargo test -p
+  bise-proto --test core_gen`), never written by hand (issue 25).
 - **hub ↔ REPL**: `say`/`interrupt` on TCP, steer and interrupt files; the
   events come back through `wire.log` + `wire.offset`; `repl.json` lets a new
   hub adopt a running REPL.
 - **clients ↔ hub**: `hub.sock` (its path from `bise_home::socket`),
-  `{op: hello}` then JSON lines; the agents' `sb` uses the same socket.
+  JSON-RPC 2.0 (`initialize`, one method per action, numbered
+  notifications: `docs/client-protocol.md`, types in `bise_proto::rpc`);
+  the agents' `sb` speaks to `agent.sock`, not this socket.
 - **Rust ↔ Bend runtime**: environment variables (`BEND_WORKDIR`,
   `BEND_EXTRA_PROMPT`, `BEND_CONTEXT_FILE`, `BISE_MODELS_FILE`,
   `Home::exports`) and the plugins' loopback HTTP bridge
@@ -58,7 +65,7 @@ Crates: `home` (every path) ← `session`, `plugins`, `images` ← `catalog` ←
 ## Where does this go
 
 - **It decides who gets woken, told, queued, or what a message/card/wait
-  becomes** → sb-core (`bend/hub/core.bend`), with a law in `LAWS.bend` when
+  becomes** → sb-core (`bend/hub/core.bend`), with a law in `bend/laws/hub.bend` when
   it changes an invariant. Not in `daemon.rs`, not in a Rust module beside the
   core.
 - **It runs a process, touches git, a file, a socket or the network** → the
@@ -111,8 +118,8 @@ Before you add a field, name who owns it.
 
 Who gets woken, told or queued is a decision.
 
-- Good: `stop_leaves_no_waiter`, `delivered_once` in `bend/LAWS.bend`,
-  checked by `PROOF.bend` in every gate.
+- Good: `stop_leaves_no_waiter`, `delivered_once` in `bend/laws/hub.bend`,
+  proved in `bend/proofs/hub.bend`, checked in every gate.
 - Bad: timer wakes in `every.rs` ("a wake while busy waits, never stacked",
   retried after a minute): sb-core's queued-message logic written again in
   Rust, with no law.
@@ -120,12 +127,18 @@ Who gets woken, told or queued is a decision.
 ### 4. Structure across a seam, text only for people
 
 - Good: sb-core's protocol: one JSON line in, `{fx}` or `{need}` out.
+- Rule: a new sb-core input, effect or feed kind is declared in
+  `bise_proto::core`; its Bend codec and Rust type are generated. What you
+  write by hand is the decision in sb-core and its law. Old transcript line
+  shapes are read in one place, `thread/legacy.rs`, and never written again.
+  A conflict in `bend/hub/gen/` is never merged by hand: take either side,
+  then bless again (the generator rewrites the tag lookup whole).
 - Bad: the TUI finds cards in feed text:
   `line.starts_with("sb card : ")` (`tui/src/sb.rs`, `ingest_for`), and
   `strip_prefix("sb route : ")` next to it. A wording change in the hub breaks
   the inbox silently.
 
-### 5. One job per function, files under 1,000 lines
+### 5. One job per function, one job per file
 
 Split before you add, not after.
 
@@ -162,6 +175,9 @@ The second time you write a rule down, write a test or a gate step instead.
 - Bad: the `bend-harness` link "kept for one release"
   (`harness/src/main.rs:2`, `scripts/versions.sh`) is still there many
   releases later.
+- An older install that must keep working gets a shim with an end date: its
+  `TODO(<tag>)` on each site and its line in `tests/shims.txt` (owner,
+  removal release); `tests/shims_check.py` goes red when that release is out.
 
 ### 9. The doc lives next to the code
 
@@ -191,7 +207,8 @@ new feed-text parsing in the TUI, no growth of `daemon::run`.
    from main.
 4. A typed client protocol shared by the hub, the TUI and the ambient core.
 5. Group `core::Hub`'s runtime fields by feature, in their modules.
-6. The 1,000-line rule as a gate check, with a shrinking exceptions list.
-7. Delete the compatibility left "for one release".
-8. `docs/IMPLEMENTATION.md` becomes a short English index of the module
+6. (done, issue 31.) Delete the compatibility left "for one release". A
+   compatibility shim is registered in `tests/shims.txt` with its owner and
+   its removal release (`tests/shims_check.py` in the quick gate and land).
+7. `docs/IMPLEMENTATION.md` becomes a short English index of the module
    headers, or goes.

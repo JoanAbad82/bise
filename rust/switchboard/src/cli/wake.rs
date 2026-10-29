@@ -1,0 +1,79 @@
+//! `sb wake` (event-wake, wake.rs): its usage and the hub request. The
+//! effects that belong to the caller happen here: a relative path is made
+//! absolute (the hub runs elsewhere), a pid's start time is read (a later
+//! process with the same pid is not it), and a pid or a launchd job that
+//! is not there is refused at once. `--then` (a pause) and `--alarm`
+//! go as the request's `then`; neither: sb-core's default by kind.
+
+use super::*;
+use crate::wake::{Spec, What};
+use bise_proto::sb::Wake;
+
+pub(super) const WAKE_USAGE: &str = "usage: sb wake --on-exit <pid> | --on-file <path> | --on-job <launchd label> [--then | --alarm] [--tail <file>] [--note \"<words>\"] [--max 1h] | sb wake | sb wake --stop <id|bg/<n>>";
+
+fn absolute(p: &str) -> String {
+    let path = std::path::Path::new(p);
+    if path.is_absolute() {
+        return p.to_string();
+    }
+    std::env::current_dir().map(|d| d.join(path).to_string_lossy().into_owned()).unwrap_or_else(|_| p.to_string())
+}
+
+pub(super) fn wake_req(rest: &[String]) -> Result<Wake, String> {
+    let (pos, o) = parse_args(rest, &["on-exit", "on-file", "on-job", "tail", "note", "max", "stop"], &["then", "alarm"])?;
+    if o.contains_key("stop") {
+        // `#3` or `3`: a watch; `bg/3`: the watch of background command 3
+        let which = str_of(&o, "stop");
+        return Ok(match which.strip_prefix("bg/") {
+            Some(slot) if !slot.is_empty() => Wake::Stop { id: None, bg: Some(slot.to_string()) },
+            _ => Wake::Stop { id: Some(which.trim_start_matches('#').parse::<u64>().map_err(|_| WAKE_USAGE.to_string())?), bg: None },
+        });
+    }
+    let ons: Vec<&str> = ["on-exit", "on-file", "on-job"].into_iter().filter(|k| o.contains_key(*k)).collect();
+    if ons.is_empty() && (pos.is_empty() || pos == ["list"]) {
+        return Ok(Wake::List);
+    }
+    if ons.len() != 1 || !pos.is_empty() {
+        return Err(WAKE_USAGE.into());
+    }
+    let what = match ons[0] {
+        "on-exit" => {
+            let pid = str_of(&o, "on-exit").parse::<u32>().map_err(|_| "sb wake: --on-exit takes a pid".to_string())?;
+            let start = crate::procs::start_time(pid).ok_or_else(|| format!("sb wake: no process {} (already ended?)", pid))?;
+            What::Pid { pid, start }
+        }
+        "on-file" => What::File { path: absolute(&str_of(&o, "on-file")) },
+        _ => {
+            let label = str_of(&o, "on-job");
+            let known = std::process::Command::new("launchctl")
+                .args(["list", &label])
+                .stdout(std::process::Stdio::null())
+                .stderr(std::process::Stdio::null())
+                .status()
+                .is_ok_and(|s| s.success());
+            if !known {
+                return Err(format!("sb wake: no launchd job {} (launchctl list {})", label, label));
+            }
+            What::Job { label }
+        }
+    };
+    let tail = Some(str_of(&o, "tail")).filter(|t| !t.is_empty()).map(|t| absolute(&t));
+    let spec = Spec { what, tail, note: str_of(&o, "note").trim().to_string() };
+    // a pause (the agent continues its work at the end) or an alarm;
+    // neither: sb-core's default by kind (a pid: pause; file, job: alarm)
+    let then = match (o.contains_key("then"), o.contains_key("alarm")) {
+        (true, true) => return Err("sb wake: --then or --alarm, not both".into()),
+        (t, a) => (t || a).then_some(t),
+    };
+    let max = str_of(&o, "max");
+    let max_ms = if max.is_empty() {
+        None
+    } else {
+        let ms = crate::every::parse_dur(&max)?;
+        if ms > crate::wake::MAX_MOST_MS {
+            return Err("sb wake: --max is at most 24h".into());
+        }
+        Some(ms)
+    };
+    Ok(Wake::Add { spec: spec.json(), max_ms, then })
+}

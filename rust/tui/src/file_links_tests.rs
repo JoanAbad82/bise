@@ -64,7 +64,6 @@ fn only_an_existing_file_is_a_target_relative_to_the_feeds_folders() {
     assert_eq!(file_links::target("./src/lib.rs"), Some(t(&wt.join("./src/lib.rs"), None, None)));
     assert_eq!(file_links::target("README.md"), Some(t(&ws.join("README.md"), None, None)));
     assert_eq!(file_links::target("docs/guide.md:3:9"), Some(t(&ws.join("docs/guide.md"), Some(3), Some(9))));
-    // absolute
     let abs = ws.join("docs/guide.md");
     assert_eq!(file_links::target(&format!("{}:2", abs.display())), Some(t(&abs, Some(2), None)));
     // missing, a folder, not a path

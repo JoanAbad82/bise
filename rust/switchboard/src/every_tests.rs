@@ -10,7 +10,11 @@ const N: u64 = 1_790_000_000_000;
 
 /// `sb every` from `from`: the new timer's id.
 fn every(t: &mut T, from: &str, to: &str, sched: Sched, until_ms: Option<u64>, times: Option<u64>) -> u64 {
-    let req = EveryReq::Add { to: to.into(), text: "check HN".into(), sched, until_ms, times, page: None };
+    let (every_ms, daily_min) = match sched {
+        Sched::Every(p) => (Some(p), None),
+        Sched::Daily(m) => (None, Some(m as u64)),
+    };
+    let req = EveryReq::Add { to: to.into(), text: "check HN".into(), every_ms, daily_min, until_ms, times, page: None, name: None };
     let (tok, fx) = t.req(from, AgentReq::Every(req));
     let r = reply(&fx, tok).unwrap();
     r["id"].as_u64().unwrap_or_else(|| panic!("{}", r))
@@ -39,28 +43,46 @@ fn hub() -> T {
     t
 }
 
+/// quit-stop (docs/idle-exit.md): his quit stops the hub with its
+/// standing orders; at the next start a `sb every 10m` down for 5 h fires
+/// once at the first tick, then keeps its period: no catch-up per missed
+/// period.
 #[test]
-fn a_timer_fires_when_due_and_its_agent_is_idle_never_stacked() {
+fn a_timer_down_for_hours_fires_once_then_keeps_its_period() {
+    let mut t = hub();
+    every(&mut t, MAIN, "w", Sched::Every(10 * MIN_MS), None, None);
+    let back = N + 300 * MIN_MS + 7;
+    let fx = tick(&mut t, back);
+    let fired = journal(&fx, "every_fired");
+    assert_eq!(fired.len(), 1, "one wake for 30 missed periods");
+    let next = fired[0]["next_ms"].as_u64().unwrap();
+    assert!(next > back && next <= back + 10 * MIN_MS, "the next one a period on: {}", next - N);
+    assert!(journal(&tick(&mut t, back + MIN_MS), "every_fired").is_empty());
+}
+
+#[test]
+fn a_timer_fires_when_due_idle_or_busy_never_stacked() {
     let mut t = hub();
     let id = every(&mut t, MAIN, "w", Sched::Every(10 * MIN_MS), None, None);
     assert_eq!(id, 1);
     assert!(say_to(&tick(&mut t, N + MIN_MS), "w").is_none(), "not due yet");
-    // due while busy: nothing, however long it stays busy
+    // due while busy: steered into the turn at once (wake-deliver, law
+    // timer_fires_busy), the next one a period later
     t.hub.force_run("w", Run::Busy);
-    for k in 0..30 {
-        let fx = tick(&mut t, N + (10 + k) * MIN_MS);
-        assert!(journal(&fx, "every_fired").is_empty() && say_to(&fx, "w").is_none());
+    let fx = tick(&mut t, N + 10 * MIN_MS);
+    let text = steer_to(&fx, "w").expect("the wake, steered");
+    assert!(say_to(&fx, "w").is_none() && text.contains("timer #1 (every 10m, set by main): check HN"), "{}", text);
+    assert_eq!(journal(&fx, "every_fired")[0]["next_ms"], N + 20 * MIN_MS);
+    assert!(journal(&tick(&mut t, N + 11 * MIN_MS), "every_fired").is_empty(), "once per period");
+    // starting (no REPL to reach): it waits, however long, then one wake
+    t.hub.force_run("w", Run::Starting);
+    for k in 0..20 {
+        assert!(journal(&tick(&mut t, N + (20 + k) * MIN_MS), "every_fired").is_empty(), "no REPL: it waits");
     }
-    // idle again: one wake, the next one a period later (no catch-up)
     t.hub.force_run("w", Run::Idle);
     let fx = tick(&mut t, N + 40 * MIN_MS);
-    let text = say_to(&fx, "w").expect("the wake");
-    // due at +10m, busy until +40m: it says how long it waited
-    assert!(text.contains("timer #1 (every 10m, waited 30m for w to finish, set by main): check HN"), "{}", text);
+    assert!(say_to(&fx, "w").is_some_and(|x| x.contains("waited 20m for w to finish")), "{:?}", say_to(&fx, "w"));
     assert_eq!(journal(&fx, "every_fired")[0]["next_ms"], N + 50 * MIN_MS);
-    t.hub.force_run("w", Run::Idle);
-    assert!(say_to(&tick(&mut t, N + 41 * MIN_MS), "w").is_none());
-    assert!(say_to(&tick(&mut t, N + 50 * MIN_MS), "w").is_some());
 }
 
 #[test]
@@ -69,7 +91,7 @@ fn the_journal_rebuilds_the_timers() {
     every(&mut t, MAIN, "w", Sched::Every(MIN_MS), None, None);
     every(&mut t, MAIN, MAIN, Sched::Every(5 * MIN_MS), None, Some(2));
     tick(&mut t, N + 5 * MIN_MS);
-    let (tok, fx) = t.req(MAIN, AgentReq::Every(EveryReq::Stop(1)));
+    let (tok, fx) = t.req(MAIN, AgentReq::Every(EveryReq::Stop { id: 1 }));
     assert_eq!(reply(&fx, tok).unwrap()["text"], "timer #1 stopped");
     let now = N + 6 * MIN_MS;
     let events = t.journal.borrow().clone();
@@ -123,13 +145,13 @@ fn a_one_shot_timer_is_spent_only_by_a_delivered_wake() {
     let mut t = hub();
     let id = every(&mut t, MAIN, "w", Sched::Daily(7 * 60 + 30), None, Some(1));
     let due = t.hub.timers().map[&id].next_ms;
+    t.hub.force_run("w", Run::Down);
+    assert!(journal(&tick(&mut t, due), "every_fired").is_empty(), "down: not spent, not counted");
     t.hub.force_run("w", Run::Busy);
-    assert!(journal(&tick(&mut t, due), "every_fired").is_empty(), "busy: not spent, not counted");
-    t.hub.force_run("w", Run::Idle);
     let fx = tick(&mut t, due + 1000);
     let at = |kind: &str| fx.iter().position(|e| matches!(e, Effect::Journal(j) if j["type"] == kind)).unwrap();
     assert!(at("message_sent") < at("every_fired") && at("every_fired") < at("every_stop"), "{:?}", fx);
-    assert!(say_to(&fx, "w").unwrap().contains("1/1"));
+    assert!(steer_to(&fx, "w").unwrap().contains("1/1"), "busy: steered into its turn");
     assert!(t.hub.timers().map.is_empty());
     // an agent with a wake from bise still queued (a busy one gets it as
     // a steer at once; a starting one keeps it queued): no second one
@@ -148,8 +170,8 @@ fn a_one_shot_timer_is_spent_only_by_a_delivered_wake() {
 fn ended_timers_runs_and_run_now() {
     let mut t = hub();
     let id = every(&mut t, MAIN, "w", Sched::Every(2 * MIN_MS), None, Some(6));
-    // due at +2m, its agent busy until +6m: one wake that waited 4m
-    t.hub.force_run("w", Run::Busy);
+    // due at +2m, its agent down until +6m: one wake that waited 4m
+    t.hub.force_run("w", Run::Down);
     assert!(say_to(&tick(&mut t, N + 5 * MIN_MS), "w").is_none());
     t.hub.force_run("w", Run::Idle);
     let text = say_to(&tick(&mut t, N + 6 * MIN_MS), "w").unwrap();
@@ -233,7 +255,8 @@ fn a_journal_of_298407ff_replays_to_the_same_scheduled_list() {
     let now = 1_791_131_900_000;
     assert_eq!(Value::Array(hub.timers().state(now)), want);
     let list = hub.timers().list(now);
-    assert!(list.starts_with("#2 @main every day 07:30 · next ") && list.ends_with("\"make the morning page\" (by main)"), "{list}");
+    // sched-names: an old journal has no name: the list says its plain fallback
+    assert!(list.starts_with("#2 @main  make the morning page · every day 07:30 · next ") && list.ends_with(" · by main"), "{list}");
 }
 
 /// A refused wake (fire_is_a_message; unreachable from the tick today:
@@ -262,4 +285,186 @@ fn refused_wakes_are_retried_a_minute_apart_and_never_counted() {
     assert!(back.replay(&events).is_empty());
     let tm = &back.timers().map[&id];
     assert_eq!((tm.fired, tm.next_ms, tm.runs.len()), (0, due + 3 * MIN_MS, 0));
+}
+
+fn asked_name(fx: &[Effect]) -> Option<(u64, String)> {
+    fx.iter().find_map(|e| match e {
+        Effect::AskTimerName { id, request } => Some((*id, request.clone())),
+        _ => None,
+    })
+}
+
+fn scheduled_lines(fx: &[Effect]) -> Vec<String> {
+    fx.iter()
+        .filter_map(|e| match e {
+            Effect::Line { line, .. } if line.starts_with("sb scheduled :: ") => Some(line.clone()),
+            _ => None,
+        })
+        .collect()
+}
+
+/// sched-names (main m_14458, architect m_14532): a timer set without
+/// --name asks the small model once, off the loop; its answer (or, with
+/// no model, the plain fallback) is sb-core's every_name, in the view,
+/// the list, the wake and the ◷ set line, which waits for it. --name asks
+/// nothing; one call at a time; the journal replays the name.
+#[test]
+fn a_timer_gets_a_name_from_the_model_or_the_fallback() {
+    let mut t = hub();
+    let req = |text: &str, name: Option<&str>| {
+        AgentReq::Every(EveryReq::Add { to: "w".into(), text: text.into(), every_ms: Some(10 * MIN_MS), daily_min: None, until_ms: None, times: None, page: None, name: name.map(String::from) })
+    };
+    // no --name: one call, and the set line waits for its name
+    let (_, fx) = t.req(MAIN, req("amb-core: read $TMPDIR/s4.log (S29 bench) and report", None));
+    let (id, request) = asked_name(&fx).expect("a name call");
+    assert!(request.contains(crate::every_name::MARK), "{request}");
+    assert!(scheduled_lines(&fx).is_empty(), "the set line waits: {:?}", fx);
+    // a second unnamed timer: no call while the first is in flight
+    let (_, fx) = t.req(MAIN, req("check the nightly build", None));
+    assert!(asked_name(&fx).is_none(), "one at a time");
+    // the model answers: every_name, the set line with the name, the next call
+    let fx = t.go(Input::TimerName { id, reply: Some("\"S29 Bench.\"".into()) });
+    let named = journal(&fx, "every_name");
+    assert_eq!((named[0]["id"].as_u64(), named[0]["name"].as_str()), (Some(id), Some("s29 bench")));
+    // sb-core says the set line goes now (architect m_15603)
+    assert_eq!(named[0]["announce"], true, "{}", named[0]);
+    let set = scheduled_lines(&fx);
+    // its agent's line, and main's copy (main set it for w)
+    assert!(set.len() == 2 && set.iter().all(|l| l.contains("\"name\":\"s29 bench\"")), "{set:?}");
+    assert_eq!(t.hub.timers().map[&id].name, "s29 bench");
+    let (id2, _) = asked_name(&fx).expect("the next unnamed timer");
+    // no model (or it failed): the plain fallback names it
+    t.go(Input::TimerName { id: id2, reply: None });
+    assert_eq!(t.hub.timers().map[&id2].name, "check the nightly build");
+    // --name: no call, the set line at once
+    let (tok, fx) = t.req(MAIN, req("x y z", Some("my own name")));
+    assert!(asked_name(&fx).is_none());
+    assert!(scheduled_lines(&fx).iter().any(|l| l.contains("my own name")));
+    let id3 = reply(&fx, tok).unwrap()["id"].as_u64().unwrap();
+    // the list shows names, never the words; --show prints them
+    let (tok, fx) = t.req(MAIN, AgentReq::Every(EveryReq::List));
+    let list = reply(&fx, tok).unwrap()["text"].as_str().unwrap().to_string();
+    assert!(list.contains(&format!("#{id} @w  s29 bench · every 10m · next ")) && !list.contains("$TMPDIR"), "{list}");
+    let (tok, fx) = t.req(MAIN, AgentReq::Every(EveryReq::Show { id: id3 }));
+    assert!(reply(&fx, tok).unwrap()["text"].as_str().unwrap().ends_with("\nx y z"));
+    // the wake carries the name
+    let fx = tick(&mut t, N + 10 * MIN_MS);
+    let wake = say_to(&fx, "w").expect("a wake");
+    assert!(wake.contains(&format!("\ntimer #{id} \"s29 bench\" (every 10m")), "{wake}");
+    // the journal replays the names (every_set's and every_name's)
+    let events = t.journal.borrow().clone();
+    let mut back = Hub::new("/w");
+    assert!(back.replay(&events).is_empty(), "every line read");
+    let names: Vec<String> = back.timers().map.values().map(|x| x.name.clone()).collect();
+    assert_eq!(names, ["s29 bench", "check the nightly build", "my own name"]);
+}
+
+/// architect m_15603: a hub restarted between a timer's set and its name
+/// still writes its ◷ set line, once: the every_set is `held` in the
+/// journal (sb-core's state, not the Asker's), the new hub asks at its
+/// first step and its every_name `announce`s; a second name does not.
+#[test]
+fn a_restart_before_the_name_still_announces_the_timer_once() {
+    let mut t = hub();
+    let req = EveryReq::Add { to: "w".into(), text: "check the nightly build".into(), every_ms: Some(10 * MIN_MS), daily_min: None, until_ms: None, times: None, page: None, name: None };
+    let (_, fx) = t.req(MAIN, AgentReq::Every(req));
+    assert!(asked_name(&fx).is_some() && scheduled_lines(&fx).is_empty());
+    let set = journal(&fx, "every_set");
+    assert_eq!(set[0]["held"], true, "{}", set[0]);
+    // the hub restarts before the answer: a new hub from the journal
+    let events = t.journal.borrow().clone();
+    let mut back = Hub::new("/w");
+    assert!(back.replay(&events).is_empty(), "every line read");
+    std::mem::swap(&mut t.hub, &mut back);
+    let fx = t.go(Input::Tick);
+    let (id, _) = asked_name(&fx).expect("the new hub asks at its first step");
+    let fx = t.go(Input::TimerName { id, reply: Some("nightly build check".into()) });
+    let named = journal(&fx, "every_name");
+    assert_eq!((named[0]["name"].as_str(), &named[0]["announce"]), (Some("nightly build check"), &json!(true)));
+    let set = scheduled_lines(&fx);
+    // its agent's line and main's copy: one each
+    assert!(set.len() == 2 && set.iter().all(|l| l.contains("nightly build check")), "{set:?}");
+    // a later name (an old hub asking again) announces nothing
+    let fx = t.go(Input::TimerName { id, reply: Some("other name".into()) });
+    assert!(scheduled_lines(&fx).is_empty(), "once");
+    assert!(journal(&fx, "every_name").iter().all(|j| j["announce"] != true));
+}
+
+/// A hub that starts with unnamed timers (an older hub's) names them, one
+/// call at a time, each once; an every_name for an ended or unknown timer
+/// changes nothing.
+#[test]
+fn old_unnamed_timers_are_named_one_at_a_time() {
+    let mut t = hub();
+    let mut events = Vec::new();
+    for id in 1..=2u64 {
+        events.push(json!({"type": "every_set", "id": id, "agent": "w", "by": "main", "text": format!("old timer {id}"),
+                           "next_ms": N + 10 * MIN_MS, "at": N, "every_ms": 10 * MIN_MS}));
+    }
+    let mut back = Hub::new("/w");
+    assert!(back.replay(&events).is_empty());
+    assert!(back.timers().map.values().all(|x| x.name.is_empty()), "an old line has no name");
+    // the next step of this hub asks for the first, then the second
+    std::mem::swap(&mut t.hub, &mut back);
+    let fx = t.go(Input::Tick);
+    let (a, _) = asked_name(&fx).expect("asks at its first step");
+    let fx = t.go(Input::TimerName { id: a, reply: Some("first".into()) });
+    assert!(scheduled_lines(&fx).is_empty(), "an old timer gets no set line");
+    let (b, _) = asked_name(&fx).expect("then the next");
+    assert_ne!(a, b);
+    let fx = t.go(Input::TimerName { id: b, reply: Some("second".into()) });
+    assert!(asked_name(&fx).is_none(), "each once");
+    // unknown id: nothing
+    let fx = t.go(Input::TimerName { id: 99, reply: Some("ghost".into()) });
+    assert!(journal(&fx, "every_name").is_empty());
+}
+
+/// `sb every` (every.rs): at least a minute, an active agent, a message;
+/// set, listed in `sb tasks`, stopped, each change in the journal.
+#[test]
+fn every_sets_lists_and_stops_timers() {
+    let mut t = T::new();
+    let add = |every_ms: u64, to: &str| AgentReq::Every(EveryReq::Add { to: to.into(), text: "check HN".into(), every_ms: Some(every_ms), daily_min: None, until_ms: None, times: None, page: None, name: None });
+    for (req, why) in [
+        (add(30_000, ""), "at least 1m"),
+        (add(600_000, "ghost"), "no active agent @ghost"),
+    ] {
+        let (tok, fx) = t.req(MAIN, req);
+        let e = reply(&fx, tok).unwrap()["error"].as_str().unwrap().to_string();
+        assert!(e.contains(why), "{}", e);
+        assert!(!fx.iter().any(|e| matches!(e, Effect::Journal(_))));
+    }
+    let (tok, fx) = t.req(MAIN, add(600_000, ""));
+    let r = reply(&fx, tok).unwrap();
+    assert!(r["text"].as_str().unwrap().starts_with("timer set: #1 @main  check HN · every 10m"), "{}", r);
+    assert!(fx.iter().any(|e| matches!(e, Effect::Journal(j) if j["type"] == "every_set")));
+    let (tok, fx) = t.req(MAIN, AgentReq::Tasks);
+    assert!(reply(&fx, tok).unwrap()["text"].as_str().unwrap().contains("## timers (sb every)\n#1 @main  check HN · every 10m"));
+    let (tok, fx) = t.req(MAIN, AgentReq::Every(EveryReq::Stop { id: 1 }));
+    assert_eq!(reply(&fx, tok).unwrap()["text"], "timer #1 stopped");
+    let (tok, fx) = t.req(MAIN, AgentReq::Every(EveryReq::List));
+    assert!(reply(&fx, tok).unwrap()["text"].as_str().unwrap().starts_with("no timers"));
+}
+
+/// debt-t5 (architect m_34549): the refusals `AgentReq::from_json` made,
+/// now in their one parser at the handler: a schedule (every.rs
+/// `Sched::of_wire`), a watch's spec (wake.rs `Spec::from_json`), a stop
+/// with no id. The decode's own refusals: proto sb/tests.rs.
+#[test]
+fn the_handlers_refuse_what_from_json_refused() {
+    let mut t = hub();
+    let error = |t: &mut T, req| {
+        let (tok, fx) = t.req(MAIN, req);
+        reply(&fx, tok).unwrap()["error"].as_str().unwrap_or_default().to_string()
+    };
+    let every = |every_ms, daily_min| AgentReq::Every(EveryReq::Add { to: String::new(), text: "x".into(), every_ms, daily_min, until_ms: None, times: None, page: None, name: None });
+    assert_eq!(error(&mut t, every(None, None)), "sb every: every_ms or daily_min");
+    assert_eq!(error(&mut t, every(None, Some(24 * 60))), "sb every: every_ms or daily_min");
+    let wake = |spec| AgentReq::Wake(WakeReq::Add { spec, max_ms: None, then: None });
+    assert_eq!(error(&mut t, wake(json!({}))), "sb wake: --on-exit, --on-file or --on-job");
+    assert_eq!(error(&mut t, wake(json!({"kind": "pid", "pid": "x"}))), "sb wake: --on-exit, --on-file or --on-job");
+    assert_eq!(error(&mut t, AgentReq::Wake(WakeReq::Stop { id: None, bg: None })), "usage: sb wake --stop <id|bg/<n>>");
+    assert!(t.hub.wakes().live.is_empty(), "nothing set");
+    let (tok, fx) = t.req(MAIN, AgentReq::Every(EveryReq::List));
+    assert!(reply(&fx, tok).unwrap()["text"].as_str().unwrap().starts_with("no timers"));
 }

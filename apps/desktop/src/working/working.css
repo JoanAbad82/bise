@@ -1,0 +1,25 @@
+/* the working signs (designer's desktop-working page): mono cells in a fixed box, tones by glyph,
+   frames step (no transition, no fade) */
+.wk-sign {
+  display: inline-block;
+  flex: none;
+  font-family: var(--font-mono);
+  white-space: pre;
+  text-align: left;
+  font-variant-ligatures: none;
+}
+.wk-gust {
+  width: 5ch;
+}
+.wk-one {
+  width: 1ch;
+}
+.wk-sign > [data-tone="ink"] {
+  color: var(--c-text);
+}
+.wk-sign > [data-tone="t2"] {
+  color: var(--c-text-2);
+}
+.wk-sign > [data-tone="t3"] {
+  color: var(--c-text-3);
+}

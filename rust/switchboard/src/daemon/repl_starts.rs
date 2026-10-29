@@ -4,15 +4,16 @@
 //! recycle is admitted by `switch_admitted` from what is left. Each phase
 //! of a start is progress (`Msg::ReplStartStep`, `ReplSpawned`, the old
 //! process's exit in a switch); `check_starts` ends a start without
-//! progress for START_STILL_MS: its process killed, a `ReplGone` that
-//! says whether the stall reports to probation (a death always does).
+//! progress for `still_limit_ms` at the load now (crate::load): its
+//! process killed, a `ReplGone` that says whether the stall reports to
+//! probation (a death always does).
 
 use super::{
-    adopt, adoptable, busy_at, debug_requests, free_port, hash_keys, kill_pid, log_line, plugins_fingerprint,
+    adopt, adoptable, busy_at, free_port, hash_keys, kill_pid, log_line, plugins_fingerprint,
     prompt_is_stale, skill_roots, skills_fingerprint, stall_for_tests, supervise, write_logged, Msg, PromptInputs,
     Shell, PROMPT_PLUGINS_FILE,
 };
-use crate::repl_start::{order, Cand, Kind};
+use crate::repl_start::{admit, Cand, Kind};
 use crate::util::now_ms;
 use std::path::PathBuf;
 use std::process::Command;
@@ -26,23 +27,31 @@ pub(super) struct Queued {
     pub(super) crash_note: Option<String>,
     pub(super) port: Option<u16>,
     pub(super) asked_ms: u64,
+    /// sb-core's `wait_load` (hub/stall.bend): admitted only at a load
+    /// under x2
+    pub(super) wait_load: bool,
 }
 
-/// Why a REPL is gone (probation reads it).
+/// Why a REPL is gone (probation reads it; sb-core the stall's facts).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum Gone {
     /// It exited, crashed or could not be run.
     Died,
-    /// Its start made no progress (crate::repl_start).
-    Stalled { reports: bool },
+    /// Its start made no progress (crate::repl_start): `loaded` at load
+    /// x2+, `row` that REPL's stalls in a row.
+    Stalled { reports: bool, loaded: bool, row: u32 },
+    /// It ended by SIGTERM, SIGINT or SIGHUP: someone asked it to stop
+    /// (repl::gone_of). sb-core decides what it counts (hub/stall.bend).
+    Stopped,
 }
 
 impl Gone {
-    /// A reason for a version on probation to roll back.
+    /// A reason for a version on probation to roll back (a stop is not).
     pub(super) fn reports(self) -> bool {
         match self {
             Gone::Died => true,
-            Gone::Stalled { reports } => reports,
+            Gone::Stalled { reports, .. } => reports,
+            Gone::Stopped => false,
         }
     }
 }
@@ -63,18 +72,27 @@ impl Shell {
         self.admit_starts();
     }
 
-    /// The queued spawns that get a free slot, in order.
+    /// The queued spawns that get a free slot, in order; one sb-core
+    /// said waits for the machine (`wait_load`) only at a load under x2.
     pub(super) fn admit_starts(&mut self) {
-        if self.start_queue.is_empty() || self.starts.free() == 0 {
+        if self.start_queue.is_empty() {
             return;
         }
+        let loaded = self.start_queue.values().any(|q| q.wait_load) && crate::load::is_loaded(crate::load::factor());
         let cands: Vec<Cand> = self
             .start_queue
             .iter()
-            .map(|(dir, q)| Cand { dir: dir.clone(), kind: Kind::Start, urgent: self.urgent(&q.name, dir), asked_ms: q.asked_ms })
+            .filter(|(_, q)| !(q.wait_load && loaded))
+            .map(|(dir, q)| Cand {
+                dir: dir.clone(),
+                kind: Kind::Start,
+                urgent: self.urgent(&q.name, dir),
+                asked_ms: q.asked_ms,
+                main: q.name == crate::model::MAIN,
+            })
             .collect();
         let free = self.starts.free();
-        for c in order(cands).into_iter().take(free) {
+        for c in admit(cands, free) {
             let Some(q) = self.start_queue.remove(&c.dir) else { continue };
             // killed or asked again meanwhile: not this start
             if self.gens.get(&c.dir) != Some(&q.gen) {
@@ -93,13 +111,13 @@ impl Shell {
             .map(|(name, dir)| {
                 let recycle = self.recycle.is_due(dir) && !self.reload_repls.contains(dir);
                 let kind = if recycle { Kind::Recycle } else { Kind::Switch };
-                Cand { dir: dir.clone(), kind, urgent: self.urgent(name, dir), asked_ms: 0 }
+                Cand { dir: dir.clone(), kind, urgent: self.urgent(name, dir), asked_ms: 0, main: name == crate::model::MAIN }
             })
             .collect();
         let free = self.starts.free();
         let now = now_ms();
         let mut out = Vec::new();
-        for c in order(cands).into_iter().take(free) {
+        for c in admit(cands, free) {
             if let Some(n) = stale.iter().find(|(_, d)| *d == c.dir) {
                 self.starts.begin(&c.dir, c.kind, now);
                 out.push(n.clone());
@@ -124,22 +142,37 @@ impl Shell {
 
     /// `dir`'s live REPL is gone: the old process of a switch exits as
     /// asked (its slot stays for the new one: progress); any other end
-    /// frees the slot.
-    pub(super) fn start_gone(&mut self, dir: &str, cause: Gone) {
+    /// frees the slot. Returns its row of stops with no connect between
+    /// (a `Stopped` end, +1; 0 otherwise).
+    pub(super) fn start_gone(&mut self, dir: &str, cause: Gone) -> u32 {
         if self.switching.contains_key(dir) && !self.switch_spawned.contains(dir) && cause == Gone::Died {
             self.starts.progress(dir, now_ms());
+        } else if cause == Gone::Stopped {
+            return self.starts.stopped(dir);
         } else {
             self.starts.ended(dir);
         }
+        0
     }
 
     /// The starts without progress: killed and gone (a crash, restarted
     /// first); then the queue gets the freed slots.
-    pub(super) fn check_starts(&mut self) {
-        for s in self.starts.stalled(now_ms()) {
+    ///
+    /// Judged at `at_ms`, when the tick that asks was sent (hub-stall):
+    /// every progress message sent before it is applied by now (the
+    /// inbox keeps their order), so a loop that was busy never fails a
+    /// start whose progress still waited behind it. A stalled one is gone
+    /// at once (`repl_gone`): a later message of its generation (spawned,
+    /// connected) finds it dead and kills its process, never an orphan
+    /// that got the brief and shares the agent's session.
+    pub(super) fn check_starts(&mut self, at_ms: u64) {
+        // the limit scales with the load (crate::repl_start)
+        let factor = crate::load::factor();
+        for s in self.starts.stalled(at_ms, factor) {
             let reason = format!(
-                "its REPL made no progress in {} s while starting ({} at once at most, the rest wait)",
+                "its REPL made no progress in {} s while starting (load x{:.1}, {} at once at most, the rest wait)",
                 s.secs,
+                factor,
                 crate::repl_start::MAX_IN_FLIGHT
             );
             log_line(&self.opts.paths, &format!("repl {} not started: {}", s.dir, reason));
@@ -147,7 +180,7 @@ impl Shell {
                 kill_pid(*pid);
             }
             if let Some(gen) = self.gens.get(&s.dir).copied() {
-                let _ = self.tx.send(Msg::ReplGone { dir: s.dir, gen, reason, cause: Gone::Stalled { reports: s.reports } });
+                let _ = self.repl_gone(s.dir, gen, reason, Gone::Stalled { reports: s.reports, loaded: s.loaded, row: s.row });
             }
         }
         self.admit_starts();
@@ -157,7 +190,9 @@ impl Shell {
 impl Shell {
     /// Start the REPL of `name` on a supervisor thread. `port`: the port of the process it replaces (a switch keeps the
     /// port: background commands and steer files are keyed by it).
-    pub(super) fn spawn_on(&mut self, name: &str, resume: bool, crash_note: Option<String>, port: Option<u16>) {
+    pub(super) fn spawn_on(&mut self, name: &str, resume: bool, crash_note: Option<String>, port: Option<u16>, wait_load: bool) {
+        // it reads context.txt at its first call (daemon/contexts.rs)
+        self.contexts_now();
         let Some(a) = self.hub.st.agents.get(name).cloned() else {
             return;
         };
@@ -207,7 +242,7 @@ impl Shell {
         // a fresh process, in a free slot; a switch's new process holds
         // the slot of its reload
         if !self.starts.in_flight(&dir) {
-            let q = Queued { name: a.name.clone(), gen, resume, crash_note, port, asked_ms: now_ms() };
+            let q = Queued { name: a.name.clone(), gen, resume, crash_note, port, asked_ms: now_ms(), wait_load };
             return self.queue_start(&dir, q);
         }
         self.spawn_fresh(&a.name, gen, resume, crash_note, port);
@@ -221,7 +256,12 @@ impl Shell {
         let dir = a.dir.clone();
         let adir = self.opts.paths.agent_dir(&dir);
         let (tmp, run) = (self.opts.paths.agent_tmp(&dir), self.opts.paths.agent_run(&dir));
-        // a fresh process: a fresh wire log
+        // a fresh process: a fresh wire log, once the old one's events
+        // the hub never took are in the session log (architect m_18556)
+        let caught = self.catch_up_wire(&dir, &adir);
+        if caught > 0 {
+            log_line(&self.opts.paths, &format!("session log of {}: {} events of its last REPL recorded before the restart", name, caught));
+        }
         write_logged(&self.opts.paths, &adir.join("wire.log"), "");
         write_logged(&self.opts.paths, &adir.join("wire.offset"), "0");
         let _ = std::fs::remove_file(adir.join("repl.json"));
@@ -278,16 +318,13 @@ impl Shell {
         if let Some(j) = &self.opts.jsrt_bin {
             env.set("BEND_JSRT_BIN", j);
         }
-        // dev: the exact body of every model request, one file each in
-        // agents/<a>/requests/ (the TUI's /log shows them), when the hub
-        // runs with BISE_DEBUG_REQUESTS=1 or <hub>/debug-requests exists
-        // (read at each REPL start: no hub restart). Bodies only, no
-        // headers: the keys go in headers.
-        if debug_requests(&self.opts.paths.state) {
-            let req_dir = adir.join("requests");
-            if std::fs::create_dir_all(&req_dir).is_ok() {
-                env.set("BEND_WIRE_DUMP", format!("{}/", req_dir.display()));
-            }
+        // the request ring (/debug completion, bise_session::reqlog): the
+        // exact body of the agent's last model calls, a few slots in
+        // agents/<a>/requests/ the REPL overwrites in turn. Bodies only,
+        // no headers: the keys go in headers.
+        let req_dir = adir.join("requests");
+        if std::fs::create_dir_all(&req_dir).is_ok() {
+            env.set("BEND_WIRE_DUMP", format!("{}/", req_dir.display()));
         }
         for (k, v) in crate::tools_env::temp_env(&tmp, &run) {
             env.set(k, v);
@@ -298,12 +335,14 @@ impl Shell {
         // the desktop's rules, read once at this start like the prompt's
         // (role_of): bise-pages (prompts/skills-all) only where they're on
         let desktop = bise_home::projects::desktop_for(&self.opts.paths.workspace);
-        if desktop {
-            env.set("BISE_DESKTOP", "1");
-        }
+        // its skill folders reach its bridge (bend_plugins::skills, the
+        // session's skills index), never guessed there
+        let roots = skill_roots(&ws, &self.opts.app_root, a.is_main, desktop);
+        let (k, v) = bend_plugins::skills::Root::env(&roots);
+        env.set(k, v);
         let spawned = PromptInputs {
             plugins: plugins_fingerprint(&ws),
-            skills: skills_fingerprint(&skill_roots(&ws, &self.opts.app_root, a.is_main, desktop)),
+            skills: skills_fingerprint(&self.opts.paths, &roots),
             ws,
             main: a.is_main,
             desktop,
@@ -344,7 +383,7 @@ impl Shell {
             // are there (BISE-166), then which plugins it has and what
             // for. Here, off the hub's loop: the first spawn may wait for
             // the login shell (read once, at most 3 s)
-            let agent_path = crate::tools_env::hub_agent_path(&paths.bin_dir());
+            let agent_path = crate::tools_env::hub_agent_path(&paths);
             env.set("BEND_TOOLS_NOTE", crate::tools_env::session_note(&agent_path, &workdir)).set("PATH", agent_path);
             // each phase is progress (the hub's start watch)
             let step = || tx.send(Msg::ReplStartStep { dir: dir.clone(), gen }).is_ok();
@@ -360,6 +399,15 @@ impl Shell {
             env.apply(&mut cmd);
             supervise(cmd, dir, gen, adir, port, tx, paths)
         });
+    }
+}
+
+/// The hub's starts: the idle limit is START_STILL_MS, or in a test
+/// `SB_START_STILL_MS` (ms; times the load factor all the same).
+pub(super) fn new_starts() -> crate::repl_start::Starts {
+    match bise_home::env::test_setting("SB_START_STILL_MS").and_then(|s| s.trim().parse::<u64>().ok()) {
+        Some(ms) => crate::repl_start::Starts::with_still_ms(ms),
+        None => Default::default(),
     }
 }
 

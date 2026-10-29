@@ -1,6 +1,7 @@
 //! Where a workspace's hub keeps its state (RFC 0001 §5):
 //! `$SB_STATE_DIR`, else `<hubs dir>/<name>-<hash>` (`bise_home::Home::hub_dir`:
-//! `~/.bise/hubs/`, or `~/.local/state/switchboard/` in the old layout).
+//! `~/.bise/hubs/`),
+//! and an agent's folders in it: `bise_home::hub_state`'s (one owner).
 //! Its task worktrees: `<home>/worktrees/<name>-<hash>/<task>/` (the
 //! `sweep` module), or `$SB_STATE_DIR/worktrees/<task>/`.
 
@@ -55,13 +56,11 @@ impl Paths {
         let workspace = workspace
             .canonicalize()
             .unwrap_or_else(|_| workspace.to_path_buf());
-        let (state, worktrees) = match bise_home::env::test_setting("SB_STATE_DIR") {
-            Some(d) => (PathBuf::from(&d), PathBuf::from(d).join("worktrees")),
-            None => {
-                let home = bise_home::Home::from_env();
-                let id = workspace_id(&workspace);
-                (home.hub_dir(&id), home.worktrees_dir().join(id))
-            }
+        // the state folder: bise_home's (one owner, the TUI reads it too)
+        let state = bise_home::hub_state::state_dir(&workspace);
+        let worktrees = match bise_home::env::test_setting("SB_STATE_DIR") {
+            Some(_) => state.join("worktrees"),
+            None => bise_home::Home::from_env().worktrees_dir().join(workspace_id(&workspace)),
         };
         Paths { workspace, state, worktrees }
     }
@@ -103,22 +102,59 @@ impl Paths {
     pub fn journal(&self) -> PathBuf {
         self.state.join("journal.jsonl")
     }
+    /// One line per land (`crate::land_record`): who landed which commits.
+    pub fn lands(&self) -> PathBuf {
+        self.state.join("lands.jsonl")
+    }
     pub fn pid_file(&self) -> PathBuf {
         self.state.join("hub.pid")
     }
     pub fn log(&self) -> PathBuf {
         self.state.join("hub.log")
     }
+    /// The image store's care (image_care.rs): touched when this hub
+    /// last touched the images it names, and when it last pruned.
+    pub fn images_touched(&self) -> PathBuf {
+        self.state.join("images-touched")
+    }
+    pub fn images_pruned(&self) -> PathBuf {
+        self.state.join("images-pruned")
+    }
+    /// When the rule started on this hub (its first tick after the
+    /// update): no prune before keep_days after it (the grace).
+    pub fn images_since(&self) -> PathBuf {
+        self.state.join("images-since")
+    }
+    /// The processes that ended in the last 24 h (`ended.jsonl`) and
+    /// their kept output (`<agent>-<id>.out`), daemon/processes.rs's.
+    pub fn procs_dir(&self) -> PathBuf {
+        self.state.join("procs")
+    }
+    /// The output of the local sites' servers the hub started again
+    /// (`<id>.out`, daemon/revive.rs's; site-revive).
+    pub fn revive_dir(&self) -> PathBuf {
+        self.state.join("revive")
+    }
     pub fn bin_dir(&self) -> PathBuf {
         self.state.join("bin")
     }
+    /// The last login-shell PATH a hub of this workspace read
+    /// (tools_env::remembered_login's): the next hub's agents get it when
+    /// its own probe fails.
+    pub fn login_path_file(&self) -> PathBuf {
+        self.state.join("login-path")
+    }
     pub fn agent_dir(&self, name: &str) -> PathBuf {
-        self.state.join("agents").join(name)
+        bise_home::hub_state::agent_dir(&self.state, name)
     }
     /// The agent's temp folder (approvals-design.md §7.1): its `TMPDIR`,
-    /// created at spawn, deleted at its /drop.
+    /// created at spawn, deleted at its /drop (bise_home::hub_state).
     pub fn agent_tmp(&self, name: &str) -> PathBuf {
-        self.agent_dir(name).join("tmp")
+        bise_home::hub_state::agent_tmp(&self.state, name)
+    }
+    /// The agent's background commands' folder (`BEND_BG_DIR`).
+    pub fn agent_bg(&self, name: &str) -> PathBuf {
+        bise_home::hub_state::agent_bg(&self.state, name)
     }
     /// The harness's own files of the agent (bash wrappers, steer,
     /// interrupt, run_typescript files): `BEND_AGENT_RUN`, never deleted
@@ -165,6 +201,20 @@ mod tests {
         assert!(is_home(&home));
         assert!(is_home(&home.join(".")));
         assert!(!is_home(&home.join("projects")) && !is_home(Path::new("/")));
+    }
+
+    /// The hub and a client find an agent's files at the same place
+    /// (bise_home::hub_state, architect m_38397): where the agent's
+    /// BEND_BG_DIR puts its bg jobs.
+    #[test]
+    fn an_agents_bg_folder_is_bise_homes() {
+        let p = Paths { workspace: "/w".into(), state: "/h/hubs/w-0a1b2c3d".into(), worktrees: "/h/wt".into() };
+        for dir in ["perf", "perf.2", "x.2", "my agent"] {
+            let tmp = p.agent_tmp(dir);
+            let bg = crate::tools_env::temp_env(&tmp, &p.agent_run(dir)).into_iter().find(|(k, _)| *k == "BEND_BG_DIR").map(|(_, v)| v);
+            assert_eq!(bg.as_deref(), Some(p.agent_bg(dir).as_path()), "{dir}");
+            assert_eq!(p.agent_bg(dir), bise_home::hub_state::agent_bg(&p.state, dir));
+        }
     }
 
     #[test]

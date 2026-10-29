@@ -15,7 +15,7 @@ import ../vendor/json.bend as J
 
 type IPart is Data:
   IText{s: String}
-  IImg{name: String, path: String, mime: String, b64: String}
+  IImg{name: String, path: String, mime: String, b64: String, caption: String}
 
 def img_open() -> String:
   "<image name=\""
@@ -51,11 +51,13 @@ def img_attr_ok(+v: String) -> Bool:
     Bool.or(String.contains(v, ">"), Bool.or(String.contains(v, "\n"),
       Bool.or(String.contains(v, "\r"), String.contains(v, "\\"))))))
 
-def img_valid(+name: String, +path: String, +mime: String, +b64: String) -> Bool:
+def img_valid(+name: String, +path: String, +mime: String, +b64: String,
+    +caption: String) -> Bool:
   Bool.and(String.starts_with(mime, "image/"),
     Bool.and(String.ends_with(b64, ".b64"),
       Bool.and(img_attr_ok(name), Bool.and(img_attr_ok(path),
-        Bool.and(img_attr_ok(mime), img_attr_ok(b64))))))
+        Bool.and(img_attr_ok(mime), Bool.and(img_attr_ok(b64),
+          img_attr_ok(caption)))))))
 
 type IMk is Data:
   IMk{part: IPart, rest: String}
@@ -67,14 +69,31 @@ def img_marker.ok(ok: Bool, +part: IPart, +rest: String) -> Maybe<&2, IMk>:
     case False{}:
       None{}
 
+# the b64 field and the caption after it, when there is one: the
+# marker's optional last attribute ` caption="…"` (a fact about the
+# image, bise_proto::parts::image_marker); none: an empty caption
+def img_caption(m: Maybe<&2, IField>, +raw: String) -> IField:
+  match m:
+    case Some{+f}:
+      f
+    case None{}:
+      IF{raw, ""}
+
+def img_marker.e(+c: IField, +name: String, +path: String, +mime: String,
+    +rest: String) -> Maybe<&2, IMk>:
+  match c:
+    case IF{+b64, +caption}:
+      img_marker.ok(img_valid(name, path, mime, b64, caption),
+        IImg{name, path, mime, b64, caption}, rest)
+
 def img_marker.d(m: Maybe<&2, IField>, +name: String, +path: String,
     +mime: String) -> Maybe<&2, IMk>:
   match m:
     case Some{+f}:
       match f:
-        case IF{+b64, +rest}:
-          img_marker.ok(img_valid(name, path, mime, b64),
-            IImg{name, path, mime, b64}, rest)
+        case IF{+raw, +rest}:
+          img_marker.e(img_caption(img_field(raw, "\" caption=\""), raw),
+            name, path, mime, rest)
     case None{}:
       None{}
 
@@ -170,7 +189,7 @@ def img_paths.go(parts: List<&2, IPart>) -> List<&2, String>:
       match p:
         case IText{_}:
           img_paths.go(rest)
-        case IImg{_, _, _, +b64}:
+        case IImg{_, _, _, +b64, _}:
           Con{b64, img_paths.go(rest)}
 
 def img_paths(+s: String) -> List<&2, String>:
@@ -310,10 +329,23 @@ def img_defang(+s: String, +keep: List<&2, Bool>) -> String:
 def img_placeholder(+b64: String) -> String:
   String.append("@@BENDIMG:", String.append(b64, "@@"))
 
-# the Codex frame around each image: the model reads its name and path
-def img_open_text(+name: String, +path: String) -> String:
+# an image's caption in its frame: ` caption="…"`, nothing without one
+def img_caption_attr.pick(none: Bool, +c: String) -> String:
+  match none:
+    case True{}:
+      ""
+    case False{}:
+      String.append(" caption=\"", String.append(c, "\""))
+
+def img_caption_attr(+c: String) -> String:
+  img_caption_attr.pick(String.is_empty(c), c)
+
+# the Codex frame around each image: the model reads its name, its
+# caption when it has one (the talk's still: the app and window), and path
+def img_open_text(+name: String, +caption: String, +path: String) -> String:
   String.append("<image name=", String.append(name,
-    String.append(" path=\"", String.append(path, "\">"))))
+    String.append(img_caption_attr(caption),
+      String.append(" path=\"", String.append(path, "\">")))))
 
 def text_json(+t: String) -> J.Json:
   J.obj(Con{J.kv("type", J.str("text")), Con{J.kv("text", J.str(t)), Nil{}}})
@@ -396,8 +428,8 @@ def parts_blocks(+st: IStyle, parts: List<&2, IPart>) -> List<&2, J.Json>:
       match p:
         case IText{+s}:
           Con{text_json_st(st, s), parts_blocks(st, rest)}
-        case IImg{+name, +path, +mime, +b64}:
-          Con{text_json_st(st, img_open_text(name, path)),
+        case IImg{+name, +path, +mime, +b64, +caption}:
+          Con{text_json_st(st, img_open_text(name, caption, path)),
             Con{J.str(img_part_ph(st, name, mime, b64)),
               Con{text_json_st(st, "</image>"), parts_blocks(st, rest)}}}
 

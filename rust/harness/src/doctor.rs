@@ -213,7 +213,7 @@ pub(crate) fn detected_checks(d: &bise_catalog::detect::Detected) -> Vec<Check> 
         v.push(info("codex", format!("signed in with ChatGPT. bise signs in on its own: {} login chatgpt", bise_catalog::CLI)));
     }
     if d.claude_plan {
-        v.push(info("claude code", "signed in with a Claude plan. that plan doesn't run in bise (Anthropic's terms): use an Anthropic API key."));
+        v.push(info("claude code", bise_proto::words::settings::claude_code_seen(bise_catalog::CLI)));
     }
     v
 }
@@ -225,44 +225,6 @@ pub(crate) fn keys_check(found: &[(String, String)]) -> Check {
     }
     let list: Vec<String> = found.iter().map(|(p, from)| format!("{} ({})", p, from)).collect();
     ok("keys", list.join(", "))
-}
-
-/// The migration line from migrated.json (None: not moved yet).
-/// `legacy`: `~/.bend-harness` or `~/.local/state/switchboard` exists.
-pub(crate) fn migration_check(
-    marker: Option<&serde_json::Value>,
-    explicit_home: bool,
-    no_migrate: bool,
-    legacy: bool,
-) -> Check {
-    let Some(v) = marker else {
-        return if explicit_home {
-            ok("migration", "not needed (BISE_HOME is set: never filled from the old places)")
-        } else if !legacy {
-            ok("migration", "nothing to move (no ~/.bend-harness nor ~/.local/state/switchboard)")
-        } else if no_migrate {
-            warn("migration", "not done (BISE_NO_MIGRATE is set)", "unset BISE_NO_MIGRATE and start bise once")
-        } else {
-            warn("migration", "not done: state still in ~/.bend-harness and ~/.local/state/switchboard", "start `bise` once: it moves them to ~/.bise")
-        };
-    };
-    let n = |k: &str| v.get(k).and_then(|x| x.as_array()).map_or(0, |a| a.len());
-    let waiting = n("hubs_waiting");
-    let errors = n("errors");
-    let detail = format!(
-        "done: {} copied, {} hubs moved, {} waiting (running in the old place), {} errors",
-        n("copied"),
-        n("hubs_moved"),
-        waiting,
-        errors
-    );
-    if errors > 0 {
-        warn("migration", detail, "see `errors` in ~/.bise/migrated.json")
-    } else if waiting > 0 {
-        warn("migration", detail, "those hubs move at their next restart (`/restart` or `bise switchboard --stop`)")
-    } else {
-        ok("migration", detail)
-    }
 }
 
 // ---- probes of this machine ----
@@ -350,55 +312,21 @@ fn home_check(home: &bise_home::Home) -> Check {
     } else {
         "default"
     };
-    match home.layout() {
-        // a fresh HOME: nothing in the old places either (qa C)
-        bise_home::Layout::Legacy if !legacy_found(home) => warn(
-            "home",
-            format!("{} does not exist yet", home.user_home().join(".bise").display()),
-            "start `bise` once",
-        ),
-        bise_home::Layout::Legacy => warn(
-            "home",
-            format!("old layout: {} + ~/.local/state/switchboard", root.display()),
-            "start `bise` once: it moves the state to ~/.bise",
-        ),
-        bise_home::Layout::Bise if !root.is_dir() => {
-            warn("home", format!("{} ({}) does not exist yet", root.display(), how), "start `bise` once")
-        }
-        bise_home::Layout::Bise => {
-            let has = |p: PathBuf| if p.exists() { "✓" } else { "-" };
-            ok(
-                "home",
-                format!(
-                    "{} ({}): config.toml {}, auth.json {}, hubs/ {}, sessions/ {}",
-                    root.display(),
-                    how,
-                    has(home.config_file()),
-                    has(home.auth_file()),
-                    has(home.hubs_dir()),
-                    has(home.sessions_dir())
-                ),
-            )
-        }
+    if !root.is_dir() {
+        return warn("home", format!("{} ({}) does not exist yet", root.display(), how), "start `bise` once");
     }
-}
-
-/// The old places of this HOME exist (what the migration would read).
-fn legacy_found(home: &bise_home::Home) -> bool {
-    let u = home.user_home();
-    u.join(".bend-harness").exists() || u.join(".local/state/switchboard").exists()
-}
-
-fn migration(home: &bise_home::Home) -> Check {
-    let env = |k: &str| std::env::var(k).ok().filter(|v| !v.is_empty());
-    let marker = std::fs::read_to_string(home.user_home().join(".bise").join(bise_home::MIGRATED))
-        .ok()
-        .and_then(|t| serde_json::from_str::<serde_json::Value>(&t).ok());
-    migration_check(
-        marker.as_ref(),
-        env(bise_home::BISE_HOME).is_some(),
-        env(bise_home::migrate::NO_MIGRATE).is_some(),
-        legacy_found(home),
+    let has = |p: PathBuf| if p.exists() { "✓" } else { "-" };
+    ok(
+        "home",
+        format!(
+            "{} ({}): config.toml {}, auth.json {}, hubs/ {}, sessions/ {}",
+            root.display(),
+            how,
+            has(home.config_file()),
+            has(home.auth_file()),
+            has(home.hubs_dir()),
+            has(home.sessions_dir())
+        ),
     )
 }
 
@@ -699,8 +627,8 @@ fn keys_and_model(home: &bise_home::Home) -> (Check, Vec<Check>, Check) {
 }
 
 /// When the conversations compact (BISE-300): BEND_THRESHOLD (`env`),
-/// else config `compaction_threshold`, else 80 % of the window; tokens
-/// or a share of the window, never above 80 % of it. One figure per
+/// else config `compaction_threshold`, else 450k from a 1M window, else 85 %
+/// of it; tokens or a share of the window, never above 85 %. One figure per
 /// model that runs (main, the agents when theirs differs).
 pub(crate) fn compaction_check(setup: &bise_catalog::Setup, env: Option<&str>) -> Check {
     let env = env.map(str::trim).filter(|v| !v.is_empty());
@@ -728,16 +656,16 @@ pub(crate) fn compaction_check(setup: &bise_catalog::Setup, env: Option<&str>) -
             let w = setup.catalog.context_window(m);
             let t = bise_catalog::compaction_threshold(written, w);
             let capped = written.and_then(|v| bise_catalog::threshold_written(v, w)).is_some_and(|n| n > t);
-            let note = if capped { format!(" (capped: 80% of its {} window)", short(w)) } else { String::new() };
+            let note = if capped { format!(" (capped: 85% of its {} window)", short(w)) } else { String::new() };
             format!("{} {} tokens{}", name, t, note)
         })
         .collect();
     let figures = if figures.is_empty() { String::new() } else { format!(" · {}", figures.join(" · ")) };
     match written {
-        None => ok("compaction", format!("at 80% of the model's window{}", figures)),
+        None => ok("compaction", format!("450k from a 1M window, else 85% of it{}", figures)),
         Some(v) if bise_catalog::threshold_written(v, 1_000_000).is_none() => warn(
             "compaction",
-            format!("{} = {} is not a threshold: 80% of the window applies{}", from, v, figures),
+            format!("{} = {} is not a threshold: the default applies{}", from, v, figures),
             "set compaction_threshold = 450000 (tokens) or \"45%\" (of the window) in config.toml",
         ),
         Some(v) => ok("compaction", format!("{} = {}{}", from, v, figures)),
@@ -758,29 +686,15 @@ fn hubs(home: &bise_home::Home) -> Check {
     } else {
         format!("none for {} (`{}` starts one)", paths.workspace.display(), bise_catalog::CLI)
     };
-    let count = |dir: &Path| -> usize {
-        std::fs::read_dir(dir)
-            .map(|rd| {
-                rd.flatten()
-                    .filter(|e| bise_home::migrate::is_hub_id(&e.file_name().to_string_lossy()))
-                    .filter(|e| e.path().is_dir() && switchboard::switch::hub_busy(&e.path()))
-                    .count()
-            })
-            .unwrap_or(0)
-    };
-    let new = count(&home.hubs_dir());
-    let old_dir = home.user_home().join(".local/state/switchboard");
-    let old = if old_dir == home.hubs_dir() { 0 } else { count(&old_dir) };
-    let detail = format!("{}; {} running in {}, {} in the old place", here, new, home.hubs_dir().display(), old);
+    let running = std::fs::read_dir(home.hubs_dir())
+        .map(|rd| rd.flatten().filter(|e| e.path().is_dir() && switchboard::switch::hub_busy(&e.path())).count())
+        .unwrap_or(0);
+    let detail = format!("{}; {} running in {}", here, running, home.hubs_dir().display());
     let socket = socket_check(&paths.natural_socket());
     if socket.mark == Mark::Fail {
         return socket;
     }
-    if old > 0 && home.layout() == bise_home::Layout::Bise {
-        warn("hubs", detail, "they move to ~/.bise at their next restart")
-    } else {
-        ok("hubs", detail)
-    }
+    ok("hubs", detail)
 }
 
 fn disk(home: &bise_home::Home) -> Check {
@@ -799,6 +713,74 @@ fn disk(home: &bise_home::Home) -> Check {
                 .and_then(|l| l.split_whitespace().nth(3).and_then(|v| v.parse().ok()))
         });
     disk_check(&at, kb)
+}
+
+/// The host of a base URL ("https://user@gw.example.com:443/v1" ->
+/// "gw.example.com"); None for an empty or bracketed (IPv6 literal) one.
+pub(crate) fn url_host(u: &str) -> Option<String> {
+    let rest = u.split_once("://").map(|(_, r)| r).unwrap_or(u);
+    let auth = rest.split(['/', '?', '#']).next().unwrap_or("");
+    let auth = auth.rsplit('@').next().unwrap_or(auth);
+    let host = auth.split(':').next().unwrap_or("");
+    (!host.is_empty() && !auth.starts_with('[')).then(|| host.to_ascii_lowercase())
+}
+
+/// A provider host as agent turns reach it (vendor/http's Dns.resolve):
+/// the system resolver's addresses, IPv4 only, tried in order. `addrs`:
+/// what getaddrinfo gave (Err: its words). Same words as the runtime's.
+pub(crate) fn reach_check(host: &str, addrs: Result<Vec<std::net::IpAddr>, String>) -> Check {
+    match addrs {
+        Err(e) => fail(
+            "reach",
+            format!("cannot resolve {}: the system resolver has no address for it ({})", host, e),
+            "check the host name in base_url, your network or VPN",
+        ),
+        Ok(all) => {
+            let v4: Vec<String> = all.iter().filter(|a| a.is_ipv4()).map(|a| a.to_string()).collect();
+            if v4.is_empty() {
+                let v6: Vec<String> = all.iter().map(|a| a.to_string()).collect();
+                return fail(
+                    "reach",
+                    format!("{} has only IPv6 addresses ({}) and agent turns connect over IPv4", host, v6.join(", ")),
+                    "use a base_url whose host has an IPv4 address",
+                );
+            }
+            ok("reach", format!("{} → {} (the system resolver, as agent turns use it)", host, v4.join(", ")))
+        }
+    }
+}
+
+/// One reach line per provider host the roles use (main, agents, small
+/// jobs): `bise auth check` and agent turns both resolve through the system
+/// resolver, so a green line here is a name the turns resolve too.
+fn reach(setup: &bise_catalog::Setup) -> Vec<Check> {
+    use std::net::ToSocketAddrs;
+    let mut hosts: Vec<String> = Vec::new();
+    for m in [&setup.model, &setup.agent_model, &setup.small_model] {
+        if m.trim().is_empty() {
+            continue;
+        }
+        if let Some(h) = url_host(&setup.catalog.resolve(m).base_url) {
+            if !hosts.contains(&h) {
+                hosts.push(h);
+            }
+        }
+    }
+    hosts
+        .iter()
+        .map(|h| {
+            let addrs = (h.as_str(), 443).to_socket_addrs().map(|it| {
+                let mut v: Vec<std::net::IpAddr> = Vec::new();
+                for a in it {
+                    if !v.contains(&a.ip()) {
+                        v.push(a.ip());
+                    }
+                }
+                v
+            });
+            reach_check(h, addrs.map_err(|e| e.to_string()))
+        })
+        .collect()
 }
 
 /// `bise doctor`: the report on stdout; 1 when a check failed.
@@ -824,7 +806,6 @@ pub(crate) fn main(args: &[String]) -> i32 {
     checks.extend([
         on_path(),
         home_check(&home),
-        migration(&home),
         git(),
         rg(),
         github(),
@@ -839,6 +820,7 @@ pub(crate) fn main(args: &[String]) -> i32 {
     let env = |k: &str| std::env::var(k).ok();
     checks.extend(detected_checks(&bise_catalog::detect::detect(home.user_home(), &env)));
     checks.extend(models);
+    checks.extend(reach(&setup));
     checks.extend([compaction, voice, hubs(&home), disk(&home)]);
     checks.extend(tmux());
     let st = Style::stdout();
@@ -857,6 +839,34 @@ pub(crate) fn main(args: &[String]) -> i32 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn url_host_of_a_base_url() {
+        assert_eq!(url_host("https://user@GW.example.com:443/v1?k=1").as_deref(), Some("gw.example.com"));
+        assert_eq!(url_host("http://127.0.0.1:9/v1").as_deref(), Some("127.0.0.1"));
+        assert_eq!(url_host("gw.example.com/v1").as_deref(), Some("gw.example.com"));
+        assert_eq!(url_host(""), None);
+        assert_eq!(url_host("http://[::1]:8080/"), None);
+    }
+
+    /// A gateway whose name is an alias (CNAME) of a dual-stack host: the
+    /// system resolver answers IPv6 first; agent turns use the IPv4 one, and
+    /// doctor names the one they use. Only IPv6, or no address: a failure in
+    /// the runtime's words, so a green auth check never hides failing turns.
+    #[test]
+    fn reach_says_what_agent_turns_use() {
+        let v6: std::net::IpAddr = "2001:db8::1".parse().unwrap();
+        let v4: std::net::IpAddr = "192.0.2.7".parse().unwrap();
+        let c = reach_check("gw.example.com", Ok(vec![v6, v4]));
+        assert_eq!((c.mark, c.detail.as_str()), (Mark::Ok, "gw.example.com → 192.0.2.7 (the system resolver, as agent turns use it)"));
+        let c = reach_check("gw.example.com", Ok(vec![v6]));
+        assert_eq!(c.mark, Mark::Fail);
+        assert_eq!(c.detail, "gw.example.com has only IPv6 addresses (2001:db8::1) and agent turns connect over IPv4");
+        let c = reach_check("gw.example.com", Err("nodename nor servname provided, or not known".into()));
+        assert_eq!(c.mark, Mark::Fail);
+        assert_eq!(c.detail, "cannot resolve gw.example.com: the system resolver has no address for it (nodename nor servname provided, or not known)");
+        assert_eq!(c.fix.as_deref(), Some("check the host name in base_url, your network or VPN"));
+    }
 
     #[test]
     fn macos_versions() {
@@ -1021,9 +1031,9 @@ mod tests {
         };
         let c = compaction_check(&cfg(""), None);
         assert_eq!(c.mark, Mark::Ok);
-        assert_eq!(c.detail, "at 80% of the model's window · main 800000 tokens · agents 160000 tokens");
+        assert_eq!(c.detail, "450k from a 1M window, else 85% of it · main 450000 tokens · agents 170000 tokens");
         let c = compaction_check(&cfg("compaction_threshold = 450000\n"), None);
-        assert_eq!(c.detail, "compaction_threshold = 450000 · main 450000 tokens · agents 160000 tokens (capped: 80% of its 200k window)");
+        assert_eq!(c.detail, "compaction_threshold = 450000 · main 450000 tokens · agents 170000 tokens (capped: 85% of its 200k window)");
         let c = compaction_check(&cfg("compaction_threshold = \"45%\"\n"), None);
         assert_eq!(c.detail, "compaction_threshold = 45% · main 450000 tokens · agents 90000 tokens");
         let c = compaction_check(&cfg("compaction_threshold = \"lots\"\n"), None);
@@ -1033,38 +1043,22 @@ mod tests {
         assert_eq!(c.detail, "BEND_THRESHOLD = 10% · main 100000 tokens · agents 20000 tokens");
         // the old key: not read, the config line says so
         let s = cfg("threshold = 450000\n");
-        assert_eq!(compaction_check(&s, None).detail, "at 80% of the model's window · main 800000 tokens · agents 160000 tokens");
+        assert_eq!(compaction_check(&s, None).detail, "450k from a 1M window, else 85% of it · main 450000 tokens · agents 170000 tokens");
         assert!(s.catalog.warnings.iter().any(|w| w.contains("rename it compaction_threshold")), "{:?}", s.catalog.warnings);
     }
 
-    /// qa C: a fresh HOME is not an "old layout".
+    /// qa C: a fresh HOME says to start bise once.
     #[test]
-    fn a_fresh_home_is_not_an_old_layout() {
+    fn a_fresh_home_says_to_start_bise() {
         let d = std::env::temp_dir().join(format!("doctor-fresh-{}", std::process::id()));
         std::fs::create_dir_all(&d).unwrap();
         let hs = d.to_string_lossy().into_owned();
         let home = bise_home::Home::from_lookup(&|k: &str| (k == "HOME").then(|| hs.clone()));
         let c = home_check(&home);
-        assert!(c.detail.contains(".bise does not exist yet") && !c.detail.contains("old layout"), "{c:?}");
-        std::fs::create_dir_all(d.join(".bend-harness")).unwrap();
-        assert!(home_check(&home).detail.contains("old layout"));
+        assert!(c.mark == Mark::Warn && c.detail.contains(".bise (default) does not exist yet"), "{c:?}");
+        std::fs::create_dir_all(d.join(".bise")).unwrap();
+        assert_eq!(home_check(&home).mark, Mark::Ok);
         let _ = std::fs::remove_dir_all(&d);
-    }
-
-    #[test]
-    fn migration_states() {
-        let done = serde_json::json!({"copied": ["a", "b"], "hubs_moved": ["h"], "hubs_waiting": [], "errors": []});
-        let c = migration_check(Some(&done), false, false, true);
-        assert_eq!(c.mark, Mark::Ok);
-        assert!(c.detail.contains("2 copied, 1 hubs moved, 0 waiting"), "{}", c.detail);
-        let waiting = serde_json::json!({"copied": [], "hubs_moved": [], "hubs_waiting": ["x"], "errors": []});
-        assert_eq!(migration_check(Some(&waiting), false, false, true).mark, Mark::Warn);
-        assert_eq!(migration_check(None, true, false, true).mark, Mark::Ok);
-        assert_eq!(migration_check(None, false, false, true).mark, Mark::Warn);
-        // qa C: a fresh HOME has nothing to move
-        let fresh = migration_check(None, false, false, false);
-        assert_eq!(fresh.mark, Mark::Ok);
-        assert!(fresh.detail.contains("nothing to move"), "{}", fresh.detail);
     }
 
     #[test]

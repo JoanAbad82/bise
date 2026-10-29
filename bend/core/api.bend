@@ -2,12 +2,15 @@
 # Bend, in one place.
 #
 # runtime/remote.bend prints the harness wire request (MODEL/TOOL/MSG/
-# CALL lines, pinned by LAWS.bend); core/wire.bend parses it; the
+# CALL lines, pinned by bend/laws/); core/wire.bend parses it; the
 # family of the model maps it to its JSON body and maps the provider
 # response back to the OK/CALL/END reply the Core parses:
 #   core/wire.bend       the wire, shared by every family
 #   core/oai-chat.bend   OpenAI Chat Completions (and compatibles)
 #   core/oai-stream.bend OpenAI Chat, streamed
+#   core/deepseek.bend   DeepSeek Chat: reasoning as reasoning_content
+#                        (on core/oai-chat.bend and core/oai-stream.bend)
+#   core/oai-resp.bend   OpenAI Responses
 #   core/anthropic.bend  Anthropic Messages (+ core/anth-stream.bend)
 #
 # The family is one of the two registries of the provider arc (the
@@ -34,12 +37,14 @@ import ./anthropic.bend as Anth
 import ./anth-stream.bend as As
 import ./oai-stream.bend as Os
 import ./oai-resp.bend as Rs
+import ./deepseek.bend as Ds
 import ../vendor/json.bend as J
 
 type Style is Data:
   OpenAI{}
   Anthropic{}
   OpenAIResp{}
+  DeepSeek{}
 
 # ---- the family's name (`api = ...` in a provider table) ----
 
@@ -62,16 +67,29 @@ def style_of_api.chat(is_chat: Bool, is_anth: Bool, is_resp: Bool)
         case False{}:
           style_of_api.resp(is_resp)
 
+def style_of_api.deepseek(deepseek: Bool, st: Maybe<&2, Style>)
+    -> Maybe<&2, Style>:
+  match deepseek:
+    case True{}:
+      Some{DeepSeek{}}
+    case False{}:
+      st
+
 # None: a family bise does not speak (yet): gemini, bedrock-converse,
-# a typo (openai-responses: BISE-147)
+# a typo. deepseek-chat: Chat Completions with DeepSeek's reasoning
+# replay, named by the catalog (`api = "deepseek-chat"`), never by the
+# provider's id: a custom provider pointed at DeepSeek sets it too.
 def style_of_api(+api: String) -> Maybe<&2, Style>:
-  style_of_api.chat(String.eq(api, "openai-chat"), String.eq(api, "anthropic"),
-    String.eq(api, "openai-responses"))
+  style_of_api.deepseek(String.eq(api, "deepseek-chat"),
+    style_of_api.chat(String.eq(api, "openai-chat"), String.eq(api, "anthropic"),
+      String.eq(api, "openai-responses")))
 
 def api_name(st: Style) -> String:
   match st:
     case OpenAI{}:
       "openai-chat"
+    case DeepSeek{}:
+      "deepseek-chat"
     case Anthropic{}:
       "anthropic"
     case OpenAIResp{}:
@@ -80,6 +98,8 @@ def api_name(st: Style) -> String:
 def is_anthropic(st: Style) -> Bool:
   match st:
     case OpenAI{}:
+      False{}
+    case DeepSeek{}:
       False{}
     case Anthropic{}:
       True{}
@@ -91,6 +111,8 @@ def is_anthropic(st: Style) -> Bool:
 def endpoint(st: Style) -> String:
   match st:
     case OpenAI{}:
+      "/chat/completions"
+    case DeepSeek{}:
       "/chat/completions"
     case Anthropic{}:
       "/messages"
@@ -130,6 +152,10 @@ def headers(st: Style, +betas: String, +key: String) -> List<&2, Hdr>:
       headers.auth(String.is_empty(key),
         Hdr{"Authorization", String.append("Bearer ", key)},
         [Hdr{"Content-Type", "application/json"}])
+    case DeepSeek{}:
+      headers.auth(String.is_empty(key),
+        Hdr{"Authorization", String.append("Bearer ", key)},
+        [Hdr{"Content-Type", "application/json"}])
     case OpenAIResp{}:
       headers.auth(String.is_empty(key),
         Hdr{"Authorization", String.append("Bearer ", key)},
@@ -146,6 +172,8 @@ def streams(st: Style) -> Bool:
   match st:
     case OpenAI{}:
       True{}
+    case DeepSeek{}:
+      True{}
     case Anthropic{}:
       True{}
     case OpenAIResp{}:
@@ -154,6 +182,8 @@ def streams(st: Style) -> Bool:
 def wire_body(st: Style, +body: String) -> String:
   match st:
     case OpenAI{}:
+      Os.stream_body(body)
+    case DeepSeek{}:
       Os.stream_body(body)
     case Anthropic{}:
       As.stream_body(body)
@@ -325,6 +355,10 @@ def api_body_for(st: Style, +model: String, +facts: MFacts, +req: W.WReq)
         case MFacts{+reasoning, +output, +max_key, _, _, +effort, _}:
           Oai.api_body_with(model, Oai.Opts{reasoning, output, max_key, effort},
             req)
+    case DeepSeek{}:
+      match facts:
+        case MFacts{+reasoning, +output, +max_key, _, _, +effort, _}:
+          Ds.api_body(model, Oai.Opts{reasoning, output, max_key, effort}, req)
     case Anthropic{}:
       match facts:
         case MFacts{+reasoning, +output, _, +thinking, _, +effort, _}:
@@ -339,6 +373,8 @@ def reply_of_for(st: Style, +status: U32, +body: String) -> String:
   match st:
     case OpenAI{}:
       Oai.reply_of(status, body)
+    case DeepSeek{}:
+      Ds.reply_of(status, body)
     case Anthropic{}:
       Anth.reply_anth_of(status, body)
     case OpenAIResp{}:
@@ -349,6 +385,8 @@ def stream_reply(st: Style, +text: String) -> String:
   match st:
     case OpenAI{}:
       Os.reply_any(text)
+    case DeepSeek{}:
+      Ds.stream_reply(text)
     case Anthropic{}:
       As.reply_any(text)
     case OpenAIResp{}:
@@ -360,6 +398,8 @@ def stream_reply(st: Style, +text: String) -> String:
 def error_code(st: Style, +body: String) -> String:
   match st:
     case OpenAI{}:
+      ""
+    case DeepSeek{}:
       ""
     case Anthropic{}:
       ""
@@ -383,6 +423,12 @@ def usage_of(st: Style, +u: J.Json) -> Usage:
         J.get_num_or(W.field_or(u, "prompt_tokens_details", J.JNull{}),
           "cached_tokens", 0n),
         0n}
+    case DeepSeek{}:
+      Usage{J.get_num_or(u, "prompt_tokens", 0n),
+        J.get_num_or(u, "completion_tokens", 0n),
+        J.get_num_or(W.field_or(u, "prompt_tokens_details", J.JNull{}),
+          "cached_tokens", 0n),
+        0n}
     case Anthropic{}:
       +cr = J.get_num_or(u, "cache_read_input_tokens", 0n)
       +cw = J.get_num_or(u, "cache_creation_input_tokens", 0n)
@@ -400,6 +446,8 @@ def usage_of(st: Style, +u: J.Json) -> Usage:
 def stream_usage(st: Style, +text: String) -> J.Json:
   match st:
     case OpenAI{}:
+      Os.usage(text)
+    case DeepSeek{}:
       Os.usage(text)
     case Anthropic{}:
       As.usage(text)

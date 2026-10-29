@@ -61,19 +61,16 @@ fn rosetta_target(target: &str, rosetta: bool) -> String {
 
 /// Where this bise runs from, in the words of the update: an install,
 /// else why there is nothing to update.
-/// bise's release channel for the desktop app's update check (bar S.6,
-/// the window's core: `SetupPorts::manifest`): `(latest.json or why not,
-/// the channel's base URL, this Mac's target)`. The channel is the same
-/// as `bise update`'s: `BISE_DIST_URL`, else the install's, else
-/// [`release::DIST_URL`] (a bise in an app bundle isn't an install).
-pub(crate) fn desktop_manifest() -> (Result<String, String>, String, String) {
-    let base = this_install()
-        .ok()
-        .and_then(|i| i.dist_url(&env))
-        .or_else(|| env(release::DIST_URL_ENV))
-        .unwrap_or_else(|| release::DIST_URL.to_string());
-    let base = base.trim_end_matches('/').to_string();
-    let text = fetch_text(&format!("{}/{}", base, release::MANIFEST));
+/// The desktop app's own release channel for its update check (bar S.6,
+/// the window's core: `SetupPorts::manifest`): `(desktop.json or why
+/// not, the channel's base URL, this Mac's target)`. Never `bise update`'s
+/// channel: the two cycles are apart (desktop-on-main), so this reads
+/// [`release::desktop_dist_url`] for the channel he follows (stable:
+/// `BISE_DIST_URL_DESKTOP`, else the rolling `desktop-latest` tag; beta:
+/// `BISE_DIST_URL_DESKTOP_BETA`, else `desktop-beta`).
+pub(crate) fn desktop_manifest(channel: release::DesktopChannel) -> (Result<String, String>, String, String) {
+    let base = release::desktop_dist_url(&env, channel);
+    let text = fetch_text(&format!("{}/{}", base, release::DESKTOP_MANIFEST));
     (text, base, host_target())
 }
 
@@ -235,17 +232,12 @@ fn unpack(inst: &Install, rel: &Release, base: &str, work: &Path, dir: &Path) ->
         .find(|p| p.join("app").is_dir())
         .ok_or("the tarball has no app/ folder")?;
     let app = bundle.join("app");
-    if let Some(f) = REQUIRED.iter().find(|f| !app.join(f).exists()) {
-        return Err(format!("incomplete release: app/{} missing", f));
-    }
     let id = release::read_version(&app).get("id").cloned().unwrap_or_default();
-    if id != rel.id {
+    if REQUIRED.iter().all(|f| app.join(f).exists()) && id != rel.id {
         return Err(format!("the tarball holds version {}, the manifest says {}", id, rel.id));
     }
-    let tmp = inst.versions_dir().join(format!(".{}.tmp", rel.id));
-    let _ = std::fs::remove_dir_all(&tmp);
-    std::fs::rename(&app, &tmp).map_err(|e| format!("{}: {}", tmp.display(), e))?;
-    std::fs::rename(&tmp, dir).map_err(|e| format!("{}: {}", dir.display(), e))?;
+    place(&inst.versions_dir(), &rel.id, &app, false).map_err(|e| format!("incomplete release: {}", e))?;
+    debug_assert!(dir.join("bise").exists());
     // the newest installer: `bise uninstall` runs it
     let sh = bundle.join("install.sh");
     if sh.is_file() {
@@ -257,6 +249,139 @@ fn unpack(inst: &Install, rel: &Release, base: &str, work: &Path, dir: &Path) ->
     Ok(())
 }
 
+/// Put the app root `from` at `<versions>/<id>`, the one way a version
+/// dir is made from a release (a tarball's `app/`, moved) or from the
+/// desktop app's bundle (copied, it stays): REQUIRED checked, then
+/// through `.<id>.<pid>.tmp` and one rename, so a half copy never shows
+/// and two at once leave one. Its dir; already there: kept as it is.
+fn place(versions: &Path, id: &str, from: &Path, copy: bool) -> Result<PathBuf, String> {
+    if id.is_empty() || id.starts_with('.') || id.contains('/') {
+        return Err(format!("{}: no usable VERSION id ('{}')", from.display(), id));
+    }
+    if let Some(f) = REQUIRED.iter().find(|f| !from.join(f).exists()) {
+        return Err(format!("{} is missing from {}", f, from.display()));
+    }
+    let dir = versions.join(id);
+    if dir.join("bise").exists() {
+        if same_build(&dir, from) {
+            return Ok(dir);
+        }
+        // that id names another build (or a half one): never handed out,
+        // never written over (a hub may run from it). One naming rule: a
+        // VERSION id names one build (releases: the version; desktop_try:
+        // root-<head8>[-<changes8>]-<recipe6>, root-<sha12> for a candidate),
+        // so a clash is an error that names both builds (the bundles packed
+        // before 0d546db5 said id=root and went to root-<commit12> until
+        // issue 31: every desktop release has 0d546db5)
+        return Err(format!("{} holds another build ({}) than {} ({}): one VERSION id, two builds", dir.display(), build_of(&dir), from.display(), build_of(from)));
+    }
+    std::fs::create_dir_all(versions).map_err(|e| format!("{}: {}", versions.display(), e))?;
+    let tmp = versions.join(format!(".{}.{}.tmp", id, std::process::id()));
+    let _ = std::fs::remove_dir_all(&tmp);
+    let made = if copy {
+        // a clone on APFS (`cp -c`: no second 100 MB), else a plain copy
+        let cp = |clone: bool| {
+            let mut c = Command::new("/bin/cp");
+            c.arg(if clone { "-Rc" } else { "-R" }).arg(from).arg(&tmp).stderr(Stdio::piped());
+            c.output().map_err(|e| e.to_string()).and_then(|o| match o.status.success() {
+                true => Ok(()),
+                false => Err(String::from_utf8_lossy(&o.stderr).trim().to_string()),
+            })
+        };
+        cp(true).or_else(|_| {
+            let _ = std::fs::remove_dir_all(&tmp);
+            cp(false)
+        })
+    } else {
+        std::fs::rename(from, &tmp).map_err(|e| e.to_string())
+    };
+    if let Err(e) = made {
+        let _ = std::fs::remove_dir_all(&tmp);
+        return Err(format!("{}: {}", tmp.display(), e));
+    }
+    match std::fs::rename(&tmp, &dir) {
+        Ok(()) => Ok(dir),
+        // another one placed it first: theirs stays
+        Err(_) if dir.join("bise").exists() => {
+            let _ = std::fs::remove_dir_all(&tmp);
+            Ok(dir)
+        }
+        Err(e) => {
+            let _ = std::fs::remove_dir_all(&tmp);
+            Err(format!("{}: {}", dir.display(), e))
+        }
+    }
+}
+
+/// A root's build as an error names it: `id=<id> commit=<commit12>`.
+fn build_of(dir: &Path) -> String {
+    let v = release::read_version(dir);
+    let commit = v.get("commit").map(String::as_str).unwrap_or("?");
+    format!("id={} commit={}", v.get("id").map(String::as_str).unwrap_or("?"), commit.get(..12).unwrap_or(commit))
+}
+
+/// `dir` is the build `from` holds, whole: every REQUIRED file there and
+/// the same VERSION id and commit.
+fn same_build(dir: &Path, from: &Path) -> bool {
+    let (a, b) = (release::read_version(dir), release::read_version(from));
+    REQUIRED.iter().all(|f| dir.join(f).exists()) && a.get("id") == b.get("id") && a.get("commit") == b.get("commit")
+}
+
+/// The app root hubs run from (architect m_18354): the desktop app's
+/// bise finds its runtime in `<x>.app/Contents/Resources/bin` (a version
+/// dir the app carries), but a hub never runs from inside a `.app` (its
+/// update renames the bundle to `.old`, then deletes it; probation and
+/// rollback want immutable dirs): that runtime is installed once as
+/// `<prefix>/versions/<its VERSION id>` ([`place`], copied), and that dir
+/// is the root. Any other root is returned as it is.
+pub(crate) fn hub_root(root: &Path) -> Result<PathBuf, String> {
+    if !in_app(root) {
+        return Ok(root.to_path_buf());
+    }
+    let id = release::read_version(root).get("id").cloned().unwrap_or_default();
+    let home = bise_home::Home::from_env();
+    let versions = release::default_prefix(&env, home.user_home()).join("versions");
+    place(&versions, &id, root, true).map_err(|e| format!("bise couldn't install its runtime: {}. reinstall bise", e))
+}
+
+/// The bise a hub runs (architect m_21731, ambient-lead m_21726), the one
+/// owner of where a hub runs from: every `sbd` this binary starts (the
+/// desktop core, `bise ambient`, the terminal) gets its executable here,
+/// with `root` from [`hub_root`]. A bise inside a `.app` runs its hubs
+/// from the runtime [`hub_root`] installed (`versions/<id>/bise`), so
+/// neither the hub nor its REPLs and their plugin bridges (they get the
+/// hub's own executable) run from the bundle an update swaps; they outlive
+/// the app. Anywhere else (a dev tree, a version dir): `current`, as
+/// before. Never a silent fallback to the bundle: a root still in an app,
+/// or one without its bise, is an error naming the path. Pure.
+pub(crate) fn hub_exe(root: &Path, current: &Path, has: &dyn Fn(&Path) -> bool) -> Result<PathBuf, String> {
+    if !in_app(current) {
+        return Ok(current.to_path_buf());
+    }
+    if in_app(root) {
+        return Err(format!("a hub never runs from inside an app ({}). reinstall bise", root.display()));
+    }
+    // the whole runtime, or no hub: a hub on a dir without its REPL or
+    // its core can't start an agent (ambient-lead m_21839)
+    if let Some(f) = [switchboard::switch::EXE, "repl-live", "sb-core"].iter().map(|f| root.join(f)).find(|p| !has(p)) {
+        return Err(format!("bise couldn't install its runtime: no {}. reinstall bise", f.display()));
+    }
+    Ok(root.join(switchboard::switch::EXE))
+}
+
+/// [`hub_root`] then [`hub_exe`] for this process: (the hub's exe, its
+/// app root).
+pub(crate) fn hub_of(root: &Path) -> Result<(PathBuf, PathBuf), String> {
+    let root = hub_root(root)?;
+    let me = std::env::current_exe().map_err(|e| format!("bise can't find itself: {e}"))?;
+    Ok((hub_exe(&root, &me, &|p| p.exists())?, root))
+}
+
+/// A path inside an app bundle (`….app/Contents/…`).
+pub(crate) fn in_app(p: &Path) -> bool {
+    p.to_string_lossy().contains(".app/Contents/")
+}
+
 /// `current -> versions/<id>`, atomically (a symlink renamed over it).
 fn flip(inst: &Install, id: &str) -> Result<(), String> {
     let tmp = inst.prefix.join(".current.tmp");
@@ -265,14 +390,17 @@ fn flip(inst: &Install, id: &str) -> Result<(), String> {
     std::fs::rename(&tmp, inst.current_link()).map_err(|e| e.to_string())
 }
 
-/// The versions to delete: past the newest `keep`, never `current` nor
-/// one a process runs (a hub, an agent's REPL: `ps` names its folder).
-fn to_prune(installed: &[release::Installed], keep: usize, current: Option<&Path>, ps: &str) -> Vec<PathBuf> {
+/// The versions to delete: past the newest `keep`, never `current`, nor
+/// one a process runs (a hub, an agent's REPL: `ps` names its folder),
+/// nor one `leased` (`release::in_use`: the desktop core runs from its
+/// .app but its hubs start from that dir; a ps line never names it).
+fn to_prune(installed: &[release::Installed], keep: usize, current: Option<&Path>, ps: &str, leased: &dyn Fn(&Path) -> bool) -> Vec<PathBuf> {
     installed
         .iter()
         .skip(keep)
         .filter(|i| Some(i.dir.as_path()) != current)
         .filter(|i| !ps.contains(&format!("{}/", i.dir.display())))
+        .filter(|i| !leased(&i.dir))
         .map(|i| i.dir.clone())
         .collect()
 }
@@ -284,7 +412,7 @@ fn prune(inst: &Install) {
         .map(|o| String::from_utf8_lossy(&o.stdout).into_owned())
         .unwrap_or_default();
     let current = inst.current();
-    for d in to_prune(&inst.installed(), KEEP, current.as_deref(), &ps) {
+    for d in to_prune(&inst.installed(), KEEP, current.as_deref(), &ps, &release::in_use) {
         let _ = std::fs::remove_dir_all(d);
     }
 }
@@ -452,6 +580,22 @@ pub(crate) fn uninstall(args: &[String]) -> i32 {
 mod tests {
     use super::*;
 
+    /// `to_prune` once a dropped lease is seen released, 10 s at most. A
+    /// child any test forks (codesign, cp, git...) holds a copy of every
+    /// open fd between its fork and its exec, the lease's too, so `in_use`
+    /// can still see it held for a moment (cli-sign, release-40: 2 reds;
+    /// a lock around this file's own forks was not enough).
+    fn pruned_once_released(all: &[release::Installed], current: &Path, want: usize) -> Vec<PathBuf> {
+        let t0 = std::time::Instant::now();
+        loop {
+            let gone = to_prune(all, 2, Some(current), "", &release::in_use);
+            if gone.len() == want || t0.elapsed() > Duration::from_secs(10) {
+                return gone;
+            }
+            std::thread::sleep(Duration::from_millis(20));
+        }
+    }
+
     #[test]
     fn rosetta_gets_the_native_build() {
         assert_eq!(rosetta_target("darwin-x86_64", true), "darwin-arm64");
@@ -468,6 +612,279 @@ mod tests {
         assert!(due(Some(Duration::ZERO), Duration::ZERO));
     }
 
+    /// The desktop app's runtime (architect m_18354): copied once out of
+    /// the .app into `versions/<id>` (the bundle stays whole), a second
+    /// launch copies nothing, a broken bundle says what it lacks.
+    #[test]
+    fn a_bundles_runtime_is_placed_once_as_a_version_dir() {
+        let t = std::env::temp_dir().join(format!("bise-place-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&t);
+        let bin = t.join("bise.app/Contents/Resources/bin");
+        std::fs::create_dir_all(bin.join("prompts")).unwrap();
+        for f in REQUIRED {
+            std::fs::write(bin.join(f), "x").unwrap();
+        }
+        std::fs::write(bin.join("VERSION"), "id=root-abc
+").unwrap();
+        std::fs::write(bin.join("prompts/p.txt"), "p").unwrap();
+        assert!(in_app(&bin) && !in_app(&t.join("versions/root-abc")));
+        let versions = t.join("prefix/versions");
+        let dir = place(&versions, "root-abc", &bin, true).unwrap();
+        assert_eq!(dir, versions.join("root-abc"));
+        assert_eq!(std::fs::read_to_string(dir.join("prompts/p.txt")).unwrap(), "p");
+        assert!(bin.join("repl-live").exists(), "copied: the bundle stays whole");
+        // the second launch: kept as it is, nothing copied over it
+        std::fs::write(dir.join("marker"), "first").unwrap();
+        std::fs::write(bin.join("prompts/p.txt"), "changed").unwrap();
+        assert_eq!(place(&versions, "root-abc", &bin, true).unwrap(), dir);
+        assert_eq!(std::fs::read_to_string(dir.join("prompts/p.txt")).unwrap(), "p");
+        assert!(dir.join("marker").exists());
+        // no temp dir left
+        let left: Vec<String> = std::fs::read_dir(&versions).unwrap().flatten().map(|e| e.file_name().to_string_lossy().into()).collect();
+        assert_eq!(left, ["root-abc"]);
+        // a bundle without its runtime, or a bad id: why, nothing placed
+        std::fs::remove_file(bin.join("sb-core")).unwrap();
+        let e = place(&versions, "root-new", &bin, true).unwrap_err();
+        assert!(e.starts_with("sb-core is missing from ") && e.ends_with("bise.app/Contents/Resources/bin"), "{e}");
+        assert!(place(&versions, "../x", &bin, true).unwrap_err().contains("no usable VERSION id"));
+        assert!(!versions.join("root-new").exists());
+        let _ = std::fs::remove_dir_all(&t);
+    }
+
+    /// A release's (and the desktop runtime's) bise is a signed bise.app
+    /// with `bise` a link into it (cli-sign): placing it, copied or moved,
+    /// keeps the bundle byte for byte and the link a link, so its signature
+    /// (what TCC keys his folder grant on) still verifies.
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn a_placed_bundle_keeps_its_signature() {
+        let t = std::env::temp_dir().join(format!("bise-place-sig-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&t);
+        let versions = t.join("prefix/versions");
+        for (id, copy) in [("v-copied", true), ("v-moved", false)] {
+            let root = t.join(id);
+            let macos = root.join("bise.app/Contents/MacOS");
+            std::fs::create_dir_all(&macos).unwrap();
+            std::fs::copy("/usr/bin/true", macos.join("bise")).unwrap();
+            std::fs::write(root.join("bise.app/Contents/Info.plist"), "<?xml version=\"1.0\" encoding=\"UTF-8\"?><plist version=\"1.0\"><dict><key>CFBundleIdentifier</key><string>dev.bise.cli</string><key>CFBundleExecutable</key><string>bise</string></dict></plist>").unwrap();
+            let signed = Command::new("codesign").args(["--force", "-s", "-"]).arg(root.join("bise.app")).status().unwrap();
+            assert!(signed.success());
+            std::os::unix::fs::symlink("bise.app/Contents/MacOS/bise", root.join("bise")).unwrap();
+            for f in ["repl-live", "sb-core"] {
+                std::fs::write(root.join(f), "x").unwrap();
+            }
+            std::fs::write(root.join("VERSION"), format!("id={id}\n")).unwrap();
+            let dir = place(&versions, id, &root, copy).unwrap();
+            assert_eq!(std::fs::read_link(dir.join("bise")).unwrap(), Path::new("bise.app/Contents/MacOS/bise"), "{id}: the link stays a link");
+            let v = Command::new("codesign").args(["--verify", "--strict"]).arg(dir.join("bise.app")).output().unwrap();
+            assert!(v.status.success(), "{id}: {}", String::from_utf8_lossy(&v.stderr));
+        }
+        let _ = std::fs::remove_dir_all(&t);
+    }
+
+    /// Where a hub runs from (architect m_21731, ambient-lead m_21726): a
+    /// bise inside a .app hands its hubs the installed runtime's bise,
+    /// never its own; a dev tree or a version dir keeps its own; nothing
+    /// falls back to the bundle silently.
+    #[test]
+    fn a_hub_never_runs_from_inside_an_app() {
+        let app = Path::new("/Applications/bise try.app/Contents/Resources/bin/bise");
+        let root = Path::new("/u/.bise/versions/root-1c5659b8-abcdef");
+        let whole = |p: &Path| ["bise", "repl-live", "sb-core"].iter().any(|f| p == root.join(f));
+        assert_eq!(hub_exe(root, app, &whole).unwrap(), root.join("bise"));
+        // its runtime not installed: why, with the path; never the bundle's bise
+        let e = hub_exe(root, app, &|_| false).unwrap_err();
+        assert!(e.contains("/u/.bise/versions/root-1c5659b8-abcdef/bise"), "{e}");
+        // a half runtime (ambient-lead m_21839): no REPL or no core, no hub
+        for gone in ["repl-live", "sb-core"] {
+            let e = hub_exe(root, app, &|p: &Path| whole(p) && p != root.join(gone)).unwrap_err();
+            assert!(e.contains(&format!("root-1c5659b8-abcdef/{gone}")), "{e}");
+        }
+        let inside = Path::new("/Applications/bise try.app/Contents/Resources/bin");
+        let e = hub_exe(inside, app, &|_| true).unwrap_err();
+        assert!(e.contains("bise try.app/Contents/Resources/bin"), "{e}");
+        // a dev tree, a version dir: this bise, as before
+        for me in ["/src/bise/rust/target/debug/bise", "/u/.bise/versions/x/bise"] {
+            assert_eq!(hub_exe(Path::new("/src/bise"), Path::new(me), &|_| true).unwrap(), PathBuf::from(me));
+            assert_eq!(hub_exe(inside, Path::new(me), &|_| false).unwrap(), PathBuf::from(me));
+        }
+    }
+
+    /// A newer app never hands its hubs an older build's dir (ambient-lead
+    /// m_21844: every promoted candidate said id=root, so his 8b00ed2b app
+    /// ran its hubs on b4a25acb's versions/root). The same id with another
+    /// commit, or a half dir: the bundle's runtime goes whole to
+    /// <id>-<commit12>, and the dir there stays as it is (a hub may run it).
+    #[test]
+    fn an_app_never_hands_its_hubs_another_builds_dir() {
+        let t = std::env::temp_dir().join(format!("bise-other-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&t);
+        let versions = t.join("prefix/versions");
+        let app = |name: &str, commit: &str| {
+            let bin = t.join(format!("{name}.app/Contents/Resources/bin"));
+            std::fs::create_dir_all(&bin).unwrap();
+            for f in REQUIRED {
+                std::fs::write(bin.join(f), commit).unwrap();
+            }
+            std::fs::write(bin.join("VERSION"), format!("id=root{}commit={commit}{}", '\n', '\n')).unwrap();
+            bin
+        };
+        let (a, b) = ("b4a25acbc155ff9315c299f62ad9089142565abf", "8b00ed2b0123456789abcdef0123456789abcdef");
+        let dir_a = place(&versions, "root", &app("a", a), true).unwrap();
+        assert_eq!(dir_a, versions.join("root"));
+        // the same id, another commit (a bundle packed before 0d546db5; its
+        // root-<commit12> second dir went in issue 31): an error naming both
+        let e = place(&versions, "root", &app("b", b), true).unwrap_err();
+        assert!(e.contains("holds another build (id=root commit=b4a25acbc155)") && e.contains("(id=root commit=8b00ed2b0123)"), "{e}");
+        assert!(!versions.join("root-8b00ed2b0123").exists(), "no second name");
+        assert_eq!(std::fs::read_to_string(dir_a.join("bise")).unwrap(), a, "A's dir untouched");
+        assert_eq!(place(&versions, "root", &app("a", a), true).unwrap(), dir_a, "A again: its dir");
+        // one naming rule (architect m_21930): any id that names two
+        // builds, or a half dir under it, is an error naming both, never a
+        // second name
+        std::fs::create_dir_all(versions.join("v2")).unwrap();
+        std::fs::write(versions.join("v2/bise"), "x").unwrap();
+        let c = app("c", b);
+        std::fs::write(c.join("VERSION"), format!("id=v2{}commit={b}{}", '\n', '\n')).unwrap();
+        let e = place(&versions, "v2", &c, true).unwrap_err();
+        assert!(e.contains("holds another build (id=? commit=?)") && e.contains("(id=v2 commit=8b00ed2b0123)"), "{e}");
+        assert!(!versions.join("v2-8b00ed2b0123").exists(), "no second name");
+        // a release (moved, its dir is current's target) never goes beside either
+        let e = place(&versions, "root", &app("r", "ffffffffffffffffffffffff"), false).unwrap_err();
+        assert!(e.contains("holds another build (id=root commit=b4a25acbc155)"), "{e}");
+        let _ = std::fs::remove_dir_all(&t);
+    }
+
+    /// A legacy root's second dir (root-<commit12>, made for the bundles
+    /// packed before 0d546db5 until issue 31; one may still sit in a
+    /// versions dir) is a version like the others: installed() lists it,
+    /// and prune keeps it only while it is among the newest, current or run
+    /// from (architect m_21930: ~100 MB each).
+    #[test]
+    fn a_legacy_roots_second_dir_is_listed_and_pruned_like_the_others() {
+        let t = std::env::temp_dir().join(format!("bise-prune-legacy-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&t);
+        let versions = t.join("prefix/versions");
+        let mk = |dir: &str, id: &str, day: u32| {
+            let d = versions.join(dir);
+            std::fs::create_dir_all(&d).unwrap();
+            for f in REQUIRED {
+                std::fs::write(d.join(f), "x").unwrap();
+            }
+            let nl = char::from(10u8);
+            std::fs::write(d.join("VERSION"), format!("id={id}{nl}built=2026-10-{day:02}T00:00:00Z{nl}")).unwrap();
+        };
+        mk("root", "root", 1);
+        mk("root-8b00ed2b0123", "root", 2);
+        mk("v3", "v3", 3);
+        mk("v4", "v4", 4);
+        std::os::unix::fs::symlink("versions/v4", t.join("prefix/current")).unwrap();
+        let versions = versions.canonicalize().unwrap();
+        let inst = Install::of_root(&versions.join("v4")).unwrap();
+        let all = inst.installed();
+        let dirs: Vec<PathBuf> = all.iter().map(|i| i.dir.clone()).collect();
+        assert!(dirs.contains(&versions.join("root-8b00ed2b0123")) && dirs.contains(&versions.join("root")), "{dirs:?}");
+        // past KEEP=2: both roots go
+        let gone = to_prune(&all, 2, Some(&versions.join("v4")), "", &release::in_use);
+        assert_eq!(gone.len(), 2, "{gone:?}");
+        assert!(gone.contains(&versions.join("root-8b00ed2b0123")) && gone.contains(&versions.join("root")), "{gone:?}");
+        // a hub runs from it: kept
+        let ps = format!("{}/bise sbd --workspace /w{}", versions.join("root-8b00ed2b0123").display(), char::from(10u8));
+        let gone = to_prune(&all, 2, Some(&versions.join("v4")), &ps, &release::in_use);
+        assert_eq!(gone, [versions.join("root")]);
+        // current: kept
+        let gone = to_prune(&all, 2, Some(&versions.join("root-8b00ed2b0123")), "", &release::in_use);
+        assert_eq!(gone, [versions.join("root")]);
+        // leased (a desktop core's runtime, no ps line names it): kept
+        // while held, gone once released (his pruned app-form runtime)
+        let lease = release::lease(&versions.join("root-8b00ed2b0123")).expect("a versions dir is leased");
+        let gone = to_prune(&all, 2, Some(&versions.join("v4")), "", &release::in_use);
+        assert_eq!(gone, [versions.join("root")]);
+        drop(lease);
+        let gone = pruned_once_released(&all, &versions.join("v4"), 2);
+        assert_eq!(gone.len(), 2, "{gone:?}");
+        let _ = std::fs::remove_dir_all(&t);
+    }
+
+    /// The same VERSION id, installed by the desktop app (its bundle's
+    /// runtime, copied) and by the terminal's `bise update` (a release's
+    /// app/, moved), is one versions/<id> dir, whichever came first.
+    #[test]
+    fn the_app_and_the_terminal_share_one_version_dir() {
+        for app_first in [true, false] {
+            let t = std::env::temp_dir().join(format!("bise-share-{}-{}", std::process::id(), app_first));
+            let _ = std::fs::remove_dir_all(&t);
+            let bin = t.join("bise.app/Contents/Resources/bin");
+            let rel = t.join("release/app");
+            for d in [&bin, &rel] {
+                std::fs::create_dir_all(d).unwrap();
+                for f in REQUIRED {
+                    std::fs::write(d.join(f), "x").unwrap();
+                }
+            }
+            let versions = t.join("prefix/versions");
+            let (a, b) = if app_first {
+                (place(&versions, "v1", &bin, true).unwrap(), place(&versions, "v1", &rel, false).unwrap())
+            } else {
+                (place(&versions, "v1", &rel, false).unwrap(), place(&versions, "v1", &bin, true).unwrap())
+            };
+            assert_eq!(a, versions.join("v1"));
+            assert_eq!(b, a);
+            let left: Vec<String> = std::fs::read_dir(&versions).unwrap().flatten().map(|e| e.file_name().to_string_lossy().into()).collect();
+            assert_eq!(left, ["v1"], "one dir, no temp left (app first: {app_first})");
+            let _ = std::fs::remove_dir_all(&t);
+        }
+    }
+
+    /// No path hands this process's own executable to an `sbd` spawn but
+    /// through [`hub_exe`] (architect m_21731): every use of it in the
+    /// harness and switchboard sources is either on a [`hub_of`] /
+    /// [`hub_exe`] line or one of these, each never a hub start from a
+    /// bise that may be inside an app. A new one fails until it's sorted.
+    #[test]
+    fn every_own_exe_use_is_known() {
+        let pat = concat!("current", "_exe()");
+        let allowed: [(&str, &str); 10] = [
+            // the hub itself: its own exe (it runs from versions/<id>) for its switch and its peers' hubs
+            ("harness/src/main.rs", "exe: std::env::"),
+            // the hub's REPLs start their plugin bridge with the hub's own exe
+            ("harness/src/main.rs", "BEND_HARNESS_BIN"),
+            ("harness/src/update.rs", "let me = std::env::"),
+            ("harness/src/update.rs", "let Ok(exe) = std::env::"),
+            ("harness/src/approot.rs", "exe: std::env::"),
+            ("harness/src/doctor.rs", ""),
+            ("switchboard/src/switch.rs", "let mine = || std::env::"),
+            ("switchboard/src/core.rs", "let next_to_exe = std::env::"),
+            ("switchboard/src/computer_use.rs", "let exe = std::env::"),
+            ("harness/src/update.rs", "let pat = concat!"),
+        ];
+        let rust = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
+        let mut stack = vec![rust.join("harness/src"), rust.join("switchboard/src")];
+        let mut unknown = vec![];
+        while let Some(d) = stack.pop() {
+            for e in std::fs::read_dir(&d).unwrap().flatten() {
+                let p = e.path();
+                if p.is_dir() {
+                    stack.push(p);
+                    continue;
+                }
+                if p.extension().is_none_or(|x| x != "rs") {
+                    continue;
+                }
+                let rel = p.strip_prefix(&rust).unwrap().to_string_lossy().into_owned();
+                for (i, l) in std::fs::read_to_string(&p).unwrap().lines().enumerate() {
+                    if !l.contains(pat) || l.contains("hub_of(") || l.contains("hub_exe(") {
+                        continue;
+                    }
+                    if !allowed.iter().any(|(f, frag)| rel == *f && l.contains(frag)) {
+                        unknown.push(format!("{}:{}: {}", rel, i + 1, l.trim()));
+                    }
+                }
+            }
+        }
+        assert!(unknown.is_empty(), "an own exe that may start a hub from inside an app: go through update::hub_of\n{}", unknown.join("\n"));
+    }
+
     #[test]
     fn prune_keeps_the_newest_the_current_and_the_running() {
         let v = |id: &str| release::Installed {
@@ -478,9 +895,9 @@ mod tests {
         };
         let all = [v("e"), v("d"), v("c"), v("b"), v("a")];
         let ps = "/p/versions/b/bise sbd --workspace /w\n";
-        let gone = to_prune(&all, 3, Some(Path::new("/p/versions/a")), ps);
+        let gone = to_prune(&all, 3, Some(Path::new("/p/versions/a")), ps, &|_| false);
         assert_eq!(gone, Vec::<PathBuf>::new());
-        let gone = to_prune(&all, 2, None, ps);
+        let gone = to_prune(&all, 2, None, ps, &|_| false);
         assert_eq!(gone, [PathBuf::from("/p/versions/c"), PathBuf::from("/p/versions/a")]);
     }
 

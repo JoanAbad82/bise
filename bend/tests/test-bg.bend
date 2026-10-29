@@ -7,7 +7,7 @@
 #
 #   bend test-bg.bend -o /tmp/bg-suite
 #   rm -rf /tmp/bgtest
-#   BEND_BG_ROOT=/tmp/bgtest BEND_BG_AFTER=2 BEND_SESSION_FILE=/tmp/bgtest-s \
+#   BEND_OUT_LIMIT_MB=5 BEND_BG_ROOT=/tmp/bgtest BEND_BG_AFTER=2 BEND_SESSION_FILE=/tmp/bgtest-s \
 #     BEND_WIRE_LOG=/tmp/bgtest-w /tmp/bg-suite
 #
 # The rm -rf BEFORE the run matters: the suite asserts on hardcoded
@@ -23,7 +23,7 @@
 # a cat of it fed on itself up to a 100 MiB result that killed the REPL):
 # each background job below takes the next id.
 #
-# Gates: no FAIL line (24 checks, s01-s24).
+# Gates: no FAIL line (26 checks, s01-s26).
 import Base
 import ../runtime/main.bend as Rt
 import ../runtime/bash.bend as Sh
@@ -205,12 +205,15 @@ def main() -> IO(Unit):
         String.contains(res_out(r16), "exit 199")),
       "s16 real exit 199 reports as failure")
 
-    # ---- s17 background output is capped at 50MiB (QA bug 3.1) ----
+    # ---- s17 the files a command writes have no size limit ----
+    # (a ulimit -f of 100 MiB on the whole command once killed rustc
+    # with SIGXFSZ on a big rlib); the suite runs with
+    # BEND_OUT_LIMIT_MB=5: a 300 MB FILE is not its output
     +r17 : Xp.ExecRes <- Sh.bash_exec(
-      "dd if=/dev/zero bs=1048576 count=55 2>/dev/null | cat > /dev/null; echo written")
+      "dd if=/dev/zero of=/tmp/bgtest/big.bin bs=1048576 count=300 2>/dev/null; echo dd-rc:$? size:$(wc -c < /tmp/bgtest/big.bin | tr -d ' '); rm -f /tmp/bgtest/big.bin")
     u17 : Unit <- check(Bool.and(res_ok(r17),
-        String.contains(res_out(r17), "written")),
-      "s17 capped output still completes (ulimit)")
+        String.contains(res_out(r17), "dd-rc:0 size:314572800")),
+      "s17 a command writes a 300 MB file (no file size limit)")
 
     # ---- s18 the wrapper script deletes itself (QA bug 3.6) ----
     +c18a : Xp.ExecRes <- Sh.bash_exec("ls \"${BEND_AGENT_RUN:-${TMPDIR:-/tmp}}\"/bend-sh-*.sh 2>/dev/null | wc -l")
@@ -294,6 +297,39 @@ job-done"),
     u24 : Unit <- check(Bool.and(String.contains(o24, "rc:143"),
         String.contains(o24, "no-timer-left")),
       "s24 a wrapper stopped mid-window leaves no timer process")
+
+    # ---- s25 a command that prints without end is stopped ----
+    # at BEND_OUT_LIMIT_MB=5 (2 MB/s: the 2 s sample sees 4 MB, then 8):
+    # what comes back is the first MiB, then the watchdog's line.
+    # Raw wrapper, own dir, a 30 s window (the stop comes in it).
+    s25 : Unit <- P.write_file("/tmp/bgtest/w25.sh", String.append("BEND_OUT_LIMIT_MB=5
+",
+      Shp.bg_wrap("while :; do head -c 1048576 /dev/zero | tr '\\0' a; sleep 0.5; done", "/tmp/bgtest/runaway", 30, "/tmp/bgtest/no-flag")))
+    +o25 : String <- Proc.run(Con{"/bin/sh", Con{"/tmp/bgtest/w25.sh", Nil{}}})
+    # (Proc.run's answer starts with the exit status, 137, on its own line)
+    u25 : Unit <- check(Bool.and(String.starts_with(o25, "137
+[bash: the output is "),
+        Bool.and(String.contains(o25, "
+[bash: stopped: its output passed 5 MB (BEND_OUT_LIMIT_MB, 0 = no limit)"),
+          Nat.is_lt(String.length(o25), 1050000n))),
+      "s25 a runaway output is stopped at its limit, with its line")
+
+    # ---- s26 a sync command's orphan that prints without end ----
+    # The command returns at once; its orphan keeps writing into the
+    # .out the wrapper removed. The watchdog holds that file: the orphan
+    # is killed, and the next command (same slot) gets no note.
+    s26 : Unit <- P.write_file("/tmp/bgtest/w26.sh", String.append("BEND_OUT_LIMIT_MB=5
+",
+      Shp.bg_wrap("( sh -c 'while :; do head -c 1048576 /dev/zero; sleep 0.5; done' bise-runaway-orphan & ); echo left", "/tmp/bgtest/orphan", 30, "/tmp/bgtest/no-flag")))
+    +o26a : String <- Proc.run(Con{"/bin/sh", Con{"/tmp/bgtest/w26.sh", Nil{}}})
+    t26 : Unit <- P.write_file("/tmp/bgtest/w26b.sh", String.append("BEND_OUT_LIMIT_MB=5
+",
+      Shp.bg_wrap("sleep 6; pgrep -f bise-runaway-orphan || echo no-orphan-left", "/tmp/bgtest/orphan", 30, "/tmp/bgtest/no-flag")))
+    +o26b : String <- Proc.run(Con{"/bin/sh", Con{"/tmp/bgtest/w26b.sh", Nil{}}})
+    u26 : Unit <- check(Bool.and(String.contains(o26a, "left"),
+        Bool.and(String.contains(o26b, "no-orphan-left"),
+          Bool.not(String.contains(o26b, "[bash: ")))),
+      "s26 a sync command's runaway orphan is killed, no note elsewhere")
 
     # ---- s14 the agent rm -rf's its own bg dir: fast failure, no hang ----
     +r14 : Xp.ExecRes <- Sh.bash_exec(String.append("rm -rf ", bg()))

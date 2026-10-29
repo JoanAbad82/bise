@@ -50,7 +50,7 @@ Lines the server sends; the ones you assert on:
   obs: compaction_started #<n> (auto|manual)
   obs: candidate_discarded: <cause>
   obs: context_compaction_failed: <cause>
-  obs: compaction_done: <summary...>
+  obs: compaction_done: <the whole summary>   <- record form: obs compaction_done :: {"summary":…}
   obs: null_iteration
   obs: turn_done: completed|failed|...
   --- idle                           <- end of the turn batch

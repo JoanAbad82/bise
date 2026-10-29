@@ -1,6 +1,8 @@
 //! `sb inspect`, `sb history` and `sb show` (RFC 0001 §7.5, BISE-233), and
 //! the transcript pages the TUI's scroll-back reads: an agent's thread
-//! from its transcript, and the search index over every thread. `answer`
+//! from its transcript, and the search index over every thread. The typed
+//! thread pages read through the transcript's offset index (tindex.rs,
+//! `page_lines`): a page costs its own lines, not the file's. `answer`
 //! works over an agents dir and an agent list, no Shell, so a reader of
 //! another hub's threads (stream C) calls it with that hub's.
 
@@ -8,6 +10,7 @@ use super::Shell;
 use crate::search;
 use crate::transcript::{self, Anchor};
 use crate::util::now_ms;
+use bise_proto::sb::{History, Inspect};
 use serde_json::{json, Value};
 use std::path::Path;
 
@@ -35,24 +38,47 @@ pub(super) fn transcript_page(path: &Path, before: usize, count: usize) -> Vec<(
     out
 }
 
-/// One line of a `history` page (C2): `{pos, line}`, plus `ts` (the
-/// time the transcript wrote it, ms since the epoch) when known. `ts` is
-/// optional: a client reads a line without it as before.
-pub(super) fn history_line(pos: usize, ts: Option<u64>, line: &str) -> Value {
-    let mut v = json!({"pos": pos, "line": line});
-    if let Some(ts) = ts {
-        v["ts"] = json!(ts);
-    }
-    v
+/// The lines of a transcript at positions [from, from + count), as
+/// [`transcript_page`]: what comes after a page (its last turn's steered
+/// receipts, `thread::mark_ahead`).
+pub(super) fn transcript_ahead(path: &Path, from: usize, count: usize) -> Vec<(usize, Option<u64>, String)> {
+    transcript_page(path, from + count, count).into_iter().filter(|l| l.0 >= from).collect()
 }
 
 impl Shell {
+    /// The lines of `path` at [before - count, before), `before` None: its
+    /// end (the newest page). Through the transcript's offset index
+    /// (tindex.rs): a page reads its own lines. A thread paged for the
+    /// first time has none yet: read the old way, once, while a worker
+    /// builds it.
+    pub(super) fn page_lines(&self, path: &Path, before: Option<usize>, count: usize) -> Vec<(usize, Option<u64>, String)> {
+        let at = |ix: &super::tindex::TIndex| {
+            let before = before.unwrap_or(ix.lines() + 1);
+            ix.read(path, before.saturating_sub(count), before)
+        };
+        if self.tix.ensure(path) {
+            if let Some(lines) = self.tix.with(path, at) {
+                return lines;
+            }
+        }
+        let before = before.unwrap_or_else(|| super::lines::transcript_len(path) + 1);
+        transcript_page(path, before, count)
+    }
+
+    /// The lines of `path` at [from, from + count), as [`Self::page_lines`]
+    /// (a page's last turn's steered receipts).
+    pub(super) fn ahead_lines(&self, path: &Path, from: usize, count: usize) -> Vec<(usize, Option<u64>, String)> {
+        if let Some(lines) = self.tix.with(path, |ix| ix.read(path, from, from + count)) {
+            return lines;
+        }
+        transcript_ahead(path, from, count)
+    }
+
     /// `sb inspect`: a bounded page of an agent's thread, with positions
     /// and cursors, or the origin of the caller (RFC 0001 §7.5).
-    pub(super) fn inspect(&self, from: &str, v: &Value) -> Value {
-        let s = |k: &str| v.get(k).and_then(|x| x.as_str()).unwrap_or("").to_string();
-        let target = s("agent");
-        let Some(name) = self.hub.st.resolve(&target) else {
+    pub(super) fn inspect(&self, from: &str, q: &Inspect) -> Value {
+        let target = &q.agent;
+        let Some(name) = self.hub.st.resolve(target) else {
             return json!({"ok": false, "error": format!("no agent named {}", target)});
         };
         let Some(dir) = self.dir_of(&name) else {
@@ -60,7 +86,7 @@ impl Shell {
         };
         let path = self.transcript(&dir);
         let now = now_ms();
-        if v.get("origin") == Some(&json!(true)) {
+        if q.origin {
             let raw = transcript::read(&path);
             let all = transcript::entries(&raw);
             let Some(me) = self.hub.st.agents.get(from) else {
@@ -75,12 +101,12 @@ impl Shell {
                 }
             };
         }
-        inspect_page(&name, &path, v, now)
+        inspect_page(&name, &path, q, now)
     }
 
     /// `sb history` and `sb show` (BISE-233): the index reads what the
     /// transcripts got since the last search, then answers.
-    pub(super) fn search(&mut self, cmd: &str, v: &Value) -> Value {
+    pub(super) fn search(&mut self, look: &Look) -> Value {
         let who: Vec<search::Who> = self
             .hub
             .st
@@ -93,114 +119,120 @@ impl Shell {
                 archived: a.status() == crate::model::Status::Archived,
             })
             .collect();
-        answer(&mut self.search, &self.opts.paths.state.join("agents"), &who, cmd, v, now_ms())
+        answer(&mut self.search, &self.opts.paths.state.join("agents"), &who, look, now_ms())
+    }
+
+    /// msg-forward: `sb show m_<n>`: the message's entry in its recipient's
+    /// thread (`forward::msg_pos` over the transcript as a stream), then
+    /// `sb show <agent>#<pos>`; not found: one line naming the recipient.
+    pub(super) fn show_msg(&mut self, n: u64, context: Option<u64>) -> Value {
+        let Some(m) = self.hub.st.msgs().get(&n) else {
+            return json!({"ok": false, "error": format!("m_{n} unknown")});
+        };
+        let to = self.hub.st.resolve(&m.to).unwrap_or_else(|| m.to.clone());
+        let Some(dir) = self.hub.st.agents.get(&to).map(|a| a.dir.clone()) else {
+            return json!({"ok": false, "error": format!("m_{n} went to {to}, which has no thread here")});
+        };
+        let path = self.opts.paths.state.join("agents").join(&dir).join("transcript.log");
+        let pos = std::fs::File::open(&path).ok().and_then(|f| {
+            use std::io::BufRead;
+            crate::forward::msg_pos(std::io::BufReader::new(f).lines().map_while(Result::ok), n)
+        });
+        match pos {
+            Some(pos) => self.search(&Look::show(&to, pos as u64, context)),
+            None => json!({"ok": false, "error": format!("m_{n} is not in {to}'s thread (its transcript was rotated or deleted)")}),
+        }
     }
 }
 
 /// `sb inspect`'s page of the thread at `path` (agent `name`): the
-/// anchor and limit of request `v` (stream C reads another hub's the same
+/// anchor and limit of request `q` (stream C reads another hub's the same
 /// way).
-pub(super) fn inspect_page(name: &str, path: &Path, v: &Value, now: u64) -> Value {
-    let s = |k: &str| v.get(k).and_then(|x| x.as_str()).unwrap_or("").to_string();
+pub(super) fn inspect_page(name: &str, path: &Path, q: &Inspect, now: u64) -> Value {
     let raw = transcript::read(path);
     let all = transcript::entries(&raw);
-    {
-        let pos = |k: &str| transcript::parse_pos(&s(k));
-        let anchor = if let Some(p) = pos("at") {
-            Anchor::At(p)
-        } else if let Some(p) = pos("around") {
-            Anchor::Around(p)
-        } else if let Some(p) = pos("before") {
-            Anchor::Before(p)
-        } else if let Some(p) = pos("after") {
-            Anchor::After(p)
-        } else {
-            Anchor::Tail
-        };
-        let limit = v
-            .get("last")
-            .and_then(|x| x.as_u64())
-            .map(|n| n as usize)
-            .unwrap_or(transcript::DEFAULT_LIMIT);
-        let query = s("query");
-        let words = transcript::words_of(&query);
-        let page = transcript::window(&all, &words, anchor, limit, transcript::BUDGET);
-        json!({"ok": true, "text": transcript::render_page(name, &query, &page, now)})
+    let pos = |p: &Option<String>| p.as_deref().and_then(transcript::parse_pos);
+    let anchor = if let Some(p) = pos(&q.at) {
+        Anchor::At(p)
+    } else if let Some(p) = pos(&q.around) {
+        Anchor::Around(p)
+    } else if let Some(p) = pos(&q.before) {
+        Anchor::Before(p)
+    } else if let Some(p) = pos(&q.after) {
+        Anchor::After(p)
+    } else {
+        Anchor::Tail
+    };
+    let limit = q.last.map_or(transcript::DEFAULT_LIMIT, |n| n as usize);
+    let words = transcript::words_of(&q.query);
+    let page = transcript::window(&all, &words, anchor, limit, transcript::BUDGET);
+    json!({"ok": true, "text": transcript::render_page(name, &q.query, &page, now)})
+}
+
+/// What `sb show` or `sb history` asks of a search index.
+pub(super) enum Look {
+    Show { agent: String, pos: usize, context: usize },
+    Search(search::Query),
+}
+
+impl Look {
+    /// `sb show <agent>#<pos> [--context <n>]`.
+    pub(super) fn show(agent: &str, pos: u64, context: Option<u64>) -> Look {
+        Look::Show { agent: agent.to_string(), pos: pos as usize, context: context.map_or(search::DEFAULT_CONTEXT, |n| n as usize) }
+    }
+
+    /// `sb history`'s request as the index's query (an unknown role is
+    /// left out: the CLI refuses it first).
+    pub(super) fn history(h: &History) -> Look {
+        Look::Search(search::Query {
+            text: h.query.clone(),
+            agents: h.agents.clone(),
+            roles: h.roles.iter().filter_map(|r| search::Role::parse(r)).collect(),
+            since: h.since,
+            until: h.until,
+            archived: match h.archived.as_str() {
+                "only" => search::Archived::Only,
+                "no" => search::Archived::No,
+                _ => search::Archived::Any,
+            },
+            limit: h.limit.map_or(search::DEFAULT_HITS, |n| n as usize),
+            page: h.page.map_or(1, |n| n as usize),
+            scope: None,
+            all: h.all,
+        })
+    }
+
+    fn cmd(&self) -> &'static str {
+        match self {
+            Look::Show { .. } => "show",
+            Look::Search(_) => "history",
+        }
     }
 }
 
 /// `sb history` and `sb show` over the threads of `agents_dir` (a hub's
 /// `<state>/agents`) and its agents `who`: `index` reads what the
-/// transcripts got since its last refresh, then answers `cmd` ("show",
-/// else a search) for request `v`.
-pub(super) fn answer(index: &mut search::Index, agents_dir: &Path, who: &[search::Who], cmd: &str, v: &Value, now: u64) -> Value {
+/// transcripts got since its last refresh, then answers `look`.
+pub(super) fn answer(index: &mut search::Index, agents_dir: &Path, who: &[search::Who], look: &Look, now: u64) -> Value {
     let t0 = std::time::Instant::now();
     index.refresh(agents_dir);
-    respond(index, who, cmd, v, now, t0)
+    respond(index, who, look, now, t0)
 }
 
 /// `answer` on an index already refreshed (stream C refreshes its own,
 /// prefixed: xread.rs).
-pub(super) fn respond(index: &search::Index, who: &[search::Who], cmd: &str, v: &Value, now: u64, t0: std::time::Instant) -> Value {
-    let s = |k: &str| v.get(k).and_then(|x| x.as_str()).unwrap_or("").to_string();
-    let n = |k: &str, d: usize| v.get(k).and_then(|x| x.as_u64()).map_or(d, |x| x as usize);
-    let strs = |k: &str| -> Vec<String> {
-        v.get(k)
-            .and_then(|x| x.as_array())
-            .map(|a| a.iter().filter_map(|x| x.as_str().map(String::from)).collect())
-            .unwrap_or_default()
-    };
-    let r = if cmd == "show" {
-        index.show(who, &s("agent"), n("pos", 0), n("context", search::DEFAULT_CONTEXT), now)
-    } else {
-        let q = search::Query {
-            text: s("query"),
-            agents: strs("agents"),
-            roles: strs("roles").iter().filter_map(|r| search::Role::parse(r)).collect(),
-            since: v.get("since").and_then(|x| x.as_u64()),
-            until: v.get("until").and_then(|x| x.as_u64()),
-            archived: match s("archived").as_str() {
-                "only" => search::Archived::Only,
-                "no" => search::Archived::No,
-                _ => search::Archived::Any,
-            },
-            limit: n("limit", search::DEFAULT_HITS),
-            page: n("page", 1),
-            scope: Some(s("scope")).filter(|p| !p.is_empty()),
-            all: v.get("all") == Some(&json!(true)),
-        };
-        index.search(who, &q, now)
+pub(super) fn respond(index: &search::Index, who: &[search::Who], look: &Look, now: u64, t0: std::time::Instant) -> Value {
+    let r = match look {
+        Look::Show { agent, pos, context } => index.show(who, agent, *pos, *context, now),
+        Look::Search(q) => index.search(who, q, now),
     };
     let ms = t0.elapsed().as_millis();
     if ms > 200 {
         let st = index.stats();
-        eprintln!("sb {}: {} ms ({} threads, {} entries)", cmd, ms, st.threads, st.docs);
+        eprintln!("sb {}: {} ms ({} threads, {} entries)", look.cmd(), ms, st.threads, st.docs);
     }
     match r {
         Ok(text) => json!({"ok": true, "text": text}),
         Err(e) => json!({"ok": false, "error": e}),
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    /// A `history` page carries each line's transcript time as `ts`
-    /// (C2 amendment); a line whose stamp does not parse has no `ts`.
-    #[test]
-    fn history_lines_carry_their_time() {
-        let dir = std::env::temp_dir().join(format!("sb-hist-ts-{}", std::process::id()));
-        std::fs::create_dir_all(&dir).unwrap();
-        let path = dir.join("transcript.log");
-        std::fs::write(&path, "1700000000000\tyou : hi\nx\tobs: turn_started\n1700000400000\t--- idle\n").unwrap();
-        let page: Vec<Value> = transcript_page(&path, 4, 10)
-            .into_iter()
-            .map(|(pos, ts, line)| history_line(pos, ts, &line))
-            .collect();
-        std::fs::remove_dir_all(&dir).unwrap();
-        assert_eq!(page[0], json!({"pos": 1, "line": "you : hi", "ts": 1700000000000u64}));
-        assert_eq!(page[1], json!({"pos": 2, "line": "obs: turn_started"}));
-        assert_eq!(page[2]["ts"], 1700000400000u64);
     }
 }

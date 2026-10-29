@@ -17,6 +17,7 @@
 <meta property="og:description" content="a plugin is a folder with skills and MCP servers. bise loads it in every agent, local stdio servers and remote ones, with their logins.">
 <meta property="og:image" content="https://bise.dev/og.png?v=paper">
 <meta name="twitter:card" content="summary_large_image">
+<script>{ const q = location.search; let a = /[?&]terminal\b/.test(q) ? 'terminal' : /[?&]desktop\b/.test(q) ? 'desktop' : null; try { if (a) localStorage.setItem('bise-docs-app', a); else a = localStorage.getItem('bise-docs-app'); } catch {} document.documentElement.classList.add('app-' + (a === 'terminal' ? 'terminal' : 'desktop')); }</script>
 <script>{ const q = location.search; let d = null; try { d = localStorage.getItem('bise-theme'); } catch {} if (/[?&]dark\b/.test(q) || (!/[?&]light\b/.test(q) && (d ?? (matchMedia('(prefers-color-scheme: dark)').matches ? '1' : '0')) === '1')) document.documentElement.classList.add('pd'); }</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,600;1,6..72,400&family=Caveat:wght@500;700&display=swap" rel="stylesheet">
@@ -38,9 +39,11 @@
 </header>
 <div class="wrap">
   <aside class="side"><nav aria-label="the docs">
+<div class="appswitch" role="group" aria-label="your app"><button type="button" data-app="desktop" aria-pressed="false">desktop</button><button type="button" data-app="terminal" aria-pressed="false">terminal</button></div>
 <div class="grp">get started</div><ul>
 <li><a href="/docs">what bise is</a></li>
-<li><a href="/docs/install">install and first run</a></li>
+<li><a href="/docs/desktop" data-app="desktop">start with bise desktop</a></li>
+<li><a href="/docs/install" data-app="terminal">start with bise terminal</a></li>
 </ul>
 <div class="grp">models</div><ul>
 <li><a href="/docs/providers">providers and keys</a></li>
@@ -50,9 +53,10 @@
 </ul>
 <div class="grp">using bise</div><ul>
 <li><a href="/docs/agents">main and the agents</a></li>
+<li><a href="/docs/window" data-app="desktop">the desktop window <span class="tag">desktop</span></a></li>
 <li><a href="/docs/approvals">approvals</a></li>
 <li><a href="/docs/flow">landing work</a></li>
-<li><a href="/docs/voice">voice</a></li>
+<li><a href="/docs/voice">voice and fn</a></li>
 <li><a href="/docs/computer-use">computer use</a></li>
 </ul>
 <div class="grp">extend</div><ul>
@@ -60,9 +64,11 @@
 <li><a href="/docs/skills">instructions and skills</a></li>
 </ul>
 <div class="grp">reference</div><ul>
+<li><a href="/docs/settings" data-app="desktop">settings <span class="tag">desktop</span></a></li>
 <li><a href="/docs/config">config.toml</a></li>
-<li><a href="/docs/cli">the bise command</a></li>
-<li><a href="/docs/keys">keys and commands</a></li>
+<li><a href="/docs/desktop-keys" data-app="desktop">keys and menus <span class="tag">desktop</span></a></li>
+<li><a href="/docs/keys" data-app="terminal">keys and commands <span class="tag">terminal</span></a></li>
+<li><a href="/docs/cli" data-app="terminal">the bise command <span class="tag">terminal</span></a></li>
 <li><a href="/docs/troubleshooting">troubleshooting</a></li>
 <li><a href="/docs/updates">updates</a></li>
 </ul>
@@ -74,6 +80,7 @@
         <button class="copymd" type="button" data-md="/docs/plugins.md">copy as markdown</button>
       </div>
       <p class="lede">a plugin is a folder with skills and MCP servers. bise loads it in every agent, local stdio servers and remote ones, with their logins.</p>
+
 <p>bise loads <a href="https://agent-plugins.org/specification" rel="noopener">Agent Plugins 1.0</a>: a folder with a <code>plugin.json</code>, an optional <code>skills/</code> folder and an optional <code>mcp.json</code>. the same plugin works in every agent.</p>
 <h2 id="where-plugins-live"><a class="anchor" href="#where-plugins-live" aria-hidden="true">#</a>where plugins live</h2>
 <div class="table"><table><thead><tr><th>folder</th><th>for</th></tr></thead><tbody><tr><td><code>~/.agents/plugins/&lt;name&gt;/</code></td><td>you, in every repo</td></tr><tr><td><code>&lt;repo&gt;/.agents/plugins/&lt;name&gt;/</code></td><td>this repo only; it wins over a plugin of the same name in your folder</td></tr></tbody></table></div>
@@ -91,10 +98,10 @@
 }</code></pre><button class="copy" type="button" aria-label="copy the code">copy</button></div></div>
 <p>its skills show as <code>my-plugin:review</code>, and its MCP tools as <code>tools.my_plugin.&lt;tool&gt;</code>.</p>
 <h2 id="see-and-change-them"><a class="anchor" href="#see-and-change-them" aria-hidden="true">#</a>see and change them</h2>
-<div class="code"><div class="box"><pre><code class="lang-sh">bise plugins                    <span class="c"># every plugin, its state, and what&#x27;s wrong with it</span>
+<div class="scopes"><div class="scoped" data-app="desktop"><p class="tag">bise desktop</p><div class="body"><p>settings › plugins lists every plugin with its state and turns each one on or off; its servers that log in have <strong>log in</strong> and <strong>log out</strong>. <code class="key">/plugins</code> in the composer opens the page. a change applies to the agents' next sessions.</p></div><button class="fold" type="button" data-to="desktop">in bise desktop: settings › plugins ›</button></div><div class="scoped" data-app="terminal"><p class="tag">bise terminal</p><div class="body"><div class="code"><div class="box"><pre><code class="lang-sh">bise plugins                    <span class="c"># every plugin, its state, and what&#x27;s wrong with it</span>
 bise plugins disable my-plugin
 bise plugins enable my-plugin</code></pre><button class="copy" type="button" aria-label="copy the code">copy</button></div></div>
-<p>in bise, <code class="key">/plugins</code> does the same. the open agents pick up a change at their next idle.</p>
+<p>in bise, <code class="key">/plugins</code> does the same. the open agents pick up a change at their next idle.</p></div><button class="fold" type="button" data-to="terminal">in bise terminal: /plugins, bise plugins ›</button></div></div>
 <h2 id="mcp-servers"><a class="anchor" href="#mcp-servers" aria-hidden="true">#</a>MCP servers</h2>
 <p><code>mcp.json</code> lists the servers. it takes the same shape as Claude Code's, Cursor's and Vibe's <code>.mcp.json</code>, so a file copied from them works as it is.</p>
 <h3 id="local-servers-stdio"><a class="anchor" href="#local-servers-stdio" aria-hidden="true">#</a>local servers (stdio)</h3>
@@ -126,7 +133,7 @@ bise plugins enable my-plugin</code></pre><button class="copy" type="button" ari
 <div class="code"><div class="box"><pre><code class="lang-sh">bise plugins login            <span class="c"># the servers that can log in</span>
 bise plugins login linear
 bise plugins logout linear    <span class="c"># forget its tokens</span></code></pre><button class="copy" type="button" aria-label="copy the code">copy</button></div></div>
-<p>in bise: <code class="key">/plugins login</code>. the server's tools reach your agents as soon as you're logged in, no restart. the tokens stay in <code>~/.bise/secrets/mcp-oauth/</code>, readable only by you; they are never printed or sent to a model.</p>
+<p>in bise desktop: settings › plugins, <strong>log in</strong> on the server's row. in bise terminal: <code class="key">/plugins login</code>. the server's tools reach your agents as soon as you're logged in, no restart. the tokens stay in <code>~/.bise/secrets/mcp-oauth/</code>, readable only by you; they are never printed or sent to a model.</p>
 <p>with bise on another machine (SSH), log in in your local browser. the last page won't load: copy its address, then paste it into <code>bise plugins login</code>, or run <code class="key">/plugins login linear &lt;address&gt;</code>.</p>
 <p>for a server with no dynamic registration (GitHub, Slack), give the client in <code>mcp.json</code>:</p>
 <div class="code"><div class="file">mcp.json</div><div class="box"><pre><code class="lang-json">{

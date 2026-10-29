@@ -218,15 +218,6 @@ fn plain_id(typed: &str) -> Option<&str> {
     ok.then_some(t)
 }
 
-/// `$0.0042`, `$0.13`, `$2.40`.
-pub(crate) fn fmt_cost(usd: f64) -> String {
-    if usd >= 0.1 {
-        format!("${:.2}", usd)
-    } else {
-        format!("${:.4}", usd)
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -255,8 +246,10 @@ mod tests {
         assert!((c - (0.009 + 0.0125)).abs() < 1e-9, "{c}");
         assert_eq!(cost("fireworks/accounts/fireworks/models/glm-5p3", 10, 10, 0, 0), None);
         assert_eq!(cost("nowhere/m", 10, 10, 0, 0), None);
-        assert_eq!(fmt_cost(4.5), "$4.50");
-        assert_eq!(fmt_cost(0.0042), "$0.0042");
+        assert_eq!(bise_proto::thread::words::usd(4.5), "$4.50");
+        assert_eq!(bise_proto::thread::words::usd(4.123), "$4.12");
+        assert_eq!(bise_proto::thread::words::usd(0.0042), "<$0.01");
+        assert_eq!(bise_proto::thread::words::usd(0.0), "$0.00");
     }
 
     #[test]

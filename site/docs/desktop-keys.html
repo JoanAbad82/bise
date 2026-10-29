@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>keys and menus · bise docs</title>
+<meta name="description" content="the keys of bise desktop, from any app, in the window, the composer and the inbox. ⌘/ shows the same list in the app.">
+<link rel="canonical" href="https://bise.dev/docs/desktop-keys">
+<meta name="theme-color" content="#f2ede2">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="alternate" type="text/markdown" href="/docs/desktop-keys.md">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="bise">
+<meta property="og:url" content="https://bise.dev/docs/desktop-keys">
+<meta property="og:title" content="keys and menus · bise docs">
+<meta property="og:description" content="the keys of bise desktop, from any app, in the window, the composer and the inbox. ⌘/ shows the same list in the app.">
+<meta property="og:image" content="https://bise.dev/og.png?v=paper">
+<meta name="twitter:card" content="summary_large_image">
+<script>{ const q = location.search; let a = /[?&]terminal\b/.test(q) ? 'terminal' : /[?&]desktop\b/.test(q) ? 'desktop' : null; try { if (a) localStorage.setItem('bise-docs-app', a); else a = localStorage.getItem('bise-docs-app'); } catch {} document.documentElement.classList.add('app-' + (a === 'terminal' ? 'terminal' : 'desktop')); }</script>
+<script>{ const q = location.search; let d = null; try { d = localStorage.getItem('bise-theme'); } catch {} if (/[?&]dark\b/.test(q) || (!/[?&]light\b/.test(q) && (d ?? (matchMedia('(prefers-color-scheme: dark)').matches ? '1' : '0')) === '1')) document.documentElement.classList.add('pd'); }</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,600;1,6..72,400&family=Caveat:wght@500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/docs/docs.css">
+</head>
+<body>
+<header class="top">
+  <button class="menu" type="button" aria-label="the pages" aria-expanded="false">≡</button>
+  <a class="logo" href="/">bise <span class="acc">:*</span></a>
+  <a class="docs" href="/docs">docs</a>
+  <div class="search">
+    <input type="search" placeholder="/ search" aria-label="search the docs" autocomplete="off" spellcheck="false">
+    <div class="results" hidden></div>
+  </div>
+  <nav>
+    <a href="https://github.com/gvergnaud/bise">GitHub</a>
+    <button id="theme" type="button" title="light / dark">◐</button>
+  </nav>
+</header>
+<div class="wrap">
+  <aside class="side"><nav aria-label="the docs">
+<div class="appswitch" role="group" aria-label="your app"><button type="button" data-app="desktop" aria-pressed="false">desktop</button><button type="button" data-app="terminal" aria-pressed="false">terminal</button></div>
+<div class="grp">get started</div><ul>
+<li><a href="/docs">what bise is</a></li>
+<li><a href="/docs/desktop" data-app="desktop">start with bise desktop</a></li>
+<li><a href="/docs/install" data-app="terminal">start with bise terminal</a></li>
+</ul>
+<div class="grp">models</div><ul>
+<li><a href="/docs/providers">providers and keys</a></li>
+<li><a href="/docs/subscriptions">subscriptions</a></li>
+<li><a href="/docs/models">models and roles</a></li>
+<li><a href="/docs/gateways">gateways and local models</a></li>
+</ul>
+<div class="grp">using bise</div><ul>
+<li><a href="/docs/agents">main and the agents</a></li>
+<li><a href="/docs/window" data-app="desktop">the desktop window <span class="tag">desktop</span></a></li>
+<li><a href="/docs/approvals">approvals</a></li>
+<li><a href="/docs/flow">landing work</a></li>
+<li><a href="/docs/voice">voice and fn</a></li>
+<li><a href="/docs/computer-use">computer use</a></li>
+</ul>
+<div class="grp">extend</div><ul>
+<li><a href="/docs/plugins">plugins and MCP</a></li>
+<li><a href="/docs/skills">instructions and skills</a></li>
+</ul>
+<div class="grp">reference</div><ul>
+<li><a href="/docs/settings" data-app="desktop">settings <span class="tag">desktop</span></a></li>
+<li><a href="/docs/config">config.toml</a></li>
+<li><a href="/docs/desktop-keys" class="here" aria-current="page" data-app="desktop">keys and menus <span class="tag">desktop</span></a></li>
+<li><a href="/docs/keys" data-app="terminal">keys and commands <span class="tag">terminal</span></a></li>
+<li><a href="/docs/cli" data-app="terminal">the bise command <span class="tag">terminal</span></a></li>
+<li><a href="/docs/troubleshooting">troubleshooting</a></li>
+<li><a href="/docs/updates">updates</a></li>
+</ul>
+  </nav></aside>
+  <main>
+    <article data-app="desktop">
+      <div class="head">
+        <h1>keys and menus</h1>
+        <button class="copymd" type="button" data-md="/docs/desktop-keys.md">copy as markdown</button>
+      </div>
+      <p class="lede">the keys of bise desktop, from any app, in the window, the composer and the inbox. ⌘/ shows the same list in the app.</p>
+<p class="only"><span>only in bise desktop</span> <a href="/docs/keys?terminal" data-to="terminal">in bise terminal: keys and commands ›</a></p>
+<p><code class="key">⌘/</code> shows this list over the window, and settings › keys has it too. every key of bise terminal that makes sense in a window works here; <code>⌘</code> adds a Mac app's gestures.</p>
+<h2 id="from-any-app"><a class="anchor" href="#from-any-app" aria-hidden="true">#</a>from any app</h2>
+<div class="table"><table><thead><tr><th>key</th><th>what it does</th></tr></thead><tbody><tr><td><code class="key">hold fn</code></td><td>talk to bise, with what is in front of you</td></tr><tr><td><code class="key">fn fn</code></td><td>hands-free voice; <code>fn</code> again stops</td></tr><tr><td><code class="key">fn space</code></td><td>the spotlight: find an agent, or ask bise</td></tr></tbody></table></div>
+<p>see <a href="/docs/voice">voice and fn</a>.</p>
+<h2 id="the-window"><a class="anchor" href="#the-window" aria-hidden="true">#</a>the window</h2>
+<div class="table"><table><thead><tr><th>key</th><th>what it does</th></tr></thead><tbody><tr><td><code class="key">⌘0</code></td><td>bise</td></tr><tr><td><code class="key">⌘1</code> … <code class="key">⌘9</code></td><td>a project, in the order of settings › projects</td></tr><tr><td><code class="key">⌥0</code> / <code class="key">⌥1</code> … <code class="key">⌥9</code></td><td>the project's main / an agent</td></tr><tr><td><code class="key">⌥↑</code> / <code class="key">⌥↓</code></td><td>the previous / next agent (the composer empty)</td></tr><tr><td><code class="key">⌘K</code></td><td>find an agent, a page or an artifact</td></tr><tr><td><code class="key">⌘[</code> / <code class="key">⌘]</code></td><td>back / forward</td></tr><tr><td><code class="key">⌘I</code></td><td>the inbox: what waits for you, most blocking first</td></tr><tr><td><code class="key">⌘F</code></td><td>find in the thread</td></tr><tr><td><code class="key">⌘D</code></td><td>the agent's changes</td></tr><tr><td><code class="key">⌘⇧A</code></td><td>the artifacts</td></tr><tr><td><code class="key">⌘E</code></td><td>unfold / fold everything (<code class="key">ctrl+o</code> too)</td></tr><tr><td><code class="key">ctrl+y</code></td><td>copy a code block</td></tr><tr><td><code class="key">⌘N</code></td><td>add a project</td></tr><tr><td><code class="key">⌘\</code></td><td>show or hide the sidebar</td></tr><tr><td><code class="key">⌥⌘0</code></td><td>show or hide the right bar</td></tr><tr><td>`<code> ctrl+</code> ``</td><td>show or hide the terminal panel</td></tr><tr><td><code class="key">⌘,</code></td><td>settings</td></tr><tr><td><code class="key">⌘/</code></td><td>this list</td></tr></tbody></table></div>
+<h2 id="the-composer"><a class="anchor" href="#the-composer" aria-hidden="true">#</a>the composer</h2>
+<div class="table"><table><thead><tr><th>key</th><th>what it does</th></tr></thead><tbody><tr><td><code class="key">⏎</code></td><td>send; during a turn, steer it</td></tr><tr><td><code class="key">⇧⏎</code></td><td>a new line</td></tr><tr><td><code class="key">tab</code></td><td>during a turn: queue it for the end of the turn</td></tr><tr><td><code>↑</code></td><td>in an empty composer: your queued or last message back</td></tr><tr><td><code class="key">ctrl+c</code></td><td>stop the turn</td></tr><tr><td><code class="key">⌘.</code></td><td>stop the agent's turn</td></tr><tr><td><code class="key">esc</code></td><td>put the draft away; close what is open</td></tr><tr><td><code class="key">⇧⇥</code></td><td>switch the <a href="/docs/approvals">approvals</a> mode: yolo / auto</td></tr><tr><td><code>/</code></td><td>commands</td></tr><tr><td><code>@</code></td><td>a file</td></tr><tr><td><code>$</code></td><td>a skill</td></tr><tr><td><code class="key">⌘V</code></td><td>paste text, an image, or a long text as a chip</td></tr><tr><td><code class="key">ctrl+r</code></td><td>dictation into the composer</td></tr></tbody></table></div>
+<h2 id="the-inbox"><a class="anchor" href="#the-inbox" aria-hidden="true">#</a>the inbox</h2>
+<div class="table"><table><thead><tr><th>key</th><th>what it does</th></tr></thead><tbody><tr><td><code>↑</code> <code>↓</code></td><td>the previous / next item</td></tr><tr><td><code class="key">ctrl+p</code> / <code class="key">ctrl+n</code></td><td>the previous / next item, round from the last to the first</td></tr><tr><td><code class="key">ctrl+o</code></td><td>open the item's folded lines</td></tr><tr><td><code>←</code> <code>→</code></td><td>walk the item's options</td></tr><tr><td><code>1</code> … <code>9</code></td><td>pick that option</td></tr><tr><td><code class="key">⏎</code></td><td>pick the option on, or send your typed answer</td></tr><tr><td><code class="key">⌘⌫</code></td><td>close it without answering</td></tr><tr><td><code class="key">esc</code></td><td>back</td></tr></tbody></table></div>
+<h2 id="the-menus"><a class="anchor" href="#the-menus" aria-hidden="true">#</a>the menus</h2>
+<div class="table"><table><thead><tr><th>menu</th><th>what it has</th></tr></thead><tbody><tr><td>bise</td><td>About, <strong>Settings…</strong> (<code class="key">⌘,</code>), Hide, <strong>Quit</strong> (<code class="key">⌘Q</code>)</td></tr><tr><td>File</td><td><strong>Save a Copy…</strong> (<code class="key">⌘S</code>, the open artifact), Close</td></tr><tr><td>Edit</td><td>undo, the clipboard, <strong>Find</strong> (<code class="key">⌘F</code>)</td></tr><tr><td>Go</td><td><strong>Inbox</strong> (<code class="key">⌘I</code>)</td></tr><tr><td>View</td><td><strong>Terminal</strong> (`<code> ctrl+</code> ``)</td></tr><tr><td>Window</td><td>macOS's own</td></tr></tbody></table></div>
+<p>the <code>:*</code> in the menu bar has its own menu: what is at work and waiting, the inbox, your projects, <strong>open bise</strong>, <strong>inbox</strong>, <strong>settings…</strong>, <strong>quit bise</strong>. a right click gives the short one: open bise (<code class="key">⌘0</code>), settings (<code class="key">⌘,</code>), quit (<code class="key">⌘Q</code>).</p>
+    </article>
+    <nav class="pn"><a class="prev" href="/docs/config"><span>previous</span>config.toml</a><a class="next" href="/docs/keys"><span>next</span>keys and commands</a></nav>
+    <footer>
+      <p>for agents: <a href="/docs/desktop-keys.md">bise.dev/docs/desktop-keys.md</a></p>
+      <p><a href="https://github.com/gvergnaud/bise/blob/main/site/docs/desktop-keys.md">edit this page on GitHub</a></p>
+    </footer>
+  </main>
+  <aside class="toc"><div class="toch">on this page</div><ul><li class="l2"><a href="#from-any-app">from any app</a></li><li class="l2"><a href="#the-window">the window</a></li><li class="l2"><a href="#the-composer">the composer</a></li><li class="l2"><a href="#the-inbox">the inbox</a></li><li class="l2"><a href="#the-menus">the menus</a></li></ul></aside>
+</div>
+<script src="/docs/docs.js" defer></script>
+</body>
+</html>

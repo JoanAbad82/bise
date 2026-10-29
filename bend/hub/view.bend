@@ -1,72 +1,70 @@
 # hub/view.bend — the state the Rust views read (board, snapshot,
 # contexts, prompts), as JSON: sb-core is the only source of truth, the
-# daemon stores this as is.
+# daemon stores this as is. Its shape is declared in bise_proto::core::view
+# (View, ViewAgent, ViewMsg); the encoders are generated (gen/view.bend).
 import Base
 
 import ../vendor/json.bend as J
 
-import ./model.bend as M
+import ./gen/view.bend as V
 
-import ./codec.bend as C
+import ./model.bend as M
+import ./gen/state.bend as S
+import ./gen/state-codec.bend as SC
 
 import ./cx.bend as X
 
 import ./core.bend as H
 
 import ./timers.bend as TM
+import ./wakes.bend as WK
+import ./lazy.bend as LZ
+import ./agents.bend as AG
 
-def jdecl(d: Maybe<&2, M.Decl>, +note: String) -> J.Json:
+def jdecl(d: Maybe<&2, S.Decl>, +note: String) -> J.Json:
   match d:
     case None{}:
       J.JNull{}
     case Some{+x}:
-      J.obj([J.kv("status", J.JStr{C.decl_str(x)}), J.kv("note", J.JStr{note})])
+      J.obj([J.kv("status", J.JStr{SC.Decl.word(x)}), J.kv("note", J.JStr{note})])
 
-# the recipient of a message (null: unknown message)
-def waits_to(m: Maybe<&2, M.Msg>) -> J.Json:
+# the recipient of a message (none: unknown message)
+def waits_to(m: Maybe<&2, S.Msg>) -> Maybe<&2, String>:
   match m:
     case None{}:
-      J.JNull{}
+      None{}
     case Some{+x}:
-      J.JStr{M.Msg.to(x)}
+      Some{S.Msg.to(x)}
 
 # who `n` waits on: the recipient of the message its first `sb wait` (or
-# `sb ask`) waits for the reply to; null when it waits on no one
-def waits_on(+ws: List<&2, X.Waiter>, +s: M.St, +n: String) -> J.Json:
+# `sb ask`) waits for the reply to; none when it waits on no one
+def waits_on(+ws: List<&2, X.Waiter>, +s: S.St, +n: String) -> Maybe<&2, String>:
   match ws:
     case Nil{}:
-      J.JNull{}
+      None{}
     case Con{+w, +t}:
-      Bool.pick(J.Json, String.eq(X.Waiter.agent(w), n),
-        waits_to(M.msg_of(s, X.Waiter.msg(w))), waits_on(t, s, n))
+      LZ.pick(Maybe<&2, String>, String.eq(X.Waiter.agent(w), n),
+        u => waits_to(M.msg_of(s, X.Waiter.msg(w))), u => waits_on(t, s, n))
 
-def agent_json(+a: M.Agent, +x: X.Rt, +wo: J.Json) -> J.Json:
-  J.obj([J.kv("name", J.JStr{M.Agent.name(a)}), J.kv("dir", J.JStr{M.Agent.dir(a)}),
-    J.kv("is_main", J.JBool{M.Agent.is_main(a)}), J.kv("parent", C.jmaybe_str(M.Agent.parent(a))),
-    J.kv("brief", M.Agent.brief(a)), J.kv("created_ms", J.JNum{M.Agent.created(a)}),
-    J.kv("ws", M.Agent.ws(a)), J.kv("lifecycle", J.JStr{C.life_str(M.Agent.life(a))}),
-    J.kv("failure", C.jmaybe_str(M.Agent.failure(a))),
-    J.kv("declared", jdecl(M.Agent.declared(a), M.Agent.note(a))),
-    J.kv("last_report", M.Agent.report(a)),
-    J.kv("aliases", J.JArr{H.jstrs(M.Agent.aliases(a))}), J.kv("files", J.JArr{H.jstrs(M.Agent.files(a))}),
-    J.kv("snapshot_ref", C.jmaybe_str(M.Agent.snap(a))),
-    J.kv("follow", J.JBool{M.Agent.follow(a)}),
-    J.kv("run", J.JStr{H.run_str(X.Rt.run(x))}), J.kv("waiting", J.JBool{X.Rt.waiting(x)}),
-    J.kv("waiting_on", wo),
-    J.kv("turn_ms", H.jturn(X.Rt.turn(x)))])
+def agent_json(+a: S.Agent, +x: X.Rt, +wo: Maybe<&2, String>) -> J.Json:
+  V.agent(S.Agent.name(a), S.Agent.dir(a), S.Agent.is_main(a), S.Agent.parent(a),
+    S.Agent.brief(a), S.Agent.created(a), S.Agent.ws(a), SC.Life.word(S.Agent.life(a)),
+    S.Agent.failure(a), jdecl(S.Agent.declared(a), S.Agent.note(a)), S.Agent.report(a),
+    S.Agent.aliases(a), S.Agent.files(a), S.Agent.snap(a), M.follows(a),
+    H.run_str(X.Rt.run(x)), X.Rt.waiting(x), wo, X.Rt.turn(x), X.Rt.turns(x))
 
-def is_archived(l: M.Life) -> Bool:
+def is_archived(l: S.Life) -> Bool:
   match l:
-    case M.LArchived{}:
+    case S.LArchived{}:
       True{}
     case _:
       False{}
 
 # a match, not Bool.pick: pick would encode every agent, kept or not
-def agents_json.keep(keep: Bool, +a: M.Agent, +rts: List<&2, X.Rt>, +ws: List<&2, X.Waiter>, +s: M.St, +rest: List<&2, J.Json>) -> List<&2, J.Json>:
+def agents_json.keep(keep: Bool, +a: S.Agent, +rts: List<&2, X.Rt>, +ws: List<&2, X.Waiter>, +s: S.St, +rest: List<&2, J.Json>) -> List<&2, J.Json>:
   match keep:
     case True{}:
-      agent_json(a, H.rt_find(rts, M.Agent.name(a)), waits_on(ws, s, M.Agent.name(a))) <> rest
+      agent_json(a, H.rt_find(rts, S.Agent.name(a)), waits_on(ws, s, S.Agent.name(a))) <> rest
     case False{}:
       rest
 
@@ -74,48 +72,115 @@ def agents_json.keep(keep: Bool, +a: M.Agent, +rts: List<&2, X.Rt>, +ws: List<&2
 # can change, see `changed`). idle-cpu: a step's view sent every agent
 # not archived, changed or not, and the hub ticks every 500 ms: ~127 KB
 # per idle tick for 20 agents, re-encoded and re-parsed twice a second.
-def agents_json(xs: List<&2, M.Agent>, +rts: List<&2, X.Rt>, +ws: List<&2, X.Waiter>, +s: M.St, +all: Bool, +names: List<&2, String>) -> List<&2, J.Json>:
+def agents_json(xs: List<&2, S.Agent>, +rts: List<&2, X.Rt>, +ws: List<&2, X.Waiter>, +s: S.St, +all: Bool, +names: List<&2, String>) -> List<&2, J.Json>:
   match xs:
     case Nil{}:
       Nil{}
     case Con{+a, +t}:
-      agents_json.keep(all || M.str_in(names, M.Agent.name(a)),
+      agents_json.keep(all || M.str_in(names, S.Agent.name(a)),
         a, rts, ws, s, agents_json(t, rts, ws, s, all, names))
 
-def rec_json(+r: M.MRec) -> J.Json:
-  J.obj([J.kv("msg", C.msg_json(M.MRec.msg(r))), J.kv("state", J.obj(C.mst_kvs(M.MRec.st(r)))),
-    J.kv("settled", J.JBool{M.MRec.settled(r)})])
+# a message, its state, and what the steps' predicates (model.bend) say
+# of it: queued, or delivered owing a reply (the hub's Waiting reads them)
+def rec_json(+r: S.MRec) -> J.Json:
+  +st = S.MRec.st(r)
+  V.msg(SC.Msg.journal_json(S.MRec.msg(r)), SC.MSt.journal_json(st), S.MRec.settled(r), M.is_queued(st), M.MRec.owes(r))
 
 # a match, not Bool.pick: pick would encode every message, kept or not
-def recs_json.keep(keep: Bool, +r: M.MRec, +rest: List<&2, J.Json>) -> List<&2, J.Json>:
+def recs_json.keep(keep: Bool, +r: S.MRec, +rest: List<&2, J.Json>) -> List<&2, J.Json>:
   match keep:
     case True{}:
       rec_json(r) <> rest
     case False{}:
       rest
 
-def recs_json(xs: List<&2, M.MRec>, +all: Bool, +ids: List<&2, Nat>) -> List<&2, J.Json>:
+def recs_json(xs: List<&2, S.MRec>, +all: Bool, +ids: List<&2, Nat>) -> List<&2, J.Json>:
   match xs:
     case Nil{}:
       Nil{}
     case Con{+r, +t}:
-      recs_json.keep(all || M.nat_in(ids, M.Msg.id(M.MRec.msg(r))), r, recs_json(t, all, ids))
+      recs_json.keep(all || M.nat_in(ids, S.Msg.id(S.MRec.msg(r))), r, recs_json(t, all, ids))
+
+# every id of `ids` is a message of `xs`
+def ids_in(ids: List<&2, Nat>, +xs: List<&2, S.MRec>) -> Bool:
+  match ids:
+    case Nil{}:
+      True{}
+    case Con{+i, +t}:
+      LZ.and(Maybe.is_some(&2, S.MRec, M.rec_of(xs, i)), u => ids_in(t, xs))
+
+# the lowest id of `ids` (0 when none)
+def ids_lo.go(ids: List<&2, Nat>, +acc: Nat) -> Nat:
+  match ids:
+    case Nil{}:
+      acc
+    case Con{+i, +t}:
+      ids_lo.go(t, Nat.min(acc, i))
+
+def ids_lo(ids: List<&2, Nat>) -> Nat:
+  match ids:
+    case Nil{}:
+      0n
+    case Con{+i, +t}:
+      ids_lo.go(t, i)
+
+# the head of `xs` has an id below `lo`
+def id_below(xs: List<&2, S.MRec>, +lo: Nat) -> Bool:
+  match xs:
+    case Nil{}:
+      False{}
+    case Con{+h, _}:
+      Nat.is_lt(M.MRec.id(h), lo)
+
+# the cold messages of `ids`, newest first: St.old is newest first, so the
+# walk stops at the first id below the lowest one asked (`below`)
+def old_of(xs: List<&2, S.MRec>, below: Bool, +ids: List<&2, Nat>, +lo: Nat) -> List<&2, S.MRec>:
+  match xs below:
+    case Nil{} _:
+      Nil{}
+    case Con{_, _} True{}:
+      Nil{}
+    case Con{+r, +t} False{}:
+      +rest = old_of(t, id_below(t, lo), ids, lo)
+      Bool.pick(List<&2, S.MRec>, M.nat_in(ids, M.MRec.id(r)), r <> rest, rest)
+
+# where the view finds the step's messages (issue 21): the hot ones when
+# they are all there (a message sent and still queued, or owing a reply);
+# else the hot ones with the cold ones of `ids` (a message the step just
+# turned cold), in send order; all of them (view_all): M.every
+def view_recs.some(here: Bool, +s: S.St, +ids: List<&2, Nat>) -> List<&2, S.MRec>:
+  match here:
+    case True{}:
+      S.St.hot(s)
+    case False{}:
+      +lo = ids_lo(ids)
+      List.reverse(&2, S.MRec, M.ins_all(S.St.hot(s), old_of(S.St.old(s), id_below(S.St.old(s), lo), ids, lo)))
+
+def view_recs.go(every: Bool, +s: S.St, +ids: List<&2, Nat>) -> List<&2, S.MRec>:
+  match every:
+    case True{}:
+      M.every(s)
+    case False{}:
+      view_recs.some(ids_in(ids, S.St.hot(s)), s, ids)
+
+def view_recs(+s: S.St, +all: Bool, +ids: List<&2, Nat>) -> List<&2, S.MRec>:
+  view_recs.go(all, s, ids)
 
 # the messages of the view: no walk of every message when the step
 # touched none (an idle tick)
-def msgs_json(walk: Bool, +xs: List<&2, M.MRec>, +all: Bool, +ids: List<&2, Nat>) -> List<&2, J.Json>:
+def msgs_json(walk: Bool, +xs: List<&2, S.MRec>, +all: Bool, +ids: List<&2, Nat>) -> List<&2, J.Json>:
   match walk:
     case True{}:
       recs_json(xs, all, ids)
     case False{}:
       Nil{}
 
-def cards_json(xs: List<&2, M.Card>) -> List<&2, J.Json>:
+def cards_json(xs: List<&2, S.Card>) -> List<&2, J.Json>:
   match xs:
     case Nil{}:
       Nil{}
     case Con{+c, +t}:
-      C.card_json(c) <> cards_json(t)
+      SC.Card.journal_json(c) <> cards_json(t)
 
 def opt_list(m: Maybe<&2, Nat>) -> List<&2, Nat>:
   match m:
@@ -128,7 +193,7 @@ def opt_list(m: Maybe<&2, Nat>) -> List<&2, Nat>:
 def ev_ids(e: M.Ev) -> List<&2, Nat>:
   match e:
     case M.EMsgSent{+m}:
-      M.Msg.id(m) <> opt_list(M.Msg.reply_to(m))
+      S.Msg.id(m) <> opt_list(S.Msg.reply_to(m))
     case M.EMsgState{+id, _}:
       [id]
     case M.ESettled{+id}:
@@ -143,6 +208,25 @@ def touched(evs: List<&2, M.Ev>) -> List<&2, Nat>:
     case Con{+e, +t}:
       List.append(&2, Nat, ev_ids(e), touched(t))
 
+# name-free: msgs_moved names no id; its rows are the hot ones to `to`
+# after the step (a few more rows than moved, never fewer)
+def to_ids(xs: List<&2, S.MRec>, +n: String) -> List<&2, Nat>:
+  match xs:
+    case Nil{}:
+      Nil{}
+    case Con{+r, +t}:
+      +rest = to_ids(t, n)
+      Bool.pick(List<&2, Nat>, String.eq(S.Msg.to(S.MRec.msg(r)), n), M.MRec.id(r) <> rest, rest)
+
+def moved_ids(evs: List<&2, M.Ev>, +hot: List<&2, S.MRec>) -> List<&2, Nat>:
+  match evs:
+    case Nil{}:
+      Nil{}
+    case Con{M.EMsgsMoved{_, +to}, +t}:
+      List.append(&2, Nat, to_ids(hot, to), moved_ids(t, hot))
+    case Con{_, +t}:
+      moved_ids(t, hot)
+
 # the agents an event changes (a rename: both names)
 def ev_names(e: M.Ev) -> List<&2, String>:
   match e:
@@ -154,11 +238,15 @@ def ev_names(e: M.Ev) -> List<&2, String>:
       [name]
     case M.ESnapshot{+name, _}:
       [name]
+    case M.EPlaced{+name, _, _}:
+      [name]
     case M.EDeclared{+name, _, _}:
       [name]
     case M.EReported{+name, _}:
       [name]
     case M.EFileTouched{+name, _}:
+      [name]
+    case M.EClaimDropped{+name, _}:
       [name]
     case M.ERenamed{+name, +nn}:
       [name, nn]
@@ -170,6 +258,24 @@ def ev_names(e: M.Ev) -> List<&2, String>:
     case _:
       Nil{}
 
+# name-free: a take of an old name strips it from its holder (its row's
+# old names change); the step's `retarget` out names that holder
+def fx_name.of(is_rt: Bool, +x: J.Json) -> List<&2, String>:
+  match is_rt:
+    case True{}:
+      [J.get_str_or(x, "to", "")]
+    case False{}:
+      Nil{}
+
+def fx_names(xs: List<&2, X.Fx>) -> List<&2, String>:
+  match xs:
+    case Nil{}:
+      Nil{}
+    case Con{X.FO{+x}, +t}:
+      List.append(&2, String, fx_name.of(String.eq(J.get_str_or(x, "fx", ""), "retarget"), x), fx_names(t))
+    case Con{_, +t}:
+      fx_names(t)
+
 def names_of(evs: List<&2, M.Ev>) -> List<&2, String>:
   match evs:
     case Nil{}:
@@ -177,12 +283,16 @@ def names_of(evs: List<&2, M.Ev>) -> List<&2, String>:
     case Con{+e, +t}:
       List.append(&2, String, ev_names(e), names_of(t))
 
-# a runtime at rest: no REPL, no wait, no turn (what rt_find answers
-# for an agent it does not know)
-def rt_rest(turn: Maybe<&2, Nat>, down: Bool, waiting: Bool) -> Bool:
+# a runtime at rest: no REPL, no wait, no turn, no turn ended (what
+# rt_find answers for an agent it does not know)
+def rt_rest(turn: Maybe<&2, Nat>, down: Bool, waiting: Bool, turns: Nat) -> Bool:
   match turn:
     case None{}:
-      down && Bool.not(waiting)
+      match turns:
+        case 0n:
+          down && Bool.not(waiting)
+        case 1n+_:
+          False{}
     case Some{_}:
       False{}
 
@@ -215,7 +325,7 @@ def turn_key(m: Maybe<&2, Nat>) -> String:
       Nat.show(t)
 
 def rt_key(+x: X.Rt) -> String:
-  H.cat([H.run_str(X.Rt.run(x)), " ", Bool.pick(String, X.Rt.waiting(x), "w", "-"), " ", turn_key(X.Rt.turn(x))])
+  H.cat([H.run_str(X.Rt.run(x)), " ", Bool.pick(String, X.Rt.waiting(x), "w", "-"), " ", turn_key(X.Rt.turn(x)), " ", Nat.show(X.Rt.turns(x))])
 
 def rt_marks.keep(rest: Bool, +x: X.Rt, +acc: List<&2, Mark>) -> List<&2, Mark>:
   match rest:
@@ -229,7 +339,7 @@ def rt_marks(rts: List<&2, X.Rt>) -> List<&2, Mark>:
     case Nil{}:
       Nil{}
     case Con{+x, +t}:
-      rt_marks.keep(rt_rest(X.Rt.turn(x), H.is_down(X.Rt.run(x)), X.Rt.waiting(x)), x, rt_marks(t))
+      rt_marks.keep(rt_rest(X.Rt.turn(x), H.is_down(X.Rt.run(x)), X.Rt.waiting(x), X.Rt.turns(x)), x, rt_marks(t))
 
 def waiter_marks(ws: List<&2, X.Waiter>) -> List<&2, Mark>:
   match ws:
@@ -248,7 +358,7 @@ def mark_in(xs: List<&2, Mark>, +m: Mark) -> Bool:
     case Nil{}:
       False{}
     case Con{+h, +t}:
-      mark_eq(h, m) || mark_in(t, m)
+      LZ.or(mark_eq(h, m), u => mark_in(t, m))
 
 def gone.keep(kept: Bool, +m: Mark, +rest: List<&2, String>) -> List<&2, String>:
   match kept:
@@ -278,15 +388,28 @@ def changed(+evs: List<&2, M.Ev>, +before: List<&2, Mark>, +rts: List<&2, X.Rt>,
 
 # the order, the cards and the notes change only by an event (model.bend
 # `apply`): a view with none (`durable` False) leaves them out, the
-# daemon keeps its own
-def durable_kvs(durable: Bool, +s: M.St) -> List<&2, Sigma<&2, &2, String, _ => J.Json>>:
+# daemon keeps its own. A match each, not Bool.pick: pick would encode
+# them, sent or not.
+def order_when(durable: Bool, +s: S.St) -> Maybe<&2, List<&2, String>>:
   match durable:
     case True{}:
-      [J.kv("order", J.JArr{H.jstrs(M.St.order(s))}),
-        J.kv("cards", J.JArr{cards_json(M.St.cards(s))}),
-        J.kv("notes", J.JArr{H.jstrs(M.St.notes(s))})]
+      Some{S.St.order(s)}
     case False{}:
-      Nil{}
+      None{}
+
+def cards_when(durable: Bool, +s: S.St) -> Maybe<&2, List<&2, J.Json>>:
+  match durable:
+    case True{}:
+      Some{cards_json(S.St.cards(s))}
+    case False{}:
+      None{}
+
+def notes_when(durable: Bool, +s: S.St) -> Maybe<&2, List<&2, String>>:
+  match durable:
+    case True{}:
+      Some{S.St.notes(s)}
+    case False{}:
+      None{}
 
 # an event of the timers (`ended`: one that ends a timer)
 def timer_ev(+ended: Bool, e: M.Ev) -> Bool:
@@ -299,6 +422,8 @@ def timer_ev(+ended: Bool, e: M.Ev) -> Bool:
       Bool.not(ended)
     case M.ETimerStop{_, _, _}:
       True{}
+    case M.ETimerName{_, _, _, _}:
+      Bool.not(ended)
     case _:
       False{}
 
@@ -307,37 +432,96 @@ def timer_evs(+ended: Bool, evs: List<&2, M.Ev>) -> Bool:
     case Nil{}:
       False{}
     case Con{+e, +t}:
-      timer_ev(ended, e) || timer_evs(ended, t)
-
-def timers_live(go: Bool, +s: M.St) -> List<&2, Sigma<&2, &2, String, _ => J.Json>>:
-  match go:
-    case True{}:
-      [J.kv("timers", J.JArr{TM.live_json(TM.Tms.live(M.St.tm(s)))})]
-    case False{}:
-      Nil{}
-
-def timers_ended(go: Bool, +s: M.St) -> List<&2, Sigma<&2, &2, String, _ => J.Json>>:
-  match go:
-    case True{}:
-      [J.kv("timers_ended", J.JArr{TM.ended_list_json(TM.Tms.ended(M.St.tm(s)))})]
-    case False{}:
-      Nil{}
+      LZ.or(timer_ev(ended, e), u => timer_evs(ended, t))
 
 # the timers (`sb every`) only when a step changed them: an idle tick
 # carries none (idle-cpu), a fire no ended ones
-def timers_kvs(+all: Bool, +evs: List<&2, M.Ev>, +s: M.St) -> List<&2, Sigma<&2, &2, String, _ => J.Json>>:
-  List.append(&2, Sigma<&2, &2, String, _ => J.Json>,
-    timers_live(all || timer_evs(False{}, evs), s), timers_ended(all || timer_evs(True{}, evs), s))
+def timers_live(go: Bool, +s: S.St) -> Maybe<&2, List<&2, J.Json>>:
+  match go:
+    case True{}:
+      Some{TM.live_json(S.Tms.live(S.St.tm(s)))}
+    case False{}:
+      None{}
+
+def timers_ended(go: Bool, +s: S.St) -> Maybe<&2, List<&2, J.Json>>:
+  match go:
+    case True{}:
+      Some{TM.ended_list_json(S.Tms.ended(S.St.tm(s)))}
+    case False{}:
+      None{}
+
+def wake_evs(evs: List<&2, M.Ev>) -> Bool:
+  match evs:
+    case Nil{}:
+      False{}
+    case Con{M.EWake{_}, _}:
+      True{}
+    case Con{_, +t}:
+      wake_evs(t)
+
+# the watches (`sb wake`, wakes.bend) only when a step changed them, or
+# all: an idle tick carries none (idle-cpu)
+def wakes_live(go: Bool, +s: S.St) -> Maybe<&2, List<&2, J.Json>>:
+  match go:
+    case True{}:
+      Some{WK.live_json(S.Wakes.live(S.Tms.wk(S.St.tm(s))))}
+    case False{}:
+      None{}
+
+def wakes_ended(go: Bool, +s: S.St) -> Maybe<&2, List<&2, J.Json>>:
+  match go:
+    case True{}:
+      Some{WK.ended_list_json(S.Wakes.ended(S.Tms.wk(S.St.tm(s))))}
+    case False{}:
+      None{}
 
 # the view: the agents in `names` (or all), the messages in `ids` (or
-# all); the order, cards and notes when `durable` (or all); the timers
-# when an event of `evs` (the step's journal) changed them (or all)
-def view(+s: M.St, +rts: List<&2, X.Rt>, +ws: List<&2, X.Waiter>, +all: Bool, +ids: List<&2, Nat>, +names: List<&2, String>, +evs: List<&2, M.Ev>) -> J.Json:
-  J.obj(List.concat(&2, Sigma<&2, &2, String, _ => J.Json>,
-    [[J.kv("agents", J.JArr{agents_json(M.St.agents(s), rts, ws, s, all, names)}),
-      J.kv("all_agents", J.JBool{all}),
-      J.kv("msgs", J.JArr{msgs_json(all || Bool.not(List.is_empty(&2, Nat, ids)), M.St.msgs(s), all, ids)}),
-      J.kv("all_msgs", J.JBool{all}),
-      J.kv("next_msg", J.JNum{M.St.next_msg(s)}), J.kv("next_card", J.JNum{M.St.next_card(s)})],
-    durable_kvs(all || Bool.not(List.is_empty(&2, M.Ev, evs)), s),
-    timers_kvs(all, evs, s)]))
+# all); the order, cards and notes when an event of `evs` (the step's
+# journal) changed the durable state (or all); the timers and the
+# watches when an event changed them (or all). cost-pause: `paused`
+# (null: it runs) in every view, a few bytes.
+def agent_or(m: Maybe<&2, S.Agent>, +rest: List<&2, S.Agent>) -> List<&2, S.Agent>:
+  match m:
+    case None{}:
+      rest
+    case Some{+a}:
+      a <> rest
+
+# the agents split (agents.bend): every agent, in creation order (St.order,
+# each looked up: St.agents, then arch), the ones in `names` or all
+def every_agents(ord: List<&2, String>, +s: S.St, +all: Bool, +names: List<&2, String>) -> List<&2, S.Agent>:
+  match ord:
+    case Nil{}:
+      Nil{}
+    case Con{+n, +t}:
+      LZ.pick(List<&2, S.Agent>, all || M.str_in(names, n),
+        u => agent_or(M.get_agent(s, n), every_agents(t, s, all, names)), u => every_agents(t, s, all, names))
+
+# a name of `names` is an archived agent's
+def any_arch(ns: List<&2, String>, +s: S.St) -> Bool:
+  match ns:
+    case Nil{}:
+      False{}
+    case Con{+n, +t}:
+      LZ.or(AG.has(S.St.arch(s), n), u => any_arch(t, s))
+
+# a step's agents: St.agents' changed ones when no archived agent changed
+# (a tick, a say: the archived ones are never walked), else every agent
+# in creation order (view_all, a step that archived or restored one)
+def view_agents(wide: Bool, +s: S.St, +rts: List<&2, X.Rt>, +ws: List<&2, X.Waiter>, +all: Bool, +names: List<&2, String>) -> List<&2, J.Json>:
+  match wide:
+    case True{}:
+      agents_json(every_agents(S.St.order(s), s, all, names), rts, ws, s, True{}, Nil{})
+    case False{}:
+      agents_json(S.St.agents(s), rts, ws, s, False{}, names)
+
+def view.go(+s: S.St, +rts: List<&2, X.Rt>, +ws: List<&2, X.Waiter>, +all: Bool, +ids: List<&2, Nat>, +names: List<&2, String>, +durable: Bool, +timers: Bool, +ended: Bool, +wakes: Bool) -> J.Json:
+  V.view(view_agents(all || any_arch(names, s), s, rts, ws, all, names), all,
+    msgs_json(all || Bool.not(List.is_empty(&2, Nat, ids)), view_recs(s, all, ids), all, ids), all,
+    S.St.next_msg(s), S.St.next_card(s), S.St.paused(s),
+    order_when(durable, s), cards_when(durable, s), notes_when(durable, s),
+    timers_live(timers, s), timers_ended(ended, s), wakes_live(wakes, s), wakes_ended(wakes, s))
+
+def view(+s: S.St, +rts: List<&2, X.Rt>, +ws: List<&2, X.Waiter>, +all: Bool, +ids: List<&2, Nat>, +names: List<&2, String>, +evs: List<&2, M.Ev>) -> J.Json:
+  view.go(s, rts, ws, all, ids, names, all || Bool.not(List.is_empty(&2, M.Ev, evs)),
+    all || timer_evs(False{}, evs), all || timer_evs(True{}, evs), all || wake_evs(evs))

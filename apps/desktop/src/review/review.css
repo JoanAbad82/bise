@@ -1,0 +1,137 @@
+/* src/review (nm-pages-b, bise fait mac: page native-mac §9): the changes, pull requests and
+   environments pages (one scroller: the ds PageBanner, then the page's column of ds GroupLabels and
+   ListRows, the floating composer's room at its foot), and the review, feature and branch screens
+   (a head, then a scrolling body: the body's content on the head's title edge, a row's tint and
+   hover hang --pad-row-x out on both sides). ds tokens only. */
+.rv-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 0 0 calc(var(--float-room) + var(--s-2));
+  box-sizing: border-box;
+}
+/* the banner takes the page's width, 24 from its edges; the rest is the page's column, the thread's
+   place beside the right side (app/pagecol.ts --page-col-l/-r), never under its card (his m_46849) */
+.rv-col { margin-inline: var(--page-col-l, var(--pad-page-x)) var(--page-col-r, var(--pad-page-x)); }
+/* the empty state on the rows' text edge (12 in, as a row's), never 4 px left of it */
+.rv-col > .b-empty,
+.rv-col > [role='group'] > .b-empty { padding-inline: var(--s-3); }
+
+.rv-screen {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
+}
+/* review, feature, branch, commit: their own head's title on the column's edge, as the body's
+   content under it (ui-review m_43947 #4), never 24 in from the window */
+.rv-screen > .b-head {
+  padding-inline: var(--page-col-l, var(--pad-page-x)) var(--page-col-r, var(--pad-page-x));
+}
+
+.rv-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  /* the rows' text on the page's column (--pad-page-x), their tint hung out --pad-row-x; the
+     floating composer's room at its foot (--float-room) */
+  padding: var(--s-2) calc(var(--page-col-r, var(--pad-page-x)) - var(--pad-row-x)) var(--float-room) calc(var(--page-col-l, var(--pad-page-x)) - var(--pad-row-x));
+}
+
+/* the region that has the keys shows no ring: the key line says it (designer m_21379 (5)) */
+.rv-body:focus {
+  outline: none;
+}
+
+/* a row's right-hand facts are words, sans 13 text-3 like the right bar's; only the machine's own
+   text (a sha, a branch, a url) is mono (designer m_21379 (4)) */
+.rv-body .b-row .end {
+  font: var(--t-13) var(--font-ui);
+}
+.rv-mono {
+  font-family: var(--font-mono);
+  font-size: var(--t-12);
+}
+
+.rv-file {
+  margin: 0 var(--pad-row-x) var(--gap-section);
+}
+
+/* the diff on its way: its words, dim, never a bare bar (designer m_15244) */
+.rv-wait {
+  /* the same left edge as the head's title above it (designer's pixel nit on 5f70331d) */
+  margin: var(--s-2) var(--pad-row-x);
+  color: var(--c-text-3);
+}
+
+.rv-note {
+  color: var(--c-text-2);
+  margin: var(--gap-tight) var(--pad-row-x);
+}
+/* a file's note is in the file's own column, already on the edge */
+.rv-file > .rv-note {
+  margin-inline: 0;
+}
+
+/* a feature's card (FeatureScreen): its question, then its answers as buttons */
+.ft-card {
+  margin: var(--gap-block) var(--pad-row-x) var(--gap-section);
+  padding: var(--pad-card);
+  border: 1px solid var(--c-line-strong);
+  border-radius: 10px;
+  background: var(--c-raised);
+}
+
+.ft-q {
+  margin: 0 0 var(--gap-block);
+  color: var(--c-text);
+}
+
+.ft-acts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--gap-inline);
+}
+
+/* a PR's number before its branch; its state's words in its tone (never the dot alone) */
+.rv-wave {
+  font: 400 var(--f-ui);
+  color: var(--c-text-3);
+}
+.rv-url > .b-app-icon {
+  margin-left: var(--s-1);
+  vertical-align: -2px;
+}
+.pr-num {
+  margin-right: var(--s-2);
+  font-variant-numeric: tabular-nums;
+  color: var(--c-text-2);
+}
+.pr-words.pr-err {
+  color: var(--c-err);
+}
+.pr-words.pr-nd {
+  color: var(--c-accent);
+}
+.pr-words.pr-ok {
+  color: var(--c-ok);
+}
+
+/* a plain link in a review screen's words (the branch screen's 'see the changes') */
+.rv-link {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: var(--c-text);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.rv-link:hover {
+  color: var(--c-accent);
+}
+.rv-link:focus-visible {
+  outline: 0;
+  box-shadow: 0 0 0 2px var(--c-focus);
+  border-radius: 3px;
+}

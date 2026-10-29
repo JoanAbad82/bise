@@ -9,11 +9,33 @@
 //!   page store's layout, written by the pages module): every page gets
 //!   in by itself, with its versions and open notes.
 //!
+//! Folders (docs/artifacts.md, "Folders"): an artifact's library folder
+//! is `folder` in its meta.json; a page's is in `artifacts/filed.json`
+//! (`{"<page id>": "<folder id>"}`: the page store owns the page's
+//! meta.json). Both are written only by [`Store::move_to`] (and a new
+//! artifact's add), and read in one place, [`Store::all`]; the join with
+//! the library (`bise_home::library`) is [`resolve_folders`], for this
+//! hub's rows and another project's ([`rows_of`]).
+//!
+//! A site's localStorage, `<id>/storage.json`, is crate::artifacts_storage's
+//! (the page server writes it, under its lock).
+//!
+//! A new version is told by the file's `sig`, `<bytes>:<mtime ms>`
+//! ([`Version::sig`]). Known limit: a rewrite of the same size within
+//! the same millisecond keeps the sig, so it makes no new version. Two
+//! saves of one file within 1 ms are rare, so no content hash is taken
+//! on every add; a test that writes versions gives each its own size
+//! (pages/artifact/notes_tests.rs, `write_version`).
+//!
 //! Plain functions over the state folder; the daemon's thread is the only
 //! writer, so there is no lock.
 
+use crate::artifacts_assets;
+use crate::artifacts_turns::{self, Place, Rev, Sitting, Turn};
+use bise_proto::anchor::Anchor;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
+use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
 /// The largest file (or folder, summed) bise keeps a copy of.
@@ -42,6 +64,36 @@ pub struct Version {
     /// empty for a link.
     #[serde(default)]
     pub sig: String,
+    /// The turn of its first save, stamped by the hub (artifacts_turns):
+    /// a save in the same turn by the same agent replaces this version.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub turn: Option<Turn>,
+    /// His sitting in the viewer that made it (artifacts_turns::Sitting):
+    /// his next save in it replaces this version; its `seq` the newest
+    /// save applied.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sitting: Option<Sitting>,
+    /// Its saves, oldest first (none in a store from before them: one).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub revs: Vec<Rev>,
+    /// A local site's recipe (artifacts_serve, site-revive): how its
+    /// server runs again; written by the hub after the add, never from a
+    /// request. None: a file, another link, or no listener at the add.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub serve: Option<crate::artifacts_serve::Serve>,
+}
+
+impl Version {
+    /// Its newest save's number (1 for a version from before revs).
+    pub fn rev(&self) -> u32 {
+        self.revs.last().map_or(1, |r| r.rev)
+    }
+
+    /// What it changed from the version before, merged over its saves;
+    /// None: a save said nothing, so no detail.
+    pub fn changed(&self) -> Option<Vec<Anchor>> {
+        artifacts_turns::merged(&self.revs)
+    }
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
@@ -64,6 +116,11 @@ pub struct Meta {
     pub cwd: String,
     #[serde(default)]
     pub versions: Vec<Version>,
+    /// Its folder's id in the library (`bise_home::library`), raw: a
+    /// reader resolves it ([`folder_of`]); none: unfiled. One folder per
+    /// artifact, written only by its own hub ([`Store::move_to`]).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub folder: Option<String>,
 }
 
 impl Meta {
@@ -83,6 +140,30 @@ pub struct Add {
     /// `you` or the agent.
     pub by: String,
     pub cwd: String,
+    /// Only a next version of a file that already is an artifact
+    /// (`bise office run`'s `run.write`, plan §2): another file is not
+    /// added, the answer says so ([`Added::not_artifact`]).
+    pub known_only: bool,
+    /// The turn it came in, stamped by the hub from sb-core's fact (never
+    /// from the request); None outside a turn.
+    pub turn: Option<Turn>,
+    /// His edits in the viewer's grid (pages/artifact/save.rs): the sitting
+    /// they came in; None for any other add.
+    pub sitting: Option<Sitting>,
+    /// What the save changed, as the writer said it (`bise office run`);
+    /// None: it said nothing.
+    pub changed: Option<Vec<Anchor>>,
+    /// The folder it goes in (a library folder's id), see [`Filed`].
+    pub folder: Option<Filed>,
+}
+
+/// An add's folder: `Asked` (`--folder`) files it, a next version too;
+/// `Default` (its task's folder) only files a new artifact, so a next
+/// version stays where he put it.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Filed {
+    Asked(String),
+    Default(String),
 }
 
 /// The answer to an add.
@@ -93,6 +174,23 @@ pub struct Added {
     pub new_version: bool,
     /// The add named a bise page: nothing stored, the page is its artifact.
     pub page: bool,
+    /// A `known_only` add of a file that is no artifact: nothing stored,
+    /// `meta` is empty but for its `source`.
+    pub not_artifact: bool,
+    /// A save in the same turn as the newest version (artifacts_turns):
+    /// its copy replaced, `v` the same, its rev grew.
+    pub replaced: bool,
+    /// An html file's links: how many files were kept beside its copy,
+    /// what was not (artifacts_assets), and whether it runs scripts.
+    pub assets: usize,
+    pub unkept: Vec<String>,
+    pub scripts: bool,
+}
+
+impl Added {
+    fn none() -> Added {
+        Added { meta: Meta::default(), new_version: false, page: false, not_artifact: false, replaced: false, assets: 0, unkept: Vec::new(), scripts: false }
+    }
 }
 
 /// A bise page as the page store keeps it (only what the list reads).
@@ -149,6 +247,8 @@ fn write_atomic(p: &Path, bytes: &[u8]) -> Result<(), String> {
     }
     let tmp = p.with_extension("tmp");
     std::fs::write(&tmp, bytes).map_err(|e| e.to_string())?;
+    // the rows built from the store are built again (crate::store_gen)
+    crate::store_gen::bump();
     std::fs::rename(&tmp, p).map_err(|e| e.to_string())
 }
 
@@ -327,6 +427,23 @@ fn measure(p: &Path) -> (u64, u64, usize) {
     (bytes, newest, files)
 }
 
+/// Copy into a sibling `.<name>.part`, then rename over `to`: a reader
+/// (the viewer fetching the copy mid-save, architect m_23911) gets the
+/// old bytes or the new, never half a file.
+fn copy_whole(from: &Path, to: &Path) -> std::io::Result<()> {
+    let name = to.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
+    let part = to.with_file_name(format!(".{name}.part"));
+    if part.is_dir() {
+        std::fs::remove_dir_all(&part)?;
+    }
+    copy_tree(from, &part)?;
+    if to.is_dir() {
+        std::fs::remove_dir_all(to)?;
+    }
+    crate::store_gen::bump();
+    std::fs::rename(&part, to)
+}
+
 fn copy_tree(from: &Path, to: &Path) -> std::io::Result<()> {
     if from.is_file() {
         if let Some(d) = to.parent() {
@@ -375,9 +492,20 @@ impl Store {
         write_atomic(&self.dir().join(&m.id).join("meta.json"), &bytes)
     }
 
+    /// name-free (sb-core's `retarget` fx): another agent takes the old
+    /// name `from`, so the artifacts that still say `from` say `to`, the
+    /// agent that had it. The number moved.
+    pub fn retarget(&self, from: &str, to: &str) -> usize {
+        self.stored()
+            .into_iter()
+            .filter(|m| m.agent == from)
+            .filter(|m| self.save(&Meta { agent: to.to_string(), ..m.clone() }).is_ok())
+            .count()
+    }
+
     /// The page server's base (`http://127.0.0.1:<port>`), from
     /// `<state>/pages.port`.
-    fn pages_base(&self) -> Option<String> {
+    pub fn pages_base(&self) -> Option<String> {
         let port = std::fs::read_to_string(self.state.join("pages.port")).ok()?;
         let port: u16 = port.trim().parse().ok()?;
         Some(format!("http://127.0.0.1:{}", port))
@@ -462,7 +590,7 @@ impl Store {
         if let Some(u) = &url {
             if let Some(id) = self.page_of_link(u) {
                 let p = pages.iter().find(|p| p.id == id).cloned().unwrap_or_default();
-                return Ok(Added { meta: page_meta(&p, self.pages_base().as_deref()), new_version: false, page: true });
+                return Ok(Added { meta: page_meta(&p, self.pages_base().as_deref()), new_version: false, page: true, not_artifact: false, replaced: false, ..Added::none() });
             }
         }
         let (source, target, kind) = match (&path, &url) {
@@ -473,6 +601,10 @@ impl Store {
             (None, Some(u)) => (u.trim_end_matches('/').to_string(), u.clone(), link_kind(u)),
             _ => unreachable!(),
         };
+        if a.known_only && !stored.iter().any(|m| m.source == source) {
+            let meta = Meta { source, ..Meta::default() };
+            return Ok(Added { meta, new_version: false, page: false, not_artifact: true, replaced: false, ..Added::none() });
+        }
         let kind = a.kind.clone().unwrap_or_else(|| kind.to_string());
         let mut meta = match stored.iter().find(|m| m.source == source) {
             Some(m) => m.clone(),
@@ -496,20 +628,35 @@ impl Store {
                     source: source.clone(),
                     cwd: a.cwd.clone(),
                     versions: Vec::new(),
+                    folder: match &a.folder {
+                        Some(Filed::Asked(f) | Filed::Default(f)) => Some(f.clone()),
+                        None => None,
+                    },
                 }
             }
         };
+        if let Some(Filed::Asked(f)) = &a.folder {
+            meta.folder = Some(f.clone());
+        }
         if let Some(t) = a.title.as_ref().filter(|t| !t.trim().is_empty()) {
             meta.title = t.trim().to_string();
         }
         if a.kind.is_some() {
             meta.kind = kind;
         }
-        let sig = match &path {
-            Some(p) => {
-                let (bytes, mtime, _) = measure(p);
-                format!("{}:{}", bytes, mtime)
-            }
+        // an html file: the files it links beside it go with it (artifacts_assets);
+        // its size, sig and caps count them all
+        let assets = path.as_deref().filter(|p| artifacts_assets::is_html(p)).map(|p| artifacts_assets::gather(p, MAX_COPY_FILES)).unwrap_or_default();
+        let root = path.as_deref().and_then(Path::parent).map(Path::to_path_buf).unwrap_or_default();
+        let size = path.as_deref().map(|p| {
+            assets.files.iter().fold(measure(p), |(b, t, n), f| {
+                let (fb, ft, _) = measure(&root.join(f));
+                (b + fb, t.max(ft), n + 1)
+            })
+        });
+        let sig = match size {
+            Some((bytes, mtime, _)) if assets.files.is_empty() => format!("{}:{}", bytes, mtime),
+            Some((bytes, mtime, n)) => format!("{}:{}:{}", bytes, mtime, n),
             None => String::new(),
         };
         // a file added again, unchanged: the same version
@@ -518,19 +665,29 @@ impl Store {
             let same_bytes = || {
                 let copy = last.copy.as_ref().map(|c| self.dir().join(&meta.id).join(c));
                 match copy {
-                    Some(c) if p.is_file() => std::fs::read(&c).ok().is_some_and(|b| std::fs::read(p).ok() == Some(b)),
+                    Some(c) if p.is_file() && assets.files.is_empty() => std::fs::read(&c).ok().is_some_and(|b| std::fs::read(p).ok() == Some(b)),
                     _ => false,
                 }
             };
             if same_sig || same_bytes() {
                 self.save(&meta)?;
-                return Ok(Added { meta, new_version: false, page: false });
+                return Ok(Added { meta, new_version: false, page: false, not_artifact: false, replaced: false, ..Added::none() });
             }
         }
-        let v = meta.versions.last().map_or(1, |l| l.v + 1);
-        let (copy, no_copy) = match &path {
-            Some(p) => {
-                let (bytes, _, files) = measure(p);
+        // a save in the same turn by the same agent, or in the same sitting of
+        // his edits: the newest version again
+        let last = meta.versions.last();
+        let same = match &a.sitting {
+            Some(_) => artifacts_turns::place_sitting(last.and_then(|l| l.sitting.as_ref()), a.sitting.as_ref()),
+            None => artifacts_turns::place(last.and_then(|l| l.turn.as_ref()), a.turn.as_ref()),
+        } == Place::Same;
+        let v = match meta.versions.last() {
+            Some(l) if same => l.v,
+            Some(l) => l.v + 1,
+            None => 1,
+        };
+        let (copy, no_copy) = match (&path, size) {
+            (Some(p), Some((bytes, _, files))) => {
                 if bytes > MAX_COPY {
                     (None, Some("over 50 MB".to_string()))
                 } else if files > MAX_COPY_FILES {
@@ -538,17 +695,55 @@ impl Store {
                 } else {
                     let name = p.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_else(|| "file".into());
                     let rel = format!("v{}/{}", v, name);
-                    match copy_tree(p, &self.dir().join(&meta.id).join(&rel)) {
+                    let vdir = self.dir().join(&meta.id).join(format!("v{}", v));
+                    // its files first, the html last: a reader of the html finds them there
+                    let linked = assets.files.iter().try_for_each(|f| copy_whole(&root.join(f), &vdir.join(f)));
+                    match linked.and_then(|()| copy_whole(p, &self.dir().join(&meta.id).join(&rel))) {
                         Ok(()) => (Some(rel), None),
                         Err(e) => (None, Some(format!("copy failed: {}", e))),
                     }
                 }
             }
-            None => (None, None),
+            _ => (None, None),
         };
-        meta.versions.push(Version { v, at_ms: now, target, copy, no_copy, sig });
+        let rev = |revs: &[Rev]| Rev { rev: artifacts_turns::next_rev(revs), at_ms: now, changed: a.changed.clone() };
+        match meta.versions.last_mut() {
+            Some(last) if same => {
+                // the copy was replaced in place; the version moves to this save
+                if last.revs.is_empty() {
+                    last.revs.push(Rev { rev: 1, at_ms: last.at_ms, changed: None });
+                }
+                let r = rev(&last.revs);
+                last.revs.push(r);
+                *last = Version { at_ms: now, target, copy, no_copy, sig, sitting: a.sitting.clone().or(last.sitting.clone()), ..last.clone() };
+            }
+            _ => {
+                let revs = vec![rev(&[])];
+                meta.versions.push(Version { v, at_ms: now, target, copy, no_copy, sig, turn: a.turn.clone(), sitting: a.sitting.clone(), revs, serve: None });
+            }
+        }
         self.save(&meta)?;
-        Ok(Added { meta, new_version: true, page: false })
+        Ok(Added { meta, new_version: true, page: false, not_artifact: false, replaced: same, assets: assets.files.len(), unkept: assets.unkept, scripts: assets.scripts })
+    }
+
+    /// The bytes of bise's copy of version `v` (None: no copy, or unreadable).
+    pub fn copy_bytes(&self, meta: &Meta, v: &Version) -> Option<Vec<u8>> {
+        std::fs::read(self.dir().join(&meta.id).join(v.copy.as_ref()?)).ok()
+    }
+
+    /// His edits of a file artifact in the viewer (pages/artifact/save.rs,
+    /// daemon/art.rs `art_save`): `bytes` over its file, through a temp file
+    /// and a rename (a reader never sees half a file). Err: its folder is
+    /// gone (an archived agent's temp folder), or the write failed.
+    pub fn write_source(&self, meta: &Meta, bytes: &[u8]) -> Result<PathBuf, String> {
+        let p = PathBuf::from(&meta.source);
+        let dir = p.parent().filter(|d| d.is_dir()).ok_or_else(|| format!("{} is gone", meta.source))?;
+        let name = p.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
+        let tmp = dir.join(format!(".{name}.bise-save"));
+        std::fs::write(&tmp, bytes).map_err(|e| e.to_string())?;
+        crate::store_gen::bump();
+        std::fs::rename(&tmp, &p).map_err(|e| e.to_string())?;
+        Ok(p)
     }
 
     /// Every artifact, stored ones and pages, newest first (the time of
@@ -557,11 +752,13 @@ impl Store {
     pub fn all(&self) -> Vec<Meta> {
         let mut out = self.stored();
         let base = self.pages_base();
+        let filed = self.pages_filed();
         for p in self.pages() {
             let mut m = page_meta(&p, base.as_deref());
             if out.iter().any(|o| o.id == m.id) {
                 m.id = format!("{}-page", m.id);
             }
+            m.folder = filed.get(&m.id).cloned();
             out.push(m);
         }
         out.sort_by(|a, b| {
@@ -571,9 +768,55 @@ impl Store {
         out
     }
 
+    /// `<state>/artifacts/<id>/storage.json`: a site's localStorage, every
+    /// version's (crate::artifacts_storage, its one writer).
+    pub fn storage_path(&self, id: &str) -> PathBuf {
+        self.dir().join(id).join("storage.json")
+    }
+
     /// One artifact by id (`artifact:<id>`).
     pub fn get(&self, id: &str) -> Option<Meta> {
         self.all().into_iter().find(|m| m.id == id)
+    }
+
+    /// `artifacts/filed.json`: the pages' folders, `{"<page id>": "<folder
+    /// id>"}` (a page's meta.json is the page store's; this store keeps
+    /// what it files).
+    fn filed_file(&self) -> PathBuf {
+        self.dir().join("filed.json")
+    }
+
+    fn pages_filed(&self) -> BTreeMap<String, String> {
+        read_json(&self.filed_file()).unwrap_or_default()
+    }
+
+    /// File `ids` in `folder` (a library folder's id, checked by the
+    /// caller; none: unfiled), all or none: an unknown id moves nothing.
+    /// Each one's folder before, raw (his undo puts it back).
+    pub fn move_to(&self, ids: &[String], folder: Option<&str>) -> Result<Vec<(String, Option<String>)>, String> {
+        let all = self.all();
+        let metas = ids
+            .iter()
+            .map(|id| all.iter().find(|m| &m.id == id).ok_or_else(|| format!("no artifact {id}")))
+            .collect::<Result<Vec<_>, _>>()?;
+        let mut filed = self.pages_filed();
+        let mut out = Vec::new();
+        for m in metas {
+            out.push((m.id.clone(), m.folder.clone()));
+            if m.by == "page" {
+                match folder {
+                    Some(f) => filed.insert(m.id.clone(), f.to_string()),
+                    None => filed.remove(&m.id),
+                };
+            } else {
+                self.save(&Meta { folder: folder.map(str::to_string), ..m.clone() })?;
+            }
+        }
+        if out.iter().any(|(id, _)| all.iter().any(|m| &m.id == id && m.by == "page")) {
+            let bytes = serde_json::to_vec_pretty(&filed).map_err(|e| e.to_string())?;
+            write_atomic(&self.filed_file(), &bytes)?;
+        }
+        Ok(out)
     }
 
     /// The open notes of a page, per version: (open, done).
@@ -586,10 +829,13 @@ impl Store {
 
     /// The `artifacts` event's rows (docs/artifacts.md, "the row").
     pub fn rows(&self, who: Who, workspace: &str) -> Vec<Value> {
-        self.all().iter().map(|m| self.row(m, who, workspace)).collect()
+        let put_away = self.archived();
+        self.all().iter().map(|m| self.row(m, who, workspace, put_away.get(&m.id).copied())).collect()
     }
 
-    pub fn row(&self, m: &Meta, who: Who, workspace: &str) -> Value {
+    /// `archived_at`: when the artifact itself was archived (`sb artifact
+    /// archive`), or None; `archived` is its agent's.
+    pub fn row(&self, m: &Meta, who: Who, workspace: &str, archived_at: Option<u64>) -> Value {
         let (agent, archived) = who(&m.agent).unwrap_or_else(|| (m.agent.clone(), false));
         let page = m.by == "page";
         let notes = |v: u64| -> String {
@@ -609,7 +855,12 @@ impl Store {
             json!({
                 "v": v.v, "ts_ms": v.at_ms, "target": v.target,
                 "copy": v.copy.as_ref().map(|c| dir.join(c).to_string_lossy().to_string()),
-                "note": if page { notes(v.v) } else { v.no_copy.clone().map(|w| format!("no copy: {}", w)).unwrap_or_default() },
+                "note": if page {
+                    notes(v.v)
+                } else {
+                    // an archived artifact's older copy is simply gone (designer m_16873)
+                    v.no_copy.clone().map(|w| if w == "archived" { "not kept".to_string() } else { format!("no copy: {}", w) }).unwrap_or_default()
+                },
             })
         };
         let cur = m.current().cloned().unwrap_or_default();
@@ -623,7 +874,7 @@ impl Store {
         };
         json!({
             "id": m.id, "title": m.title, "kind": m.kind, "agent": agent, "by": m.by,
-            "archived": archived, "ts_ms": cur.at_ms, "created_ms": m.created_ms, "v": cur.v,
+            "archived": archived, "archived_at": archived_at, "ts_ms": cur.at_ms, "created_ms": m.created_ms, "v": cur.v,
             "target": cur.target,
             "copy": cur.copy.as_ref().map(|c| dir.join(c).to_string_lossy().to_string()),
             "gone": gone,
@@ -631,29 +882,88 @@ impl Store {
             "pr": pr_of(&cur.target).map(|(repo, n)| json!({"repo": repo, "number": n})),
             "keys": keys(m, workspace),
             "versions": m.versions.iter().map(version).collect::<Vec<_>>(),
+            // raw: the hub resolves it against the library (artifacts_ev)
+            "folder": m.folder,
+            "turn": cur.turn.as_ref().map(|t| t.started_ms),
+            // a local site bise serves again (artifacts_serve): the page
+            // server's door, what every client opens; `target` stays the link
+            "live": self.live_url(m),
         })
     }
 
-    /// How many came after the user last looked.
+    /// The door of a local site bise can serve again
+    /// (`<pages base>/a/<id>/live`, artifacts_serve::has_door); None
+    /// otherwise or with no page server.
+    pub fn live_url(&self, m: &Meta) -> Option<String> {
+        m.current().filter(|v| m.by != "page" && crate::artifacts_serve::has_door(v))?;
+        Some(format!("{}{}", self.pages_base()?, crate::artifacts_serve::live_href(&m.id)))
+    }
+
+    /// Version `v` of artifact `id` gets its recipe (artifacts_serve,
+    /// found off the hub's loop after the add) and, for a static site,
+    /// bise's copy of the folder it serves (`root`; the caps of any
+    /// folder). False: no such version, or nothing to write.
+    pub fn set_serve(&self, id: &str, v: u64, serve: crate::artifacts_serve::Serve, root: Option<&Path>) -> Result<bool, String> {
+        let Some(mut meta) = self.stored().into_iter().find(|m| m.id == id) else { return Ok(false) };
+        let Some(ver) = meta.versions.iter_mut().find(|x| x.v == v) else { return Ok(false) };
+        if ver.serve.as_ref() == Some(&serve) && (root.is_none() || ver.copy.is_some()) {
+            return Ok(false);
+        }
+        ver.serve = Some(serve);
+        if let Some(root) = root.filter(|_| ver.copy.is_none()) {
+            let (bytes, _, files) = measure(root);
+            if bytes > MAX_COPY {
+                ver.no_copy = Some("over 50 MB".into());
+            } else if files > MAX_COPY_FILES {
+                ver.no_copy = Some(format!("over {} files", MAX_COPY_FILES));
+            } else {
+                let name = root.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_else(|| "site".into());
+                let rel = format!("v{}/{}", v, name);
+                match copy_whole(root, &self.dir().join(id).join(&rel)) {
+                    Ok(()) => ver.copy = Some(rel),
+                    Err(e) => ver.no_copy = Some(format!("copy failed: {}", e)),
+                }
+            }
+        }
+        self.save(&meta)?;
+        Ok(true)
+    }
+
+    /// How many came after the user last looked (the archived ones never).
     pub fn new_count(&self, now: u64) -> usize {
         let seen = self.seen_ms(now);
-        self.all().iter().filter(|m| m.by != "you" && m.current().is_some_and(|v| v.at_ms > seen)).count()
+        let put_away = self.archived();
+        self.all()
+            .iter()
+            .filter(|m| m.by != "you" && !put_away.contains_key(&m.id) && m.current().is_some_and(|v| v.at_ms > seen))
+            .count()
     }
 
     /// What `sb artifact list` prints: one line each, newest first,
-    /// filtered by words (title, agent, kind, id) and agent.
-    pub fn list_text(&self, words: &str, agent: Option<&str>, now: u64) -> String {
+    /// filtered by words (title, agent, kind, id) and agent; the archived
+    /// ones only with `archived` (else a last line counts them).
+    pub fn list_text(&self, words: &str, agent: Option<&str>, archived: bool, now: u64) -> String {
+        let put_away = self.archived();
         let all = self.all();
+        let hidden = all.iter().filter(|m| put_away.contains_key(&m.id) != archived).count();
+        let foot = if archived || hidden == 0 {
+            String::new()
+        } else {
+            format!("\n{} archived · sb artifact list --archived", hidden)
+        };
+        let all: Vec<Meta> = all.into_iter().filter(|m| put_away.contains_key(&m.id) == archived).collect();
         let hits: Vec<&Meta> = all
             .iter()
             .filter(|m| agent.is_none_or(|a| m.agent == a))
             .filter(|m| matches(m, words))
             .collect();
         if hits.is_empty() {
-            return if all.is_empty() {
+            return if archived {
+                "nothing archived.".into()
+            } else if all.is_empty() && hidden == 0 {
                 "no artifacts yet. add what you make for the user with sb artifact add <path or link>.".into()
             } else {
-                "nothing matches.".into()
+                format!("nothing matches.{}", foot)
             };
         }
         hits.iter()
@@ -675,6 +985,7 @@ impl Store {
             })
             .collect::<Vec<_>>()
             .join("\n")
+            + &foot
     }
 }
 
@@ -695,12 +1006,35 @@ fn page_meta(p: &PageMeta, base: Option<&str>) -> Meta {
         created_ms: p.created_ms,
         source: url(last, true),
         cwd: String::new(),
+        folder: None,
         versions: p
             .versions
             .iter()
             .map(|v| Version { v: v.n, at_ms: v.at_ms, target: url(v.n, v.n == last), ..Default::default() })
             .collect(),
     }
+}
+
+/// The rows' `folder`, raw from their metas, as readers read it: the
+/// live library folder it resolves to (a merged one's target), else
+/// none (a deleted or unknown id: unfiled). The one join of the
+/// artifacts and the library, for this hub's rows and another
+/// project's (artifacts/library).
+pub fn resolve_folders(rows: &mut [Value], lib: &bise_home::library::Library) {
+    for r in rows.iter_mut() {
+        let f = r.get("folder").and_then(Value::as_str).and_then(|f| bise_home::library::resolve(lib, f)).map(|f| f.id.clone());
+        r["folder"] = json!(f);
+    }
+}
+
+/// Another project's rows, read from its state folder (artifacts/library):
+/// the same store reader as this hub's own, agents by their stored names,
+/// folders resolved.
+pub fn rows_of(state: &Path, workspace: &str, lib: &bise_home::library::Library) -> Vec<Value> {
+    let store = Store::new(state);
+    let mut rows = store.rows(&|_: &str| None, workspace);
+    resolve_folders(&mut rows, lib);
+    rows
 }
 
 /// Every form a reply may name it by (E's plain links and paths): the
@@ -741,17 +1075,16 @@ pub fn matches(m: &Meta, words: &str) -> bool {
     words.split_whitespace().all(|w| hay.contains(&w.to_lowercase()))
 }
 
-/// The thread line of an add (`sb artifact : id : agent : title : kind :
-/// v`), for the maker's thread and main's.
-pub fn thread_line(m: &Meta) -> String {
-    let fields: Vec<String> = vec![
-        m.id.clone(),
-        m.agent.clone(),
-        m.title.clone(),
-        m.kind.clone(),
-        m.current().map_or(1, |v| v.v).to_string(),
-    ];
-    crate::core::join_fields(&fields)
+/// The thread record of an add (its id, agent, title, kind, version), for
+/// the maker's thread and main's.
+pub fn thread_rec(m: &Meta) -> bise_proto::core::Feed {
+    bise_proto::core::Feed::Artifact(bise_proto::core::feed::Artifact {
+        id: m.id.clone(),
+        agent: m.agent.clone(),
+        title: m.title.clone(),
+        kind: m.kind.clone(),
+        version: m.current().map_or(1, |v| v.v),
+    })
 }
 
 /// What the adder reads: `added pricing-plans.xlsx (sheet) · v1 · link it
@@ -760,6 +1093,9 @@ pub fn added_text(a: &Added) -> String {
     let m = &a.meta;
     let v = m.current().map_or(1, |v| v.v);
     let link = format!("[{}](artifact:{})", m.title, m.id);
+    if a.not_artifact {
+        return format!("{} is not an artifact: written only", m.source);
+    }
     if a.page {
         return format!("{} is a bise page (v{}): it's in already. link it as {}", m.id, v, link);
     }
@@ -772,8 +1108,20 @@ pub fn added_text(a: &Added) -> String {
         Some(why) if a.new_version => format!(" · no copy kept ({})", why),
         _ => String::new(),
     };
-    format!("{}{} · link it as {}", what, copy, link)
+    let with = if a.new_version && a.assets > 0 && copy.is_empty() { format!(" · with {} files it links", a.assets) } else { String::new() };
+    let mut out = format!("{}{}{} · link it as {}", what, with, copy, link);
+    if a.new_version {
+        for line in artifacts_assets::unkept_line(&a.unkept).into_iter().chain(a.scripts.then(|| artifacts_assets::SCRIPTS_LINE.to_string())) {
+            out.push('\n');
+            out.push_str(&line);
+        }
+    }
+    out
 }
+
+#[path = "artifacts_archive.rs"]
+mod archive;
+pub use archive::{archived_text, parse_before, unarchived_text, Archived, Pick};
 
 #[cfg(test)]
 #[path = "artifacts_tests.rs"]

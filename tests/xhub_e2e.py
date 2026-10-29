@@ -38,7 +38,11 @@ def bise(env, *args):
 
 
 def sb_as_main(env, sock, *args):
-    return bise(dict(env, SB_SOCKET=sock, SB_AGENT="main"), "sb", *args)
+    """`sb` as that hub's main: on its agent.sock, next to `sock` (its
+    hub.sock), as a REPL's sb is (hub.sock serves no agent request since
+    debt-t3, docs/issues/16)."""
+    asock = os.path.join(os.path.dirname(sock), "agent.sock")
+    return bise(dict(env, SB_SOCKET=asock, SB_AGENT="main"), "sb", *args)
 
 
 def journal(state):
@@ -108,8 +112,14 @@ def main():
         said = [m["msg"] for m in of_type(pstate, "message_sent") if m["msg"]["id"] == pin[0]["in"]["msg"]][0]
         check(said["from"] == "user" and said.get("via") == "bise" and "the login is broken" in said["text"], "as his words via bise: %r" % said)
         # the project's main answers at its turn's end; bise's main hears @<name>
-        wait.until(lambda: of_type(hstate, "x_settled"), 90, "the answer settles the send")
-        ans = [m["msg"] for m in of_type(hstate, "message_sent") if m["msg"]["from"] == "@" + name]
+        # waited for by its last line: xanswer journals x_settled, then the
+        # message, one write each; a read between the two (the nightly at
+        # load 8-9) saw the send settled and no answer yet
+        def answers():
+            return [m["msg"] for m in of_type(hstate, "message_sent") if m["msg"]["from"] == "@" + name]
+        wait.until(answers, 90, "the answer to main")
+        check(of_type(hstate, "x_settled"), "the answer settles the send")
+        ans = answers()
         check(len(ans) == 1 and ans[0]["to"] == "main" and ("m_%d" % his) in ans[0]["text"], "the answer to main: %r" % ans)
         check(len(of_type(pstate, "x_replied")) == 1, "answered once")
 
@@ -175,12 +185,12 @@ def main():
         check(r.returncode == 0, "bise follows %s/perf: %s %s" % (name, r.stdout, r.stderr))
         fol = [e for e in of_type(pstate, "follow") if e.get("name") == "perf"]
         check(fol and fol[-1].get("on") is True and fol[-1].get("hub") == home_row["id"], "the follow journaled with bise's hub: %r" % fol)
-        perf = dict(E.env, SB_SOCKET=psock, SB_AGENT="perf")
+        perf = dict(E.env, SB_SOCKET=os.path.join(pstate, "agent.sock"), SB_AGENT="perf")
         r = bise(perf, "sb", "report", "progress", "bench 3 of 7", "--step", "3/7")
         check(r.returncode == 0, "perf's progress: %s %s" % (r.stdout, r.stderr))
         check(not [x for x in of_type(pstate, "x_out") if x.get("out", {}).get("kind") == "job_end"], "progress stays quiet")
         # bise's hub goes away before the end
-        e2e.Client(hsock).send({"op": "stop_hub"})
+        e2e.stop_hub(hsock)
         hubs[0].wait(timeout=30)
         wait.until(lambda: not os.path.exists(os.path.join(hstate, "hub.pid")), 30, "bise's hub stopped", poll=0.2)
         r = bise(perf, "sb", "report", "done", "p99 down 31%")
@@ -218,7 +228,7 @@ def main():
         check(r.returncode != 0 and "only bise reads other projects" in (r.stdout + r.stderr), "a project hub refuses: %s %s" % (r.stdout, r.stderr))
         # the project's hub stopped: bise reads its threads on disk, never
         # starting it
-        e2e.Client(psock).send({"op": "stop_hub"})
+        e2e.stop_hub(psock)
         wait.until(lambda: not os.path.exists(os.path.join(pstate, "hub.pid")), 30, "the project's hub stopped", poll=0.2)
         r = sb_as_main(E.env, hsock, "history", "the login is broken", "--project", name)
         check(r.returncode == 0 and ("%s/main#" % name) in r.stdout and "--project " + name in r.stdout, "history --project: %s %s" % (r.stdout, r.stderr))
@@ -242,7 +252,7 @@ def main():
             sock = os.path.join(st, "hub.sock")
             if os.path.exists(sock):
                 try:
-                    e2e.Client(sock).send({"op": "stop_hub"})
+                    e2e.stop_hub(sock)
                 except Exception:
                     pass
         for h in hubs:

@@ -12,7 +12,7 @@
 //! A key never goes out in an event or a log line ([`redact`]).
 
 use bise_home::projects::Row;
-use bise_proto::draft::{Account, Found, Plugin, RoleRow};
+use bise_proto::app_rows::{Account, Found, Plugin, RoleRow};
 use serde_json::Value;
 use std::path::{Path, PathBuf};
 use std::sync::mpsc::Sender;
@@ -39,10 +39,41 @@ pub enum Done {
     CuCheck(Value),
     /// a computer-use fix went wrong later (its line)
     CuSaid(String),
-    /// bise's release channel read (bar S.6, core/app_update.rs): its
-    /// `latest.json` (Err: why not), the channel's base URL, this Mac's
-    /// target
+    /// the desktop app's release channel read (bar S.6,
+    /// core/app_update.rs): its `desktop.json` (Err: why not), the
+    /// channel's base URL, this Mac's target
     Manifest { text: Result<String, String>, base: String, target: String },
+    /// a `provider_use` check ended (its seq: a newer one for the same
+    /// provider drops it)
+    Used { seq: u64, used: crate::firstkey::Used },
+    /// N1: a /keychain move ended: its lines (item names and counts,
+    /// never a secret) and whether it failed
+    Keychain { lines: Vec<String>, failed: bool },
+    /// a plugin to add built in the staging folder (a git clone may have
+    /// run), its preview next (Err: why not)
+    Staged { res: Result<StagedPlugin, String> },
+    /// his projects read for what they name (the band's whys)
+    Signals { inputs: Vec<bend_plugins::signals::Inputs> },
+    /// a marketplace added and read: its plugins as Browse rows
+    Market { source: String, res: Result<Vec<Plugin>, String> },
+    /// a Mistral connector's connect said a step (`said`) or ended
+    /// (`res`); the list is sent again either way
+    Connecting { id: String, project: Option<String>, said: Option<String>, res: Option<Result<(), String>> },
+    /// the Mistral catalog fetched again (Err: its problem)
+    Refreshed { project: Option<String>, res: Result<(), String> },
+    /// the servers of a plugin he just added were tried once: their
+    /// states are in the status files, the list is sent again
+    Tried,
+}
+
+/// A staged plugin on its way back to the core (compared by its token).
+#[derive(Debug)]
+pub struct StagedPlugin(pub bend_plugins::add::Staged);
+
+impl PartialEq for StagedPlugin {
+    fn eq(&self, other: &Self) -> bool {
+        self.0.token() == other.0.token()
+    }
 }
 
 /// A repo the walk found.
@@ -65,17 +96,42 @@ pub enum RegistryOp {
 pub type FlowFn = Box<dyn Fn(&Path, bool) -> Result<(), String>>;
 pub type WriteFn = Box<dyn Fn(&Value) -> Result<(), String>>;
 pub type IdFn = Box<dyn Fn(&str) -> Result<(), String>>;
-pub type KeySetFn = Box<dyn Fn(&str, &str) -> Result<(), String>>;
+/// (provider, the key pasted or none, its seq, the channel of its end) ->
+/// (the provider's name, the model it is checked with), at once; the
+/// check's end comes as `Done::Used`
+pub type ProviderUseFn = Box<dyn Fn(&str, Option<String>, Option<String>, u64, Sender<Done>) -> (String, String)>;
 pub type SignInFn = Box<dyn Fn(&str, Sender<Done>) -> Result<(), String>>;
 pub type PathFn = Box<dyn Fn(&Path) -> Result<(), String>>;
-/// Reads bise's release channel on its own thread, `Done::Manifest` at its end.
-pub type ManifestFn = Box<dyn Fn(Sender<Done>)>;
+/// Reads the desktop app's release channel he follows (stable or beta) on
+/// its own thread, `Done::Manifest` at its end.
+pub type ManifestFn = Box<dyn Fn(bise_home::release::DesktopChannel, Sender<Done>)>;
 /// A workspace's plugins (`pending`: the logins whose browser is open).
 pub type PluginsFn = Box<dyn Fn(&Path, &[String]) -> Vec<Plugin>>;
 pub type PluginSetFn = Box<dyn Fn(&str, bool) -> Result<(), String>>;
 /// (workspace, server name, the project it was asked for, the channel of its end)
 pub type PluginLoginFn = Box<dyn Fn(&Path, &str, Option<String>, Sender<Done>) -> Result<(), String>>;
 pub type PluginLogoutFn = Box<dyn Fn(&Path, &str) -> Result<(), String>>;
+/// Builds what he adds in the staging folder on its own thread (a git
+/// clone), `Done::Staged` at its end; nothing of the plugin runs
+pub type PluginStageFn = Box<dyn Fn(bend_plugins::add::Request, Sender<Done>)>;
+/// Adds a marketplace to his list and reads it on its own thread (a git
+/// clone), `Done::Market` at its end
+pub type MarketFn = Box<dyn Fn(String, Sender<Done>)>;
+/// (each project's folder and name, the channel): what they name
+/// (bend_plugins::signals::gather, names only) on its own thread,
+/// `Done::Signals` at its end
+pub type SignalsFn = Box<dyn Fn(Vec<(PathBuf, String)>, Sender<Done>)>;
+/// (the plugin he just added, where adds read and write, the channel):
+/// its MCP servers tried once on their own thread
+/// (bend_plugins::add::try_servers), `Done::Tried` at its end
+pub type PluginTryFn = Box<dyn Fn(PathBuf, bend_plugins::add::Ctx, Sender<Done>)>;
+/// (connector id, the project it was asked for, the channel): its connect
+/// on its own thread (his browser, then a poll up to 5 min),
+/// `Done::Connecting` at each step and at its end (never run by a test)
+pub type PluginConnectFn = Box<dyn Fn(&str, Option<String>, Sender<Done>) -> Result<(), String>>;
+/// (the project it was asked for, the channel): the catalog fetched on
+/// its own thread, `Done::Refreshed` at its end
+pub type PluginsRefreshFn = Box<dyn Fn(Option<String>, Sender<Done>)>;
 /// (role, model, effort): config.toml's `[roles]` through the one locked writer
 pub type RoleSetFn = Box<dyn Fn(&str, Option<&str>, Option<&str>) -> Result<(), String>>;
 /// What runs now from computer use's page (the live test, a helper that reopens).
@@ -108,7 +164,10 @@ pub struct SetupPorts {
     pub prefs: Box<dyn Fn() -> Option<Value>>,
     pub write_prefs: WriteFn,
     pub accounts: Box<dyn Fn() -> Vec<Account>>,
-    pub key_set: KeySetFn,
+    /// Claude Code is signed in with a Claude plan (bise_catalog::detect,
+    /// presence only): the accounts event says so
+    pub claude_plan: Box<dyn Fn() -> bool>,
+    pub provider_use: ProviderUseFn,
     pub key_remove: IdFn,
     /// only a provider that signs in; its browser flow, `Done::SignedIn`
     /// at its end (never run by a test)
@@ -133,16 +192,81 @@ pub struct SetupPorts {
     /// run by a test)
     pub plugin_login: PluginLoginFn,
     pub plugin_logout: PluginLogoutFn,
+    /// the add menu (bend_plugins::add): a plugin staged, then held by
+    /// the core until his click (`plugin_preview`)
+    pub plugin_stage: PluginStageFn,
+    pub plugin_market: MarketFn,
+    /// what his projects name, for the band's whys (never on a send path)
+    pub signals: SignalsFn,
+    /// where an add reads and writes (`add::Ctx::standard`, a temp one in
+    /// tests): what a confirmed preview installs into
+    pub add_ctx: Box<dyn Fn() -> bend_plugins::add::Ctx>,
+    /// right after his confirm installed a plugin (never before)
+    pub plugin_try: PluginTryFn,
+    pub plugin_connect: PluginConnectFn,
+    pub plugins_refresh: PluginsRefreshFn,
+    /// why his Mistral connectors may be missing or old (their cache's)
+    pub connectors_problem: Box<dyn Fn() -> Option<bise_proto::app_rows::ConnectorsProblem>>,
     pub cu: CuPorts,
     /// each role's model (V17, [`role_rows`] of config.toml's setup)
     pub roles: Box<dyn Fn() -> Vec<RoleRow>>,
     /// a role's model and effort, checked ([`check_role_set`]) then
     /// written by bise_catalog's roles::save_role
     pub role_set: RoleSetFn,
-    /// bise's release channel, for the desktop app's updates (bar S.6):
-    /// the binary wires `bise update`'s own fetch; none here (a core
-    /// without it never offers an update)
+    /// the desktop app's release channel (stable or beta), for its updates
+    /// (bar S.6): the binary wires its fetch; none here (a core without
+    /// it never offers an update)
     pub manifest: ManifestFn,
+    /// this core's own build time (its app root's VERSION `built=`, found
+    /// the way bise finds its app root everywhere: the binary wires
+    /// approot::locate); empty: a dev build, none here
+    pub own_built: Box<dyn Fn() -> String>,
+    /// N1 (the TUI's /keychain): where the secrets are and the move
+    pub keychain: KeychainPort,
+}
+
+/// N1: his keys and sign-ins, in the macOS keychain or in files. `now`
+/// says where (`keychain` or `file`); `switch(to_keychain, tx)` moves
+/// them on its own thread and sends `Done::Keychain` at its end. The live
+/// one is bise_catalog's secrets_cli::switch (the TUI's /keychain); a
+/// test's is a fake (never /usr/bin/security).
+pub struct KeychainPort {
+    pub now: Box<dyn Fn() -> String>,
+    pub switch: Box<dyn Fn(bool, Sender<Done>)>,
+}
+
+/// The keychain port bise uses: bise_catalog's secrets_cli, as the TUI's
+/// keychain.rs (auth.json and the MCP logins; off macOS its line says so).
+pub fn live_keychain() -> KeychainPort {
+    // the TUI's own paths and setting (architect m_17309: one builder, crate::keychain's)
+    use crate::keychain::paths;
+    KeychainPort {
+        now: Box::new(|| store_word(crate::keychain::now()).into()),
+        switch: Box::new(|on, tx| {
+            std::thread::spawn(move || {
+                let to = if on { bise_secrets::Store::Keychain } else { bise_secrets::Store::File };
+                // a panic in the move still ends it (amb-core m_17305): else the core stays
+                // 'moving' and refuses every later /keychain until a restart
+                let done = std::panic::catch_unwind(|| bise_catalog::secrets_cli::switch(&paths(), &bend_plugins::oauth::store_dir(), Some(to), cfg!(target_os = "macos")));
+                let d = match done {
+                    Ok(o) => Done::Keychain { lines: o.lines, failed: o.failed },
+                    Err(why) => {
+                        let why = why.downcast_ref::<&str>().map(|s| (*s).to_string()).or_else(|| why.downcast_ref::<String>().cloned()).unwrap_or_else(|| "an error".into());
+                        Done::Keychain { lines: vec![format!("the move stopped: {why}")], failed: true }
+                    }
+                };
+                let _ = tx.send(d);
+            });
+        }),
+    }
+}
+
+/// The event's word for where the secrets are.
+pub fn store_word(s: bise_secrets::Store) -> &'static str {
+    match s {
+        bise_secrets::Store::Keychain => "keychain",
+        _ => "file",
+    }
 }
 
 /// Each role's model and effort as the TUI's `/models` screen reads
@@ -220,6 +344,10 @@ pub fn account_of(s: &bise_catalog::auth_cli::Status) -> Account {
         state: state.into(),
         who: s.email.clone(),
         provider: s.id.clone(),
+        from: None,
+        keys_url: String::new(),
+        coding: false,
+        needs_url: false,
     }
 }
 
@@ -271,15 +399,15 @@ pub fn walk(dir: &Path, depth: usize, skip: &[PathBuf]) -> Vec<Entry> {
     out
 }
 
-/// A stdin line fit for a log: a `key_set`'s key is never written.
+/// A stdin line fit for a log: a `provider_use`'s key is never written.
 pub fn redact(line: &str) -> String {
     match serde_json::from_str::<Value>(line) {
-        Ok(mut v) if v.get("cmd").and_then(Value::as_str) == Some("key_set") => {
+        Ok(mut v) if v.get("cmd").and_then(Value::as_str) == Some("provider_use") && v.get("key").is_some() => {
             v["key"] = Value::from("…");
             v.to_string()
         }
         Ok(_) => line.to_string(),
-        Err(_) if line.contains("key_set") => "(a key_set line that isn't JSON)".into(),
+        Err(_) if line.contains("provider_use") => "(a provider_use line that isn't JSON)".into(),
         Err(_) => line.to_string(),
     }
 }
@@ -387,10 +515,7 @@ fn sign_in_cancel(id: &str, open: &SignIns) -> Result<(), String> {
 pub fn live(flow: FlowFn) -> SetupPorts {
     use bise_catalog::auth_cli;
     let home = bise_home::Home::from_env;
-    let auth_paths = move || {
-        let h = home();
-        auth_cli::Paths { auth_file: h.auth_file(), config: h.config_file(), env_files: h.env_files(), home: Some(h.user_home().to_path_buf()) }
-    };
+    let auth_paths = move || bise_catalog::auth_cli::Paths::of(&home());
     let env = |k: &str| std::env::var(k).ok();
     // the open sign-ins: their process group and whether it was cancelled
     let open: SignIns = Default::default();
@@ -406,16 +531,58 @@ pub fn live(flow: FlowFn) -> SetupPorts {
             let files = bise_catalog::auth::EnvFile::read_all(&paths.env_files);
             let keys = bise_catalog::auth::Keys { env: &env, store: &store, files: &files };
             let main = setup.catalog.resolve(&setup.model).provider;
-            auth_cli::statuses(&setup.catalog, &keys, &main, paths.home.as_deref()).iter().map(account_of).collect()
-        }),
-        key_set: Box::new(move |id, key| {
-            let paths = auth_paths();
-            let setup = bise_catalog::Setup::load(&paths.config);
-            let p = auth_cli::check_provider(&setup.catalog, id)?;
-            if p.key_env.is_empty() {
-                return Err(format!("{} takes no key", p.name));
+            let home = paths.home.as_deref();
+            let mut v = auth_cli::statuses(&setup.catalog, &keys, &main, home)
+                .iter()
+                .map(|s| {
+                    let mut a = account_of(s);
+                    if let Some(p) = setup.catalog.provider(&s.id) {
+                        a.from = (!p.signs_in()).then(|| keys.find(&p.id, &p.key_env)).flatten().map(|f| crate::firstkey::key_from(&f.from, home));
+                        a.keys_url = p.keys_url.clone();
+                        a.coding = crate::onboarding::CODING_PLANS.contains(&p.id.as_str());
+                        a.needs_url = crate::firstkey::needs_url(p);
+                        // a key with no base URL can't answer: never "added" (Isidor, 28 oct)
+                        if a.needs_url && a.state == "signed_in" {
+                            a.state = "signed_out".into();
+                        }
+                    }
+                    a
+                })
+                .collect::<Vec<_>>();
+            // the coding plans are hidden from the catalog's list until set
+            // up; the first run offers them under their own row (the TUI's)
+            for id in crate::onboarding::CODING_PLANS {
+                if let Some(p) = setup.catalog.provider(id).filter(|p| !p.key_env.is_empty() && !v.iter().any(|a| a.id == p.id)) {
+                    v.push(Account {
+                        id: p.id.clone(),
+                        label: p.name.clone(),
+                        kind: "key".into(),
+                        state: "signed_out".into(),
+                        who: None,
+                        provider: p.id.clone(),
+                        from: None,
+                        keys_url: p.keys_url.clone(),
+                        coding: true,
+                        needs_url: false,
+                    });
+                }
             }
-            auth_cli::login(&paths, p, key, &env).map(|_| ())
+            v
+        }),
+        claude_plan: Box::new(move || bise_catalog::detect::claude_plan(home().user_home(), &env)),
+        // the key step's one path (firstkey.rs): checked live on its own
+        // thread, saved only once it works
+        provider_use: Box::new(move |id, key, base_url, seq, tx| {
+            let h = home();
+            let env = |k: &str| std::env::var(k).ok().filter(|v| !v.is_empty());
+            let said = crate::firstkey::model_for(&h, &env, id);
+            let id = id.to_string();
+            std::thread::spawn(move || {
+                let env = |k: &str| std::env::var(k).ok().filter(|v| !v.is_empty());
+                let used = crate::firstkey::use_provider(&h, &env, &id, key, base_url, &crate::firstkey::live_ports());
+                let _ = tx.send(Done::Used { seq, used });
+            });
+            said
         }),
         key_remove: Box::new(move |id| {
             let paths = auth_paths();
@@ -424,7 +591,8 @@ pub fn live(flow: FlowFn) -> SetupPorts {
         }),
         sign_in: Box::new(move |id, tx| {
             let setup = bise_catalog::Setup::load(&auth_paths().config);
-            if !setup.catalog.provider(id).is_some_and(|p| p.signs_in()) {
+            // the ChatGPT plan, or OpenRouter's login that mints a key
+            if !setup.catalog.provider(id).is_some_and(|p| p.signs_in() || p.id == bise_catalog::openrouter_login::ID) {
                 return Err(format!("{id} has no sign-in"));
             }
             sign_in_run(id, tx, &open)
@@ -476,8 +644,53 @@ pub fn live(flow: FlowFn) -> SetupPorts {
             Ok(())
         }),
         plugin_logout: Box::new(|ws, name| crate::plugins::logout(ws, name).map(|_| ())),
+        plugin_stage: Box::new(|req, tx| {
+            std::thread::spawn(move || {
+                let res = bend_plugins::add::stage(&req, &bend_plugins::add::Ctx::standard());
+                let _ = tx.send(Done::Staged { res: res.map(StagedPlugin).map_err(|e| e.to_string()) });
+            });
+        }),
+        plugin_market: Box::new(|url, tx| {
+            std::thread::spawn(move || {
+                use bend_plugins::marketplace;
+                let h = bise_home::Home::from_env();
+                let res = marketplace::add(&h.marketplaces(), &url)
+                    .and_then(|(_, url)| marketplace::read(&h.marketplace_cache(), &url, true))
+                    .map(|m| marketplace::rows(&m))
+                    .map_err(|e| e.to_string());
+                let _ = tx.send(Done::Market { source: url, res });
+            });
+        }),
+        signals: Box::new(|projects, tx| {
+            std::thread::spawn(move || {
+                let inputs = projects.iter().map(|(path, name)| bend_plugins::signals::gather(path, name)).collect();
+                let _ = tx.send(Done::Signals { inputs });
+            });
+        }),
+        add_ctx: Box::new(bend_plugins::add::Ctx::standard),
+        plugin_try: Box::new(|dir, ctx, tx| {
+            std::thread::spawn(move || {
+                bend_plugins::add::try_servers(&dir, &ctx);
+                let _ = tx.send(Done::Tried);
+            });
+        }),
+        // the TUI's own threads (crate::plugins), never the core loop
+        plugin_connect: Box::new(|id, project, tx| {
+            let (tx2, p2, id1, id2) = (tx.clone(), project.clone(), id.to_string(), id.to_string());
+            crate::plugins::connect(
+                id,
+                move |l| drop(tx.send(Done::Connecting { id: id1.clone(), project: project.clone(), said: Some(l), res: None })),
+                move |r| drop(tx2.send(Done::Connecting { id: id2, project: p2, said: None, res: Some(r) })),
+            )
+        }),
+        connectors_problem: Box::new(crate::plugins::connectors_problem),
+        plugins_refresh: Box::new(|project, tx| {
+            crate::plugins::refresh(move |e| drop(tx.send(Done::Refreshed { project, res: e.map_or(Ok(()), Err) })));
+        }),
         // the harness binary sets bise update's fetch (crate harness)
-        manifest: Box::new(|_| {}),
+        manifest: Box::new(|_, _| {}),
+        own_built: Box::new(String::new),
+        keychain: live_keychain(),
         cu: CuPorts {
             is_on: Box::new(crate::computer_use::is_on),
             set_on: Box::new(crate::computer_use::set_on),
@@ -563,9 +776,9 @@ mod tests {
 
     #[test]
     fn a_key_never_reaches_a_log_line() {
-        let l = redact(r#"{"cmd":"key_set","id":"anthropic","key":"sk-secret"}"#);
+        let l = redact(r#"{"cmd":"provider_use","id":"anthropic","key":"sk-secret"}"#);
         assert!(!l.contains("sk-secret") && l.contains("anthropic"), "{l}");
-        assert!(!redact(r#"{"cmd":"key_set","key":"sk-secret""#).contains("sk-secret"));
+        assert!(!redact(r#"{"cmd":"provider_use","key":"sk-secret""#).contains("sk-secret"));
         assert_eq!(redact(r#"{"cmd":"found_scan"}"#), r#"{"cmd":"found_scan"}"#);
     }
 }

@@ -17,7 +17,9 @@
 //! its steps and replay lines, never its heartbeats); a switch kills a
 //! hub that stops moving, a rollback leaves it booting (it stops itself
 //! when stuck). A probation without
-//! failure marks the version good. `versions.json` in the state dir holds
+//! failure marks the version good, with no line in main's thread: its
+//! start and end are the switch row's (`notice` kind `switch`) and
+//! hub.log's (designer m_23091). `versions.json` in the state dir holds
 //! `current`, `good` and `previous` (version dirs).
 
 use crate::client;
@@ -107,6 +109,8 @@ fn hub_pid(paths: &Paths) -> Option<u32> {
 
 use crate::procs::alive;
 
+mod ask;
+
 fn ping(paths: &Paths) -> bool {
     client::request(
         &paths.socket(),
@@ -115,6 +119,16 @@ fn ping(paths: &Paths) -> bool {
     )
     .is_ok()
 }
+
+/// The switch's phase moved in versions.json: the hub sends its switch
+/// row to every client, and writes no line in main's thread (a `notice`
+/// of kind `switch`, daemon::dispatch).
+fn phase_moved(paths: &Paths) {
+    notice(paths, SWITCH_KIND, "");
+}
+
+/// The notice kind that only marks a switch phase (no thread line).
+pub const SWITCH_KIND: &str = "switch";
 
 /// A line in main's thread (and every client), through the hub.
 pub fn notice(paths: &Paths, kind: &str, text: &str) {
@@ -160,9 +174,10 @@ pub fn running_root(paths: &Paths) -> Option<PathBuf> {
 /// The command's file in a version dir (BISE-165; was `bend-harness`).
 pub const EXE: &str = "bise";
 
-/// The executable of an app root: a version dir's `bise` (or the
-/// `bend-harness` of a version built before the rename), the dev tree's
-/// debug build.
+/// The executable of an app root: a version dir's `bise`, the dev tree's
+/// debug build. `bend-harness` is not a link kept for a release: it is the
+/// only executable of a version dir built from a commit before BISE-165
+/// (v2026.9.29), which a switch back to that version still runs.
 pub fn exe_of(root: &Path) -> Option<PathBuf> {
     [EXE, "bend-harness", "rust/target/debug/bise", "rust/target/debug/bend-harness"]
         .iter()
@@ -217,6 +232,8 @@ enum Late {
 /// the new hub is not up.
 fn replace_hub(paths: &Paths, root: &Path, same: bool, late: Late) -> Result<(), String> {
     let old = hub_pid(paths);
+    // Err (no answer, or still there after its wait): the old pid is
+    // killed just below before a new hub starts, never two at once
     let _ = client::stop(paths, true);
     if let Some(p) = old {
         let t0 = Instant::now();
@@ -232,7 +249,7 @@ fn replace_hub(paths: &Paths, root: &Path, same: bool, late: Late) -> Result<(),
     let _ = std::fs::remove_file(paths.socket());
     if !same {
         // an older version's hub would write its sb script through the link
-        crate::daemon::drop_sb_link(&paths.bin_dir());
+        crate::tools_env::drop_agent_links(&paths.bin_dir());
     }
     // what the new hub writes: only its own lines name why it failed
     // (an older line of hub.err once passed for the cause)
@@ -391,92 +408,8 @@ pub fn abort_probation(paths: &Paths) {
 }
 
 /// `sbswitch --to <version dir> [--probation <s>]`: the whole switch.
-/// Copy the hub state (journal, sessions, transcripts) aside before a
-/// switch or a restart: `/tmp/sb-backup-<state dir name>-<ms>`.
-fn backup(paths: &Paths) -> Result<PathBuf, String> {
-    backup_in(&paths.state, Path::new("/tmp"), now_ms(), KEEP_BACKUPS)
-}
-
-/// The backups of one state dir kept in /tmp: each holds the journal
-/// and every transcript, a few GB once a workspace has lived.
-const KEEP_BACKUPS: usize = 5;
-
-/// Back `state` up into `<dir>/sb-backup-<state dir name>-<ms>`, then
-/// keep only the `keep` newest backups of that state dir (only after a
-/// backup that worked: a failing one never costs an old one).
-fn backup_in(state: &Path, dir: &Path, ms: u64, keep: usize) -> Result<PathBuf, String> {
-    let name = state
-        .file_name()
-        .ok_or("the state dir has no name")?
-        .to_string_lossy()
-        .to_string();
-    let prefix = format!("sb-backup-{}-", name);
-    let dest = dir.join(format!("{}{}", prefix, ms));
-    backup_to(state, &dest)?;
-    let mut old: Vec<(u64, PathBuf)> = std::fs::read_dir(dir)
-        .map(|rd| {
-            rd.flatten()
-                .filter_map(|e| {
-                    let f = e.file_name().to_string_lossy().to_string();
-                    let ms = f.strip_prefix(&prefix)?;
-                    // only <ms>: another state dir's name may extend this one
-                    if ms.is_empty() || !ms.chars().all(|c| c.is_ascii_digit()) {
-                        return None;
-                    }
-                    let ms: u64 = ms.parse().ok()?;
-                    e.file_type().ok()?.is_dir().then(|| (ms, e.path()))
-                })
-                .collect()
-        })
-        .unwrap_or_default();
-    old.sort();
-    let drop = old.len().saturating_sub(keep);
-    for (_, p) in old.into_iter().take(drop) {
-        let _ = std::fs::remove_dir_all(p);
-    }
-    Ok(dest)
-}
-
-/// `rsync` of the state dir `src` into `dest`, regular files, links and
-/// dirs only. Not `-a`: it implies -D, and copying a unix socket makes
-/// rsync bind a new one at the destination, which fails (`mkstempsock:
-/// Invalid argument`) once the path passes the 104-byte socket limit, as
-/// the e2e and tmux sockets under agents/*/tmp do. macOS's openrsync has
-/// no --no-specials, hence the explicit -rlptg. The agents' scratch
-/// folders (agents/*/tmp: sockets, FIFOs, GBs of test trees) are not
-/// state; nor are the live REPLs' side channels (agents/*/run: their
-/// bend-sh-*.sh, bend-prog-* come and go, one vanished mid-copy failed a
-/// switch's backup with exit 23), but `approvals-mode`, kept there, is.
-/// A file gone mid-copy anyway (exit 24) is not a failed backup. rsync's
-/// stderr is kept for the error, never left in hub.err.
-fn backup_to(src: &Path, dest: &Path) -> Result<(), String> {
-    let out = std::process::Command::new("rsync")
-        .args(["-rlptg", "--exclude", "/hub.sock", "--exclude", "/agents/*/tmp/"])
-        .args(["--include", "/agents/*/run/approvals-mode", "--exclude", "/agents/*/run/*"])
-        .arg(format!("{}/", src.display()))
-        .arg(format!("{}/", dest.display()))
-        .stdin(std::process::Stdio::null())
-        .output()
-        .map_err(|e| format!("rsync: {}", e))?;
-    let err = String::from_utf8_lossy(&out.stderr);
-    if out.status.success() || out.status.code() == Some(24) || (out.status.code() == Some(23) && only_vanished(&err)) {
-        return Ok(());
-    }
-    let first = err.lines().map(str::trim).find(|l| !l.is_empty()).unwrap_or("");
-    Err(if first.is_empty() {
-        format!("rsync {}", out.status)
-    } else {
-        format!("rsync {}: {}", out.status, crate::util::clip(first, 200))
-    })
-}
-
-/// rsync's errors are only files gone mid-copy: macOS's openrsync says
-/// exit 23 with `<file>: open (2)` (ENOENT) where rsync says 24 (an
-/// agent's role-request.txt vanished in an e2e's backup).
-fn only_vanished(stderr: &str) -> bool {
-    let errs: Vec<&str> = stderr.lines().filter(|l| l.contains("error")).collect();
-    !errs.is_empty() && errs.iter().all(|l| l.contains(": open (2)") || l.contains("No such file or directory (2)"))
-}
+// the state's backup before a switch or a restart (/tmp/sb-backup-*)
+mod backup;
 
 /// The workspace is bise's own source tree (dev mode, BISE-131): there
 /// `/restart` builds the latest commit, then switches to it; anywhere
@@ -491,6 +424,12 @@ pub fn dev_workspace(ws: &Path) -> bool {
 pub fn versions_script(repo: &Path) -> Option<PathBuf> {
     ["scripts/versions.sh", "versions.sh"].iter().map(|p| repo.join(p)).find(|p| p.is_file())
 }
+
+// the newest switch's facts (versions.json `switch`) and its row
+// (`hub/switch`, architect m_20576)
+mod row;
+pub use row::row;
+use row::set_phase;
 
 /// Left by a reload's switcher for the hub it starts (BISE-131): that hub
 /// reloads every REPL it adopts and tells the TUIs to re-exec. It holds
@@ -511,7 +450,21 @@ pub fn take_reload(paths: &Paths) -> Option<String> {
 /// hub, e.g. a stuck one); the agents are kept the same way. `reload`
 /// (BISE-131, implies `restart`): the new hub also relaunches every
 /// agent's REPL (at its next idle, same session) and the TUIs.
-pub fn run(paths: &Paths, to: &Path, period: Duration, restart: bool, reload: bool) -> i32 {
+/// `release` (update-flow): a switch to the machine's `update now`
+/// release: it holds the machine's switch lock (bise_home::release_offer)
+/// through the switch and its probation, so one hub switches at a time;
+/// another holder: nothing done (the hub asks again at its next look).
+pub fn run(paths: &Paths, to: &Path, period: Duration, restart: bool, reload: bool, release: bool) -> i32 {
+    let _machine = match release {
+        true => match bise_home::release_offer::try_lock(&bise_home::Home::from_env().switch_lock()) {
+            Some(l) => Some(l),
+            None => {
+                log(paths, "another project is switching to the new release: this one waits its turn");
+                return 1;
+            }
+        },
+        false => None,
+    };
     let lock = paths.state.join("switch.pid");
     if let Some(p) = std::fs::read_to_string(&lock)
         .ok()
@@ -562,8 +515,11 @@ fn run_locked(paths: &Paths, to: &Path, period: Duration, restart: bool, reload:
     }
     let (from_id, to_id) = (id_of(&from), id_of(&to));
     log(paths, &format!("{} -> {}", from.display(), to.display()));
-    let saved = match backup(paths) {
-        Ok(d) => format!(" · state backed up: {}", d.display()),
+    let saved = match backup::backup(&paths.state, now_ms()) {
+        Ok((d, how)) => {
+            log(paths, &format!("state backup ({}): {}", how.word(), d.display()));
+            format!(" · state backed up: {}", d.display())
+        }
         Err(e) => {
             log(paths, &format!("state backup failed: {}", e));
             format!(" · the state backup failed ({}): nothing is backed up", e)
@@ -578,11 +534,10 @@ fn run_locked(paths: &Paths, to: &Path, period: Duration, restart: bool, reload:
     } else {
         format!("switching to version {} (from {})", to_id, from_id)
     };
-    notice(
-        paths,
-        "info",
-        &format!("{}{}{}", what, if reload { "" } else { " — the agents keep running" }, saved),
-    );
+    // in hub.log, not main's thread: the switch row says it while it runs,
+    // and a line in the thread would stay after the hub is back (designer
+    // m_22843: a restart that went well leaves no line)
+    log(paths, &format!("{}{}{}", what, if reload { "" } else { " · the agents keep running" }, saved));
     let _ = std::fs::remove_file(fail_file(paths));
     if from != to {
         st["previous"] = json!(from.to_string_lossy());
@@ -592,10 +547,13 @@ fn run_locked(paths: &Paths, to: &Path, period: Duration, restart: bool, reload:
         st["good"] = json!(from.to_string_lossy());
     }
     st["probation_until"] = json!(now_ms() + period.as_millis() as u64);
+    set_phase(&mut st, "reloading", &to_id, &from_id, None);
     write_state(paths, &st);
     if reload {
         let _ = std::fs::write(reload_file(paths), now_ms().to_string());
     }
+    // the phase is written: the hub sends its switch row ('reloading')
+    phase_moved(paths);
 
     let outcome = replace_hub(paths, &to, from == to, Late::Kill).and_then(|_| probation(paths, period));
     let mut st = read_state(paths);
@@ -603,19 +561,11 @@ fn run_locked(paths: &Paths, to: &Path, period: Duration, restart: bool, reload:
     match outcome {
         Ok(()) => {
             st["good"] = json!(to.to_string_lossy());
+            set_phase(&mut st, "passed", &to_id, &from_id, None);
             write_state(paths, &st);
             log(paths, &format!("{} good", to_id));
-            notice(
-                paths,
-                "info",
-                &if reload {
-                    format!("bise reloaded on version {} (probation passed)", to_id)
-                } else if from == to {
-                    format!("hub restarted on version {} (probation passed)", to_id)
-                } else {
-                    format!("version {} validated (probation passed)", to_id)
-                },
-            );
+            // no thread line either: the switch row says '✓ reloaded'
+            phase_moved(paths);
             0
         }
         Err(reason) => {
@@ -641,6 +591,7 @@ fn run_locked(paths: &Paths, to: &Path, period: Duration, restart: bool, reload:
             }
             st["failed"] =
                 json!({"version": to.to_string_lossy(), "reason": reason, "at": now_ms()});
+            set_phase(&mut st, "rolled_back", &to_id, &from_id, Some(&reason));
             write_state(paths, &st);
             let _ = std::fs::remove_file(fail_file(paths));
             let back = replace_hub(paths, &from, from == to, Late::Leave);
@@ -694,8 +645,7 @@ pub fn should_follow_install(me: &Path, hub: &Path, failed: Option<&Path>) -> bo
         _ => return false,
     }
     let built = |r: &Path| read_version(r).get("built").cloned().unwrap_or_default();
-    let (b_me, b_hub) = (built(&me), built(&hub));
-    !b_me.is_empty() && b_me > b_hub
+    bise_home::release::built_after(&built(&me), &built(&hub))
 }
 
 /// Before a `bise` TUI attaches to the hub of its workspace (BISE-255):
@@ -706,7 +656,6 @@ pub fn should_follow_install(me: &Path, hub: &Path, failed: Option<&Path>) -> bo
 /// one. Every hub since BISE-131 takes the request. `say`: one line for
 /// the user each (the terminal is not the TUI's yet).
 pub fn follow_install(paths: &Paths, me: &Path, say: &dyn Fn(&str)) {
-    use std::io::{BufRead, BufReader};
     if switch_running(paths) {
         return;
     }
@@ -721,35 +670,56 @@ pub fn follow_install(paths: &Paths, me: &Path, say: &dyn Fn(&str)) {
     let me = me.canonicalize().unwrap_or_else(|_| me.to_path_buf());
     let (from_id, to_id) = (id_of(&hub), id_of(&me));
     say(&format!("this folder's hub runs bise {}: moving it to {} (the agents keep running)…", from_id, to_id));
-    let answer = (|| -> std::io::Result<String> {
-        let mut s = UnixStream::connect(paths.socket())?;
-        let req = json!({"op": "version", "do": "switch", "to": me.to_string_lossy()});
-        s.write_all(format!("{{\"op\":\"hello\"}}\n{}\n", req).as_bytes())?;
-        s.set_read_timeout(Some(Duration::from_secs(5)))?;
-        // the hub's hello first (tens of KB), then the answer: a notice
-        for line in BufReader::new(s).lines() {
-            let v: Value = serde_json::from_str(&line?).unwrap_or(Value::Null);
-            if v.get("ev").and_then(|x| x.as_str()) == Some("notice") {
-                return Ok(v.get("text").and_then(|x| x.as_str()).unwrap_or("").to_string());
-            }
-        }
-        Ok(String::new())
-    })()
-    .unwrap_or_default();
+    match move_hub(paths, &me, MOVE_BOUND) {
+        Moved::There => say(&format!("the hub runs bise {} now", to_id)),
+        Moved::Refused(answer) => say(&format!("the hub did not switch ({}): /restart in it switches to {}", clip_answer(&answer), to_id)),
+        Moved::Late => say(&format!("the hub is still switching to {} (probation): the TUI follows it once it is up", to_id)),
+    }
+}
+
+/// How long a client waits for a moved hub to listen again (the
+/// switcher's start, then the new hub's).
+pub const MOVE_BOUND: Duration = Duration::from_secs(30);
+
+/// What [`move_hub`] got.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Moved {
+    /// the hub listens again, as `me`'s version
+    There,
+    /// the hub didn't take the switch: its words (a refusal, `""` when it
+    /// said nothing in time)
+    Refused(String),
+    /// it took the switch but isn't up as `me` within the bound
+    Late,
+}
+
+/// Move the folder's running hub to the app root `me` (the hub's own
+/// `/version <me>`: the switcher, probation, agents kept), then wait up
+/// to `bound` for it to listen again as `me`. The one move a client
+/// makes of its hub: `bise` at launch (`follow_install`, BISE-255) and
+/// the desktop core when its home hub is older than it (an older hub's
+/// `initialize` refusal, architect m_15476). A hub that serves JSON-RPC
+/// gets `initialize` then `version/switch`, an older one the older hello
+/// and `version` op (switch/ask.rs).
+pub fn move_hub(paths: &Paths, me: &Path, bound: Duration) -> Moved {
+    let me = me.canonicalize().unwrap_or_else(|_| me.to_path_buf());
+    let mut answer = ask::ask_switch(&paths.socket(), &me.to_string_lossy()).unwrap_or_default();
+    // an older hub: his install's steps (architect m_24004)
+    if answer == bise_proto::rpc::HUB_OLDER {
+        answer = crate::client::older_words(&paths.state);
+    }
     if !answer.starts_with("switching to version") {
-        say(&format!("the hub did not switch ({}): /restart in it switches to {}", clip_answer(&answer), to_id));
-        return;
+        return Moved::Refused(answer);
     }
     let t0 = Instant::now();
-    while t0.elapsed() < Duration::from_secs(30) {
+    while t0.elapsed() < bound {
         std::thread::sleep(Duration::from_millis(200));
         let there = running_root(paths).and_then(|r| r.canonicalize().ok()).as_ref() == Some(&me);
         if there && ping(paths) {
-            say(&format!("the hub runs bise {} now", to_id));
-            return;
+            return Moved::There;
         }
     }
-    say(&format!("the hub is still switching to {} (probation): the TUI follows it once it is up", to_id));
+    Moved::Late
 }
 
 fn clip_answer(a: &str) -> String {
@@ -835,89 +805,6 @@ mod state_tests {
             assert_eq!(st["current"], "v");
         }
         assert_eq!(super::state_of(Some("{\"good\": \"x\"}"))["good"], "x");
-    }
-
-    /// A state dir with a socket and a FIFO deep down (an e2e hub's
-    /// socket, a tmux socket, a bg command's stdin): the backup copies the
-    /// state and skips them, where `rsync -a` died on "mkstempsock:
-    /// Invalid argument" (the hub's own c2c30af8 switch); the agents'
-    /// scratch folders are not copied; only the 5 newest backups stay.
-    #[test]
-    fn a_backup_skips_sockets_fifos_and_scratch_and_keeps_the_newest_five() {
-        use std::path::Path;
-        let t = std::env::temp_dir().join(format!("sb-bk-{}", std::process::id()));
-        let _ = std::fs::remove_dir_all(&t);
-        let st = t.join("state-of-a-workspace");
-        let run = st.join("agents/x/run");
-        let deep = st.join("agents/x/tmp/sb-e2e-0000/st");
-        for d in [&run, &deep] {
-            std::fs::create_dir_all(d).unwrap();
-        }
-        std::fs::write(st.join("journal.jsonl"), "{}\n").unwrap();
-        std::fs::write(st.join("agents/x/transcript.log"), "1\tsb you : fake\n").unwrap();
-        std::fs::write(deep.join("big.bin"), "scratch").unwrap();
-        // a live REPL's side channels come and go; its approvals mode stays
-        std::fs::write(run.join("approvals-mode"), "auto").unwrap();
-        std::fs::write(run.join("bend-sh-59301-2714723221.sh"), "echo").unwrap();
-        // made from inside the folder: a full path may pass the socket limit
-        let mk = |d: &Path| {
-            let ok = std::process::Command::new("python3")
-                .current_dir(d)
-                .args(["-c", "import socket,os; socket.socket(socket.AF_UNIX).bind('hub.sock'); os.mkfifo('0.in')"])
-                .status()
-                .unwrap()
-                .success();
-            assert!(ok, "socket and fifo made in {}", d.display());
-        };
-        mk(&run);
-        mk(&deep);
-        let dir = t.join("backups-in-a-folder-with-a-long-enough-name-to-pass-the-limit");
-        std::fs::create_dir_all(&dir).unwrap();
-        for ms in 1..=6u64 {
-            std::fs::create_dir_all(dir.join(format!("sb-backup-state-of-a-workspace-{}", ms))).unwrap();
-        }
-        // another state dir whose name extends this one's, and a stray file
-        std::fs::create_dir_all(dir.join("sb-backup-state-of-a-workspace-2-7")).unwrap();
-        std::fs::create_dir_all(dir.join("sb-backup-state-of-a-workspace-x")).unwrap();
-        let b = super::backup_in(&st, &dir, 100, 5).expect("the backup works");
-        assert_eq!(b, dir.join("sb-backup-state-of-a-workspace-100"));
-        assert_eq!(std::fs::read_to_string(b.join("journal.jsonl")).unwrap(), "{}\n");
-        assert!(b.join("agents/x/transcript.log").is_file());
-        assert!(b.join("agents/x/run").is_dir());
-        assert!(!b.join("agents/x/run/hub.sock").exists() && !b.join("agents/x/run/0.in").exists());
-        assert_eq!(std::fs::read_to_string(b.join("agents/x/run/approvals-mode")).unwrap(), "auto");
-        assert!(!b.join("agents/x/run/bend-sh-59301-2714723221.sh").exists(), "a REPL's scratch is not state");
-        assert!(!b.join("agents/x/tmp").exists(), "scratch is not state");
-        let mut left: Vec<String> =
-            std::fs::read_dir(&dir).unwrap().flatten().map(|e| e.file_name().to_string_lossy().into_owned()).collect();
-        left.sort();
-        assert_eq!(
-            left,
-            [
-                "sb-backup-state-of-a-workspace-100",
-                "sb-backup-state-of-a-workspace-2-7",
-                "sb-backup-state-of-a-workspace-3",
-                "sb-backup-state-of-a-workspace-4",
-                "sb-backup-state-of-a-workspace-5",
-                "sb-backup-state-of-a-workspace-6",
-                "sb-backup-state-of-a-workspace-x",
-            ]
-        );
-        // a failed backup says why and costs no old one
-        let e = super::backup_in(&t.join("no-such-state"), &dir, 200, 1).unwrap_err();
-        assert!(e.starts_with("rsync "), "{}", e);
-        assert!(dir.join("sb-backup-state-of-a-workspace-3").is_dir());
-        let _ = std::fs::remove_dir_all(&t);
-    }
-
-    #[test]
-    fn a_file_gone_mid_backup_is_not_a_failed_backup_another_error_is() {
-        use super::only_vanished;
-        let gone = "rsync(40552): error: /st/agents/t7/role-request.txt: open (2) in /v\nrsync(40552): error: /st/agents/a/run/bend-sh-1.sh: open (2)\n";
-        assert!(only_vanished(gone));
-        assert!(!only_vanished("rsync(1): error: /st/journal.jsonl: open (13)\n"), "permission denied is a failure");
-        assert!(!only_vanished(&format!("{}rsync(1): error: write failed: No space left on device (28)\n", gone)));
-        assert!(!only_vanished(""));
     }
 
     #[test]

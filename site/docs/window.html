@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>the desktop window · bise docs</title>
+<meta name="description" content="every project in one window. bise at the top, your projects under it, the agents and the bims on the right, and a menu bar icon that tells you when something waits.">
+<link rel="canonical" href="https://bise.dev/docs/window">
+<meta name="theme-color" content="#f2ede2">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="alternate" type="text/markdown" href="/docs/window.md">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="bise">
+<meta property="og:url" content="https://bise.dev/docs/window">
+<meta property="og:title" content="the desktop window · bise docs">
+<meta property="og:description" content="every project in one window. bise at the top, your projects under it, the agents and the bims on the right, and a menu bar icon that tells you when something waits.">
+<meta property="og:image" content="https://bise.dev/og.png?v=paper">
+<meta name="twitter:card" content="summary_large_image">
+<script>{ const q = location.search; let a = /[?&]terminal\b/.test(q) ? 'terminal' : /[?&]desktop\b/.test(q) ? 'desktop' : null; try { if (a) localStorage.setItem('bise-docs-app', a); else a = localStorage.getItem('bise-docs-app'); } catch {} document.documentElement.classList.add('app-' + (a === 'terminal' ? 'terminal' : 'desktop')); }</script>
+<script>{ const q = location.search; let d = null; try { d = localStorage.getItem('bise-theme'); } catch {} if (/[?&]dark\b/.test(q) || (!/[?&]light\b/.test(q) && (d ?? (matchMedia('(prefers-color-scheme: dark)').matches ? '1' : '0')) === '1')) document.documentElement.classList.add('pd'); }</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,600;1,6..72,400&family=Caveat:wght@500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/docs/docs.css">
+</head>
+<body>
+<header class="top">
+  <button class="menu" type="button" aria-label="the pages" aria-expanded="false">≡</button>
+  <a class="logo" href="/">bise <span class="acc">:*</span></a>
+  <a class="docs" href="/docs">docs</a>
+  <div class="search">
+    <input type="search" placeholder="/ search" aria-label="search the docs" autocomplete="off" spellcheck="false">
+    <div class="results" hidden></div>
+  </div>
+  <nav>
+    <a href="https://github.com/gvergnaud/bise">GitHub</a>
+    <button id="theme" type="button" title="light / dark">◐</button>
+  </nav>
+</header>
+<div class="wrap">
+  <aside class="side"><nav aria-label="the docs">
+<div class="appswitch" role="group" aria-label="your app"><button type="button" data-app="desktop" aria-pressed="false">desktop</button><button type="button" data-app="terminal" aria-pressed="false">terminal</button></div>
+<div class="grp">get started</div><ul>
+<li><a href="/docs">what bise is</a></li>
+<li><a href="/docs/desktop" data-app="desktop">start with bise desktop</a></li>
+<li><a href="/docs/install" data-app="terminal">start with bise terminal</a></li>
+</ul>
+<div class="grp">models</div><ul>
+<li><a href="/docs/providers">providers and keys</a></li>
+<li><a href="/docs/subscriptions">subscriptions</a></li>
+<li><a href="/docs/models">models and roles</a></li>
+<li><a href="/docs/gateways">gateways and local models</a></li>
+</ul>
+<div class="grp">using bise</div><ul>
+<li><a href="/docs/agents">main and the agents</a></li>
+<li><a href="/docs/window" class="here" aria-current="page" data-app="desktop">the desktop window <span class="tag">desktop</span></a></li>
+<li><a href="/docs/approvals">approvals</a></li>
+<li><a href="/docs/flow">landing work</a></li>
+<li><a href="/docs/voice">voice and fn</a></li>
+<li><a href="/docs/computer-use">computer use</a></li>
+</ul>
+<div class="grp">extend</div><ul>
+<li><a href="/docs/plugins">plugins and MCP</a></li>
+<li><a href="/docs/skills">instructions and skills</a></li>
+</ul>
+<div class="grp">reference</div><ul>
+<li><a href="/docs/settings" data-app="desktop">settings <span class="tag">desktop</span></a></li>
+<li><a href="/docs/config">config.toml</a></li>
+<li><a href="/docs/desktop-keys" data-app="desktop">keys and menus <span class="tag">desktop</span></a></li>
+<li><a href="/docs/keys" data-app="terminal">keys and commands <span class="tag">terminal</span></a></li>
+<li><a href="/docs/cli" data-app="terminal">the bise command <span class="tag">terminal</span></a></li>
+<li><a href="/docs/troubleshooting">troubleshooting</a></li>
+<li><a href="/docs/updates">updates</a></li>
+</ul>
+  </nav></aside>
+  <main>
+    <article data-app="desktop">
+      <div class="head">
+        <h1>the desktop window</h1>
+        <button class="copymd" type="button" data-md="/docs/window.md">copy as markdown</button>
+      </div>
+      <p class="lede">every project in one window. bise at the top, your projects under it, the agents and the bims on the right, and a menu bar icon that tells you when something waits.</p>
+<p class="only"><span>only in bise desktop</span> <a href="/docs/agents?terminal" data-to="terminal">in bise terminal: the screen ›</a></p>
+<h2 id="the-sidebar"><a class="anchor" href="#the-sidebar" aria-hidden="true">#</a>the sidebar</h2>
+<p>from top to bottom:</p>
+<ul><li><strong>search or jump</strong> (<code class="key">⌘K</code>): find an agent, a page or an artifact, and open it.</li><li><strong>bise</strong> (<code class="key">⌘0</code>): your own agent. it sees every project: say what's on your mind and it passes the work to the right one, or tells you what happened while you were away.</li><li><strong>inbox</strong> (<code class="key">⌘I</code>): what waits for you, from every project, with its count.</li><li><strong>artifacts</strong> and <strong>scheduled</strong>: what your agents made, and their timers, across every project.</li><li><strong>your projects</strong> (<code class="key">⌘1</code> … <code class="key">⌘9</code>, in the order of settings › projects). each has a mark: <code>∿</code> at work, <code>?</code> it asks you, <code>·</code> quiet. a click opens the project's main; its <code>⋯</code> menu lists its agents.</li><li><strong>+ add a project</strong> (<code class="key">⌘N</code>) and <strong>settings</strong> (<code class="key">⌘,</code>) at the foot.</li></ul>
+<p><code class="key">⌘\</code> hides the sidebar.</p>
+<h2 id="projects-and-bise"><a class="anchor" href="#projects-and-bise" aria-hidden="true">#</a>projects and bise</h2>
+<p>a project is a folder, usually a git repo. each project has its own <strong>main</strong>, which starts the agents of that project, exactly as in <a href="/docs/agents">main and the agents</a>. <strong>bise</strong> sits above them all: you can talk to it instead of picking a project, and it coordinates the mains.</p>
+<p>settings › projects lists them: rename, move up or down (that is the <code class="key">⌘1</code> … <code class="key">⌘9</code> order), or remove one from bise (its folder and its git history stay).</p>
+<h2 id="the-thread"><a class="anchor" href="#the-thread" aria-hidden="true">#</a>the thread</h2>
+<p>the middle of the window is the thread of the agent you opened: its messages, what it ran, what it changed. you write in the composer at the bottom. <code class="key">⌘[</code> and <code class="key">⌘]</code> go back and forward, <code class="key">⌘F</code> finds in the thread, <code class="key">⌘E</code> folds or unfolds everything.</p>
+<h2 id="the-right-bar"><a class="anchor" href="#the-right-bar" aria-hidden="true">#</a>the right bar</h2>
+<p>what happens in the project you're looking at, in four sections:</p>
+<div class="table"><table><thead><tr><th>section</th><th>what it shows</th></tr></thead><tbody><tr><td>agents</td><td>the project's agents and their state; <code class="key">⌥1</code> … <code class="key">⌥9</code> open them, <code class="key">⌥0</code> its main</td></tr><tr><td>archived</td><td>the agents that are done, folded until you open it</td></tr><tr><td>artifacts</td><td>what the agents made: pages, docs, files, links</td></tr><tr><td>scheduled &amp; watching</td><td>the agents' timers, and what they wait for</td></tr></tbody></table></div>
+<p>on bise's thread, the same sections cover every project. <code class="key">⌥⌘0</code> shows or hides the right bar.</p>
+<h2 id="the-bims"><a class="anchor" href="#the-bims" aria-hidden="true">#</a>the bims</h2>
+<p>each agent is a <strong>bim</strong>, a little character in its project's office. the cube at the top of the agents section shows the office above the list: you see who works, who waits, who asks you (a <code>?</code> over its head) and who failed (<code>✗</code>). hover a bim for its card; a click opens its thread. pinch to zoom, drag to move, <strong>fit</strong> goes back to the whole office. the office grows as the project's agents get work done.</p>
+<h2 id="changes-and-artifacts"><a class="anchor" href="#changes-and-artifacts" aria-hidden="true">#</a>changes and artifacts</h2>
+<ul><li><code class="key">⌘D</code>: in an agent's thread, the changes it made; elsewhere, the project's changes.</li><li><code class="key">⌘⇧A</code>: the project's artifacts. an open artifact has <strong>save a copy…</strong> (<code class="key">⌘S</code>).</li></ul>
+<h2 id="the-terminal-panel"><a class="anchor" href="#the-terminal-panel" aria-hidden="true">#</a>the terminal panel</h2>
+<p>`<code> ctrl+</code> `` (View › Terminal) shows or hides a terminal panel in the window, a shell in the project's folder.</p>
+<h2 id="the-menu-bar"><a class="anchor" href="#the-menu-bar" aria-hidden="true">#</a>the menu bar</h2>
+<p>bise's <code>:*</code> sits in the macOS menu bar. it moves while agents work and blows two kisses when something new waits for you. a click opens its menu: how many agents are at work and waiting, the inbox, your projects (a live one opens its agents), then <strong>open bise</strong>, <strong>inbox</strong>, <strong>settings…</strong> and <strong>quit bise</strong>.</p>
+<h2 id="the-spotlight"><a class="anchor" href="#the-spotlight" aria-hidden="true">#</a>the spotlight</h2>
+<p><code class="key">fn space</code>, from any app, opens the spotlight: find an agent, or ask bise. see <a href="/docs/voice">voice and fn</a>.</p>
+<h2 id="notifications"><a class="anchor" href="#notifications" aria-hidden="true">#</a>notifications</h2>
+<p>when an agent asks you something and bise isn't in front, a macOS notification tells you. turn them on in settings › general.</p>
+<p>settings › quiet moments decides when they wait: during a call (Zoom, Meet, FaceTime), while you share your screen, in full screen, in focus mode. then they come together, one at a time, at most every few minutes; after you were away, one notification sums it up when you open your Mac again.</p>
+    </article>
+    <nav class="pn"><a class="prev" href="/docs/agents"><span>previous</span>main and the agents</a><a class="next" href="/docs/approvals"><span>next</span>approvals</a></nav>
+    <footer>
+      <p>for agents: <a href="/docs/window.md">bise.dev/docs/window.md</a></p>
+      <p><a href="https://github.com/gvergnaud/bise/blob/main/site/docs/window.md">edit this page on GitHub</a></p>
+    </footer>
+  </main>
+  <aside class="toc"><div class="toch">on this page</div><ul><li class="l2"><a href="#the-sidebar">the sidebar</a></li><li class="l2"><a href="#projects-and-bise">projects and bise</a></li><li class="l2"><a href="#the-thread">the thread</a></li><li class="l2"><a href="#the-right-bar">the right bar</a></li><li class="l2"><a href="#the-bims">the bims</a></li><li class="l2"><a href="#changes-and-artifacts">changes and artifacts</a></li><li class="l2"><a href="#the-terminal-panel">the terminal panel</a></li><li class="l2"><a href="#the-menu-bar">the menu bar</a></li><li class="l2"><a href="#the-spotlight">the spotlight</a></li><li class="l2"><a href="#notifications">notifications</a></li></ul></aside>
+</div>
+<script src="/docs/docs.js" defer></script>
+</body>
+</html>

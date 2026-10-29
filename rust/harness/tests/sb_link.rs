@@ -35,6 +35,9 @@ fn cases() -> Vec<Vec<&'static str>> {
         vec!["interrupt", "t1"],
         vec!["stop", "t1", "why"],
         vec!["drop", "t1"],
+        vec!["notify", "a question?"],
+        vec!["notify", "--withdraw", "3", "answered in chat"],
+        // the old name of sb notify: an unknown command (docs/issues/27, 31)
         vec!["card", "a question?"],
         vec!["close", "1", "handled"],
         vec!["rename", "t1", "t2"],
@@ -71,6 +74,12 @@ fn cases() -> Vec<Vec<&'static str>> {
         vec!["every", "day", "07:30", "make the morning page"],
         vec!["every", "--stop", "2"],
         vec!["every", "soon", "x"],
+        // event-wake: wake on an event (a pid's start time differs between
+        // two runs: only the refused pid)
+        vec!["wake"],
+        vec!["wake", "--on-file", "/nonexistent/rc", "--tail", "/nonexistent/log", "--note", "the gate", "--max", "2h"],
+        vec!["wake", "--stop", "3"],
+        vec!["wake", "--on-exit", "nope"],
         // what bise keeps about the user (keeps.rs)
         vec!["taste"],
         vec!["taste", "add", "no emoji", "--from", "the launch post"],

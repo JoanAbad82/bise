@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- The terminal's bise.app (bundle id dev.bise.cli, scripts/mac_sign.py): its hardened runtime
+     entitlements, the same in the terminal release (scripts/dist_sign.py) and in the desktop app's
+     runtime (scripts/desktop_sign.py). audio-input: voice (cpal in the TUI). apple-events: the
+     osascript bise runs (a clipboard image paste) and what an agent runs under the hub, which
+     TCC charges to the hub. No JIT: bise runs no V8 (bend-jsrt does). -->
+<plist version="1.0">
+<dict>
+  <key>com.apple.security.device.audio-input</key>
+  <true/>
+  <key>com.apple.security.automation.apple-events</key>
+  <true/>
+</dict>
+</plist>

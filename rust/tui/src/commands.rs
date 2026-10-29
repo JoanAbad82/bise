@@ -1,150 +1,15 @@
 //! Slash commands and the composer autocomplete popup (commands,
-//! agents, files, skills, emoji).
+//! agents, files, skills, emoji). The commands' catalog itself is
+//! bise_proto::commands; this module completes and runs it.
 
 use crate::app::*;
 use crate::*;
 
 // ---- slash commands (codex-style) ----
 
-pub(crate) struct Cmd {
-    pub(crate) name: &'static str,
-    /// what it does, then its usage after `: ` when it takes arguments
-    pub(crate) desc: &'static str,
-    /// its arguments in order, each with what completes it (BISE-117):
-    /// the `/` popup offers them after the command's name
-    pub(crate) args: &'static [Arg],
-}
-
-/// What completes one argument of a command (BISE-117).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) enum Arg {
-    /// one of these words, and what each does
-    Words(&'static [(&'static str, &'static str)]),
-    /// a live agent (not main)
-    Task,
-    /// an archived agent
-    Archived,
-    /// an open card, by its number
-    Card,
-    /// a version of switchboard (the hub's list: the commits, tree,
-    /// back), after these words
-    Version(&'static [(&'static str, &'static str)]),
-    /// the same, the versions only in bise's source tree (`/restart`:
-    /// elsewhere it only reloads, a commit is refused)
-    DevVersion(&'static [(&'static str, &'static str)]),
-    /// a plugin of the workspace
-    Plugin,
-    /// a model of the catalog, or an alias (BISE-135)
-    Model,
-    /// an effort the model of the agent in view takes (BISE-135)
-    Effort,
-    /// `/computer-use`'s own, by the plugin's state: off → "on" (runs the
-    /// bare `/computer-use`); on → setup (the bare one), off, uninstall
-    ComputerUse,
-    /// a branch to diff against main (the hub's `branches`: agents'
-    /// branches, shared worktrees, PRs, branches with no agent)
-    Branch,
-    /// `/keychain`'s on and off, the setting now marked `· now`
-    Keychain,
-    /// free text, required: the rest of the line (nothing to complete)
-    Text,
-    /// free text, optional: the value before it can already run
-    Note,
-}
-
-const THEMES: &[(&str, &str)] =
-    &[("auto", "your terminal's background"), ("light", "the light palette"), ("dark", "the dark palette")];
-
-/// The slash commands the popup offers and `/help` lists.
-pub(crate) const COMMANDS: &[Cmd] = &[
-    // voice-menu (designer): one row, one ⏎, one screen; `/voice setup`
-    // typed still opens it, on speech to text, but the menu offers no
-    // argument
-    Cmd { name: "/voice", desc: "dictation and voice mode: the model, the voice, the language", args: &[] },
-    Cmd {
-        name: "/restart",
-        desc: "reload bise, nothing lost (a <commit>: bise's own sources only, built then switched): /restart [current|<commit>]",
-        args: &[Arg::DevVersion(&[("current", "the version running now, nothing built")])],
-    },
-    Cmd { name: "/update", desc: "look for a new bise release now, and install it from its item (bise's source tree: build HEAD and restart on it)", args: &[] },
-    Cmd {
-        name: "/version",
-        desc: "switchboard versions: /version [<commit>|tree|back]",
-        // the hub's list holds tree and back
-        args: &[Arg::Version(&[])],
-    },
-    Cmd {
-        name: "/new",
-        desc: "start an agent: /new [-w] [name:] objective",
-        args: &[Arg::Words(&[("-w", "in its own git worktree")]), Arg::Text],
-    },
-    Cmd {
-        name: "/archive",
-        desc: "stop an agent and archive it, with its worktree: /archive <agent>",
-        args: &[Arg::Task],
-    },
-    Cmd { name: "/restore", desc: "bring an archived agent back: /restore <agent>", args: &[Arg::Archived] },
-    Cmd { name: "/archived", desc: "show or hide the archived agents in the panel", args: &[] },
-    Cmd { name: "/isolate", desc: "give an agent its own git worktree: /isolate <agent>", args: &[Arg::Task] },
-    Cmd { name: "/rename", desc: "rename an agent: /rename <agent> <new-name>", args: &[Arg::Task, Arg::Text] },
-    Cmd { name: "/answer", desc: "answer an inbox item: /answer N text", args: &[Arg::Card, Arg::Text] },
-    Cmd { name: "/close", desc: "close an inbox item without answering: /close N [note]", args: &[Arg::Card, Arg::Note] },
-    Cmd {
-        name: "/plugins",
-        desc: "the workspace's agent plugins: /plugins [list|enable|disable|login|logout] [<name>]",
-        args: &[
-            Arg::Words(&[
-                ("list", "the plugins and their state"),
-                ("enable", "turn a plugin on"),
-                ("disable", "turn a plugin off"),
-                ("login", "log in to a remote MCP server"),
-                ("logout", "forget a remote MCP server's login"),
-            ]),
-            Arg::Plugin,
-        ],
-    },
-    Cmd { name: "/artifacts", desc: "what your agents made: pages, docs, files, links", args: &[] },
-    Cmd { name: "/scheduled", desc: "your scheduled tasks: list, open, run now, stop", args: &[] },
-    Cmd { name: "/diff", desc: "a branch's changes against main, in a panel on the right: /diff [<branch>]", args: &[Arg::Branch] },
-    Cmd { name: "/inbox", desc: "open what waits for you, the most blocking first (also /cards)", args: &[] },
-    Cmd { name: "/agents", desc: "list the agents and what they do", args: &[] },
-    Cmd { name: "/switch", desc: "find an agent by name, archived ones too, and open it (also cmd+k, ctrl+s)", args: &[] },
-    Cmd {
-        name: "/model",
-        desc: "the model of the agent in view: /model [<model>] [default]",
-        args: &[
-            Arg::Model,
-            Arg::Words(&[("default", "also for new sessions (config.toml [roles]: main, or agents for an agent)")]),
-        ],
-    },
-    Cmd { name: "/models", desc: "which model does what: main, agents, small jobs (titles, summaries), voice", args: &[] },
-    Cmd { name: "/provider", desc: "set up a provider's key, or change it", args: &[] },
-    // designer m_13193: macOS only (the popup hides it elsewhere)
-    Cmd { name: "/keychain", desc: "keep your keys and sign-ins in the macOS keychain: /keychain [on|off]", args: &[Arg::Keychain] },
-    Cmd { name: "/reasoning", desc: "its reasoning effort: /reasoning [<effort>]", args: &[Arg::Effort] },
-    Cmd { name: "/interrupt", desc: "interrupt the turn of the agent in view", args: &[] },
-    Cmd {
-        name: "/stop",
-        desc: "stop an agent's turn and its hands on Chrome or an app until you write to it: /stop <agent>",
-        args: &[Arg::Task],
-    },
-    Cmd {
-        name: "/computer-use",
-        desc: "turn on and set up computer use: agents drive Chrome and your apps, step by step: /computer-use [off|uninstall]",
-        args: &[Arg::ComputerUse],
-    },
-    Cmd { name: "/compact", desc: "compact the conversation of the agent in view", args: &[] },
-    Cmd {
-        name: "/theme",
-        desc: "light, dark, or auto (your terminal's background): /theme [auto|light|dark]",
-        args: &[Arg::Words(THEMES)],
-    },
-    Cmd { name: "/welcome", desc: "replay the welcome of the first launch", args: &[] },
-    Cmd { name: "/setup", desc: "check your terminal and repo again, and offer what would help", args: &[] },
-    Cmd { name: "/help", desc: "the commands and the essential keys", args: &[] },
-    Cmd { name: "/shortcuts", desc: "every keyboard shortcut (also /keys)", args: &[] },
-    Cmd { name: "/quit", desc: "quit (the agents keep running)", args: &[] },
-];
+/// The catalog (the commands, their arguments, who runs them) is
+/// bise_proto's, the one table the TUI reads and the hub serves.
+pub(crate) use bise_proto::commands::{Arg, Cmd, COMMANDS};
 
 pub(crate) fn popup_matches(input: &str) -> Vec<&'static Cmd> {
     if !input.starts_with('/') || input.contains(' ') {
@@ -187,7 +52,7 @@ pub(crate) fn popup_items(app: &App) -> Vec<PopItem> {
     if app.ed.text.starts_with('/') && !app.ed.text.contains(' ') {
         cmds.extend(sb::release::dev_commands(app).iter().filter(|c| c.name.starts_with(app.ed.text.as_str())));
     }
-    // `/log` (logview.rs): its usage has no completer, so not in COMMANDS
+    // `/debug` (logview.rs): its usage has no completer, so not in COMMANDS
     if app.ed.text.starts_with('/') && !app.ed.text.contains(' ') && crate::logview::enabled(app) && crate::logview::COMMAND.name.starts_with(app.ed.text.as_str()) {
         cmds.push(&crate::logview::COMMAND);
     }
@@ -320,12 +185,12 @@ fn choices(app: &App, arg: Arg, q: &str) -> Vec<Choice> {
 fn version_word(q: &str) -> Option<Choice> {
     use bise_proto::slash::{version, Version};
     match q.trim().to_lowercase().as_str() {
-        "restart" => Some(Choice::word("/restart", "reload bise, nothing lost")),
-        "update" => Some(Choice::word("/update", "look for a new bise release now")),
+        "restart" => Some(Choice::word("/restart", bise_proto::words::settings::version_restart)),
+        "update" => Some(Choice::word("/update", bise_proto::words::settings::version_update)),
         "" => None, // the bare '/version ': every version is offered
         w => match version(&format!("/version {w}"))? {
-            Version::List => Some(Choice::word(w, "the installed versions")),
-            Version::Rollback => Some(Choice::word(w, "back to the version before")),
+            Version::List => Some(Choice::word(w, bise_proto::words::settings::version_list)),
+            Version::Rollback => Some(Choice::word(w, bise_proto::words::settings::version_rollback)),
             _ => None,
         },
     }
@@ -465,7 +330,8 @@ pub(crate) fn effort_hint(e: &str) -> &'static str {
         "low" => "faster, cheaper",
         "medium" => "balanced",
         "high" => "deeper, slower",
-        "max" | "xhigh" => "the hard stuff",
+        "xhigh" => "deeper still",
+        "max" => "the hard stuff",
         _ => "",
     }
 }
@@ -485,6 +351,8 @@ fn effort_choices(app: &App, q: &str) -> Vec<Choice> {
         return out;
     }
     let default = crate::models::efforts(&model).1;
+    // the hints in one column, as /model's (designer m_21142)
+    let col = efforts.iter().map(|e| unicode_width::UnicodeWidthStr::width(e.as_str())).max().unwrap_or(0) + 2;
     for e in efforts.iter().filter(|e| matches(q, &[e])) {
         let mut desc = effort_hint(e).to_string();
         if *e == default {
@@ -492,7 +360,7 @@ fn effort_choices(app: &App, q: &str) -> Vec<Choice> {
         }
         out.push(Choice {
             value: e.clone(),
-            label: e.clone(),
+            label: format!("{e}{}", " ".repeat(col - unicode_width::UnicodeWidthStr::width(e.as_str()))),
             desc,
             mark: (*e == current).then(|| ("✓", theme::accent())),
         });
@@ -807,11 +675,12 @@ mod arg_tests {
         let d = std::env::temp_dir().join(format!("cu-menu-{}", std::process::id()));
         let p = d.join("plugins.json");
         assert!(!crate::computer_use::on_in(&p), "off before /computer-use");
-        bend_plugins::state::set_enabled(&p, "computer", true).unwrap();
+        let cu = bend_plugins::id::PluginId::plugin("computer");
+        bend_plugins::state::set(&p, &cu, true).unwrap();
         assert!(crate::computer_use::on_in(&p));
-        bend_plugins::state::set_enabled(&p, "computer", false).unwrap();
+        bend_plugins::state::set(&p, &cu, false).unwrap();
         assert!(!crate::computer_use::on_in(&p), "off after /computer-use off");
-        bend_plugins::state::set_enabled(&p, "computer", true).unwrap();
+        bend_plugins::state::set(&p, &cu, true).unwrap();
         assert!(crate::computer_use::on_in(&p), "on again after the bare /computer-use");
         let _ = std::fs::remove_dir_all(&d);
     }
@@ -916,7 +785,8 @@ mod arg_tests {
         let n = items(&mut app, "/new ");
         assert_eq!((labels(&n), n[0].fill.as_str()), (vec!["-w".to_string()], "/new -w "));
         assert!(items(&mut app, "/new fix the tests").is_empty());
-        assert_eq!(labels(&items(&mut app, "/plugins ")), ["list", "enable", "disable", "login", "logout"]);
+        assert_eq!(labels(&items(&mut app, "/plugins ")), ["off", "on", "add", "connect", "login", "logout", "remove", "list", "refresh"]);
+        assert_eq!(labels(&items(&mut app, "/skills ")), ["off", "on"]);
         let v = items(&mut app, "/restart ");
         assert_eq!(v[0].label, "current");
         assert!(v.iter().any(|i| i.label == "…" && i.run.is_none()), "the versions load");
@@ -984,16 +854,20 @@ mod arg_tests {
         assert!(f.iter().any(|i| i.label == "+ set up OpenRouter for openrouter/x-ai/grok-9" && i.desc == "no key yet: i'll ask for one"), "{:?}", labels(&f));
         crate::models::TEST_READY.with(|r| *r.borrow_mut() = None);
         let r = items(&mut app, "/reasoning ");
-        assert_eq!(labels(&r), ["reasoning for auth-fix", "none", "low", "medium", "high", "max"]);
-        let high = r.iter().find(|i| i.label == "high").unwrap();
+        // effort-table: Opus 5.5 takes Claude's xhigh, high stays its default
+        // the hints in one column: each name padded to the widest + 2 (designer m_21142)
+        assert_eq!(labels(&r), ["reasoning for auth-fix", "none    ", "low     ", "medium  ", "high    ", "xhigh   ", "max     "]);
+        let high = r.iter().find(|i| i.label.trim_end() == "high").unwrap();
         assert_eq!((high.mark.map(|x| x.0), high.desc.as_str()), (Some("✓"), "deeper, slower · default"));
+        let desc = |l: &str| r.iter().find(|i| i.label.trim_end() == l).unwrap().desc.clone();
+        assert_eq!((desc("xhigh"), desc("max")), ("deeper still".to_string(), "the hard stuff".to_string()));
         assert_eq!(items(&mut app, "/reasoning lo")[1].run.as_deref(), Some("/reasoning low"));
         // main, on a model with two words; one without reasoning
         add_agent(&mut app, "main", "");
         app.sb.focus = "main".into();
         set_model(&mut app, "main", "mistral/zai-glm-5-3", "none");
         let r = items(&mut app, "/reasoning ");
-        assert_eq!(labels(&r), ["reasoning for main", "none", "high"]);
+        assert_eq!(labels(&r), ["reasoning for main", "none  ", "high  "]);
         assert_eq!(r[1].mark.map(|x| x.0), Some("✓"));
         set_model(&mut app, "main", "mistral/mistral-large-latest", "");
         let r = items(&mut app, "/reasoning ");

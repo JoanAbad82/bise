@@ -1,0 +1,191 @@
+#!/usr/bin/env python3
+"""The Mistral connectors' catalog, fetched in Rust (bend_plugins::connectors),
+against a fake Mistral (BISE_MISTRAL_URL) on a throwaway BISE_HOME.
+
+`bise plugins refresh|connect` drive the real HTTP, the cache file and the
+connect polling; the parse, the index lines and the cache's decisions are
+unit tests (rust/plugins/src/connectors/tests.rs). Checks:
+
+1. refresh: one GET of the bootstrap with the key as the bearer, both
+   builtins as their own param; the cache holds every connector and no key.
+2. a 500: refresh fails, says the last catalog is kept, and the cache still
+   has every connector.
+3. the TTL: connect on a ready connector reads the fresh cache (no GET);
+   the same with a cache older than 10 min fetches once.
+4. connect an OAuth connector: Mistral's auth_url opens (BISE_OPEN records
+   it), then the catalog is fetched again until it is ready.
+5. connect a no-auth connector: one POST of his default connection, then
+   ready.
+6. no Mistral key: no request, and it says so.
+
+Needs the bise binary (cd rust && cargo build -p bend-harness).
+python3 -u tests/fake_bootstrap.py
+"""
+import http.server, json, os, subprocess, sys, tempfile, threading
+from urllib.parse import urlparse, parse_qs
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+ROOT = os.path.abspath(os.path.join(HERE, ".."))
+sys.path.insert(0, HERE)
+import bise_env  # noqa: E402
+
+EXE = os.path.join(os.path.abspath(os.environ.get("CARGO_TARGET_DIR") or os.path.join(ROOT, "rust", "target")),
+                   "debug", "bise")
+KEY = "fake-mistral-key"
+
+
+def connector(cid, name, ready, action=None):
+    c = {"id": cid, "name": name, "display_name": name.title(), "status": {"is_ready": ready},
+         "tools": [{"name": "search", "description": "Search", "inputSchema": {"type": "object", "maximum": 9007199254740991}}] if ready else []}
+    if action:
+        c["auth_action"] = {"type": action}
+    return c
+
+
+class Mistral:
+    """the bootstrap (queued statuses, then 200), auth_url and the no-auth
+    connection; a connector turns ready at the first bootstrap after its
+    connect"""
+
+    def __init__(self):
+        self.statuses, self.gets, self.posts, self.auth = [], [], [], []
+        self.ready = {"c-slack"}
+        self.pending = set()
+        m = self
+
+        class H(http.server.BaseHTTPRequestHandler):
+            def answer(self, code, body):
+                b = json.dumps(body).encode()
+                self.send_response(code)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(b)))
+                self.end_headers()
+                self.wfile.write(b)
+
+            def do_GET(self):
+                m.auth.append(self.headers.get("Authorization"))
+                u = urlparse(self.path)
+                if u.path == "/v1/connectors/bootstrap":
+                    m.gets.append(parse_qs(u.query))
+                    code = m.statuses.pop(0) if m.statuses else 200
+                    if code != 200:
+                        return self.answer(code, {"detail": "Internal Server Error"})
+                    m.ready |= m.pending
+                    m.pending = set()
+                    return self.answer(200, {"connectors": [
+                        connector("c-slack", "slack", "c-slack" in m.ready),
+                        connector("c-gh", "github", "c-gh" in m.ready, "oauth"),
+                        connector("c-notion", "notion", "c-notion" in m.ready, "no_auth_connect"),
+                    ]})
+                if u.path.endswith("/auth_url"):
+                    cid = u.path.split("/")[3]
+                    m.pending.add(cid)
+                    return self.answer(200, {"auth_url": "https://login.example.test/%s" % cid})
+                self.answer(404, {"detail": "not found"})
+
+            def do_POST(self):
+                m.auth.append(self.headers.get("Authorization"))
+                n = int(self.headers.get("Content-Length") or 0)
+                body = json.loads(self.rfile.read(n) or b"{}")
+                m.posts.append((self.path, body))
+                if self.path.endswith("/user/credentials"):
+                    m.pending.add(self.path.split("/")[3])
+                    return self.answer(200, {"message": "ok"})
+                self.answer(404, {"detail": "not found"})
+
+            def log_message(self, *a):
+                pass
+
+        self.srv = http.server.ThreadingHTTPServer(("127.0.0.1", 0), H)
+        threading.Thread(target=self.srv.serve_forever, daemon=True).start()
+        self.url = "http://127.0.0.1:%d" % self.srv.server_address[1]
+
+
+def main():
+    if not os.path.exists(EXE):
+        sys.exit("build first: cd rust && cargo build -p bend-harness")
+    fails = []
+
+    def check(name, ok, detail=""):
+        print("%s %s" % ("ok  " if ok else "FAIL", name), flush=True)
+        if not ok:
+            fails.append("%s %s" % (name, detail))
+
+    m = Mistral()
+    with tempfile.TemporaryDirectory() as tmp:
+        home = os.path.join(tmp, "bise")
+        opened = os.path.join(tmp, "opened.txt")
+        opener = os.path.join(tmp, "open.sh")
+        with open(opener, "w") as f:
+            f.write('#!/bin/sh\necho "$1" >> %s\n' % opened)
+        os.chmod(opener, 0o755)
+        env = bise_env.clean_env(BISE_HOME=home, BISE_MISTRAL_URL=m.url, BISE_OPEN=opener, MISTRAL_API_KEY=KEY)
+        bise_env.refuse_real_home(env)
+        cache = os.path.join(home, "connectors", "bootstrap.json")
+
+        def run(*args, e=env):
+            r = subprocess.run([EXE, "plugins", *args], env=e, capture_output=True, text=True, timeout=120)
+            return r.returncode, r.stdout + r.stderr
+
+        def cached():
+            return json.load(open(cache))
+
+        rc, out = run("refresh")
+        q = m.gets[-1] if m.gets else {}
+        check("refresh: one GET, the key as the bearer, each builtin its own param",
+              rc == 0 and len(m.gets) == 1 and m.auth == ["Bearer " + KEY]
+              and q.get("builtin_connectors") == ["web_search", "image_generation"]
+              and q.get("supports_mcp") == ["true"] and q.get("include_auth_actionable_connectors") == ["true"],
+              repr((rc, out, m.gets, m.auth)))
+        text = open(cache).read()
+        check("the cache has every connector and no key",
+              [c["name"] for c in cached()["connectors"]] == ["slack", "github", "notion"] and KEY not in text
+              and "9007199254740991" in text, text[:300])
+
+        m.statuses = [500]
+        rc, out = run("refresh")
+        check("a 500: refresh fails and says the last catalog is kept",
+              rc == 1 and "HTTP 500" in out and "kept the last catalog" in out, repr((rc, out)))
+        check("a 500: the cache keeps every connector, with the error",
+              len(cached()["connectors"]) == 3 and "HTTP 500" in (cached()["error"] or ""), repr(cached()))
+
+        rc, out = run("refresh")
+        n = len(m.gets)
+        rc, out = run("connect", "mistral:slack")
+        check("a fresh cache: connect on a ready connector fetches nothing",
+              rc == 0 and "already connected" in out and len(m.gets) == n, repr((rc, out, len(m.gets), n)))
+        c = cached()
+        c["fetched_ms"] -= 11 * 60 * 1000
+        json.dump(c, open(cache, "w"))
+        rc, out = run("connect", "mistral:slack")
+        check("a cache older than the TTL: one fetch", rc == 0 and len(m.gets) == n + 1, repr((rc, out, len(m.gets), n)))
+
+        rc, out = run("connect", "mistral:github")
+        urls = open(opened).read().split() if os.path.exists(opened) else []
+        gh = next(c for c in cached()["connectors"] if c["name"] == "github")
+        check("connect oauth: Mistral's auth_url opens, then it is ready",
+              rc == 0 and urls == ["https://login.example.test/c-gh"] and gh["auth"] == "ready"
+              and "connected" in out, repr((rc, out, urls, gh)))
+
+        rc, out = run("connect", "mistral:notion")
+        posts = [p for p in m.posts if p[0] == "/v1/connectors/c-notion/user/credentials"]
+        check("connect no-auth: one POST of his default connection, then ready",
+              rc == 0 and len(posts) == 1
+              and posts[0][1] == {"name": "default", "is_default": True, "credentials": {"headers": {}}}
+              and next(c for c in cached()["connectors"] if c["name"] == "notion")["auth"] == "ready"
+              and len(open(opened).read().split()) == 1, repr((rc, out, m.posts)))
+
+        n = len(m.auth)
+        nokey = dict(env)
+        nokey.pop("MISTRAL_API_KEY")
+        rc, out = run("refresh", e=nokey)
+        check("no Mistral key: no request, and it says so",
+              rc == 1 and "no Mistral key" in out and len(m.auth) == n, repr((rc, out)))
+    m.srv.shutdown()
+    if fails:
+        sys.exit("FAIL %s" % fails)
+    print("PASS fake_bootstrap")
+
+
+if __name__ == "__main__":
+    main()

@@ -1,0 +1,13 @@
+c0ffee-01 Slack search_messages : #Search messages  in a channel | input: {"properties":{"limit":{"default":20,"maximum":9007199254740991,"minimum":-9007199254740991,"type":"integer"},"query":{"maxLength":9007199254740991,"type":"string"}},"required":["query"],"type":"object"}
+c0ffee-01 Slack post : #Post "quoted" text \ back	slash | input: {"10":5,"9":6,"Alpha":2,"_u":4,"alpha":3,"nested":{"a":null,"b":[1.0,0.50,1e-05,-0.0,1E3],"c":true,"d":false},"zeta":1,"é":"ü \u0001 \u0008 \u000c / é"}
+c0ffee-01 Slack ? : #a tool with no name
+c0ffee-01 Slack no_desc : # | input: {}
+c0ffee-01 Slack no_schema : #nothing else
+c0ffee-02 slack list : #List | input: {"type":"object"}
+c0ffee-04 github_app_2 create_issue : #Create an issue | input: {"properties":{"title":{"type":"string"}},"type":"object"}
+c0ffee-08 x_y t : #edges trimmed | input: {"type":"object"}
+c0ffee-09 unnamed t : #no connector name | input: {"type":"object"}
+web_search web_search web_search : #Search the web | input: {"properties":{"query":{"type":"string"}},"required":["query"],"type":"object"}
+image_generation image_generation generate_image : #Generate an image NOTE (bise): the result is a JSON {url}, a link that expires in about 1 hour: download it to a file at once (curl -sSL <url> -o <file>.jpg) and use the file; pass the url to edit_image only within that hour. Each image costs $0.10 on the user's Mistral account. | input: {"properties":{"prompt":{"type":"string"}},"type":"object"}
+image_generation image_generation edit_image : #Edit an image NOTE (bise): the result is a JSON {url}, a link that expires in about 1 hour: download it to a file at once (curl -sSL <url> -o <file>.jpg) and use the file; pass the url to edit_image only within that hour. Each image costs $0.10 on the user's Mistral account. | input: {"type":"object"}
+c0ffee-11 Weird ? : # | input: [1,2]

@@ -1,4 +1,6 @@
 use super::*;
+#[path = "effort_tests.rs"]
+mod effort_tests;
 
 fn no_env(_: &str) -> Option<String> {
     None
@@ -104,7 +106,7 @@ fn a_listed_model_takes_its_own_fields_then_its_providers() {
     let c = Catalog::builtin();
     let r = c.resolve("anthropic/claude-haiku-4-5");
     assert_eq!(r.known, Known::Listed);
-    assert_eq!(r.caps, Caps { context: 200_000, max_output: 64_000, vision: true, reasoning: true, tools: true, thinking: "budget".into(), betas: ANTH_BETAS.into(), efforts: String::new(), effort: String::new(), cache_key: String::new(), cache_header: String::new(), headers_env: String::new(), headers: Default::default(), key_command: String::new(), idle_timeout_sec: 0 });
+    assert_eq!(r.caps, Caps { context: 200_000, max_output: 64_000, vision: true, reasoning: true, tools: true, thinking: "budget".into(), betas: ANTH_BETAS.into(), efforts: "none,low,medium,high,max".into(), effort: String::new(), cache_key: String::new(), cache_header: String::new(), headers_env: String::new(), headers: Default::default(), key_command: String::new(), idle_timeout_sec: 0 });
     let r = c.resolve("mistral/mistral-large-latest");
     assert_eq!((r.caps.context, r.caps.reasoning, r.caps.vision), (262_144, false, true));
     let r = c.resolve("mistral/mistral-large-4");
@@ -362,11 +364,11 @@ fast = "groq/openai/gpt-oss-120b"
         r
     };
     for m in &s.catalog.models {
-        assert_eq!(read_back(&m.name()), s.catalog.resolve(&m.name()), "{}", m.name());
+        assert_eq!(read_back(&m.name()), effort_tests::with_family(&s.catalog, s.catalog.resolve(&m.name())), "{}", m.name());
     }
     for p in &s.catalog.providers {
         let n = format!("{}/unlisted", p.id);
-        assert_eq!(read_back(&n), s.catalog.resolve(&n));
+        assert_eq!(read_back(&n), effort_tests::with_family(&s.catalog, s.catalog.resolve(&n)));
         let b = back.catalog.provider(&p.id).unwrap();
         assert_eq!((&b.auth, &b.shape), (&p.auth, &p.shape), "{}", p.id);
     }
@@ -413,6 +415,35 @@ fn write_handoff_is_atomic_and_export_falls_back() {
     let _ = std::fs::remove_file(&p);
     // no config file at all: fine
     assert!(export_handoff(&dir.join("none.toml"), &dir.join("cache"), &no_env).is_some());
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+/// The hub writes the handoff from several threads at once (a REPL
+/// start, the keys check, small jobs): every write lands in the cache,
+/// none falls back to the temp dir. 2026-10-12: two writes shared one
+/// temp name, a rename failed, the fallback path read as a key change
+/// and all 26 REPLs of his hub relaunched.
+#[test]
+fn writes_at_once_all_land_in_the_cache() {
+    let dir = std::env::temp_dir().join(format!("bise-catalog-race-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    let cfg = dir.join("config.toml");
+    std::fs::write(&cfg, "model = \"openai/gpt-5\"\n").unwrap();
+    let cache = dir.join("cache");
+    let paths: Vec<PathBuf> = std::thread::scope(|s| {
+        let hs: Vec<_> = (0..16)
+            .map(|_| s.spawn(|| (0..20).map(|_| export_handoff(&cfg, &cache, &no_env).unwrap()).collect::<Vec<_>>()))
+            .collect();
+        hs.into_iter().flat_map(|h| h.join().unwrap()).collect()
+    });
+    let fell_back: Vec<_> = paths.iter().filter(|p| **p != cache.join("models.toml")).collect();
+    for p in &fell_back {
+        let _ = std::fs::remove_file(p);
+    }
+    assert!(fell_back.is_empty(), "{} of {} writes fell back", fell_back.len(), paths.len());
+    let left: Vec<_> = std::fs::read_dir(&cache).unwrap().map(|e| e.unwrap().file_name()).collect();
+    assert_eq!(left.len(), 1, "{left:?}");
     let _ = std::fs::remove_dir_all(&dir);
 }
 
@@ -543,18 +574,18 @@ fn prices_come_from_the_model_then_its_provider() {
 }
 
 #[test]
-fn the_default_threshold_is_80_percent_of_the_window() {
+fn the_default_threshold_is_450k_from_1m_else_85_percent() {
     let c = Catalog::builtin();
-    assert_eq!(c.default_threshold("foundry/claude-opus-5-5"), 800_000);
-    assert_eq!(c.default_threshold("anthropic/claude-haiku-4-5"), 160_000);
-    assert_eq!(c.default_threshold("nowhere/m"), 102_400);
-    // the same rounding as runtime/provider-pure.bend threshold_of
-    assert_eq!(threshold_of(131_072), 104_857);
+    assert_eq!(c.default_threshold("foundry/claude-opus-5-5"), 450_000);
+    assert_eq!(c.default_threshold("anthropic/claude-haiku-4-5"), 170_000);
+    assert_eq!(c.default_threshold("nowhere/m"), 108_800);
+    // the same rounding as runtime/threshold-pure.bend threshold_of
+    assert_eq!(threshold_of(131_072), 111_411);
     assert_eq!(threshold_of(0), 0);
 }
 
 /// BISE-300: config `compaction_threshold` is tokens or a share of the
-/// window, never above 80 % of it; the old `threshold` key is not read
+/// window, never above 85 % of it; the old `threshold` key is not read
 /// (a warning says to rename it). The same cases as the Bend laws
 /// `threshold_tokens_or_percent` / `threshold_capped_at_80_percent` /
 /// `threshold_bad_values_default`.
@@ -564,16 +595,16 @@ fn the_compaction_threshold_is_tokens_or_a_share_capped_at_80_percent() {
     assert_eq!(compaction_threshold(Some("45%"), 1_000_000), 450_000);
     assert_eq!(compaction_threshold(Some("45%"), 200_000), 90_000);
     assert_eq!(compaction_threshold(Some(" 45 % "), 128_000), 57_600);
-    // the cap: a 1M number on a 200k model, a share above 80 %
-    assert_eq!(compaction_threshold(Some("450000"), 200_000), 160_000);
-    assert_eq!(compaction_threshold(Some("95%"), 1_000_000), 800_000);
-    assert_eq!(compaction_threshold(Some("250%"), 200_000), 160_000);
-    assert_eq!(compaction_threshold(Some("99999999999999999999"), 200_000), 160_000);
+    // the cap: a 1M number on a 200k model, a share above 85 %
+    assert_eq!(compaction_threshold(Some("450000"), 200_000), 170_000);
+    assert_eq!(compaction_threshold(Some("95%"), 1_000_000), 850_000);
+    assert_eq!(compaction_threshold(Some("250%"), 200_000), 170_000);
+    assert_eq!(compaction_threshold(Some("99999999999999999999"), 200_000), 170_000);
     // no threshold: the default
     for bad in ["0", "0%", "lots", "4.5%", "%", "", "-5", "+5"] {
-        assert_eq!(compaction_threshold(Some(bad), 200_000), 160_000, "{bad}");
+        assert_eq!(compaction_threshold(Some(bad), 200_000), 170_000, "{bad}");
     }
-    assert_eq!(compaction_threshold(None, 200_000), 160_000);
+    assert_eq!(compaction_threshold(None, 200_000), 170_000);
 
     let s = Setup::from_text(Some("compaction_threshold = 450000\n"), &|_| None);
     assert_eq!(s.compaction_threshold.as_deref(), Some("450000"));
@@ -596,7 +627,7 @@ fn the_compaction_threshold_is_tokens_or_a_share_capped_at_80_percent() {
 #[test]
 fn the_voice_model_defaults_to_voxtral_and_the_config_picks_another() {
     let s = Setup::from_text(None, &no_env);
-    assert_eq!(s.voice.model, "mistral/voxtral-transcribe-3");
+    assert_eq!(s.voice.model, "mistral/voxtral-mini-transcribe-3");
     assert_eq!((s.voice.from, s.voice.language.clone()), ("default", None));
     let r = s.catalog.resolve_stt(&s.voice.model);
     assert_eq!((r.api.as_str(), r.base_url.as_str(), r.key_env.as_str()), ("mistral", "https://api.mistral.ai/v1", "MISTRAL_API_KEY"));
@@ -625,7 +656,7 @@ fn a_bad_voice_table_is_a_warning() {
     for k in ["voice.model", "voice.language", "voice.vocabulary", "voice.pitch: unknown key"] {
         assert!(w.contains(k), "{k}: {w}");
     }
-    assert_eq!(s.voice.model, "mistral/voxtral-transcribe-3");
+    assert_eq!(s.voice.model, "mistral/voxtral-mini-transcribe-3");
     let s = setup("voice = \"x\"\n");
     assert!(s.catalog.warnings.join("\n").contains("voice: not a table"));
     let s = setup("[providers.x]\nstt = \"nope\"\nkind = \"tts\"\n");
@@ -643,7 +674,7 @@ fn the_voice_job_takes_the_chat_keys_resolution() {
     let job = setup("[voice]\nlanguage = \"fr\"\nvocabulary = [\"bise\"]\n").voice_job(&keys).unwrap();
     assert_eq!(
         (job.api.as_str(), job.base_url.as_str(), job.model.as_str(), job.key.as_str()),
-        ("mistral", "https://api.mistral.ai/v1", "voxtral-transcribe-3", "m-file")
+        ("mistral", "https://api.mistral.ai/v1", "voxtral-mini-transcribe-3", "m-file")
     );
     assert_eq!((job.language.as_deref(), job.vocabulary.clone()), (Some("fr"), vec!["bise".to_string()]));
     assert!(!format!("{:?}", job).contains("m-file"));
@@ -675,14 +706,14 @@ fn voice_entries_stay_out_of_the_chat_list_and_the_handoff() {
     let store = crate::auth::Store::default();
     let keys = crate::auth::Keys { env: &env, store: &store, files: &[] };
     let out = cli::render(&s, None, &keys, None);
-    assert!(out.contains("voice        mistral/voxtral-transcribe-3  (default; listed)"), "{out}");
+    assert!(out.contains("voice        mistral/voxtral-mini-transcribe-3  (default; listed)"), "{out}");
     assert!(!out.contains("voxtral-mini-latest"), "{out}");
     assert!(out.contains("language auto"), "{out}");
     let (chat, voice) = out.split_once("\nvoice (speech to text").unwrap();
     assert!(!chat.contains("whisper") && !chat.contains("elevenlabs  ElevenLabs"), "{chat}");
     for l in [
         "  mistral  Mistral · mistral · key: env MISTRAL_API_KEY",
-        "    mistral/voxtral-transcribe-3",
+        "    mistral/voxtral-mini-transcribe-3",
         "  elevenlabs  ElevenLabs · elevenlabs · no key (ELEVENLABS_API_KEY or 'bise login elevenlabs')",
         "    deepgram/nova-3",
         "    groq/whisper-large-v3-turbo",
@@ -702,9 +733,7 @@ fn voice_entries_stay_out_of_the_chat_list_and_the_handoff() {
 fn efforts_follow_the_family_and_the_model() {
     let s = setup("");
     let c = &s.catalog;
-    let opus = c.resolve("foundry/claude-opus-5-5");
-    assert_eq!(opus.efforts(), ANTHROPIC_EFFORTS.map(String::from).to_vec());
-    assert_eq!(opus.default_effort(), "high");
+    assert_eq!(c.resolve("anthropic/claude-next").efforts(), ANTHROPIC_EFFORTS.map(String::from).to_vec());
     assert_eq!(c.resolve("groq/openai/gpt-oss-120b").efforts(), CHAT_EFFORTS.map(String::from).to_vec());
     // OpenAI's GPT-6: its words, luna's with none
     assert_eq!(c.resolve("openai/gpt-6-astra").efforts(), ["low", "medium", "high", "xhigh", "max"]);
@@ -850,8 +879,8 @@ fn cache_routing_keys_reach_the_handoff() {
         let r = c.resolve(id);
         (r.caps.cache_key, r.caps.cache_header)
     };
-    assert_eq!(key("openai/gpt-5.5"), ("prompt_cache_key".into(), String::new()));
-    assert_eq!(key("mistral/mistral-medium-latest"), ("prompt_cache_key".into(), String::new()));
+    // chatgpt: issue #18, the plan's route is the same Responses API as openai's
+    for (id, h) in [("openai/gpt-5.5", ""), ("mistral/mistral-medium-latest", ""), ("chatgpt/gpt-6.1-sol", "session-id")] { assert_eq!(key(id), ("prompt_cache_key".into(), h.into()), "{id}") }
     assert_eq!(key("xai/grok-4.7"), (String::new(), "x-grok-conv-id".into()));
     assert_eq!(key("foundry/claude-opus-5-5"), (String::new(), String::new()));
     // config: a model overrides its provider, a bad name is warned
@@ -946,7 +975,7 @@ fn roles_come_from_the_roles_table_then_the_old_keys() {
     assert_eq!(s.role_model(roles::AGENTS), ("mistral/mistral-medium-latest".to_string(), roles::Source::SameAs(roles::MAIN)));
     assert_eq!(s.role_model(roles::SMALL), ("mistral/mistral-small-latest".to_string(), roles::Source::Auto));
     assert_eq!(s.role_model(roles::CLASSIFY).1, roles::Source::Auto);
-    assert_eq!(s.role_model(roles::VOICE), ("mistral/voxtral-transcribe-3".to_string(), roles::Source::Auto));
+    assert_eq!(s.role_model(roles::VOICE), ("mistral/voxtral-mini-transcribe-3".to_string(), roles::Source::Auto));
 }
 
 #[test]
@@ -1106,7 +1135,7 @@ fn the_env_then_the_env_files_in_order() {
     assert_eq!(with_files(&env, &files, "X").as_deref(), Some("from-env"));
     assert_eq!(with_files(&env, &files, "Y"), None);
     // Ben's setup: key and URL in ~/.vibe/.env, nothing in config.toml
-    let s = Setup::from_parts(Some(OPUS), &none, &|k| with_files(&none, &files, k));
+    let s = Setup::from_parts(Some(OPUS), &[], &none, &|k| with_files(&none, &files, k));
     assert_eq!(s.model_for("main").base_url, "https://vibe.example/anthropic/v1");
 }
 

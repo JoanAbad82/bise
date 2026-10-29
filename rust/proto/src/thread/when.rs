@@ -30,6 +30,30 @@ pub fn civil(ms: u64, off: i32) -> Civil {
     (y, m, d, (rem / 3600) as u32, ((rem % 3600) / 60) as u32)
 }
 
+/// The moment a `YYYY-MM-DD HH:MM UTC` time names (the shell's
+/// `search::fmt_utc`: a forward's `at`), in ms since the epoch; another
+/// shape: none.
+pub fn utc_ms(s: &str) -> Option<u64> {
+    let s = s.strip_suffix(" UTC")?;
+    let (date, hm) = s.split_once(' ')?;
+    let mut d = date.splitn(3, '-').map(|x| x.parse::<i64>().ok());
+    let (y, m, day) = (d.next()??, d.next()??, d.next()??);
+    let (h, mi) = hm.split_once(':')?;
+    let (h, mi) = (h.parse::<i64>().ok()?, mi.parse::<i64>().ok()?);
+    if !(1..=12).contains(&m) || !(1..=31).contains(&day) || !(0..24).contains(&h) || !(0..60).contains(&mi) {
+        return None;
+    }
+    // a civil date to days since 1970-01-01 (H. Hinnant's algorithm)
+    let y = y - i64::from(m <= 2);
+    let era = y.div_euclid(400);
+    let yoe = y.rem_euclid(400);
+    let mp = (m + 9) % 12;
+    let doy = (153 * mp + 2) / 5 + day - 1;
+    let doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
+    let days = era * 146_097 + doe - 719_468;
+    u64::try_from(days * 86_400_000 + h * 3_600_000 + mi * 60_000).ok()
+}
+
 /// The local date of `ms` is the day before the local date of `now`.
 fn is_yesterday(ms: u64, off: i32, now: u64, now_off: i32) -> bool {
     let (a, b) = (civil(ms, off), civil(now.saturating_sub(DAY), now_off));

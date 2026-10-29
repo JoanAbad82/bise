@@ -6,8 +6,10 @@
 //! request (BISE-130: batch, the full model) and the text lands in the
 //! composer. The model, the language and a vocabulary come from
 //! `[voice]` in ~/.bise/config.toml (bise_catalog: Mistral's Voxtral
-//! Transcribe 3 by default, never Voxtral Mini; OpenAI, Groq, ElevenLabs, Deepgram, any
-//! OpenAI-compatible server), the key from the chat keys' resolution.
+//! Mini Transcribe 3 by default; OpenAI, Groq, ElevenLabs, Deepgram, any
+//! OpenAI-compatible server), the key from the chat keys' resolution. A
+//! model the provider no longer knows (a 404) is tried once more with
+//! the provider's voice pick ([`VoiceJob::fallback`]).
 //! While recording, Ctrl+C or Esc cancels. Off by default: `/voice`
 //! toggles it, saved in bise's prefs. The state shows as one chip in
 //! the composer text at the cursor ([`chip`], BISE-222); the transcript
@@ -23,6 +25,7 @@
 // meter and the resampler are only used by the tests there
 #![cfg_attr(all(target_os = "linux", not(test)), allow(dead_code))]
 
+use bise_proto::words::composer;
 use crossterm::event::{KeyCode, KeyModifiers};
 use serde_json::Value;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -34,8 +37,10 @@ use std::time::{Duration, Instant};
 
 pub const SAMPLE_RATE: u32 = 16_000;
 /// The request: a 5-minute clip takes Voxtral ~10-20 s; past this the
-/// transcription failed.
-const TRANSCRIBE_TIMEOUT: Duration = Duration::from_secs(120);
+/// transcription failed. The one wait for a stopped take's words, in the
+/// TUI and in the ambient core (its dictation and fn's talk, architect
+/// m_22168).
+pub(crate) const TRANSCRIBE_TIMEOUT: Duration = Duration::from_secs(120);
 const MAX_DURATION: Duration = Duration::from_secs(300);
 /// Shorter than this, a recording has no audio blocks yet: silence then
 /// means "stopped too early", not "the microphone is muted".
@@ -69,9 +74,9 @@ pub fn loudness(peak: f32) -> f32 {
 
 fn mic_access_hint() -> &'static str {
     if cfg!(target_os = "macos") {
-        " grant access in System Settings → Privacy & Security → Microphone."
+        composer::voice_mic_access_mac
     } else if cfg!(target_os = "windows") {
-        " grant access in Settings → Privacy & security → Microphone."
+        composer::voice_mic_access_windows
     } else {
         ""
     }
@@ -81,8 +86,8 @@ fn mic_access_hint() -> &'static str {
 /// voice mode).
 pub(crate) fn start_error_line(e: StartError) -> String {
     match e {
-        StartError::NoInputDevice => format!("no audio input device found.{}", mic_access_hint()),
-        StartError::Backend(m) => format!("audio backend is unavailable: {}", m),
+        StartError::NoInputDevice => composer::voice_no_device(mic_access_hint()),
+        StartError::Backend(m) => composer::voice_backend(m),
     }
 }
 
@@ -90,24 +95,22 @@ pub(crate) fn start_error_line(e: StartError) -> String {
 /// terminal may not use it).
 fn no_audio_detected_message() -> String {
     if cfg!(target_os = "macos") {
-        "i can't hear you. allow the microphone for your terminal: System Settings › Privacy & Security › Microphone.".into()
+        composer::voice_cant_hear_mac.into()
     } else {
-        format!("i can't hear you. check your terminal may use the microphone.{}", mic_access_hint())
+        composer::voice_cant_hear(mic_access_hint())
     }
 }
 
 /// The voice model has no key (BISE-298: replaces "voice transcription
 /// needs an API key: …").
-pub const NEEDS_KEY: &str = "voice needs a key. /voice picks one.";
+pub const NEEDS_KEY: &str = composer::voice_needs_key;
 
-/// `/voice` with a setup that works (BISE-298): `voice is on: <model>`
-pub const ENABLED_MESSAGE: &str = "voice is on: ";
-pub const DISABLED_MESSAGE: &str = "voice is off. /voice turns it back on.";
-pub const OFF_HINT: &str = "voice is off: /voice turns it on";
+pub const DISABLED_MESSAGE: &str = composer::voice_disabled;
+pub const OFF_HINT: &str = composer::voice_off_hint;
 /// under `✓ voice is on: <model>.` once the voice picker checked it
-pub const ON_HOW: &str = "press ctrl+r and talk, any key stops. /voice turns it off.";
+pub const ON_HOW: &str = composer::voice_on_how;
 /// esc on the voice picker while turning voice on
-pub const STAYS_OFF: &str = "voice is off. /voice when you want it.";
+pub const STAYS_OFF: &str = composer::voice_stays_off;
 
 // ---- keys ----
 
@@ -261,6 +264,8 @@ pub fn wav_bytes(samples: &[i16], sample_rate: u32) -> Vec<u8> {
 pub enum TranscribeEvent {
     /// the text (a batch model sends it once)
     Delta(String),
+    /// one line to show with the words (the model fell back)
+    Note(String),
     Done,
     /// the provider said no or did not answer (BISE-298): why, and the
     /// clip, kept for ctrl+r
@@ -327,24 +332,24 @@ pub struct FailLines {
 
 pub fn fail_lines(f: &Failure, provider: &str, model: &str, billing_url: &str, kept: bool) -> FailLines {
     let (glyph, head) = match f.kind {
-        FailKind::WrongKey => ("✗", format!("{} says the voice key is wrong. /provider fixes it.", provider)),
-        FailKind::NoCredit if billing_url.is_empty() => ("?", format!("your {} account has no credit yet.", provider)),
-        FailKind::NoCredit => ("?", format!("your {} account has no credit yet. add some here: {}", provider, billing_url)),
-        FailKind::Model => ("✗", format!("{} can't transcribe with {}. /voice picks another model.", provider, model)),
-        FailKind::Down => ("✗", format!("i couldn't reach {} to transcribe. try again, or /voice for another provider.", provider)),
-        FailKind::Other => ("✗", format!("{} answered something i can't read. try again, or /voice for another provider.", provider)),
+        FailKind::WrongKey => ("✗", composer::voice_wrong_key(provider)),
+        FailKind::NoCredit if billing_url.is_empty() => ("?", composer::voice_no_credit(provider)),
+        FailKind::NoCredit => ("?", composer::voice_no_credit_url(provider, billing_url)),
+        FailKind::Model => ("✗", composer::voice_bad_model(provider, model)),
+        FailKind::Down => ("✗", composer::voice_down(provider)),
+        FailKind::Other => ("✗", composer::voice_unreadable(provider)),
     };
     let mut dim = Vec::new();
     if !f.said.is_empty() {
         dim.push(f.said.clone());
     }
     if kept {
-        dim.push("your recording is kept: ctrl+r retry".into());
+        dim.push(composer::voice_kept.into());
     }
     FailLines { glyph, head, dim }
 }
 
-// ---- settings (the `voice` preference: bise_home, prefs.json or ~/.bend-harness/tui.json) ----
+// ---- settings (the `voice` preference: bise_home, prefs.json) ----
 
 fn settings() -> bise_home::Slot {
     bise_home::Home::from_env().pref(bise_home::Pref::Voice)
@@ -610,6 +615,7 @@ impl Voice {
                         out.push(VoiceOutput::Insert(t));
                     }
                 }
+                Ok(TranscribeEvent::Note(line)) => out.push(VoiceOutput::Notice(line)),
                 Ok(TranscribeEvent::Failed(f, clip)) => {
                     let (provider, model, billing) = run.names.clone();
                     self.cancel();
@@ -632,7 +638,7 @@ impl Voice {
             {
                 self.cancel();
                 out.push(VoiceOutput::Error(
-                    "voice transcription failed: the transcription timed out".into(),
+                    composer::voice_failed(composer::voice_timed_out),
                 ));
             }
             _ => {}
@@ -649,12 +655,9 @@ impl Voice {
         if run.text_len > 0 {
             vec![VoiceOutput::Utterance]
         } else if !run.has_signal && duration >= MIN_SIGNAL_DURATION {
-            vec![VoiceOutput::Error(format!(
-                "voice transcription failed: {}",
-                no_audio_detected_message()
-            ))]
+            vec![VoiceOutput::Error(composer::voice_failed(no_audio_detected_message()))]
         } else {
-            vec![VoiceOutput::Notice("no speech detected".into())]
+            vec![VoiceOutput::Notice(composer::voice_no_speech.into())]
         }
     }
 }
@@ -769,7 +772,7 @@ pub struct MicRecorder;
 #[cfg(target_os = "linux")]
 impl Recorder for MicRecorder {
     fn start(&mut self, _sample_rate: u32, _audio: Sender<AudioMsg>) -> Result<Box<dyn Capture>, StartError> {
-        Err(StartError::Backend("voice input is not available on Linux yet".into()))
+        Err(StartError::Backend(composer::voice_no_linux.into()))
     }
 }
 
@@ -847,14 +850,17 @@ impl Transcriber for BatchTranscriber {
     fn start(&self, job: VoiceJob, audio: Receiver<AudioMsg>, events: Sender<TranscribeEvent>, cancel: Arc<AtomicBool>) {
         std::thread::spawn(move || {
             let Some(samples) = collect_clip(&audio, &cancel) else { return };
-            let result = transcribe_clip(&job, &samples, &cancel, &|req| http::send(req, TRANSCRIBE_TIMEOUT));
+            let result = transcribe(&job, &samples, &cancel, &|req| http::send(req, TRANSCRIBE_TIMEOUT));
             if cancel.load(Ordering::SeqCst) {
                 return;
             }
             match result {
-                Ok(t) => {
-                    if !t.is_empty() {
-                        let _ = events.send(TranscribeEvent::Delta(t));
+                Ok(w) => {
+                    if !w.text.is_empty() {
+                        let _ = events.send(TranscribeEvent::Delta(w.text));
+                    }
+                    if let Some(line) = w.fell_back.and_then(|used| fell_back_line(&job, &used)) {
+                        let _ = events.send(TranscribeEvent::Note(line));
                     }
                     let _ = events.send(TranscribeEvent::Done);
                 }
@@ -894,10 +900,73 @@ pub fn transcribe_clip(
     cancel: &AtomicBool,
     send: &dyn Fn(&http::Request) -> Result<http::Response, String>,
 ) -> Result<String, Failure> {
+    transcribe(job, samples, cancel, send).map(|w| w.text)
+}
+
+/// A clip's words, and the model that heard them when it was not the
+/// job's (the job's model is gone: [`VoiceJob::fallback`]).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Words {
+    pub text: String,
+    /// the fallback's id: the take says so in one line
+    pub fell_back: Option<String>,
+}
+
+/// [`transcribe_clip`], with the fallback it took.
+pub fn transcribe(
+    job: &VoiceJob,
+    samples: &[i16],
+    cancel: &AtomicBool,
+    send: &dyn Fn(&http::Request) -> Result<http::Response, String>,
+) -> Result<Words, Failure> {
+    let words = |text: String| Words { text, fell_back: None };
     if samples.len() < MIN_CLIP || peak(samples) <= SILENCE_PEAK || cancel.load(Ordering::SeqCst) {
-        return Ok(String::new());
+        return Ok(words(String::new()));
     }
-    let req = stt::request(job, &wav_bytes(samples, SAMPLE_RATE));
+    let wav = wav_bytes(samples, SAMPLE_RATE);
+    match transcribe_wav(job, &wav, send) {
+        // the provider doesn't know the model (Mistral took
+        // voxtral-transcribe-3 away): one it lists, once; still no
+        // model, the user's model's failure says what to do
+        Err(f) if f.kind == FailKind::Model && !cancel.load(Ordering::SeqCst) => match &job.fallback {
+            Some(id) => {
+                let again = VoiceJob { model: id.clone(), name: format!("{}/{}", provider_of(&job.name), id), fallback: None, ..job.clone() };
+                match transcribe_wav(&again, &wav, send) {
+                    Err(g) if g.kind == FailKind::Model => Err(f),
+                    r => r.map(|text| Words { text, fell_back: Some(id.clone()) }),
+                }
+            }
+            None => Err(f),
+        },
+        r => r.map(words),
+    }
+}
+
+/// The one line of a take that fell back (the job's model is gone, this
+/// one heard it): once a session per model (designer m_33749), then the
+/// fallback is silent until he picks another model. None: said already.
+pub fn fell_back_line(job: &VoiceJob, used: &str) -> Option<String> {
+    static SAID: std::sync::Mutex<Vec<String>> = std::sync::Mutex::new(Vec::new());
+    let mut said = SAID.lock().unwrap_or_else(|e| e.into_inner());
+    if said.contains(&job.name) {
+        return None;
+    }
+    said.push(job.name.clone());
+    Some(composer::voice_fell_back(&job.provider_name, &job.model, used))
+}
+
+/// "mistral/voxtral-mini-transcribe-3" -> "mistral".
+fn provider_of(name: &str) -> &str {
+    name.split_once('/').map(|(p, _)| p).unwrap_or(name)
+}
+
+/// One request with the job's model: the text, or why not.
+fn transcribe_wav(
+    job: &VoiceJob,
+    wav: &[u8],
+    send: &dyn Fn(&http::Request) -> Result<http::Response, String>,
+) -> Result<String, Failure> {
+    let req = stt::request(job, wav);
     let resp = send(&req).map_err(|e| Failure { kind: FailKind::Down, said: stt::one_line(&e) })?;
     if !(200..300).contains(&resp.status) {
         return Err(Failure::of_answer(resp.status, &resp.body, &job.key));

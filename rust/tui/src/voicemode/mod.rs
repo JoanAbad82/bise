@@ -179,6 +179,9 @@ pub enum Heard {
     Flushed,
     /// the one-line reason (voice::fail_lines' wording)
     Failed(String),
+    /// one line about the words just sent (their model fell back:
+    /// `voice::fell_back_line`), before their Flushed
+    Note(String),
 }
 
 pub trait Listener {

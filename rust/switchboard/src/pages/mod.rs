@@ -3,14 +3,20 @@
 //! ([`server`]). [`Pages`] is what the hub and the server share: the
 //! store behind one lock, the server's port and token, the SSE
 //! subscribers of each page, and the way back to the hub (the notes sent
-//! from a page become the agent's input there).
+//! from a page become the agent's input there). [`artifact`]: the
+//! server's artifact routes beyond a copy's own file (the office viewer,
+//! docs/office.md); the kit and the office bundles are read from the app
+//! root given to [`Pages::new`].
 
 pub mod checklist;
 pub mod drafts;
 pub mod export;
 pub mod lint;
+pub mod artifact;
+pub mod media;
 pub mod mirror;
 pub mod notelines;
+pub mod plan;
 pub mod questions;
 pub mod server;
 pub mod site;
@@ -28,9 +34,13 @@ use store::{Meta, Publish, Store};
 /// What the page server tells the hub.
 #[derive(Debug, PartialEq)]
 pub enum PageMsg {
-    /// `send` on page `id`: `text` (the notes message) goes to `agent`
-    /// (the page's), as from the user; the hub picks main when it is gone
-    Sent { id: String, agent: String, text: String },
+    /// `send` on a page or an artifact (`target`): `text` (the notes
+    /// message) goes to `agent` (the page's, the artifact's maker), as
+    /// from the user; the hub picks main when it is gone. `notes`: the
+    /// notes in it, for the message's typed parts (a page's:
+    /// `store::page_part`; an artifact's: `artifact::notes::parts`; the
+    /// clients draw his words, never `text`)
+    Sent { target: store::Target, agent: String, text: String, notes: Vec<store::Note> },
     /// the drafts of page `id` changed (its open notes count)
     Notes { id: String },
     /// the user answered question `block` of page `id` on the page
@@ -38,6 +48,13 @@ pub enum PageMsg {
     Answer { id: String, block: String, reply: String },
     /// the user opened a newer version of page `id` in a browser
     Opened { id: String },
+    /// his edits of artifact `id` in the viewer's grid (artifact/save.rs):
+    /// the hub decides, writes the file and the version, and answers `reply`
+    Save { id: String, req: artifact::save::SaveReq, reply: artifact::save::Reply },
+    /// the door of local site `id` (artifact/live.rs) found its port free:
+    /// the hub starts its recipe again (daemon/revive.rs) and answers
+    /// `reply` (200 `{pid}`, else `{why}`); the door waits for the port
+    Revive { id: String, reply: artifact::save::Reply },
     /// the user's mirror of the public pages failed after a publish of `id`
     /// (mirror.rs): one line in main's thread
     Mirror { id: String, error: String },
@@ -52,11 +69,18 @@ pub struct Pages {
     pub port: u16,
     pub token: String,
     pub kit_dir: PathBuf,
+    /// the office SDK's bundles (office/dist: office.js, office-view.js),
+    /// served at /kit/office/ for the viewer (pages/artifact)
+    pub office_dir: PathBuf,
     /// SSE streams of each page id ("" = the home list)
     subs: Mutex<HashMap<String, Vec<Sender<String>>>>,
     to_hub: Mutex<Option<ToHub>>,
     /// each page's last `progress` frames
     progress: Mutex<HashMap<String, std::collections::VecDeque<String>>>,
+    /// each artifact's last live words, for a new stream's first frame
+    /// (pages/artifact/events.rs; the hub knows the maker's turn, this
+    /// thread does not)
+    pub(crate) art_live: Mutex<HashMap<String, Value>>,
     /// the agents at work now (the hub sets it: `set_busy`)
     busy: Mutex<std::collections::BTreeSet<String>>,
     /// (page, agent) → the page's version when that agent became done
@@ -65,7 +89,15 @@ pub struct Pages {
     /// stream holds one while it is open, so a page open in a browser
     /// keeps the hub up
     pub holds: crate::idle::Holds,
+    /// the rows and the overdue count, built again only when a store
+    /// write or the day moves them (crate::store_gen, send-fast): the
+    /// state push asks for them up to 10 times a second
+    rows_memo: Mutex<RowsMemo>,
 }
+
+/// The pages' rows and overdue count, keyed by (store generation, day,
+/// the pages folder's stamp).
+type RowsMemo = crate::store_gen::Memo<(u64, i64, u64), (Vec<bise_proto::rows::Page>, usize)>;
 
 /// The progress lines a new SSE stream replays.
 const PROGRESS_KEPT: usize = 8;
@@ -77,8 +109,8 @@ pub const PAGE_WAIT_MS: u64 = 45_000;
 /// A feed line that shows the agent took an input: a turn started, or a
 /// message steered into the running one.
 pub fn took_input(line: &str) -> bool {
-    let o = line.strip_prefix("  obs: ").unwrap_or("");
-    o == "turn_started" || o.starts_with("steering_received: ") || o.starts_with("steered: ")
+    use bise_proto::thread::lines::{read, Obs, Rec};
+    matches!(read(line), Rec::Obs(Obs::TurnStarted | Obs::SteeringReceived(_) | Obs::Steered(_)))
 }
 
 /// What to do with page messages that `agent` has not taken for
@@ -113,20 +145,24 @@ pub fn new_token() -> String {
 
 impl Pages {
     /// The pages of a hub whose state folder is `state`; `port` 0: none
-    /// (tests of the store alone).
-    pub fn new(state: &Path, port: u16, kit_dir: PathBuf) -> Pages {
+    /// (tests of the store alone). `app_root`: where the kit (`kit/`) and
+    /// the office bundles (`office/dist/`) are, in the repo or a version.
+    pub fn new(state: &Path, port: u16, app_root: &Path) -> Pages {
         Pages {
             store: Store::new(state),
             lock: Mutex::new(()),
             port,
             token: new_token(),
-            kit_dir,
+            kit_dir: app_root.join("kit"),
+            office_dir: app_root.join("office").join("dist"),
             subs: Mutex::new(HashMap::new()),
             to_hub: Mutex::new(None),
             progress: Mutex::new(HashMap::new()),
+            art_live: Mutex::new(HashMap::new()),
             busy: Mutex::new(std::collections::BTreeSet::new()),
             done_at: Mutex::new(HashMap::new()),
             holds: crate::idle::Holds::default(),
+            rows_memo: Mutex::default(),
         }
     }
 
@@ -141,6 +177,8 @@ impl Pages {
         }
         let left: Vec<String> = b.difference(&now).cloned().collect();
         *b = now;
+        // a page row's waiting count reads it (`held`): built again
+        crate::store_gen::bump();
         Some(left)
     }
 
@@ -149,6 +187,7 @@ impl Pages {
     /// one written after the fix; ambient-lead m_6187).
     pub fn mark_done(&self, id: &str, name: &str, version: u64) {
         self.done_at.lock().unwrap_or_else(|e| e.into_inner()).insert((id.to_string(), name.to_string()), version);
+        crate::store_gen::bump();
     }
 
     /// The replies of agent `name`'s items on page `id` (at `version`)
@@ -239,6 +278,27 @@ impl Pages {
         self.store.list().iter().map(|m| self.page_json(m)).collect()
     }
 
+    /// The pages as the typed rows (the hub's snapshot, `hub/pages`),
+    /// newest first.
+    pub fn list_rows(&self) -> Vec<bise_proto::rows::Page> {
+        self.rows_now().0
+    }
+
+    /// The rows and the overdue count, from the memo when no store write
+    /// (nor the day) moved them since its build.
+    fn rows_now(&self) -> (Vec<bise_proto::rows::Page>, usize) {
+        let today = crate::every::local_day(crate::util::now_ms()).unwrap_or(i64::MAX);
+        // a page written by another process moves the stamp (store_gen)
+        let key = (crate::store_gen::now(), today, crate::store_gen::dir_stamp(&self.store.dir));
+        let mut memo = self.rows_memo.lock().unwrap_or_else(|e| e.into_inner());
+        memo.get(key, || (self.fresh_rows(), self.fresh_overdue()))
+    }
+
+    /// The rows built from the store (what the memo keeps).
+    fn fresh_rows(&self) -> Vec<bise_proto::rows::Page> {
+        self.store.list().iter().filter_map(|m| serde_json::from_value(self.page_json(m)).ok()).collect()
+    }
+
     pub fn page_json(&self, m: &Meta) -> Value {
         let notes = self.store.notes(&m.id);
         let open = notes.iter().filter(|n| n.open()).count();
@@ -249,7 +309,7 @@ impl Pages {
         let waiting = self
             .store
             .html(&m.id, m.version())
-            .map_or(0, |h| waiting::of_page_on(&m.id, &h, &notes, &self.store.questions(&m.id), today, &|a| self.held(&m.id, a, m.version())).len());
+            .map_or(0, |h| waiting::of_page_on(&m.id, &h, &notes, &self.store.questions(&m.id), &m.went_blocks(), today, &|a| self.held(&m.id, a, m.version())).len());
         let mut v = json!({
             "id": m.id, "title": m.title, "agent": m.agent, "version": m.version(),
             "url": self.url(&m.id), "at_ms": m.at_ms(), "state": m.state, "open_notes": open,
@@ -271,7 +331,7 @@ impl Pages {
         let mut out = Vec::new();
         for m in self.store.list() {
             let Some(html) = self.store.html(&m.id, m.version()) else { continue };
-            out.extend(waiting::of_page_on(&m.id, &html, &self.store.notes(&m.id), &self.store.questions(&m.id), today, &|a| self.held(&m.id, a, m.version())));
+            out.extend(waiting::of_page_on(&m.id, &html, &self.store.notes(&m.id), &self.store.questions(&m.id), &m.went_blocks(), today, &|a| self.held(&m.id, a, m.version())));
         }
         // his late promises first, across every page (ambient-lead m_5982)
         out.sort_by_key(|w| w.days.is_none());
@@ -281,6 +341,10 @@ impl Pages {
     /// How many promises of his are overdue today, across every page (the
     /// hub's state: the morning page and the menu-bar count).
     pub fn overdue(&self) -> usize {
+        self.rows_now().1
+    }
+
+    fn fresh_overdue(&self) -> usize {
         let Some(today) = crate::every::local_day(crate::util::now_ms()) else { return 0 };
         self.store
             .list()
@@ -305,12 +369,6 @@ impl Pages {
             "ev": "page", "id": m.id, "title": m.title, "agent": m.agent, "version": m.version(),
             "url": self.url(&m.id), "at_ms": m.at_ms(), "state": m.state,
         })
-    }
-
-    /// The pages `agent` is updating (sent notes not answered by a
-    /// publish yet).
-    pub fn updating_of(&self, agent: &str) -> Vec<String> {
-        self.store.list().into_iter().filter(|m| m.state == "updating" && m.agent == agent).map(|m| m.id).collect()
     }
 
     /// An SSE event to every stream of page `id` (a closed one is dropped).
@@ -361,14 +419,39 @@ impl Pages {
     }
 }
 
-/// The page server's port of a workspace: the one kept in
-/// `<state>/pages.port` when it is free, else the first free one from a
-/// hash of the workspace id in 47100-47899 (ports-plan.md), kept.
-pub fn pick_port(state: &Path, workspace_id: &str, free: &dyn Fn(u16) -> bool) -> Option<u16> {
+/// How long a starting hub tries its kept port again while it is busy (the
+/// previous hub may still be stopping: `wait_previous_hub` gives up after
+/// 15 s) before it moves: a move kills every link to the old port, in the
+/// agents' messages and his browser tabs (page-unreach).
+pub const KEPT_WAIT: std::time::Duration = std::time::Duration::from_secs(5);
+/// The pause between two tries of the kept port.
+pub const KEPT_STEP: std::time::Duration = std::time::Duration::from_millis(50);
+
+/// The page server's listener, bound: its port, and the kept port it left
+/// when that one stayed busy (None: it kept its port, or had none).
+pub struct Picked<L> {
+    pub listener: L,
+    pub port: u16,
+    pub moved_from: Option<u16>,
+}
+
+/// The page server's port of a workspace, bound once by `bind` (never a
+/// probe then a second bind: another hub could take it in between, and
+/// the hub ran without a page server while its rows named that port).
+/// The one kept in `<state>/pages.port` first, tried again while `again()`
+/// says so (it waits a step); else the first port `bind` takes from a hash
+/// of the workspace id in 47100-47899 (ports-plan.md), kept in the file.
+pub fn pick_port<L>(state: &Path, workspace_id: &str, bind: &mut dyn FnMut(u16) -> Option<L>, again: &mut dyn FnMut() -> bool) -> Option<Picked<L>> {
     let file = state.join("pages.port");
-    if let Some(p) = std::fs::read_to_string(&file).ok().and_then(|t| t.trim().parse::<u16>().ok()) {
-        if (47100..47900).contains(&p) && free(p) {
-            return Some(p);
+    let kept = std::fs::read_to_string(&file).ok().and_then(|t| t.trim().parse::<u16>().ok()).filter(|p| (47100..47900).contains(p));
+    if let Some(p) = kept {
+        loop {
+            if let Some(listener) = bind(p) {
+                return Some(Picked { listener, port: p, moved_from: None });
+            }
+            if !again() {
+                break;
+            }
         }
     }
     let mut h: u32 = 0x811c_9dc5;
@@ -376,9 +459,9 @@ pub fn pick_port(state: &Path, workspace_id: &str, free: &dyn Fn(u16) -> bool) -
         h = (h ^ b as u32).wrapping_mul(0x0100_0193);
     }
     let start = (h % 800) as u16;
-    let p = (0..800u16).map(|k| 47100 + (start + k) % 800).find(|p| free(*p))?;
-    let _ = std::fs::write(&file, p.to_string());
-    Some(p)
+    let (port, listener) = (0..800u16).map(|k| 47100 + (start + k) % 800).filter(|p| Some(*p) != kept).find_map(|p| bind(p).map(|l| (p, l)))?;
+    let _ = std::fs::write(&file, port.to_string());
+    Some(Picked { listener, port, moved_from: kept })
 }
 
 /// The hub's soft limit on open files up to `want` (never above the hard
@@ -406,14 +489,22 @@ pub fn raise_fd_limit(want: u64) -> u64 {
 
 /// Start the page server of a hub: the port, the listener, its thread.
 /// `holds`: the hub's idle-exit holds (an open event stream holds one).
-pub fn start(state: &Path, workspace_id: &str, kit_dir: PathBuf, holds: crate::idle::Holds) -> std::io::Result<Arc<Pages>> {
+/// Also the kept port it had to leave, for the hub's log (None: kept).
+pub fn start(state: &Path, workspace_id: &str, app_root: &Path, holds: crate::idle::Holds) -> std::io::Result<(Arc<Pages>, Option<u16>)> {
     raise_fd_limit(10240);
-    let free = |p: u16| std::net::TcpListener::bind(("127.0.0.1", p)).is_ok();
-    let port = pick_port(state, workspace_id, &free).ok_or_else(|| std::io::Error::other("no free port in 47100-47899"))?;
-    let listener = std::net::TcpListener::bind(("127.0.0.1", port))?;
-    let pages = Arc::new(Pages { holds, ..Pages::new(state, port, kit_dir) });
-    server::serve(listener, pages.clone());
-    Ok(pages)
+    let mut bind = |p: u16| std::net::TcpListener::bind(("127.0.0.1", p)).ok();
+    let t0 = std::time::Instant::now();
+    let mut again = || {
+        let more = t0.elapsed() < KEPT_WAIT;
+        if more {
+            std::thread::sleep(KEPT_STEP);
+        }
+        more
+    };
+    let picked = pick_port(state, workspace_id, &mut bind, &mut again).ok_or_else(|| std::io::Error::other("no free port in 47100-47899"))?;
+    let pages = Arc::new(Pages { holds, ..Pages::new(state, picked.port, app_root) });
+    server::serve(picked.listener, pages.clone());
+    Ok((pages, picked.moved_from))
 }
 
 #[cfg(test)]
@@ -432,18 +523,64 @@ mod tests {
         assert_eq!(untaken(crate::model::MAIN, PAGE_WAIT_MS), Untaken::Warn);
     }
 
+    /// `pick_port` over a fake bind: the ports `busy` refuses, each try
+    /// counted; `tries` kept-port retries allowed.
+    fn pick(d: &Path, ws: &str, busy: &dyn Fn(u16, usize) -> bool, tries: usize) -> Option<(u16, Option<u16>, usize)> {
+        let mut n = 0;
+        let mut bind = |p: u16| {
+            n += 1;
+            (!busy(p, n)).then_some(p)
+        };
+        let mut left = tries;
+        let mut again = || {
+            let more = left > 0;
+            left = left.saturating_sub(1);
+            more
+        };
+        let got = pick_port(d, ws, &mut bind, &mut again)?;
+        assert_eq!(got.listener, got.port, "the listener is the one bound on its port");
+        Some((got.port, got.moved_from, n))
+    }
+
     #[test]
     fn the_port_is_stable_and_kept() {
         let d = std::env::temp_dir().join(format!("sb-port-{}", std::process::id()));
         std::fs::create_dir_all(&d).unwrap();
-        let p = pick_port(&d, "harness-1234abcd", &|_| true).unwrap();
+        let (p, moved, _) = pick(&d, "harness-1234abcd", &|_, _| false, 0).unwrap();
         assert!((47100..47900).contains(&p));
+        assert_eq!(moved, None, "no port kept yet: nothing moved");
         assert_eq!(std::fs::read_to_string(d.join("pages.port")).unwrap(), p.to_string());
         // kept, even when the hash would give another
-        assert_eq!(pick_port(&d, "other-ws", &|_| true), Some(p));
-        // taken: the next free one from the hash
-        let q = pick_port(&d, "harness-1234abcd", &|x| x != p).unwrap();
-        assert_ne!(q, p);
+        assert_eq!(pick(&d, "other-ws", &|_, _| false, 0).map(|x| x.0), Some(p));
+        let _ = std::fs::remove_dir_all(d);
+    }
+
+    /// page-unreach (Benjamin's dead link): the kept port busy for a moment
+    /// at a start (the previous hub still stopping) is waited for, never
+    /// left: every link to it, in messages and tabs, keeps working.
+    #[test]
+    fn a_kept_port_busy_for_a_moment_is_kept() {
+        let d = std::env::temp_dir().join(format!("sb-port-busy-{}", std::process::id()));
+        std::fs::create_dir_all(&d).unwrap();
+        std::fs::write(d.join("pages.port"), "47415").unwrap();
+        // busy for the first 3 tries, free at the 4th
+        let (p, moved, n) = pick(&d, "harness-1234abcd", &|p, n| p == 47415 && n <= 3, 100).unwrap();
+        assert_eq!((p, moved, n), (47415, None, 4), "the same port, bound once free");
+        assert_eq!(std::fs::read_to_string(d.join("pages.port")).unwrap(), "47415");
+        let _ = std::fs::remove_dir_all(d);
+    }
+
+    /// Busy through the whole wait: the server moves (a hub without one is
+    /// worse), says which port it left, and the file names the new one.
+    #[test]
+    fn a_kept_port_busy_throughout_moves_and_says_so() {
+        let d = std::env::temp_dir().join(format!("sb-port-moved-{}", std::process::id()));
+        std::fs::create_dir_all(&d).unwrap();
+        std::fs::write(d.join("pages.port"), "47415").unwrap();
+        let (q, moved, _) = pick(&d, "harness-1234abcd", &|p, _| p == 47415, 5).unwrap();
+        assert_ne!(q, 47415);
+        assert_eq!(moved, Some(47415), "the port it left, for the hub's log");
+        assert_eq!(std::fs::read_to_string(d.join("pages.port")).unwrap(), q.to_string(), "the rows read the new port at once");
         let _ = std::fs::remove_dir_all(d);
     }
 
@@ -458,7 +595,7 @@ mod tests {
     #[test]
     fn a_page_says_how_many_of_its_items_wait_for_him() {
         let d = std::env::temp_dir().join(format!("sb-wait-{}", std::process::id()));
-        let p = Pages::new(&d, 0, d.join("kit"));
+        let p = Pages::new(&d, 0, &d);
         let html = r#"<section data-kit="checklist" data-id="open"><ol>
 <li data-id="p1" data-who="yours">send Camille the pricing sheet</li>
 <li data-id="p2" data-who="Camille">sign the order</li></ol></section>"#;
@@ -477,7 +614,7 @@ mod tests {
     #[test]
     fn a_reply_is_held_until_the_version_after_its_agents_done() {
         let d = std::env::temp_dir().join(format!("sb-held-{}", std::process::id()));
-        let p = Pages::new(&d, 0, d.join("kit"));
+        let p = Pages::new(&d, 0, &d);
         let busy = |names: &[&str]| names.iter().map(|n| n.to_string()).collect::<std::collections::BTreeSet<_>>();
         assert_eq!(p.set_busy(busy(&["fix-fish"])), Some(vec![]));
         assert!(p.held("fb", "fix-fish", 2) && !p.held("fb", "fix-proxy", 2));

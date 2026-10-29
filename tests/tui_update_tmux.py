@@ -16,6 +16,7 @@ import time
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import e2e  # noqa: E402
 from tui_tmux import tui_session, run, wait_until, MAIN_IDLE  # noqa: E402
+from words import w  # noqa: E402
 
 FAKE_BUILD = r"""#!/bin/sh
 echo "$*" >> "$(dirname "$0")/../build-args"
@@ -53,7 +54,7 @@ def main():
         sc = t.wait("couldn't build %s, you're still on " % head, 30)
         assert "▲ couldn't build" in sc, sc
         assert "could not compile `bise`" in sc, sc
-        t.wait("▸ 20 more lines")
+        t.wait(w("settings.release_more_lines", n=20))
         # the header's item is gone (the answer `already building …` stays in the feed)
         header = lambda: [r for r in t.screen().split("\n") if "bise :*" in r or "bise " in r[:12]][:1]
         wait_until(lambda: header() and ("building %s · " % head) not in header()[0], 10,

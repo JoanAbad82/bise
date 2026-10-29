@@ -13,6 +13,9 @@
 //!   claimed (its file tools' files, `--add`); every other change made
 //!   since it started that is no other agent's is named, never taken.
 //! - Nested repos (`x/`) are never taken: named.
+//! - The claims that are over ([`clean_claims`], land-claims): a claim on
+//!   a file with no change left ends (sb-core drops it), so a file two
+//!   agents once changed can be landed again.
 
 /// More unclaimed changes than this in a worktree are not swept in on
 /// their own (build output git does not ignore): the land says so.
@@ -117,6 +120,24 @@ pub(crate) fn pick(changes: &[Change], claims: &Claims, alone: bool) -> Result<P
         }
     }
     Ok(Picked { mine, left_out })
+}
+
+/// The claims that are over (land-claims): of `claims` (the strings as
+/// the hub keeps them, absolute or relative, with `rel` their path
+/// relative to the place's folder), the ones whose file has no change in
+/// `changes` (the place's `git status` against its tip). A clean file has
+/// nothing left to protect, however it got clean (landed, a hand commit,
+/// a checkout); a claim outside the folder is never over here.
+pub(crate) fn clean_claims(changes: &[Change], claims: &[String], rel: impl Fn(&str) -> Option<String>) -> Vec<String> {
+    let dirty: std::collections::BTreeSet<&String> = changes.iter().flat_map(|c| c.paths()).collect();
+    let mut out: Vec<String> = Vec::new();
+    for c in claims {
+        let over = rel(c).is_some_and(|p| !dirty.contains(&p));
+        if over && !out.contains(c) {
+            out.push(c.clone());
+        }
+    }
+    out
 }
 
 /// The 1-based line numbers of git conflict blocks in `text`: a line
@@ -240,6 +261,31 @@ mod tests {
         pick(changes, &Claims { files: &files, add: &add, others: &others }, alone)
     }
 
+    /// land-claims: a claim on a file with no change left is over; the
+    /// stale claim that blocked a land no longer does once dropped.
+    #[test]
+    fn clean_claims_are_the_claims_on_files_with_no_change() {
+        let rel = |f: &str| crate::land::relative(std::path::Path::new("/w"), f);
+        // @marketing changed tests/k.txt once and landed it: still claimed.
+        // @native-lead changes it again: its land is refused
+        let cs = [ch("tests/k.txt", true), ch("b", true), mv("new.rs", "old.rs")];
+        let blocked = pick_of(&cs, &["tests/k.txt"], &[], &[("marketing", &["tests/k.txt"])], false);
+        assert!(blocked.unwrap_err().contains("also changed by @marketing"));
+        // the claims while tests/k.txt was clean (marketing's land): over
+        let landed = [ch("b", true)];
+        let claims = s(&["/w/tests/k.txt", "b", "tests/k.txt", "/elsewhere/x", "old.rs", "/w/tests/k.txt"]);
+        assert_eq!(clean_claims(&landed, &claims, rel), s(&["/w/tests/k.txt", "tests/k.txt", "old.rs"]));
+        // a claimed file still changed (another agent still editing it,
+        // either side of a rename) stays claimed
+        assert_eq!(clean_claims(&cs, &claims, rel), Vec::<String>::new());
+        // dropped, the new change lands
+        let marketing: Vec<String> = s(&["tests/k.txt"]).into_iter().filter(|c| !clean_claims(&landed, &claims, rel).contains(c)).collect();
+        let others = [("marketing".to_string(), marketing)];
+        let files = s(&["tests/k.txt"]);
+        let p = pick(&cs, &Claims { files: &files, add: &[], others: &others }, false).unwrap();
+        assert_eq!(p.mine, s(&["tests/k.txt"]));
+    }
+
     #[test]
     fn alone_every_change_is_mine_however_it_was_made() {
         // a: a file tool; sed.rs: sed; gone: rm; new.rs (from old.rs): git mv;
@@ -319,6 +365,92 @@ mod tests {
     fn a_change_another_agent_also_made_is_refused_even_alone_claimed() {
         let e = pick_of(&[ch("a", true)], &["a"], &[], &[("y", &["a"]), ("z", &["a"])], false).unwrap_err();
         assert!(e.starts_with("a is also changed by @y, @z"), "{}", e);
+    }
+
+    /// issue 37 #3: rust/proto/fixtures/land_pick.jsonl, today's pick on
+    /// every case of these tests and more, one per line: its input
+    /// (changes, files, add, others, alone) and its answer (mine and
+    /// left_out, or why). sb-core's land.bend reads the same file.
+    /// `BISE_PROTO_BLESS=1` writes it.
+    #[test]
+    fn the_pick_fixture_is_todays_pick() {
+        use serde_json::json;
+        let ch = |p: &str, r: bool| ch(p, r);
+        let many: Vec<Change> = (0..=SWEEP_MAX).map(|i| ch(&format!("out/{:03}", i), true)).chain([ch("a", true)]).collect();
+        let max: Vec<Change> = many[1..].to_vec();
+        let shared = vec![
+            ch("a", true),
+            ch("b", true),
+            ch("c", true),
+            ch("old.txt", false),
+            ch("gone", true),
+            ch("gen/v.svg", true),
+            ch("x/", true),
+            ch("y/", false),
+        ];
+        let alone = vec![ch("a", true), ch("Cargo.lock", false), ch("gone", true), mv("new.rs", "old.rs"), ch("n.txt", true), ch("sed.rs", false), ch("x/", false)];
+        let gen = vec![ch("c", true), ch("gen/v.svg", true), ch("gen/old.rs", false), ch("gen/y.txt", true)];
+        let y: &[(&str, &[&str])] = &[("y", &["gen/y.txt"])];
+        type Case<'a> = (Vec<Change>, &'a [&'a str], &'a [&'a str], &'a [(&'a str, &'a [&'a str])], bool);
+        let cases: Vec<Case> = vec![
+            (alone.clone(), &["a"], &[], &[], true),
+            (alone.clone(), &[], &[], &[], true),
+            (alone.clone(), &["a"], &[], &[], false),
+            (alone, &["a"], &["n.txt"], &[("z", &["sed.rs"])], true),
+            (many, &["a"], &[], &[], true),
+            (max, &["a"], &[], &[], true),
+            (shared.clone(), &["a", "unchanged"], &[], &[("y", &["b"])], false),
+            (shared.clone(), &["a"], &[], &[("y", &["b"])], true),
+            (shared.clone(), &[], &[], &[], false),
+            (shared, &["a"], &["."], &[("y", &["b"])], false),
+            (gen.clone(), &[], &["c"], y, false),
+            (gen.clone(), &[], &["gen/"], y, false),
+            (gen.clone(), &[], &["gen"], y, false),
+            (gen.clone(), &[], &["gen/y.txt"], y, false),
+            (gen.clone(), &[], &["nope"], y, false),
+            (gen.clone(), &[], &["."], y, false),
+            (gen.clone(), &[], &["c", "nope"], y, false),
+            (gen, &["gen/y.txt"], &[], y, true),
+            (vec![mv("b.rs", "a.rs")], &["a.rs"], &[], &[], false),
+            (vec![mv("b.rs", "a.rs")], &["b.rs"], &[], &[], false),
+            (vec![mv("b.rs", "a.rs")], &[], &[], &[], true),
+            (vec![mv("b.rs", "a.rs")], &[], &["a.rs"], &[], false),
+            (vec![ch("a.rs", true), ch("b.rs", true)], &["b.rs"], &[], &[], false),
+            (vec![ch("a", true)], &["a"], &[], &[("y", &["a"]), ("z", &["a"])], false),
+            (vec![ch("a", true)], &[], &[], &[("y", &["a"])], true),
+            (vec![ch("a", true), ch("a", true)], &["a"], &[], &[], false),
+            (vec![ch("x/", true)], &["x/"], &["x"], &[], false),
+            (vec![ch("x/", false), ch("y/", true)], &[], &[], &[], false),
+            (vec![], &["a"], &[], &[], true),
+            (vec![], &[], &["a"], &[], false),
+            (vec![ch("é/ü.txt", true), ch("sp ace", true)], &["sp ace"], &[], &[], false),
+            (vec![ch("d/a", true), ch("d/b", false), ch("dd/c", true)], &[], &["d"], &[], false),
+            (vec![ch("d/a", true), mv("e/b", "d/b")], &[], &["d/"], &[("y", &["e/b"])], false),
+        ];
+        let strs = |xs: &[String]| json!(xs);
+        let lines: Vec<String> = cases
+            .iter()
+            .map(|(cs, files, add, others, alone)| {
+                let input = json!({
+                    "changes": cs.iter().map(|c| json!({"path": c.path, "from": c.from.clone().unwrap_or_default(), "recent": c.recent})).collect::<Vec<_>>(),
+                    "files": files,
+                    "add": add.iter().map(|a| json!([a, a])).collect::<Vec<_>>(),
+                    "others": others.iter().map(|(n, fs)| json!([n, fs])).collect::<Vec<_>>(),
+                    "alone": alone,
+                });
+                let out = match pick_of(cs, files, add, others, *alone) {
+                    Ok(p) => json!({"ok": true, "mine": strs(&p.mine), "left_out": strs(&p.left_out), "why": ""}),
+                    Err(e) => json!({"ok": false, "mine": [], "left_out": [], "why": e}),
+                };
+                json!({"in": input, "out": out}).to_string()
+            })
+            .collect();
+        let text = lines.join("\n") + "\n";
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../proto/fixtures/land_pick.jsonl");
+        if std::env::var("BISE_PROTO_BLESS").is_ok() {
+            std::fs::write(&path, &text).expect("write the fixture");
+        }
+        assert_eq!(std::fs::read_to_string(&path).unwrap_or_default(), text, "land_pick.jsonl: BISE_PROTO_BLESS=1 writes it");
     }
 
     #[test]

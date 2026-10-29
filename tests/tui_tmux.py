@@ -14,8 +14,10 @@ import traceback
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import bise_env  # noqa: E402
+from words import w, w_re  # noqa: E402
 import e2e  # noqa: E402
 import wait  # noqa: E402
+from words import w  # noqa: E402
 
 def tmux(*a):
     return subprocess.run(["tmux", *a], capture_output=True, text=True).stdout
@@ -53,7 +55,17 @@ class Tui:
         tmux("send-keys", "-t", self.name, *k)
 
     def typed(self, text):
-        tmux("send-keys", "-t", self.name, "-l", text)
+        """`text` into the pane. One with an escape sequence (a mouse
+        report, a kitty key) goes in one write, as a terminal sends it:
+        send-keys -l writes it a key at a time, and under load the TUI
+        read its ESC alone (a lone esc) and typed the rest (`[<0;71;8M`
+        in the composer, tui_artifacts_tmux)."""
+        if "\x1b" not in text:
+            tmux("send-keys", "-t", self.name, "-l", text)
+            return
+        buf = "raw-%s" % self.name
+        subprocess.run(["tmux", "load-buffer", "-b", buf, "-"], input=text, text=True, check=True)
+        tmux("paste-buffer", "-d", "-r", "-b", buf, "-t", self.name)
 
     def wait_any(self, conds, timeout=40, poll=0.2, colors=False):
         """Poll the screen (with its SGR escapes if `colors`) until one of
@@ -87,6 +99,16 @@ class Tui:
     def wait(self, needle, timeout=40):
         """Wait for the text `needle` on the screen; return the screen."""
         return self.wait_any([needle], timeout)[1]
+
+    def wait_all(self, needles, timeout=40):
+        """Wait until every text of `needles` is on one screen; return it.
+        For a screen drawn from several states (the hub's mode, the
+        provider, a later event): a wait on one of them then asserts on
+        the others reads the screen before the rest arrived, under load."""
+        def every(sc):
+            return all(n in sc for n in needles)
+        every.__doc__ = "all of %r" % (needles,)
+        return self.wait_any([every], timeout)[1]
 
     def wait_re(self, pattern, timeout=40):
         """Wait for the regex `pattern` on the screen (multiline)."""
@@ -151,7 +173,7 @@ class Tui:
             refuse_other_root(self.E.state)
         sock = os.path.join(self.E.state, "hub.sock")
         try:
-            e2e.Client(sock).send({"op": "stop_hub"})
+            e2e.stop_hub(sock)
             wait.until(lambda: not os.path.exists(sock), 1, "the hub's socket gone", poll=0.05)
         except Exception:
             pass
@@ -205,22 +227,30 @@ def in_view(name):
 MAIN_IDLE = r"\b0 ○ main\b|you → main(?: · [\w.\-]+(?:[ ·][\w.\-]+)*)* ─"
 
 
-PLACEHOLDER = re.compile(r"^(what's on your mind\?|talk to \S+ directly)$")
+# a sub-agent's: 'write to perf, then ⏎ · esc back to main', its head dropped when it doesn't fit
+PLACEHOLDER = re.compile(r"^(%s|(?:%s · )?%s|%s)$" % (
+    re.escape(w("composer.placeholder_main")), w_re("composer.placeholder_to"),
+    w_re("composer.esc_back_to"), w_re("composer.placeholder_to")))
 
 
 def pane_rows(rows):
     """The composer's rows (BISE-98): from the bottom, the first run of
-    rows whose text, inside the frame's edges, starts with the bar `│`
-    (the key bar and the frame's bottom edge are skipped; a popup may
-    hide the divider); each row's text after the bar."""
+    rows whose text, inside the frame's edges, starts with the bar `│`,
+    or `┃` while his words answer an open item (sb/answer_target.rs),
+    the same bar all the run long: a popup's `┃` edge over the composer
+    ends it (the key bar and the frame's bottom edge are skipped; a
+    popup may hide the divider); each row's text after the bar."""
     out = []
+    bar = None
     for r in reversed(rows):
         r = r.rstrip()
         if r.startswith("│"):
             r = r[1:].rstrip()
             if r.endswith("│"):
                 r = r[:-1]
-        if r.lstrip().startswith("│"):
+        mark = r.lstrip()[:1]
+        if mark in ("│", "┃") and mark == (bar or mark):
+            bar = mark
             text = r.lstrip()[1:].strip()
             # the empty composer's dim placeholder is not text
             out.append("" if PLACEHOLDER.match(text) else text)
@@ -275,6 +305,7 @@ def start_tui(E, cols, rows, extra_env, session):
     # double quotes still run backticks and $(…) (an agent's BEND_TOOLS_NOTE
     # holds `node`: the pane ran a node REPL and bise never started)
     bise_env.refuse_real_home(E.env)
+    bise_env.refuse_real_keys(E.env)
     envs = " ".join("%s=%s" % (k, shlex.quote(v)) for k, v in pane_env(E.env).items())
     unset = " ".join("-u " + k for k in pane_unset(E.env))   # tmux's server env may carry them
     # a TUI that exits early leaves its last screen and its exit code
@@ -288,9 +319,10 @@ def start_tui(E, cols, rows, extra_env, session):
 
 def main():
     with tui_session(150, 42) as t:
-        sc = t.wait("bise :*")
+        # the keybar is on the screen once main's view is drawn whole: the
+        # first frame with "bise :*" can come before it (red under load)
+        t.wait_all(["bise :*", "@ file   $ skills   / commands"])
         t.wait_re(in_view("main"))
-        assert "@ file   $ skills   / commands" in sc, sc
         t.wait_re(MAIN_IDLE)
         t.typed('crée [[bash: sb spawn t1 --objective "écris {{bash: echo hi-t1}}"]]')
         t.keys("Enter")
@@ -303,7 +335,7 @@ def main():
         sc = t.wait("⏎ enter   space preview")
         t.keys("Enter")
         sc = t.wait_re(in_view("t1"))
-        assert "you're talking to t1 directly. main isn't in the loop. esc back to main." in sc, sc
+        assert w("composer.talking_directly", agent="t1") in sc, sc
         # its brief, folded (BISE-12)
         assert "brief" in sc, sc
         t.wait("done: tool bash ok: hi-t1")
@@ -324,20 +356,29 @@ def main():
         t.keys("M-Down")
         t.keys("M-Down")
         t.keys("Space")
-        t.wait("preview of t1")
+        t.wait(w("panel.preview_of", agent="t1"))
         t.keys("Escape")
         # a slash command and its notice
         t.typed("/agents")
         t.keys("Enter")
         t.wait("écris {{bash: echo hi-t1}}")
-        # archive from the panel with D: it asks first (BISE-43), y archives
+        # archive from the panel with D: it asks first (BISE-43), y archives.
+        # t1 idle first (its turn on "salut t1" ended: ○ in the panel):
+        # archived mid-turn, the hub asks again ("the agent is mid-turn.
+        # [y/N]", y then ⏎) and the archive never came, red under load
+        t.wait_re(r"\b1 ○ t1\b", 60)
         t.keys("M-Down")
         t.keys("M-Down")
         t.typed("D")
-        t.wait("archive t1? /restore brings it back. y / n")
+        t.wait(w("composer.drop_question", agent="t1"))
         t.typed("y")
         t.wait("@t1 archived", 20)
-        t.wait("1 archived")
+        t.wait(w("panel.archived_count", n=1))
+        # /agents lists live agents only: t1 now under /archived
+        t.typed("/agents")
+        t.keys("Enter")
+        t.wait("no live agents")
+        t.wait("1 archived: /archived")
         print(t.screen())
     print("PASS tui")
 

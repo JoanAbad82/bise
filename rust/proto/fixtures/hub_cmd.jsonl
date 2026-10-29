@@ -1,20 +1,19 @@
-{"cmd":"hello","proto":1}
 {"cmd":"subscribe","project":"acme-1a2b3c4d","agent":"perf"}
 {"cmd":"subscribe","project":"acme-1a2b3c4d","agent":"perf","limit":60}
 {"cmd":"unsubscribe","project":"acme-1a2b3c4d","agent":"perf"}
 {"cmd":"page","project":"acme-1a2b3c4d","agent":"perf","before":200,"limit":60}
+{"cmd":"find","project":"acme-1a2b3c4d","agent":"perf","needle":"bench","rid":7}
 {"cmd":"page","project":"acme-1a2b3c4d","agent":"perf","before":4}
 {"cmd":"send","project":"acme-1a2b3c4d","agent":"perf","text":"look at the cold bench","mode":"now"}
 {"cmd":"send","project":"acme-1a2b3c4d","agent":"perf","text":"and the warm one","mode":"now","cid":12}
 {"cmd":"send","project":"acme-1a2b3c4d","agent":"main","text":"then the warm one","mode":"queued"}
 {"cmd":"send","project":"acme-1a2b3c4d","agent":"main","text":"why is this slow?","mode":"now","context":{"app":"Safari","url":"https://grafana.acme.test/d/p99","title":"p99 latency"}}
-{"cmd":"send","project":"acme-1a2b3c4d","agent":"main","text":"what stands out here","mode":"now","files":["/Users/ana/notes/q3-notes.md","/Users/ana/Desktop/shot.png"]}
+{"cmd":"send","project":"acme-1a2b3c4d","agent":"main","text":"what stands out here","mode":"now"}
+{"cmd":"send","project":"acme-1a2b3c4d","agent":"main","text":"","mode":"now","cid":13,"parts":[{"kind":"text","text":"regarding "},{"kind":"image","name":"[Image #1]","source":"/Users/ana/Desktop/a.png"},{"kind":"text","text":" and "},{"kind":"quote","from":"main","text":"the cache is warm","n":2},{"kind":"text","text":", which is right?"}]}
 {"cmd":"answer","project":"acme-1a2b3c4d","card":9,"reply":"1"}
 {"cmd":"answer","project":"acme-1a2b3c4d","card":10,"reply":"yes"}
-{"cmd":"answer","project":"acme-1a2b3c4d","card":11,"reply":"this one","files":["/Users/ana/Desktop/shot.png"]}
+{"cmd":"answer","project":"acme-1a2b3c4d","card":11,"reply":"this one"}
 {"cmd":"close","project":"acme-1a2b3c4d","card":9}
-{"cmd":"confirm","project":"acme-1a2b3c4d","id":3,"yes":true}
-{"cmd":"confirm","project":"acme-1a2b3c4d","id":4,"yes":false}
 {"cmd":"approvals","project":"acme-1a2b3c4d"}
 {"cmd":"approvals","project":"acme-1a2b3c4d","mode":"toggle"}
 {"cmd":"remove_rule","project":"acme-1a2b3c4d","rule":{"tool":"bash","pattern":"cargo test *","project":"/Users/me/acme","added":"1791100000000","from":"card #3, perf"}}
@@ -23,19 +22,28 @@
 {"cmd":"archive","project":"acme-1a2b3c4d","agent":"old-fix","force":false}
 {"cmd":"unarchive","project":"acme-1a2b3c4d","agent":"old-fix"}
 {"cmd":"artifacts_seen","project":"acme-1a2b3c4d"}
-{"cmd":"hello","proto":1,"typed_only":true}
 {"cmd":"diff","project":"acme-1a2b3c4d","agent":"perf"}
 {"cmd":"tool_out","project":"acme-1a2b3c4d","agent":"perf","pos":4}
+{"cmd":"queued_take","project":"acme-1a2b3c4d","agent":"perf","id":3}
+{"cmd":"queued_steer","project":"acme-1a2b3c4d","agent":"perf","id":3}
 {"cmd":"diff","project":"acme-1a2b3c4d","agent":"perf","commit":"e0f3df5a9c1b2d3e4f5a6b7c8d9e0f1a2b3c4d5e"}
 {"cmd":"worktrees","project":"acme-1a2b3c4d"}
-{"cmd":"dev_servers","project":"acme-1a2b3c4d"}
+{"cmd":"processes","project":"acme-1a2b3c4d"}
+{"cmd":"processes","project":"acme-1a2b3c4d","watch":true}
+{"cmd":"proc_out","project":"acme-1a2b3c4d","agent":"perf","id":"bg3.1791100100"}
+{"cmd":"proc_out","project":"acme-1a2b3c4d","agent":"perf","id":"bg3.1791100100","from":62}
+{"cmd":"proc_follow","project":"acme-1a2b3c4d","agent":"perf","id":"bg3.1791100100","on":true}
+{"cmd":"proc_stop","project":"acme-1a2b3c4d","agent":"perf","id":"bg3.1791100100"}
+{"cmd":"proc_stop","project":"acme-1a2b3c4d","agent":"perf","all":true}
 {"cmd":"route_correct","project":"bise-home-00000000","rid":3,"to":"shop-5e6f7a8b"}
 {"cmd":"route_cancel","project":"bise-home-00000000","rid":3}
 {"cmd":"merged","project":"acme-1a2b3c4d"}
 {"cmd":"features","project":"acme-1a2b3c4d"}
 {"cmd":"prs","project":"acme-1a2b3c4d"}
+{"cmd":"inbox_history","project":"acme-1a2b3c4d","agent":"perf","state":"answered","words":"avif","before":12,"limit":50}
 {"cmd":"scheduled","project":"acme-1a2b3c4d"}
 {"cmd":"scheduled_stop","project":"acme-1a2b3c4d","id":48}
+{"cmd":"wake_stop","project":"acme-1a2b3c4d","id":7}
 {"cmd":"models","project":"acme-1a2b3c4d"}
 {"cmd":"new","project":"acme-1a2b3c4d","name":"fix","brief":"-w the login button: keep its label","worktree":true,"with_changes":true}
 {"cmd":"new","project":"acme-1a2b3c4d","brief":"x: look at the flaky e2e"}
@@ -46,3 +54,41 @@
 {"cmd":"follow","project":"acme-1a2b3c4d","agent":"perf","on":false}
 {"cmd":"slash","project":"acme-1a2b3c4d","agent":"perf","line":"/rename perf perf2","cid":31}
 {"cmd":"slash","project":"acme-1a2b3c4d","agent":"main","line":"/flow"}
+{"cmd":"slash","project":"acme-1a2b3c4d","agent":"main","line":"@fix encore","mode":"now","voice":true,"via":"capsule"}
+{"cmd":"slash","project":"acme-1a2b3c4d","agent":"perf","line":"why is this slow?","mode":"queued","context":{"app":"Safari","url":"https://grafana.acme.test/d/p99","title":"p99 latency"}}
+{"cmd":"send","project":"acme-1a2b3c4d","agent":"main","text":"what's running?","mode":"now","via":"capsule","voice":true}
+{"cmd":"diff","project":"acme-1a2b3c4d","branch":"sb/perf","req":4}
+{"cmd":"diff","project":"acme-1a2b3c4d","pr":31,"req":5}
+{"cmd":"diff","project":"acme-1a2b3c4d","agent":"perf","range":"e0f3df5^..e0f3df5","req":6}
+{"cmd":"branches","project":"acme-1a2b3c4d"}
+{"cmd":"scheduled_run","project":"acme-1a2b3c4d","id":48}
+{"cmd":"artifacts_add","project":"acme-1a2b3c4d","agent":"perf","target":"bench/report.html"}
+{"cmd":"artifacts_add","project":"acme-1a2b3c4d","agent":"main","target":"https://acme.test/deck","title":"Q3 deck"}
+{"cmd":"focus","project":"acme-1a2b3c4d","focus":"perf"}
+{"cmd":"versions","project":"acme-1a2b3c4d"}
+{"cmd":"version_info","project":"acme-1a2b3c4d"}
+{"cmd":"version_switch","project":"acme-1a2b3c4d","to":"v2026.10.2-27"}
+{"cmd":"version_rollback","project":"acme-1a2b3c4d"}
+{"cmd":"version_restart","project":"acme-1a2b3c4d"}
+{"cmd":"version_restart","project":"acme-1a2b3c4d","to":"latest"}
+{"cmd":"version_update","project":"acme-1a2b3c4d"}
+{"cmd":"bise_update","project":"acme-1a2b3c4d"}
+{"cmd":"release_plan","project":"acme-1a2b3c4d","dry":true}
+{"cmd":"release_run","project":"acme-1a2b3c4d","tag":"v2026.10.3","commit":"e0f3df5a9c1b2d3e4f5a6b7c8d9e0f1a2b3c4d5e"}
+{"cmd":"stop_hub","project":"acme-1a2b3c4d"}
+{"cmd":"stop_hub","project":"acme-1a2b3c4d","keep_agents":true}
+{"cmd":"page_voice","project":"acme-1a2b3c4d","page":"weekly-update","phase":"start"}
+{"cmd":"page_voice","project":"acme-1a2b3c4d","page":"weekly-update","phase":"heard","text":"make the intro shorter"}
+{"cmd":"log","project":"acme-1a2b3c4d","agent":"perf"}
+{"cmd":"log","project":"acme-1a2b3c4d","agent":"perf","before":212}
+{"cmd":"usage","project":"acme-1a2b3c4d"}
+{"cmd":"pause","project":"acme-1a2b3c4d"}
+{"cmd":"resume","project":"acme-1a2b3c4d"}
+{"cmd":"log","project":"acme-1a2b3c4d","agent":"perf","before":13893632,"find":"hero"}
+{"cmd":"completion","project":"acme-1a2b3c4d","agent":"perf"}
+{"cmd":"completion","project":"acme-1a2b3c4d","agent":"perf","slot":3,"provider":"openai/gpt-5","raw":true,"find":"bench"}
+{"cmd":"log_body","project":"acme-1a2b3c4d","agent":"perf","of":{"of":"row","pos":212}}
+{"cmd":"log_body","project":"acme-1a2b3c4d","agent":"perf","of":{"of":"block","slot":3,"req":41,"provider":"openai/gpt-5","raw":true,"row":4,"block":1}}
+{"cmd":"artifacts_move","project":"acme-1a2b3c4d","ids":["perf-notes","report-html"],"folder":"f-abcdefghij","to":"site","keep_undo":true}
+{"cmd":"artifacts_folders","project":"acme-1a2b3c4d","op":{"make":{"name":"pricing","parent":"f-abcdefghij"}}}
+{"cmd":"artifacts_library","project":"acme-1a2b3c4d"}

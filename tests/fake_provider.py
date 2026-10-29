@@ -26,6 +26,10 @@ the injected <bise_state> block is not one):
   verbatim (markdown kept), instead of "done: …" / "ack: …";
 - `[[ts: CODE]]`: a run_typescript call with that program (CODE without
   `]]`);
+- `[[say: TEXT]]`: every tool-call reply to that message starts with
+  TEXT (text, then the call, in one reply);
+- `[[usage: N]]`: every reply to that message reports N input tokens
+  (a non-zero context gauge without $FAKE_SCRIPTS; qa-flows m_20438);
 - `[[think: TEXT]]`: every reply to that message starts with reasoning
   TEXT (Anthropic thinking + signature, reasoning_content, a Responses
   reasoning item, Gemini thought parts + thoughtSignature);
@@ -33,6 +37,10 @@ the injected <bise_state> block is not one):
   that message fail (N = 1), then the script goes on. KIND: 429, 500,
   overloaded (Anthropic 529, the others 503), stream (a 200 stream that
   breaks with the family's error event; a whole reply gets a 500),
+  cut (the same, but the error event comes after two thirds of the
+  answer's events: the text started streaming, then the stream broke;
+  a turn that is a bare tool call streams the `[[reply: PATH]]` text
+  instead, so the retry can answer with the call alone),
   badname (a final 400: the API refusing a tool name, BISE-293).
   Several markers fail in their order. `retry=S` sets Retry-After (1);
 - `[[slow: S]]`: every request for that message waits S seconds (a
@@ -48,6 +56,10 @@ the injected <bise_state> block is not one):
   in two in the middle (inside an event), S seconds between the halves;
   the log line has its sha256 (`split_sha`): the client must read it
   byte for byte across a pause longer than its quiet slice (issue 13);
+- `[[pieces: N S]]` (streamed): the whole streamed body re-cut every N
+  bytes, S seconds between the pieces, whatever the events: an event
+  split across pieces, an event boundary (and a block's) inside one. The
+  answer streams in slowly (the partial lines, runtime/live-pure.bend);
 - `[[fixture: NAME]]`: the first request for that message is answered
   with the recorded file tests/providers/<family>/NAME.sse (streamed) or
   NAME.json (whole), or NAME.<status>.json (an error with that status),
@@ -86,6 +98,7 @@ import socketserver
 import sys
 import threading
 import time
+from fake_plan import bearer_of, is_jwt, plan_model_error, plan_models
 import urllib.request
 import zlib
 
@@ -96,14 +109,23 @@ FAMILIES = ("anthropic", "openai-chat", "openai-responses", "gemini")
 MARK = re.compile(r"\[\[(bash|skill|edit|write_file|apply_patch|run_typescript|ts): (.*?)\]\]", re.S)
 INNER = re.compile(r"\{\{(bash): (.*?)\}\}", re.S)
 THINK = re.compile(r"\[\[think: (.*?)\]\]", re.S)
+SAY = re.compile(r"\[\[say: (.*?)\]\]", re.S)
 REPLY = re.compile(r"\[\[reply: ([^\]\n]+)\]\]")
 ERROR = re.compile(r"\[\[error: (\w+)(?: x(\d+))?(?: retry=(\d+))?\]\]")
 FIXTURE = re.compile(r"\[\[fixture: ([\w.-]+)\]\]")
 SLOW = re.compile(r"\[\[slow: ([\d.]+)\]\]")
 DRIP = re.compile(r"\[\[drip: (\d+) ([\d.]+)\]\]")
 SPLIT = re.compile(r"\[\[split: ([\d.]+)\]\]")
+PIECES = re.compile(r"\[\[pieces: (\d+) ([\d.]+)\]\]")
 PLAN = re.compile(r"\[\[plan: ([\w-]+)(?: x(\d+))?\]\]")
+USAGE_MARK = re.compile(r"\[\[usage: (\d+)\]\]")
 USAGE = {"input": 10, "cached": 2, "output": 5, "reasoning": 3}
+
+
+def usage_of(turn):
+    """The call's token counts: USAGE, or a script's own "usage" {"input", "output", ...} (the
+    rich world's agent whose head carries 'context 44k · 17%', ambient-lead m_17350)."""
+    return dict(USAGE, **(turn.get("usage") or {}))
 
 
 # ---------------------------------------------------------------- requests
@@ -244,6 +266,9 @@ def agent_of(conv):
             # the hub's one-shot call for a task's role line (BISE-126)
             if m["text"].startswith("# bise role line"):
                 return "(role line)"
+            # the hub's one-shot call for a timer's name (sched-names, every_name.rs)
+            if m["text"].startswith("# bise timer name"):
+                return "(timer name)"
             # auto mode's checker as a chat model (approvals, design §4.2)
             if m["text"].startswith("# bise checker"):
                 return "(checker)"
@@ -258,13 +283,99 @@ def agent_of(conv):
     return "?"
 
 
+NUDGE = "[bise] The message(s) just above arrived while you were writing your last answer"
+
+
 def last_user(conv):
-    """index of the last real user message (the state block is not one)"""
+    """index of the last real user message (the state block is not one).
+    The hub's nudge after a steered turn ("[bise] The message(s) just
+    above arrived ...", sb-core's fx say) is not the message to answer:
+    a real model answers the messages above it, so this is the last real
+    user message before it (the steered one, which the REPL puts before
+    or after the answer it came during: its script runs, as if it had
+    come at idle). A test's say that lands while main answers another
+    message (a task's reply, a job's wake) is then still run, whatever
+    the load (core_restart, repl_recycle_e2e)."""
     idx = None
     for i, m in enumerate(conv):
         if m["role"] == "user" and not m["text"].lstrip().startswith("<bise_state>"):
             idx = i
+    if idx is not None and conv[idx]["text"].lstrip().startswith(NUDGE):
+        for i in range(idx - 1, -1, -1):
+            m = conv[i]
+            if m["role"] == "user" and not m["text"].lstrip().startswith(("<bise_state>", NUDGE)):
+                return i
+    # a message steered into a turn of tool calls (it follows a tool
+    # result) does not end the script the turn runs: a real model goes on
+    # with its plan and answers it after (the hub's nudge then asks).
+    # While the message that started the turn has markers left, it is the
+    # one to follow (tui_demo_tips: pm's reply came in after its spawn and
+    # the third spawn, dev-api's, never ran)
+    while idx is not None and steered_mid_turn(conv, idx):
+        start = turn_start(conv, idx)
+        if start is None or not markers_left(conv, start):
+            break
+        idx = start
     return idx
+
+
+# the Core's compaction prompt (bend/core/compaction.bend compaction_prompt) and the [[done: N]]
+# a fake summary carries
+COMPACT_PROMPT = "Summarize the conversation so far for the agent that continues it."
+DONE_MARK = re.compile(r"\[\[done: (\d+)\]\]")
+
+
+def calls_done_of(conv, i):
+    """The script calls of conv[i] that ran: the ones after it, plus what a compaction summary
+    before it says ran ([[done: N]]: the calls it replaced)."""
+    after = sum(m["calls"] for m in conv[i + 1:] if m["role"] == "assistant")
+    before = [int(d) for m in conv[:i] if m["role"] == "user" for d in DONE_MARK.findall(m["text"])]
+    return after + (before[-1] if before else 0)
+
+
+def compacted_calls(prev):
+    """What a compaction summary says ran: the last summary's count plus the calls after it (the
+    request carries the newest messages that fit, so the task's own message may be cut off)."""
+    marks = [(j, int(d)) for j, m in enumerate(prev) if m["role"] == "user" for d in DONE_MARK.findall(m["text"])]
+    start, k = marks[-1] if marks else (-1, 0)
+    return k + sum(m["calls"] for m in prev[start + 1:] if m["role"] == "assistant")
+
+
+def is_real_user(m):
+    return m["role"] == "user" and not m["text"].lstrip().startswith("<bise_state>")
+
+
+def steered_mid_turn(conv, i):
+    """conv[i], a user message, came after a tool result (state blocks
+    aside): steering into a running turn of tool calls."""
+    for j in range(i - 1, -1, -1):
+        if is_real_user(conv[j]):
+            return False
+        if conv[j]["role"] == "tool":
+            # a call stopped by an interrupt ends its turn: the message
+            # after it starts a new one, the batch's next call never runs
+            # (interrupt_e2e C/D: 'hello again' ran 'echo second-call')
+            return "interrupted by" not in conv[j]["text"]
+        if conv[j]["role"] == "assistant":
+            return False
+    return False
+
+
+def turn_start(conv, i):
+    """The real user message before conv[i] that started its turn."""
+    for j in range(i - 1, -1, -1):
+        if is_real_user(conv[j]):
+            return j
+    return None
+
+
+def markers_left(conv, i):
+    """The script of conv[i] has calls not made yet in the turn after it."""
+    user = script_of(conv[i]["text"])
+    sc = scripted(user)
+    n = len(sc.get("calls", [])) if sc else len(MARK.findall(user) or INNER.findall(user))
+    done = sum(m["calls"] for m in conv[i + 1:] if m["role"] == "assistant")
+    return done < n
 
 
 # ------------------------------------------------------------------ script
@@ -338,6 +449,10 @@ def reply_for(conv, seen=0):
     [{"id", "name", "args"}], "error", "fixture"}. `seen`: how many
     requests for the same user message came before this one."""
     turn = {"text": "", "reasoning": "", "calls": [], "error": None, "fixture": None}
+    if agent_of(conv) == "(timer name)":
+        # a fixed name, as a model would write it (the hub cleans it: "fake timer name")
+        turn["text"] = "\"Fake Timer Name.\""
+        return turn
     if agent_of(conv) == "(role line)":
         # a fixed line (the tests read it in the snapshot), never a script; FAKE_PLAIN: the line a
         # model would write, from what the agent was asked
@@ -356,12 +471,30 @@ def reply_for(conv, seen=0):
         turn["text"] = json.dumps({"contained": not risky, "serves_task": True, "secrets": False})
         return turn
     if agent_of(conv) == "(route pick)":
-        # `[[route: N]]` in his words: the N-th project listed; else none
+        # `[[route: N]]` in his words: the N-th project listed; `[[route: <name>]]`: the listed
+        # project whose name starts with it (qa-native m_18165: 'shop' every time, whatever the
+        # order); else none
         text = " ".join(m["text"] for m in conv if m["role"] == "user")
-        n = re.search(r"\[\[route: (\d+)\]\]", text)
-        names = re.findall(r"project: ([^\n]+)", text.replace("\\n", "\n"))
-        k = int(n.group(1)) - 1 if n else -1
-        turn["text"] = names[k].strip() if 0 <= k < len(names) else "none"
+        n = re.search(r"\[\[route: ([^\]]+)\]\]", text)
+        names = [x.strip() for x in re.findall(r"project: ([^\n]+)", text.replace("\\n", "\n"))]
+        want = n.group(1).strip() if n else ""
+        if want.isdigit():
+            k = int(want) - 1
+            turn["text"] = names[k] if 0 <= k < len(names) else "none"
+        else:
+            hit = [x for x in names if want and x.startswith(want)]
+            turn["text"] = hit[0] if hit else "none"
+        return turn
+    if conv and conv[-1]["role"] == "user" and conv[-1]["text"].lstrip().startswith(COMPACT_PROMPT):
+        # a compaction request: like a real model, the summary says how much of the task is
+        # done ([[done: N]], the script's calls that ran), so the turn that goes on from it
+        # runs the rest of the script, not the whole script again (compact_resume_e2e)
+        prev = conv[:-1]
+        i = last_user(prev)
+        key = script_of(prev[i]["text"]) if i is not None else ""
+        with State.lock:
+            done = max(compacted_calls(prev), State.done.get(key, 0))
+        turn["text"] = "<summary>[[done: %d]] the task so far: %d call(s) of its script ran; next: the rest</summary>" % (done, done)
         return turn
     idx = last_user(conv)
     if idx is None:
@@ -369,6 +502,18 @@ def reply_for(conv, seen=0):
         return turn
     user = script_of(conv[idx]["text"])
     errs = errors_of(user)
+    if seen < len(errs) and errs[seen]["kind"] == "cut":
+        # the answer's text streams in before the break: the turn the
+        # script gives once its errors are over (a fixture never)
+        turn = reply_for(conv, len(errs) + 1)
+        turn["error"] = errs[seen]
+        rep = REPLY.search(user)
+        if not turn["text"] and rep:
+            try:
+                turn["text"], turn["calls"] = open(rep.group(1).strip(), encoding="utf-8").read(), []
+            except OSError:
+                pass
+        return turn
     if seen < len(errs):
         turn["error"] = errs[seen]
         return turn
@@ -378,11 +523,25 @@ def reply_for(conv, seen=0):
         return turn
     think = THINK.search(user)
     turn["reasoning"] = think.group(1).strip() if think else ""
+    um = USAGE_MARK.search(user)
+    if um:
+        turn["usage"] = {"input": int(um.group(1))}
     after = conv[idx + 1:]
-    calls_done = sum(m["calls"] for m in after if m["role"] == "assistant")
+    calls_done = calls_done_of(conv, idx)
     sc = scripted(user)
     if sc:
         marks = [(c["tool"], c["arg"] if isinstance(c["arg"], str) else json.dumps(c["arg"])) for c in sc.get("calls", [])]
+        # "think": the script's first step starts with that reasoning (the window's thinking row)
+        if sc.get("think") and calls_done == 0:
+            turn["reasoning"] = sc["think"]
+        # "stream" on a call step too (not a duplicate of the reply step's: a call step returns
+        # before it): it paces the first step's reasoning, the thinking row (50703855 removed this
+        # one as a copy, so the bar's thinking came in 3 deltas, not the script's chunks)
+        if isinstance(sc.get("stream"), dict):
+            turn["stream"] = sc["stream"]
+        # "usage": this script's calls report these token counts (usage_of)
+        if isinstance(sc.get("usage"), dict):
+            turn["usage"] = sc["usage"]
     else:
         marks = MARK.findall(user) or INNER.findall(user)
     if calls_done < len(marks):
@@ -404,9 +563,19 @@ def reply_for(conv, seen=0):
             cmd, desc = arg.split(" @@ ", 1)
             args = {"arg": cmd.strip(), "description": desc.strip()}
         turn["calls"] = [{"id": "call_%d_%d" % (idx, calls_done), "name": tool, "args": args}]
+        # what a summary of this task will say ran: a compaction request carries only the
+        # newest messages that fit, so the oldest calls are not in it (the summarizer saw them)
+        with State.lock:
+            State.done[user] = max(State.done.get(user, 0), calls_done + 1)
+        say = SAY.search(user)
+        if say:
+            turn["text"] = say.group(1).strip()
         return turn
     if sc:
         turn["text"] = sc.get("reply") or plain(PLAIN_DONE, user)
+        # "stream": {"chunks": N, "every": S}: the answer goes out as N text deltas S seconds apart
+        if isinstance(sc.get("stream"), dict):
+            turn["stream"] = sc["stream"]
         return turn
     # `[[reply: PATH]]`: once every call ran, the answer is that file's text verbatim (long
     # markdown, code blocks, tables: ambient-qa's rich world)
@@ -433,6 +602,10 @@ def reply_for(conv, seen=0):
     # image, text `</image>` (docs/images.md): a model says `[Image #1]`,
     # it does not echo the framing
     user = re.sub(r'<image name=(\[[^\]]*\])[^>]*>\s*</image>', r"\1", user)
+    # his own words come framed `<user_message id="m_2">…</user_message>`
+    # (msg-forward): a model answers the words, not the frame; a routed one
+    # (`via="main"`) keeps its frame, the tests check the route by it
+    user = re.sub(r'<user_message id="[^"]*">\s*(.*?)\s*</user_message>', r"\1", user, flags=re.S)
     turn["text"] = "ack: " + " ".join(user.split())[:300]
     return turn
 
@@ -445,6 +618,49 @@ def pieces(s, n=3):
     return [s[i:i + k] for i in range(0, len(s), k)]
 
 
+def text_pieces(s, turn):
+    """the answer's text deltas: pieces(s) (3), or a script's "stream": {"chunks": N}: exactly N
+    (fewer only when s is shorter), cut evenly"""
+    st = turn.get("stream") or {}
+    if not st.get("chunks") or not s:
+        return pieces(s)
+    n = max(1, min(int(st["chunks"]), len(s)))
+    return [s[i * len(s) // n:(i + 1) * len(s) // n] for i in range(n)]
+
+
+def is_text_delta(family, name, data):
+    """this SSE event carries a piece of the answer's text (not thinking, not a tool call)"""
+    if not isinstance(data, dict):
+        return False
+    if family == "anthropic":
+        return data.get("type") == "content_block_delta" and (data.get("delta") or {}).get("type") == "text_delta"
+    if family == "openai-responses":
+        return name == "response.output_text.delta"
+    if family == "gemini":
+        parts = [p for c in data.get("candidates", []) for p in (c.get("content") or {}).get("parts", [])]
+        return any("text" in p and not p.get("thought") for p in parts)
+    ch = data.get("choices") or [{}]
+    return bool((ch[0].get("delta") or {}).get("content"))
+
+
+def is_think_delta(family, name, data):
+    """this SSE event carries a piece of the reasoning (paced like the text under a script's "stream",
+    so the window's thinking row runs for a while: 'thought N s')"""
+    if not isinstance(data, dict):
+        return False
+    if family == "anthropic":
+        return data.get("type") == "content_block_delta" and (data.get("delta") or {}).get("type") == "thinking_delta"
+    if family == "openai-responses":
+        return name == "response.reasoning_summary_text.delta"
+    if family == "gemini":
+        parts = [p for c in data.get("candidates", []) for p in (c.get("content") or {}).get("parts", [])]
+        return any("text" in p and p.get("thought") for p in parts)
+    ch = data.get("choices") or [{}]
+    d = ch[0].get("delta") or {}
+    blocks = d.get("content") if isinstance(d.get("content"), list) else []
+    return bool(d.get("reasoning_content")) or any(b.get("type") == "thinking" for b in blocks)
+
+
 # ------------------------------------------------------------------ errors
 # (status, headers, body) of an error reply, per family.
 
@@ -453,7 +669,7 @@ def error_reply(family, err):
     if kind == "badname":
         # BISE-293: a final 400, the API's words for a tool name off its pattern
         return 400, {}, name_error(family, {"tools": [{"name": "self.compact", "function": {"name": "self.compact"}}]}) or {}
-    status = {"429": 429, "500": 500, "stream": 500}.get(kind, 529 if family == "anthropic" else 503)
+    status = {"429": 429, "500": 500, "stream": 500, "cut": 500}.get(kind, 529 if family == "anthropic" else 503)
     hdr = {"retry-after": str(err.get("retry", 1))} if status in (429, 503, 529) else {}
     if family == "anthropic":
         t, m = {429: ("rate_limit_error", "Number of request tokens has exceeded your per-minute rate limit"),
@@ -478,9 +694,23 @@ def error_reply(family, err):
 # of (event name or None, data dict or "[DONE]")). `mid_error`: the stream
 # breaks with the family's error event after its start.
 
+def mistral_blocks(model):
+    """Mistral's API sends reasoning as content blocks ([{type: thinking, thinking: [{type: text,
+    text}]}, {type: text, text}], the vibe CLI's ThinkChunk), never reasoning_content: the hub's
+    Mistral path keeps only those (ambient-lead m_16823: the rich world's thinking row was empty)."""
+    return str(model).split("/")[-1].startswith(("mistral", "magistral", "devstral"))
+
+
+def think_block(text):
+    return {"type": "thinking", "thinking": [{"type": "text", "text": text}]}
+
+
 def whole_openai_chat(turn, model):
+    u = usage_of(turn)
     m = {"role": "assistant", "content": turn["text"]}
-    if turn["reasoning"]:
+    if turn["reasoning"] and mistral_blocks(model):
+        m["content"] = [think_block(turn["reasoning"])] + ([{"type": "text", "text": turn["text"]}] if turn["text"] else [])
+    elif turn["reasoning"]:
         m["reasoning_content"] = turn["reasoning"]
     if turn["calls"]:
         m["tool_calls"] = [{"id": c["id"], "type": "function",
@@ -489,10 +719,10 @@ def whole_openai_chat(turn, model):
     return {"id": "fake", "object": "chat.completion", "created": 0, "model": model,
             "choices": [{"index": 0, "message": m,
                          "finish_reason": "tool_calls" if turn["calls"] else "stop"}],
-            "usage": {"prompt_tokens": USAGE["input"], "completion_tokens": USAGE["output"],
-                      "total_tokens": USAGE["input"] + USAGE["output"],
-                      "prompt_tokens_details": {"cached_tokens": USAGE["cached"]},
-                      "completion_tokens_details": {"reasoning_tokens": USAGE["reasoning"]}}}
+            "usage": {"prompt_tokens": u["input"], "completion_tokens": u["output"],
+                      "total_tokens": u["input"] + u["output"],
+                      "prompt_tokens_details": {"cached_tokens": u["cached"]},
+                      "completion_tokens_details": {"reasoning_tokens": u["reasoning"]}}}
 
 
 def sse_openai_chat(turn, model, include_usage=False, mid_error=False):
@@ -511,9 +741,9 @@ def sse_openai_chat(turn, model, include_usage=False, mid_error=False):
         ev.append((None, dict(base, error={"code": "server_error", "message": "Internal server error"},
                               choices=[{"index": 0, "delta": {"content": ""}, "finish_reason": "error"}])))
         return ev
-    for p in pieces(turn["reasoning"]) if turn["reasoning"] else []:
-        ev.append(chunk({"content": None, "reasoning_content": p}))
-    for p in pieces(turn["text"]) if turn["text"] else []:
+    for p in text_pieces(turn["reasoning"], turn) if turn["reasoning"] else []:
+        ev.append(chunk({"content": [think_block(p)]} if mistral_blocks(model) else {"content": None, "reasoning_content": p}))
+    for p in text_pieces(turn["text"], turn) if turn["text"] else []:
         ev.append(chunk({"content": p}))
     for i, c in enumerate(turn["calls"]):
         ev.append(chunk({"tool_calls": [{"index": i, "id": c["id"], "type": "function",
@@ -539,19 +769,20 @@ def anth_blocks(turn):
     return out
 
 
-def anth_usage(output):
-    return {"input_tokens": USAGE["input"] - USAGE["cached"], "cache_creation_input_tokens": 0,
-            "cache_read_input_tokens": USAGE["cached"], "output_tokens": output}
+def anth_usage(turn, output):
+    u = usage_of(turn)
+    return {"input_tokens": u["input"] - u["cached"], "cache_creation_input_tokens": 0,
+            "cache_read_input_tokens": u["cached"], "output_tokens": output}
 
 
 def whole_anthropic(turn, model):
     return {"id": "msg_fake", "type": "message", "role": "assistant", "model": model,
             "content": anth_blocks(turn), "stop_reason": "tool_use" if turn["calls"] else "end_turn",
-            "stop_sequence": None, "usage": anth_usage(USAGE["output"])}
+            "stop_sequence": None, "usage": anth_usage(turn, usage_of(turn)["output"])}
 
 
 def sse_anthropic(turn, model, mid_error=False):
-    start = dict(whole_anthropic(turn, model), content=[], stop_reason=None, usage=anth_usage(1))
+    start = dict(whole_anthropic(turn, model), content=[], stop_reason=None, usage=anth_usage(turn, 1))
     ev = [("message_start", {"type": "message_start", "message": start}), ("ping", {"type": "ping"})]
     if mid_error:
         ev.append(("error", {"type": "error", "error": {"type": "overloaded_error", "message": "Overloaded"}}))
@@ -559,11 +790,11 @@ def sse_anthropic(turn, model, mid_error=False):
     for i, b in enumerate(anth_blocks(turn)):
         if b["type"] == "thinking":
             first = {"type": "thinking", "thinking": ""}
-            deltas = [{"type": "thinking_delta", "thinking": p} for p in pieces(b["thinking"])]
+            deltas = [{"type": "thinking_delta", "thinking": p} for p in text_pieces(b["thinking"], turn)]
             deltas.append({"type": "signature_delta", "signature": b["signature"]})
         elif b["type"] == "text":
             first = {"type": "text", "text": ""}
-            deltas = [{"type": "text_delta", "text": p} for p in pieces(b["text"])]
+            deltas = [{"type": "text_delta", "text": p} for p in text_pieces(b["text"], turn)]
         else:
             first = dict(b, input={})
             deltas = [{"type": "input_json_delta", "partial_json": p}
@@ -575,7 +806,7 @@ def sse_anthropic(turn, model, mid_error=False):
     ev.append(("message_delta", {"type": "message_delta",
                                  "delta": {"stop_reason": "tool_use" if turn["calls"] else "end_turn",
                                            "stop_sequence": None},
-                                 "usage": {"output_tokens": USAGE["output"]}}))
+                                 "usage": {"output_tokens": usage_of(turn)["output"]}}))
     ev.append(("message_stop", {"type": "message_stop"}))
     return ev
 
@@ -603,16 +834,17 @@ def resp_items(turn, encrypted):
 
 
 def whole_responses(turn, model, encrypted=False, status="completed"):
+    u = usage_of(turn)
     return {"id": "resp_fake", "object": "response", "created_at": 0, "status": status,
             "error": None, "incomplete_details": None, "model": model,
             "output": resp_items(turn, encrypted) if status == "completed" else [],
-            "usage": {"input_tokens": USAGE["input"], "input_tokens_details": {"cached_tokens": USAGE["cached"]},
-                      "output_tokens": USAGE["output"],
-                      "output_tokens_details": {"reasoning_tokens": USAGE["reasoning"]},
-                      "total_tokens": USAGE["input"] + USAGE["output"]} if status == "completed" else None}
+            "usage": {"input_tokens": u["input"], "input_tokens_details": {"cached_tokens": u["cached"]},
+                      "output_tokens": u["output"],
+                      "output_tokens_details": {"reasoning_tokens": u["reasoning"]},
+                      "total_tokens": u["input"] + u["output"]} if status == "completed" else None}
 
 
-def sse_responses(turn, model, encrypted=False, mid_error=False):
+def sse_responses(turn, model, encrypted=False, mid_error=False, plan=False):
     ev = []
 
     def add(t, **d):
@@ -630,7 +862,7 @@ def sse_responses(turn, model, encrypted=False, mid_error=False):
             text = it["summary"][0]["text"]
             add("response.reasoning_summary_part.added", item_id=iid, output_index=oi, summary_index=0,
                 part={"type": "summary_text", "text": ""})
-            for p in pieces(text):
+            for p in text_pieces(text, turn):
                 add("response.reasoning_summary_text.delta", item_id=iid, output_index=oi, summary_index=0,
                     delta=p)
             add("response.reasoning_summary_text.done", item_id=iid, output_index=oi, summary_index=0, text=text)
@@ -642,7 +874,7 @@ def sse_responses(turn, model, encrypted=False, mid_error=False):
             text = it["content"][0]["text"]
             add("response.content_part.added", item_id=iid, output_index=oi, content_index=0,
                 part={"type": "output_text", "text": "", "annotations": []})
-            for p in pieces(text):
+            for p in text_pieces(text, turn):
                 add("response.output_text.delta", item_id=iid, output_index=oi, content_index=0, delta=p,
                     logprobs=[])
             add("response.output_text.done", item_id=iid, output_index=oi, content_index=0, text=text,
@@ -657,24 +889,25 @@ def sse_responses(turn, model, encrypted=False, mid_error=False):
             add("response.function_call_arguments.done", item_id=iid, output_index=oi,
                 arguments=it["arguments"])
         add("response.output_item.done", output_index=oi, item=it)
-    add("response.completed", response=whole_responses(turn, model, encrypted))
+    add("response.completed", response=dict(whole_responses(turn, model, encrypted), **({"output": []} if plan else {})))
     return ev
 
 
-def gem_usage(final):
-    u = {"promptTokenCount": USAGE["input"], "totalTokenCount": USAGE["input"]}
+def gem_usage(final, turn=None):
+    n = usage_of(turn or {})
+    u = {"promptTokenCount": n["input"], "totalTokenCount": n["input"]}
     if final:
-        u.update(candidatesTokenCount=USAGE["output"], thoughtsTokenCount=USAGE["reasoning"],
-                 cachedContentTokenCount=USAGE["cached"],
-                 totalTokenCount=USAGE["input"] + USAGE["output"] + USAGE["reasoning"])
+        u.update(candidatesTokenCount=n["output"], thoughtsTokenCount=n["reasoning"],
+                 cachedContentTokenCount=n["cached"],
+                 totalTokenCount=n["input"] + n["output"] + n["reasoning"])
     return u
 
 
-def gem_chunk(parts, model, finish=None):
+def gem_chunk(parts, model, finish=None, turn=None):
     cand = {"content": {"parts": parts, "role": "model"}, "index": 0}
     if finish:
         cand["finishReason"] = finish
-    return {"candidates": [cand], "usageMetadata": gem_usage(bool(finish)),
+    return {"candidates": [cand], "usageMetadata": gem_usage(bool(finish), turn),
             "modelVersion": model, "responseId": "fake-response"}
 
 
@@ -682,8 +915,8 @@ def gem_parts(turn):
     """the parts in stream order: thoughts, text, then whole function calls
     (Gemini never splits a functionCall); the first functionCall of a step
     carries the thoughtSignature (Gemini 3)"""
-    out = [[{"text": p, "thought": True}] for p in pieces(turn["reasoning"])] if turn["reasoning"] else []
-    out += [[{"text": p}] for p in pieces(turn["text"])] if turn["text"] else []
+    out = [[{"text": p, "thought": True}] for p in text_pieces(turn["reasoning"], turn)] if turn["reasoning"] else []
+    out += [[{"text": p}] for p in text_pieces(turn["text"], turn)] if turn["text"] else []
     calls = [{"functionCall": {"name": c["name"], "args": c["args"]}} for c in turn["calls"]]
     if calls:
         calls[0]["thoughtSignature"] = "fake-thought-sig"
@@ -692,20 +925,20 @@ def gem_parts(turn):
 
 
 def whole_gemini(turn, model):
-    return gem_chunk([p for ps in gem_parts(turn) for p in ps], model, "STOP")
+    return gem_chunk([p for ps in gem_parts(turn) for p in ps], model, "STOP", turn)
 
 
 def sse_gemini(turn, model, mid_error=False):
     ps = gem_parts(turn)
     if mid_error:
-        return [(None, gem_chunk(ps[0], model)),
+        return [(None, gem_chunk(ps[0], model, None, turn)),
                 (None, {"error": {"code": 503, "message": "The model is overloaded. Please try again later.",
                                   "status": "UNAVAILABLE"}})]
-    return [(None, gem_chunk(p, model, "STOP" if i == len(ps) - 1 else None)) for i, p in enumerate(ps)]
+    return [(None, gem_chunk(p, model, "STOP" if i == len(ps) - 1 else None, turn)) for i, p in enumerate(ps)]
 
 
-def render(family, turn, model="fake", stream=True, body=None, mid_error=False):
-    """the events (stream) or the JSON body (whole) for a turn"""
+def render(family, turn, model="fake", stream=True, body=None, mid_error=False, plan=False):
+    """the events (stream) or the JSON body (whole) for a turn; plan: completed's output [] (issue 15)"""
     body = body or {}
     enc = "reasoning.encrypted_content" in (body.get("include") or [])
     if not stream:
@@ -717,7 +950,7 @@ def render(family, turn, model="fake", stream=True, body=None, mid_error=False):
     if family == "anthropic":
         return sse_anthropic(turn, model, mid_error)
     if family == "openai-responses":
-        return sse_responses(turn, model, enc, mid_error)
+        return sse_responses(turn, model, enc, mid_error, plan)
     return sse_gemini(turn, model, mid_error)
 
 
@@ -746,6 +979,7 @@ def openai_view(turn):
 class State:
     lock = threading.Lock()
     seen = {}  # (family, agent, user message) -> requests so far
+    done = {}  # user message -> the most script calls seen made for it (a compaction's summary)
 
 
 def fixture_reply(family, name, stream):
@@ -803,6 +1037,29 @@ class H(http.server.BaseHTTPRequestHandler):
         self.wfile.write(b"0\r\n\r\n")
         self.close_connection = True
 
+    def send_sse_paced(self, data_chunks, texts, gap):
+        """a script's "stream": every event at once but the answer's text deltas, which go out
+        `gap` seconds apart (a model writing word by word: the window's text animation)"""
+        self.send_response(200)
+        self.send_header("content-type", "text/event-stream")
+        self.send_header("cache-control", "no-cache")
+        self.send_header("transfer-encoding", "chunked")
+        self.send_header("connection", "close")
+        self.end_headers()
+        self.close_connection = True
+        first = True
+        try:
+            for c, is_text in zip(data_chunks, texts):
+                if is_text and not first:
+                    time.sleep(gap)
+                first = first and not is_text
+                if c:
+                    self.wfile.write(b"%x\r\n%s\r\n" % (len(c), c))
+                    self.wfile.flush()
+            self.wfile.write(b"0\r\n\r\n")
+        except (BrokenPipeError, ConnectionResetError):
+            pass
+
     def send_sse_drip(self, data_chunks, n, gap):
         """[[drip: N S]]: the first chunk at once, N pings S s apart, then
         the rest; (pings sent, the client hung up first)."""
@@ -830,6 +1087,28 @@ class H(http.server.BaseHTTPRequestHandler):
         except (BrokenPipeError, ConnectionResetError):
             return sent, True
         return sent, False
+
+    def send_sse_pieces(self, data_chunks, n, gap):
+        """[[pieces: N S]]: the body re-cut every N bytes, S s apart"""
+        crlf = bytes([13, 10])
+        body = b"".join(c for c in data_chunks if c)
+        self.send_response(200)
+        self.send_header("content-type", "text/event-stream")
+        self.send_header("transfer-encoding", "chunked")
+        self.send_header("connection", "close")
+        self.end_headers()
+        self.close_connection = True
+        try:
+            for i in range(0, len(body), max(1, n)):
+                if i:
+                    time.sleep(gap)
+                part = body[i:i + max(1, n)]
+                self.wfile.write(b"%x" % len(part) + crlf + part + crlf)
+                self.wfile.flush()
+            self.wfile.write(b"0" + crlf + crlf)
+            self.wfile.flush()
+        except (BrokenPipeError, ConnectionResetError):
+            pass
 
     def send_sse_split(self, data_chunks, gap):
         """[[split: S]]: the body in two writes, cut mid-event, S s apart;
@@ -912,6 +1191,12 @@ class H(http.server.BaseHTTPRequestHandler):
             self.send(400, json.dumps({"type": "error", "error": {
                 "type": "invalid_request_error", "message": "Request content length exceeded 32 MB limit."}}).encode())
             return
+        # debug-cmd: $FAKE_RAW (a folder) gets every body's bytes as
+        # received, <n>.json in order, for the byte-for-byte checks
+        if os.environ.get("FAKE_RAW"):
+            d = os.environ["FAKE_RAW"]
+            with open(os.path.join(d, "%06d.json" % len(os.listdir(d))), "wb") as f:
+                f.write(raw)
         body = json.loads(raw or b"{}")
         family = family_of(self.path)
         # prompt-diet: $FAKE_BODIES gets every whole request body, one JSON
@@ -938,6 +1223,16 @@ class H(http.server.BaseHTTPRequestHandler):
                 self.send(err[0], json.dumps(err[1]).encode())
                 return
             plan = claims
+        elif family == "openai-responses" and os.environ.get("FAKE_PLAN_MODELS"):
+            # a plan whose list is $FAKE_PLAN_MODELS, behind a key_command
+            # token (chatgpt_plan_default_e2e): its model check alone
+            e = plan_model_error(body, oai_error)
+            if e:
+                with open(LOG, "a") as f:
+                    f.write(json.dumps({"agent": "", "family": family, "path": self.path, "status": 400,
+                                        "plan_error": e, "model": body.get("model")}) + "\n")
+                self.send(400, json.dumps(e).encode())
+                return
         # BISE-266: a key holding "bad" is refused (401), one holding
         # "broke" has no credit (402): the first run's key check
         auth = " ".join(self.headers.get(h, "") for h in ("authorization", "x-api-key", "x-goog-api-key"))
@@ -985,6 +1280,7 @@ class H(http.server.BaseHTTPRequestHandler):
         self.drip = None
         split = SPLIT.search(script_of(conv[idx]["text"])) if idx is not None else None
         self.split = None
+        cut = PIECES.search(script_of(conv[idx]["text"])) if idx is not None else None
         model = body.get("model") or self.path.split("/models/")[-1].split(":")[0] or "fake"
         status = 200
         fail = plan_fail(script_of(conv[idx]["text"]) if idx is not None else "", seen) if plan else None
@@ -1007,20 +1303,31 @@ class H(http.server.BaseHTTPRequestHandler):
                 self.send_sse([data])
             else:
                 self.send(status, data)
-        elif turn["error"] and not (turn["error"]["kind"] == "stream" and stream):
+        elif turn["error"] and not (turn["error"]["kind"] in ("stream", "cut") and stream):
             status, hdr, err = error_reply(family, turn["error"])
             self.send(status, json.dumps(err).encode(), headers=hdr)
         else:
             mid = bool(turn["error"])
-            out = render(family, turn, model, stream, body, mid)
+            out = render(family, turn, model, stream, body, mid, bool(plan))
+            if mid and turn["error"]["kind"] == "cut":
+                # the text streamed in, then the family's error event
+                full = render(family, turn, model, stream, body, plan=bool(plan))
+                out = full[:len(full) * 2 // 3] + out[-1:]
             if not stream:
                 self.send(200, json.dumps(out).encode())
+            elif sse and cut:
+                self.send_sse_pieces([sse_bytes(family, [e]) for e in out],
+                                     int(cut.group(1)), float(cut.group(2)))
             elif sse and split and family == "anthropic":
                 self.split = self.send_sse_split([sse_bytes(family, [e]) for e in out],
                                                  float(split.group(1)))
             elif sse and drip and family == "anthropic":
                 self.drip = self.send_sse_drip([sse_bytes(family, [e]) for e in out],
                                                int(drip.group(1)), float(drip.group(2)))
+            elif sse and turn.get("stream") and float(turn["stream"].get("every") or 0) > 0:
+                self.send_sse_paced([sse_bytes(family, [e]) for e in out],
+                                    [is_text_delta(family, *e) or is_think_delta(family, *e) for e in out],
+                                    float(turn["stream"]["every"]))
             elif sse:
                 self.send_sse([sse_bytes(family, [e]) for e in out])
             else:  # Gemini without alt=sse: one JSON array
@@ -1028,7 +1335,7 @@ class H(http.server.BaseHTTPRequestHandler):
         u = conv[idx] if idx is not None else msg("user")
         last = [m for m in conv if m["role"] == "user"]
         with open(LOG, "a") as f:
-            f.write(json.dumps({"agent": agent, "last_user": (last[-1]["text"] if last else "")[:3000],
+            f.write(json.dumps({"agent": agent, "session_id": self.headers.get("session-id"), "last_user": (last[-1]["text"] if last else "")[:3000],
                                 # the model asked (issue #4: a task's own model)
                                 "model": model, "status": status,
                                 "user": u["text"][:3000], "reply": openai_view(turn),
@@ -1271,40 +1578,6 @@ PLAN_FAILS = {
 }
 
 
-def plan_models():
-    """the account's model list, the real /v1/models shape of this route:
-    $FAKE_PLAN_MODELS = "slug[:display name[:hide]],..." or three listed
-    models and one hidden"""
-    spec = os.environ.get("FAKE_PLAN_MODELS")
-    if spec:
-        out = []
-        for one in spec.split(","):
-            p = one.strip().split(":")
-            out.append({"slug": p[0], "display_name": p[1] if len(p) > 1 and p[1] else p[0],
-                        "visibility": "hide" if len(p) > 2 and p[2] == "hide" else "list"})
-        return out
-    return [{"slug": "gpt-6.1-sol", "display_name": "GPT-6.1 Sol", "visibility": "list"},
-            {"slug": "gpt-6-astra", "display_name": "GPT-6 Astra", "visibility": "list"},
-            {"slug": "gpt-6-luna", "display_name": "GPT-6 Luna", "visibility": "list"},
-            {"slug": "gpt-6-internal-eval", "display_name": "internal eval", "visibility": "hide"}]
-
-
-def bearer_of(headers):
-    a = headers.get("authorization") or ""
-    return a[7:].strip() if a.lower().startswith("bearer ") else ""
-
-
-def is_jwt(token):
-    parts = token.split(".")
-    if len(parts) != 3:
-        return False
-    try:
-        head = json.loads(base64.urlsafe_b64decode(parts[0] + "=" * (-len(parts[0]) % 4)))
-    except ValueError:
-        return False
-    return isinstance(head, dict) and head.get("alg") == "RS256"
-
-
 def plan_token(token):
     """(None, claims) when the issuer honours the token, else (status, body):
     the direct-route admission errors (a {"detail"} body) or the structured
@@ -1348,9 +1621,9 @@ def plan_body_error(body):
     for k in PLAN_UNSUPPORTED:
         if k in body:
             return unsupported(k, "Unsupported parameter for ChatGPT plan usage: '%s'." % k)
-    if body.get("model") not in [m["slug"] for m in plan_models()]:
-        return oai_error("model", "The model `%s` does not exist or you do not have access to it." % body.get("model"),
-                         "model_not_found")
+    e = plan_model_error(body, oai_error)
+    if e:
+        return e
     inp = body.get("input")
     if not isinstance(inp, list):
         return unsupported("input", "ChatGPT plan usage requires `input` to be an array.")
@@ -1460,7 +1733,7 @@ def serve(port=0):
 
 
 def bend_literal(text):
-    """a Bend string literal (LAWS fixtures): escapes like LAWS.bend's"""
+    """a Bend string literal (LAWS fixtures): escapes like bend/laws/'s"""
     return '"' + text.replace("\\", "\\\\").replace('"', '\\"').replace("\r", "\\r").replace("\n", "\\n") + '"'
 
 
@@ -1530,7 +1803,7 @@ def main(argv):
         sys.stdout.write(bend_literal(open(argv[1]).read()) + "\n")
         return
     port = int(argv[0]) if argv else 0
-    srv = Server(("127.0.0.1", port), H)
+    srv = __import__("fake_tls").wrap(Server(("127.0.0.1", port), H))  # HTTPS when FAKE_TLS=1
     print("PORT", srv.server_address[1], flush=True)
     srv.serve_forever()
 

@@ -1,0 +1,174 @@
+/* The capsule surface: transparent around the glass (L1: the pearl floats free, never in a square);
+   one live pearl at a fixed place for every view. Tokens only. */
+html:has(.b-capsule), body:has(.b-capsule) { margin: 0; background: transparent; overflow: hidden; }
+/* the page IS the glass (amb-mac a0b3ebce, glass.ts): macOS draws the capsule window as a
+   'popover' vibrancy panel with its own shadow and rounded corners, filling the whole window, so
+   the page has no margin, sizes itself to the view (the window follows it: onSize, the glass rect
+   = the page), and paints no background, blur, shadow or big corner of its own: the real glass
+   shows through (a CSS backdrop-filter sees nothing of the apps behind a window anyway). The ds's
+   own .b-capsule (ds/css/capsule.css: r 26, overlay fill, e-3 shadow) is undone here: inside the
+   native rounded glass it drew a second rounded card and a clipped square shadow (his corner card
+   shot, 2026-10-14). The only rounded edge is the window's. */
+.b-capsule { position: relative; width: fit-content; padding: 0; border-radius: 0; background: transparent; backdrop-filter: none; box-shadow: none; }
+/* the words on the glass (menubar-contrast, his Sound-panel shot): macOS's label colours, white
+   (dark) or black (light) at an alpha, so the glass under them keeps its hue, never the window's
+   opaque greys (#a39c90 / #857d72 were made for a near-black ground: 1.2:1 on his pink glass).
+   macOS's tertiary (25%) is for what is off; our text-3 carries words (heads, keys), so it stays
+   readable. The accent goes a step lighter (dark) or deeper (light) for the same reason.
+   capsule-ink.test.ts holds them to a contrast floor over a light, a pink and a dark wallpaper. */
+.b-capsule {
+  --c-text: rgba(255, 255, 255, .92); --c-text-2: rgba(255, 255, 255, .66); --c-text-3: rgba(255, 255, 255, .54);
+  --c-line: rgba(255, 255, 255, .12); --c-line-strong: rgba(255, 255, 255, .2); --c-accent: #ffc2cc;
+  --c-hover: rgba(255, 255, 255, .1);
+}
+@media (prefers-color-scheme: light) { :root:not([data-theme="dark"]) .b-capsule {
+  --c-text: rgba(0, 0, 0, .85); --c-text-2: rgba(0, 0, 0, .6); --c-text-3: rgba(0, 0, 0, .5);
+  --c-line: rgba(0, 0, 0, .1); --c-line-strong: rgba(0, 0, 0, .18); --c-accent: #962a52;
+  --c-hover: rgba(0, 0, 0, .06);
+} }
+[data-theme="light"] .b-capsule {
+  --c-text: rgba(0, 0, 0, .85); --c-text-2: rgba(0, 0, 0, .6); --c-text-3: rgba(0, 0, 0, .5);
+  --c-line: rgba(0, 0, 0, .1); --c-line-strong: rgba(0, 0, 0, .18); --c-accent: #962a52;
+  --c-hover: rgba(0, 0, 0, .06);
+}
+/* the row under the pointer or the keys (designer m_41742): a neutral fill (--c-hover above, never
+   the system blue or our pink), r-1, 4 px in from the glass's edges (the menu's own padding), the
+   text unchanged */
+.b-capsule .b-picker-row, .b-capsule .b-row { border-radius: var(--r-1); }
+.b-cap-glass, .b-cap-talk, .b-cap-answer { width: 640px; box-sizing: border-box; }
+.b-capsule .b-spot, .b-capsule .b-menu { background: transparent; backdrop-filter: none; box-shadow: none; border-radius: 0; }
+.b-capsule .b-spot { width: 640px; }
+/* the card is amb-home's InboxCard v2 on surface 'glass' (.ic.glass: no fill, no shadow) */
+.b-cap-card { width: 560px; }
+/* the pearl 40 px, 16 px in from the glass's corner; the words start 16 px past it, their first
+   line centered on it (24 + half a 24.6 px line = the pearl's center at 36) */
+.b-cap-pearl { position: absolute; left: var(--s-4); top: var(--s-4); width: var(--s-10); height: var(--s-10); z-index: 2; pointer-events: none; }
+.b-cap-pearl.off { visibility: hidden; }
+.b-cap-hole { display: inline-block; width: var(--s-10); height: var(--s-10); flex: none; }
+.b-cap-talk, .b-cap-answer { min-height: calc(var(--s-4) * 2 + var(--s-10)); padding: var(--s-6) var(--s-6) var(--s-5) calc(var(--s-4) * 2 + var(--s-10)); font: var(--t-17)/1.45 var(--font-read); color: var(--c-text); }
+.b-cap-talk { color: var(--c-text-2); }
+/* the 'over' line's link to where he fixes it ('settings › voice', designer m_21945): the line's own words, underlined */
+.b-cap-link { all: unset; color: var(--c-text); text-decoration: underline; text-underline-offset: 3px; }
+.b-cap-link:focus-visible { outline: 2px solid var(--c-focus, currentColor); outline-offset: 2px; }
+/* THE CORNER CARD (his pick C, designer m_22118): the talk, its answer and every 'over' line, at the
+   bottom-right of the screen (amb-mac's 'corner': the window keeps its right edge and bottom, it
+   grows upward). 320 wide, the capsule's glass (r 16, macOS draws it), padding 12/16, the pearl
+   32 on the left, words t-13. */
+.b-capsule.corner .b-cap-pearl { left: var(--s-4); top: var(--s-3); width: var(--s-8); height: var(--s-8); }
+.b-capsule.corner .b-cap-talk, .b-capsule.corner .b-cap-answer {
+  width: 320px; min-height: calc(var(--s-3) * 2 + var(--s-8));
+  padding: var(--s-3) var(--s-4) var(--s-3) calc(var(--s-4) + var(--s-8) + var(--s-3));
+  font: var(--t-13)/1.45 var(--font-ui);
+}
+/* talking and answering: never a cropped message. The card starts at its one-line size, grows
+   upward to half the screen (--cap-max) with his words or the answer, then the words scroll
+   (Capsule.tsx useFollow: the newest line followed unless he scrolled up) */
+.b-cap-talk, .b-cap-answer { display: flex; flex-direction: column; max-height: var(--cap-max, 50vh); }
+.b-cap-talk .words, .b-cap-answer .t { flex: 0 1 auto; min-height: 0; overflow-y: auto; overflow-wrap: anywhere; }
+.b-cap-talk .words > div { min-height: var(--s-8); display: flex; align-items: center; }
+.b-cap-talk > *:not(.words) { flex: none; }
+.b-cap-answer .t { white-space: pre-wrap; user-select: text; }
+/* scrolled, the line under the top edge fades out over 16 px, as under the thread's head (designer
+   m_21358); at the top of the text, no fade */
+.b-cap-talk .words[data-scrolled], .b-cap-answer .t[data-scrolled] { -webkit-mask-image: linear-gradient(to bottom, transparent, black var(--s-4)); mask-image: linear-gradient(to bottom, transparent, black var(--s-4)); }
+/* its markdown in the thread's colors (.b-md, ds md.css): inline code green with no fill, never the
+   chip tint (designer m_22394) */
+.b-cap-answer .t code { background: none; }
+/* the overlay scrollbar: 4 px, text-3, only while he scrolls, in the card's right padding (the
+   words keep their width: the box reaches 12 px into the padding, 8 px padding + the 4 px bar) */
+.b-capsule.corner .b-cap-answer .t, .b-capsule.corner .b-cap-talk .words { margin-right: calc(-1 * var(--s-3)); padding-right: var(--s-2); }
+.b-cap-answer .t::-webkit-scrollbar, .b-cap-talk .words::-webkit-scrollbar { width: 4px; background: transparent; }
+.b-cap-answer .t::-webkit-scrollbar-track, .b-cap-talk .words::-webkit-scrollbar-track { background: transparent; }
+.b-cap-answer .t::-webkit-scrollbar-thumb, .b-cap-talk .words::-webkit-scrollbar-thumb { border-radius: 2px; background: transparent; }
+.b-cap-answer .t[data-scrolling]::-webkit-scrollbar-thumb, .b-cap-talk .words[data-scrolling]::-webkit-scrollbar-thumb { background: var(--c-text-3); }
+.b-cap-answer .more { flex: none; align-self: flex-start; margin-top: var(--s-2); padding: 0; border: 0; background: none; font: var(--t-12) var(--font-ui); color: var(--c-text-2); }
+.b-cap-answer .more:hover { color: var(--c-text); }
+.b-cap-answer .b-cap-keys { flex: none; }
+/* motion: in 160 ms, fade + 8 px rise; out 120 ms, fade; reduced motion: the fades only */
+@keyframes b-cap-corner-in { from { opacity: 0; transform: translateY(var(--s-2)); } }
+@keyframes b-cap-corner-fade { from { opacity: 0; } }
+.b-capsule.corner { animation: b-cap-corner-in 160ms var(--ease-out, ease-out); transition: opacity 120ms linear; }
+.b-capsule.corner[data-leaving] { opacity: 0; }
+@media (prefers-reduced-motion: reduce) { .b-capsule.corner { animation-name: b-cap-corner-fade; } }
+.b-cap-menu .b-menu { width: 260px; }
+/* the window follows the page (onSize), so the picker's 'max-width: 100vw - 16 px' read the last
+   size and shrank the menu 16 px a show down to its 240 px floor: no viewport cap here */
+.b-capsule .b-cap-menu .b-menu { max-width: none; }
+/* its words over the rows' words (a row's sides are --pad-row-x) */
+.b-cap-menu-head { padding: var(--s-1) var(--pad-row-x); font-size: var(--t-12); color: var(--c-text-3); }
+/* one-inbox 3: the window's inbox block rows under the head, at the tight row (28 px), no age */
+.b-cap-menu:has(.b-cap-rows) .b-menu { width: 340px; }
+.b-cap-rows { display: flex; flex-direction: column; }
+.b-cap-rows .b-row { height: var(--h-row-tight); font-size: var(--t-13); }
+.b-cap-rows .b-row .nm { display: flex; gap: var(--s-1); min-width: 0; }
+.b-cap-rows .ib-sign { flex: none; width: 1em; text-align: center; font: 600 var(--t-12) var(--font-mono); color: var(--c-accent); }
+.b-cap-rows .strip-who { font-weight: 500; }
+/* the project tag at the row's end: sans t-13 text-3, as the block's (designer m_20986) */
+.b-cap-rows .b-row .end { flex: none; font: var(--t-13) var(--font-ui); color: var(--c-text-3); }
+/* the talk's still (designer m_21903): one row under his words, 8 px above the keys line; the
+   signed image chip (ink, 1 px line, r 9, no fill, 16 px thumb), its ✕ on hover */
+.b-cap-shot { display: flex; margin-top: var(--s-2); font-size: var(--t-12); }
+.b-cap-shot-chip { position: relative; display: inline-flex; align-items: center; gap: var(--s-1); min-width: 0; max-width: 100%; }
+.b-cap-shot .b-chip.part { color: var(--c-text-2); }
+.b-cap-shot .b-chip.part .ink { color: var(--c-text-2); }
+.b-cap-shot .x { visibility: hidden; flex: none; padding: 0 var(--s-1); border: 0; background: none; font: var(--t-12) var(--font-ui); color: var(--c-text-3); }
+.b-cap-shot-chip:hover .x, .b-cap-shot .x:focus-visible { visibility: visible; }
+.b-cap-shot .x:hover { color: var(--c-text); }
+.b-cap-keys { margin-top: var(--s-2); font: var(--t-12) var(--font-mono); color: var(--c-text-3); }
+.b-cap-keys .k { color: var(--c-text-2); }
+/* the one-time ask under his words: its line, then its two buttons */
+.b-cap-ask { margin-top: var(--gap-block); font: var(--t-13)/1.45 var(--font-ui); color: var(--c-text-2); }
+.b-cap-ask .acts { display: flex; gap: var(--s-2); margin-top: var(--s-2); }
+/* the projects block (designer m_27872): bise's ':*' or the sidebar's project mark, the name sans
+   13 cut with '…', a quiet one in text-2; the end '? 1   ∿ 3' (the accent waits, text-3 works),
+   never cut */
+.b-cap-pjs .b-row .nm { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.b-cap-pjs .quiet .b-row .nm { color: var(--c-text-2); }
+.b-cap-pjs .b-cap-pj-mark { display: inline-flex; align-items: center; justify-content: center; width: 18px; flex: none; }
+.b-cap-pjs .b-cap-pj-end { display: inline-flex; gap: 3ch; font: var(--t-12) var(--font-mono); white-space: nowrap; }
+.b-cap-pjs .b-cap-pj-end .w { color: var(--c-accent); }
+.b-cap-pjs .b-cap-pj-end .k { color: var(--c-text-3); }
+.b-cap-pjs > .b-mi .n { color: var(--c-text-3); }
+/* a live line's second line (designer m_29577): 40 px rows, the name over what waits or works
+   ('? search · which size…', the '?' accent; 'perf · merging the cache fix  +2'), sans 12 text-3,
+   cut after a whole word; the end's '›' says it has a submenu */
+.b-cap-pjs .two .b-row { height: calc(var(--h-row-tight) + var(--s-3)); }
+.b-cap-pjs .two .b-row .nm { display: flex; flex-direction: column; justify-content: center; gap: 1px; }
+.b-cap-pjs .two .b-row .nm .pj { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.b-cap-pj-sum { display: flex; gap: var(--s-1); min-width: 0; font: var(--t-12) var(--font-ui); color: var(--c-text-3); white-space: nowrap; }
+.b-cap-pj-sum .t { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.b-cap-pj-sum .w { flex: none; color: var(--c-accent); }
+.b-cap-pj-sum .more { flex: none; }
+.b-cap-pjs .b-cap-pj-end .go { color: var(--c-text-3); font-family: var(--font-ui); }
+/* the submenu (designer m_29577): a second column of the same glass (the window is the glass),
+   280 px, a 1 px rule on the menu's side, on the side the screen has room; its rows start level
+   with the project's row */
+.b-cap-tray { display: flex; align-items: stretch; }
+.b-cap-tray.left { flex-direction: row-reverse; }
+.b-cap-sub { width: 280px; flex: none; box-sizing: border-box; border-left: 1px solid var(--c-line); }
+.b-cap-tray.left .b-cap-sub { border-left: 0; border-right: 1px solid var(--c-line); }
+/* its rows, moved down (TrayMenu's margin-top) to start level with the project's row */
+.b-cap-sub-in { display: flow-root; }
+.b-capsule .b-cap-sub .b-menu { width: 280px; min-width: 0; max-width: none; }
+.b-cap-sub-head { display: flex; gap: var(--s-2); align-items: baseline; padding: var(--s-1) var(--pad-row-x); font-size: var(--t-12); white-space: nowrap; overflow: hidden; }
+.b-cap-sub-head .nm { color: var(--c-text); font-size: var(--t-13); }
+.b-cap-sub-head .cn { color: var(--c-text-3); overflow: hidden; text-overflow: ellipsis; }
+.b-cap-sub .b-row { height: var(--h-row-tight); font-size: var(--t-13); }
+.b-cap-sub .b-row .nm { display: flex; gap: var(--s-2); min-width: 0; overflow: hidden; white-space: nowrap; }
+.b-cap-sub .b-row .nm .who { flex: none; }
+.b-cap-sub .b-row .nm .what { min-width: 0; overflow: hidden; text-overflow: ellipsis; color: var(--c-text-3); }
+.b-cap-sub .b-row .end { flex: none; font: var(--t-12) var(--font-mono); color: var(--c-text-3); }
+/* the bar's sign (app/side's signOf): its glyph and tone, in the 15 px mono column */
+.b-cap-sub-g { flex: none; width: 15px; text-align: center; font: var(--t-12) var(--font-mono); }
+.b-cap-sub-g.ink { color: var(--c-text); }
+.b-cap-sub-g.acc { color: var(--c-accent); }
+.b-cap-sub-g.err { color: var(--c-err); }
+.b-cap-sub-g.dim { color: var(--c-text-3); }
+/* fn's permissions sheet (setup/PermSheet.tsx, desktop-onboarding v4 §3): at the top, on the glass,
+   the title, its line, the three rows, [allow], the dim 'not now' line */
+.b-cap-perms { display: flex; flex-direction: column; gap: var(--s-2); width: 440px; padding: var(--s-5); box-sizing: border-box; font: var(--t-13)/1.45 var(--font-ui); color: var(--c-text-2); }
+.b-cap-perms .t { font: 500 var(--t-17)/1.25 var(--font-display); color: var(--c-text); }
+.b-cap-perms .b-group { margin: var(--s-1) 0 0; }
+.b-cap-perms .acts { display: flex; margin-top: var(--s-2); }
+.b-cap-perms .later { margin: 0; color: var(--c-text-3); font-size: var(--t-12); }
+.b-cap-perms .later .b-act { font-size: inherit; color: var(--c-text-2); padding: 0; }

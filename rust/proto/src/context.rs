@@ -1,7 +1,7 @@
 //! The fn context (architect's decision F): what the Mac app read of the
 //! front app when the user pressed fn, sent with his words. One typed
-//! struct for every reader: the home hub's route guess
-//! (switchboard's route.rs), the routed message to a project's main, the
+//! struct for every reader: the home hub's routed words (sb-core's
+//! route_ask carries it as text), the routed message to a project's main, the
 //! transcript's render. Every field is optional (an excluded app sends
 //! nothing, a terminal has no URL) and left out of the JSON when absent.
 
@@ -28,8 +28,7 @@ pub struct FnContext {
     /// the window's visible text (Accessibility), cut by the app
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub window_text: Option<String>,
-    /// the screen capture taken at fn: a path to the PNG the shell wrote
-    /// (the window draws it as a thumbnail on his message, amb-win m_8492)
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub shot: Option<String>,
+    // no `shot`: the talk's still goes as a captioned Part::Image of his
+    // message (architect m_22000/m_22053). An older core's `shot` key is an
+    // unknown field, ignored (no deny_unknown_fields).
 }

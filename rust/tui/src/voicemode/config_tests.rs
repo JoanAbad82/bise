@@ -85,7 +85,7 @@ fn the_listen_job_is_the_batch_transcribe_3_never_realtime() {
     let j = with("", listen_job_of).unwrap();
     // round 2: no realtime model (Voxtral Mini's is retired)
     assert!(j.realtime.is_none(), "{j:?}");
-    assert_eq!(j.batch.name, "mistral/voxtral-transcribe-3");
+    assert_eq!(j.batch.name, "mistral/voxtral-mini-transcribe-3");
     assert_eq!(j.batch.key, "sk-test-15");
     // the key is never printed
     let shown = format!("{:?}", j);

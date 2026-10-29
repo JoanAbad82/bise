@@ -18,6 +18,7 @@ import time
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import bise_env  # noqa: E402
 import e2e  # noqa: E402
+import wait  # noqa: E402
 from e2e import EXE, check  # noqa: E402
 
 
@@ -68,6 +69,20 @@ def main():
         "echo \"${TMUX_TMPDIR:-}\" > %s\n"
         "echo started\n" % (tag, child_st, EXE, child_ws, tsock, tag, os.path.join(E.tmp, "t1-tmux")))
     user = subprocess.Popen(["sleep", "909" + tag], env=bise_env.clean_env())
+    # every task's REPL is recycled at its first idle (a budget of 1 token; the
+    # hub sees load x1, else recycle::load_holds waits for the machine): a
+    # REPL that ends this way kills nobody's processes, its own agent's
+    # included (repl-kill: today's rc 143s were an agent's pkill, not this)
+    load = os.path.join(E.tmp, "load-factor")
+    open(load, "w").write("1")
+    E.env.update(BISE_RECYCLE_TOKENS="1", SB_LOAD_FACTOR=load)
+    hub_log = os.path.join(E.state, "hub.log")
+
+    def switched(t):
+        try:
+            return "switched the REPL of %s\n" % t in open(hub_log).read()
+        except FileNotFoundError:
+            return False
     ok = True
     try:
         c = E.start_hub()
@@ -88,6 +103,12 @@ def main():
         if t1_dir:
             t1_tmux["TMUX_TMPDIR"] = t1_dir
         check(subprocess.run(["tmux", "-L", tsock, "has-session"], env=t1_tmux).returncode == 0, "t1's tmux")
+
+        c.wait(lambda: all(switched(t) for t in ("t1", "t2", "t3")), 60, "t1's, t2's and t3's REPLs recycled")
+        # a kill would land within the reap's grace (procs::STOP_GRACE, 5 s)
+        wait.holds(lambda: all(alive("sleep " + n + tag) for n in ("901", "902", "903", "904"))
+                   and alive("sbd --workspace " + child_ws), 6,
+                   "every agent's processes (t1's sleeps and hub, t2's, t3's) survive the REPLs' recycles")
 
         c.say("/archive t1")
         c.wait_status("t1", "archived", 30)

@@ -278,7 +278,14 @@ pub fn control(paths: &Paths, cmd: &str, args: &Value) -> Result<Value, String> 
             Err(e) => Err(e.to_string()),
         };
     }
-    let mut st = state::read(paths);
+    // no broker: on the file, under its lock (racing callers lose nothing)
+    // (its refusals ride an io::Error and come back as the same words)
+    state::update(paths, |st| on_file(paths, st, cmd, args).map_err(std::io::Error::other)).map_err(|e| e.to_string())
+}
+
+/// `control` on state.json's value when no broker runs: the change and
+/// its event, the answer the broker would give.
+fn on_file(paths: &Paths, st: &mut Value, cmd: &str, args: &Value) -> Result<Value, String> {
     let agent = args["agent"].as_str().unwrap_or("").to_string();
     let names: Vec<String> = if args["all"] == true {
         st["agents"].as_object().map(|m| m.keys().cloned().collect()).unwrap_or_default()
@@ -313,7 +320,6 @@ pub fn control(paths: &Paths, cmd: &str, args: &Value) -> Result<Value, String> 
         st["agents"] = json!({});
     }
     st["v"] = json!(2);
-    state::write(paths, &st).map_err(|e| e.to_string())?;
     Ok(out)
 }
 
@@ -388,7 +394,7 @@ pub fn extension_dir(paths: &Paths) -> Option<PathBuf> {
     c.extend(bise_home::env::test_setting("BISE_CU_EXTENSION").map(PathBuf::from));
     c.extend(env("BISE_APP_ROOT").map(|r| r.join("computer-use").join("extension")));
     // a version dir or a bundle: the executable's folder holds VERSION
-    if let Some(dir) = std::env::current_exe().ok().and_then(|e| e.canonicalize().ok()).and_then(|e| e.parent().map(PathBuf::from)) {
+    if let Some(dir) = std::env::current_exe().ok().and_then(|e| e.canonicalize().ok()).and_then(|e| e.parent().map(bise_home::exe_home_dir)) {
         if dir.join("VERSION").is_file() {
             c.push(dir.join("computer-use").join("extension"));
         }
@@ -486,7 +492,9 @@ fn browser_rows(paths: &Paths) -> Value {
         row("extension", "waits", "an update is ready".into(), Some("reload_extension"))
     } else if pick["connected"] == true {
         row("extension", "done", format!("v{}", pick["extension_version"].as_str().unwrap_or("?")), None)
-    } else if pick["manifest"] != "ok" {
+    } else if pick["manifest"] != "ok" && paths.shim().exists() {
+        // set up once and broken since; a first setup has no shim yet:
+        // its add_extension writes the host (the TUI runs repair first)
         row("extension", "failed", "the extension can't reach bise".into(), Some("repair"))
     } else {
         row("extension", "waits", format!("add bise to {}", name), Some("add_extension"))

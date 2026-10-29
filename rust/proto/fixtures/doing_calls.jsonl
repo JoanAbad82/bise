@@ -1,0 +1,25 @@
+{"name": "bash", "args": "ls -la", "kind": "tool"}
+{"name": "bash", "args": "git status | head -3", "kind": "tool"}
+{"name": "bash", "args": "cd rust && cargo test -p bise-proto", "kind": "build"}
+{"name": "bash", "args": "~/.bise/run/heavy-run tests/gate.sh quick > $TMPDIR/q.out 2>&1", "kind": "build"}
+{"name": "bash", "args": "cargo build --release", "kind": "build"}
+{"name": "bash", "args": "cd apps/desktop && pnpm check", "kind": "build"}
+{"name": "bash", "args": "python3 -u tests/e2e.py", "kind": "build"}
+{"name": "bash", "args": "sb page publish $TMPDIR/p.html --title plan", "kind": "publish"}
+{"name": "bash", "args": "sb artifact add out/deck.pptx --title deck", "kind": "publish"}
+{"name": "bash", "args": "rg -n \"StateGate\" rust", "kind": "search"}
+{"name": "bash", "args": "grep -rn foo src", "kind": "search"}
+{"name": "run_typescript", "args": "async function main() { return await tools.computer.screenshot({}) }", "kind": "computer"}
+{"name": "run_typescript", "args": "return self.readImages('/a.png')", "kind": "image"}
+{"name": "run_typescript", "args": "async function main() { return tools.gmail.search({}) }", "kind": "tool"}
+{"name": "edit", "args": "{\"file_path\":\"src/a.rs\",\"old_string\":\"x\"}", "kind": "edit"}
+{"name": "write_file", "args": "{\"file_path\":\"a.md\",\"content\":\"hi\"}", "kind": "edit"}
+{"name": "apply_patch", "args": "*** Begin Patch", "kind": "edit"}
+{"name": "read_file", "args": "{\"path\":\"a\"}", "kind": "search"}
+{"name": "web_search", "args": "{\"query\":\"bise\"}", "kind": "search"}
+{"name": "search_tool_functions", "args": "{\"query\":\"list issues\"}", "kind": "search"}
+{"name": "read_image", "args": "{\"path\":\"a.png\"}", "kind": "image"}
+{"name": "skill", "args": "{\"name\":\"bise-pages\"}", "kind": "tool"}
+{"name": "mcp_tool", "args": "", "kind": "tool"}
+{"name": "bash", "args": "jq --arg x 1 . a.json", "kind": "tool"}
+{"name": "bash", "args": "ls | rg foo", "kind": "search"}

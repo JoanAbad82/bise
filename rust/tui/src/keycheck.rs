@@ -198,6 +198,7 @@ fn voice_request(c: &Call) -> crate::voice::http::Request {
         key: c.key.clone(),
         language: None,
         vocabulary: Vec::new(),
+        fallback: None,
     };
     crate::voice::stt::request(&job, &crate::voice::wav_bytes(&samples, crate::voice::SAMPLE_RATE))
 }
@@ -353,10 +354,17 @@ fn mask(text: &str, key: &str) -> String {
 /// tried once more after [`RETRY_AFTER`], quietly: a new key may take a
 /// few seconds to work everywhere.
 pub(crate) fn check(c: &Call, env: &dyn Fn(&str) -> Option<String>) -> Result<(), Fail> {
+    check_with(c, env, RETRY_AFTER).map(|_| ())
+}
+
+/// [`check`], with what the model answered (its first words, one line,
+/// at most [`SAID_MAX`] chars; "" when the body has no text): the first
+/// run's "it works" quotes it (firstkey.rs).
+pub(crate) fn check_answer(c: &Call, env: &dyn Fn(&str) -> Option<String>) -> Result<String, Fail> {
     check_with(c, env, RETRY_AFTER)
 }
 
-fn check_with(c: &Call, env: &dyn Fn(&str) -> Option<String>, retry_after: Duration) -> Result<(), Fail> {
+fn check_with(c: &Call, env: &dyn Fn(&str) -> Option<String>, retry_after: Duration) -> Result<String, Fail> {
     match check_once(c, env) {
         Err(f) if f.why == Why::WrongKey => {
             std::thread::sleep(retry_after);
@@ -366,7 +374,7 @@ fn check_with(c: &Call, env: &dyn Fn(&str) -> Option<String>, retry_after: Durat
     }
 }
 
-fn check_once(c: &Call, env: &dyn Fn(&str) -> Option<String>) -> Result<(), Fail> {
+fn check_once(c: &Call, env: &dyn Fn(&str) -> Option<String>) -> Result<String, Fail> {
     let mut call = c.clone();
     if !call.key_command.is_empty() {
         call.key = bise_catalog::auth::command_key(&call.key_command, Duration::from_secs(60))
@@ -375,8 +383,64 @@ fn check_once(c: &Call, env: &dyn Fn(&str) -> Option<String>) -> Result<(), Fail
     let c = &call;
     let req = request(c, env);
     match crate::voice::http::send(&req, Duration::from_secs(20)) {
-        Ok(r) => verdict(r.status, &r.body, &c.key),
+        Ok(r) => verdict(r.status, &r.body, &c.key).map(|()| mask(&answer(&r.body), &c.key)),
         Err(e) => Err(Fail::of(Why::Unreachable(mask(&e, &c.key)))),
+    }
+}
+
+/// The text a check's answer holds, whatever its family: Anthropic's
+/// `content[].text`, Chat Completions' `choices[0].message.content`, the
+/// Responses API's `output_text` or `output[].content[].text`, Gemini's
+/// `candidates[0].content.parts[].text`, or a stream's text deltas (the
+/// plan's route). One line, at most [`SAID_MAX`] chars; "" when none.
+pub(crate) fn answer(body: &[u8]) -> String {
+    let text = String::from_utf8_lossy(body);
+    let mut out = String::new();
+    let mut take = |v: &serde_json::Value| {
+        let mut push = |t: &str| out.push_str(t);
+        if let Some(t) = v.pointer("/choices/0/message/content").and_then(|x| x.as_str()) {
+            push(t);
+        } else if let Some(t) = v.get("output_text").and_then(|x| x.as_str()) {
+            push(t);
+        } else if let Some(a) = v.get("content").and_then(|x| x.as_array()) {
+            a.iter().filter_map(|p| p.get("text").and_then(|x| x.as_str())).for_each(&mut push);
+        } else if let Some(a) = v.get("output").and_then(|x| x.as_array()) {
+            for item in a {
+                for p in item.get("content").and_then(|x| x.as_array()).into_iter().flatten() {
+                    if let Some(t) = p.get("text").and_then(|x| x.as_str()) {
+                        push(t);
+                    }
+                }
+            }
+        } else if let Some(a) = v.pointer("/candidates/0/content/parts").and_then(|x| x.as_array()) {
+            a.iter().filter_map(|p| p.get("text").and_then(|x| x.as_str())).for_each(&mut push);
+        } else if v.get("type").and_then(|x| x.as_str()) == Some("response.output_text.delta") {
+            if let Some(t) = v.get("delta").and_then(|x| x.as_str()) {
+                push(t);
+            }
+        } else if let Some(t) = v.pointer("/choices/0/delta/content").and_then(|x| x.as_str()) {
+            push(t);
+        } else if let Some(t) = v.pointer("/delta/text").and_then(|x| x.as_str()) {
+            push(t);
+        }
+    };
+    match serde_json::from_str::<serde_json::Value>(text.trim()) {
+        Ok(v) => take(&v),
+        // a stream: each `data:` line's JSON
+        Err(_) => {
+            for l in text.lines() {
+                if let Some(d) = l.trim().strip_prefix("data:") {
+                    if let Ok(v) = serde_json::from_str::<serde_json::Value>(d.trim()) {
+                        take(&v);
+                    }
+                }
+            }
+        }
+    }
+    let line = out.split_whitespace().collect::<Vec<_>>().join(" ");
+    match line.char_indices().nth(SAID_MAX) {
+        Some((i, _)) => format!("{}…", line[..i].trim_end()),
+        None => line,
     }
 }
 
@@ -636,16 +700,50 @@ mod tests {
             for (status, body) in [(401, ANTHROPIC_BAD_KEY), (200, "{}")] {
                 let (mut s, _) = l.accept().unwrap();
                 use std::io::{Read, Write};
+                // the whole request (headers, then Content-Length bytes):
+                // one read got only its first segment under the full
+                // suite, and closing with bytes unread sends a reset the
+                // client saw before the answer (os error 54)
+                let mut req = Vec::new();
                 let mut buf = [0u8; 4096];
-                let _ = s.read(&mut buf);
+                loop {
+                    if let Some(end) = req.windows(4).position(|w| w == b"\r\n\r\n") {
+                        let head = String::from_utf8_lossy(&req[..end]).to_ascii_lowercase();
+                        let len: usize = head.lines().find_map(|l| l.strip_prefix("content-length:")).map_or(0, |v| v.trim().parse().unwrap_or(0));
+                        if req.len() >= end + 4 + len {
+                            break;
+                        }
+                    }
+                    match s.read(&mut buf) {
+                        Ok(0) | Err(_) => break,
+                        Ok(n) => req.extend_from_slice(&buf[..n]),
+                    }
+                }
                 calls += 1;
                 let _ = write!(s, "HTTP/1.1 {} X\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}", status, body.len(), body);
             }
             calls
         });
         let env = move |k: &str| (k == "BEND_PROVIDER_URL").then(|| url.clone());
-        assert_eq!(check_with(&call("anthropic", "anthropic"), &env, Duration::from_millis(10)), Ok(()));
+        assert!(check_with(&call("anthropic", "anthropic"), &env, Duration::from_millis(10)).is_ok());
         assert_eq!(server.join().unwrap(), 2);
+    }
+
+    /// "it works" quotes the model: each family's text, a stream's deltas.
+    #[test]
+    fn the_answer_text_of_each_family() {
+        assert_eq!(answer(br#"{"content":[{"type":"text","text":"Hi there!"}]}"#), "Hi there!");
+        assert_eq!(answer(br#"{"choices":[{"message":{"content":"Hello\n you"}}]}"#), "Hello you");
+        assert_eq!(answer(br#"{"output":[{"type":"message","content":[{"type":"output_text","text":"Hey"}]}]}"#), "Hey");
+        assert_eq!(answer(br#"{"candidates":[{"content":{"parts":[{"text":"Yo"}]}}]}"#), "Yo");
+        let sse = "event: x
+data: {\"type\":\"response.output_text.delta\",\"delta\":\"Hi \"}
+data: {\"type\":\"response.output_text.delta\",\"delta\":\"there\"}
+data: [DONE]
+";
+        assert_eq!(answer(sse.as_bytes()), "Hi there");
+        assert_eq!(answer(b"{}"), "");
+        assert_eq!(answer(b"<html>"), "");
     }
 
     #[test]

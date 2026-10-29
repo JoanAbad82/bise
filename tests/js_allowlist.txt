@@ -1,0 +1,10 @@
+# The hand-written JavaScript that stays JS (js-to-ts, architect m_40557), one path or glob
+# per line and why. tests/js_guard.py fails on any other git-tracked .js/.mjs/.cjs that is
+# neither generated (a "generated from/by" banner in its first lines) nor vendored (bend/vendor/).
+# A new script is TypeScript: a .ts next to it, emitted by scripts/ts_emit.ts, or run by node.
+rust/jsrt/src/script_prelude.js        # include_str! into bend-jsrt: cargo builds it, no node
+apps/desktop/electron-builder.mjs      # the release config, read by electron-builder's own loader
+apps/desktop/eslint.config.mjs         # an eslint.config.ts needs jiti
+computer-use/extension/build.js        # a stamp bise computer-use rewrites on each sync (build.d.ts types it)
+docs/research/computer-use-spike/**    # a frozen record the design docs cite, never typechecked
+site/desktop/hero/*.js                 # generated: apps/desktop's vite hero bundle (hero.vite.config.ts), minified, no banner

@@ -49,10 +49,10 @@ pub fn overdue(id: &str, html: &str, notes: &[Note], today: i64) -> Vec<Waiting>
 
 /// [`of_page`] with page `id`'s overdue promises first (the same row is
 /// not listed again as a step).
-pub fn of_page_on(id: &str, html: &str, notes: &[Note], questions: &[Question], today: i64, busy: &dyn Fn(&str) -> bool) -> Vec<Waiting> {
+pub fn of_page_on(id: &str, html: &str, notes: &[Note], questions: &[Question], went: &[String], today: i64, busy: &dyn Fn(&str) -> bool) -> Vec<Waiting> {
     let mut out = overdue(id, html, notes, today);
     let late: Vec<String> = out.iter().map(|w| w.item.clone()).collect();
-    out.extend(of_page(id, html, notes, questions, busy).into_iter().filter(|w| !(w.kind == "step" && late.contains(&w.item))));
+    out.extend(of_page(id, html, notes, questions, went, busy).into_iter().filter(|w| !(w.kind == "step" && late.contains(&w.item))));
     out
 }
 
@@ -90,8 +90,8 @@ fn cut(t: &str) -> String {
 /// he has not approved, sent or skipped (review items, emails, messages),
 /// the questions he has not answered, and the notes he left unsent.
 /// `busy`: an agent still at work on an item; its draft does not wait
-/// yet (drafts::ready).
-pub fn of_page(id: &str, html: &str, notes: &[Note], questions: &[Question], busy: &dyn Fn(&str) -> bool) -> Vec<Waiting> {
+/// yet (drafts::ready). `went`: the blocks its `--went` names (gone).
+pub fn of_page(id: &str, html: &str, notes: &[Note], questions: &[Question], went: &[String], busy: &dyn Fn(&str) -> bool) -> Vec<Waiting> {
     let mut out = Vec::new();
     let w = |item: &str, kind: &'static str, text: &str| Waiting { page: id.into(), item: item.into(), kind, text: cut(text), days: None };
     // his steps whose turn came
@@ -110,13 +110,13 @@ pub fn of_page(id: &str, html: &str, notes: &[Note], questions: &[Question], bus
     // (ambient-lead m_5977)
     // (a promises or meeting page has no card: each draft its own line;
     // m_6091)
-    let drafts = super::drafts::ready(html, super::drafts::pending(html, notes, questions), busy);
+    let drafts = super::drafts::ready(html, super::drafts::pending(html, notes, questions, went), busy);
     let carded = super::drafts::carded(id);
     match drafts.len() {
         0 => {}
         1 => out.push(w(drafts[0].anchor(), "draft", &drafts[0].text)),
         _ if !carded => out.extend(drafts.iter().map(|d| w(d.anchor(), "draft", &d.text))),
-        _ => out.push(w(drafts[0].anchor(), "draft", &super::drafts::batch_text(&drafts, "").replace('\n', ": "))),
+        _ => out.push(w(drafts[0].anchor(), "draft", &super::drafts::summary(&drafts))),
     }
     // questions he has not answered (on the page: no data-answer)
     for (b, _) in blocks_of(html, "question") {
@@ -143,7 +143,7 @@ mod tests {
     // a plan (data-plan): its drafts are one card, so one line
     const PAGE: &str = r#"<section data-kit="checklist" data-id="steps" data-plan><ol>
 <li data-id="t1" data-done>check the name</li><li data-id="t2" data-who="yours">pay the domain on Gandi</li><li data-id="t3">point the DNS</li></ol></section>
-<section data-kit="review" data-id="replies"><ol><li data-id="m1">reply to Nina: yes, Friday</li><li data-id="m2">reply to Marc: no</li></ol></section>
+<section data-kit="review" data-id="replies" data-verb="send"><ol><li data-id="m1">reply to Nina: yes, Friday</li><li data-id="m2">reply to Marc: no</li></ol></section>
 <section data-kit="email" data-id="mail"><p data-field="to">team@acme.test</p><p>Subject: the offsite</p><p>Hi all, …</p></section>
 <section data-kit="question" data-id="q1"><p>post it now?</p><ol><li>yes</li><li>no</li></ol></section>
 <section data-kit="question" data-id="q2" data-answer="1"><p>done one?</p><ol><li>yes</li></ol></section>"#;
@@ -159,7 +159,7 @@ mod tests {
             note(json!({"id": "n2", "block": "mail", "kind": "note", "text": "shorter", "status": "draft"})),
         ];
         let qs = vec![Question { block: "q1".into(), text: "post it now?".into(), options: vec!["yes".into(), "no".into()], card: 4, ..Default::default() }];
-        let lines: Vec<String> = of_page("plan", PAGE, &notes, &qs, &|_| false).iter().map(Waiting::line).collect();
+        let lines: Vec<String> = of_page("plan", PAGE, &notes, &qs, &[], &|_| false).iter().map(Waiting::line).collect();
         // two drafts (m1, the mail) are one line, as they are one card
         // (ambient-lead m_5977)
         assert_eq!(lines, vec![
@@ -176,7 +176,7 @@ mod tests {
             note(json!({"id": "n4", "block": "steps", "item": "t2", "kind": "tick", "status": "sent"})),
         ];
         let qs = vec![Question { reply: Some("yes".into()), ..qs[0].clone() }];
-        assert!(of_page("plan", PAGE, &notes, &qs, &|_| false).is_empty());
+        assert!(of_page("plan", PAGE, &notes, &qs, &[], &|_| false).is_empty());
     }
 
     /// Law (ambient-lead m_6091, amb-tools' promises run): on a page with
@@ -195,7 +195,7 @@ mod tests {
             em("d-nda", "paul@girard.test"),
             em("d-deck", "marc@acme.test"),
         );
-        let lines: Vec<String> = of_page("promises-w40", &page, &[], &[], &|_| false).iter().map(Waiting::line).collect();
+        let lines: Vec<String> = of_page("promises-w40", &page, &[], &[], &[], &|_| false).iter().map(Waiting::line).collect();
         assert_eq!(lines, vec![
             "promises-w40#p-sso · step · send Hélène the SSO timeline",
             "promises-w40#d-sso · draft · helene@northwind.test s x",
@@ -219,7 +219,7 @@ mod tests {
         let ticked = vec![note(json!({"id": "n1", "block": "open", "item": "p5", "kind": "tick", "status": "sent"}))];
         // on its due date: not yet
         assert!(overdue("promises-w21", page, &ticked, day("2026-05-18")).is_empty());
-        let lines: Vec<String> = of_page_on("promises-w21", page, &ticked, &[], day("2026-05-20"), &|_| false).iter().map(Waiting::line).collect();
+        let lines: Vec<String> = of_page_on("promises-w21", page, &ticked, &[], &[], day("2026-05-20"), &|_| false).iter().map(Waiting::line).collect();
         // p1 is also the checklist's step whose turn came: listed once
         assert_eq!(lines, vec!["promises-w21#p1 · overdue 2 days · send Camille the pricing sheet"]);
         assert_eq!(overdue("promises-w21", page, &ticked, day("2026-05-21")).iter().map(Waiting::line).collect::<Vec<_>>(), vec![

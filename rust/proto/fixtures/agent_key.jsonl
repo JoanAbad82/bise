@@ -1,0 +1,8 @@
+{"dir": "t2", "key": "t2"}
+{"dir": "old t1", "key": "old_t1"}
+{"dir": "x.2", "key": "x_2"}
+{"dir": "a-b_c9", "key": "a-b_c9"}
+{"dir": "café", "key": "caf_"}
+{"dir": "日本", "key": "__"}
+{"dir": "", "key": ""}
+{"dir": "a/b c.d", "key": "a_b_c_d"}

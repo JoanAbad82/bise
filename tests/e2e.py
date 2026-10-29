@@ -4,11 +4,13 @@ real git worktrees, a scripted provider (fake_provider.py).
 
 Run from anywhere:  python3 -u tests/e2e.py [name...]
 """
+import glob
 import json
 import os
 import queue
 import re
 import shutil
+import signal
 import socket
 import subprocess
 import sys
@@ -17,11 +19,17 @@ import threading
 import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import obs_lines  # noqa: E402
 import wait  # noqa: E402
-from bise_env import clean_env, refuse_real_home, refuse_real_run_dir, refuse_real_skills  # noqa: E402
+from bise_env import clean_env, drop_git_repo_vars, refuse_real_home, refuse_real_keys, refuse_real_run_dir, refuse_real_skills  # noqa: E402
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.abspath(os.path.join(HERE, ".."))
+# his own words' frame (msg-forward); a routed one (`via="main"`) keeps its frame
+USER_FRAME = re.compile(r'<user_message id="[^"]*">\s*(.*?)\s*</user_message>', re.S)
+
+# a test's git stays in its own throwaway repo (bise_env.GIT_REPO_VARS)
+drop_git_repo_vars()
 # the binary cargo built: $CARGO_TARGET_DIR (a gate's own target) or rust/target
 EXE = os.path.join(os.path.abspath(os.environ.get("CARGO_TARGET_DIR") or os.path.join(ROOT, "rust", "target")),
                    "debug", "bise")
@@ -63,7 +71,7 @@ def short_sock(natural):
 
 def tiny_png():
     """A 1x1 PNG (the image store sniffs it): a file he attached or
-    pasted (route_e2e, proto_e2e)."""
+    pasted (route_e2e, proto_e2e_*)."""
     import struct
     import zlib
 
@@ -84,16 +92,15 @@ def short_tmp():
 
 def no_real_accounts(tmp):
     """Tests run on fake data, never the user's real accounts: a throwaway
-    hub gets an empty connector index and a bootstrap URL nothing answers
-    (with a real Mistral key it would fetch his Gmail, Slack...), none of
+    hub gets a Mistral API base nothing answers (BISE_MISTRAL_URL: with a
+    real Mistral key its bridges would fetch his Gmail, Slack...), none of
     his plugins (~/.agents/plugins: their logins) and its own plugin state
     (computer use off: not his browser). BISE_TEST_REAL_ACCOUNTS=1 keeps
     his own, for the one run he asks for."""
     if os.environ.get("BISE_TEST_REAL_ACCOUNTS") == "1":
         return {}
     return {
-        "BEND_MCP_INDEX": os.path.join(tmp, "mcp-index.txt"),
-        "BEND_MCP_BOOTSTRAP_URL": "http://127.0.0.1:9/v1/connectors/bootstrap",
+        "BISE_MISTRAL_URL": "http://127.0.0.1:9",
         "BEND_PLUGINS_HOME": os.path.join(tmp, "user-plugins"),
         "BEND_PLUGINS_STATE": os.path.join(tmp, "plugins.json"),
         "BEND_PLUGINS_DATA": os.path.join(tmp, "plugin-data"),
@@ -111,8 +118,90 @@ def own_side_channels(tmp):
     }
 
 
+
+def feed_rec(line):
+    """A transcript line's hub record, in either form (issue 25): (kind,
+    fields) for `sb <kind> :: <json>` (a bise_proto::core::Feed record);
+    (kind, {"text": <its text>}) for an older `sb <kind> : <text>` line;
+    None for any other line. The one place the tests read hub lines: a
+    format change is here."""
+    if not line.startswith("sb "):
+        return None
+    kind, sep, rest = line[3:].partition(" :: ")
+    if sep and kind and " " not in kind:
+        try:
+            r = json.loads(rest)
+        except ValueError:
+            r = None
+        return kind, r if isinstance(r, dict) else {}
+    kind, _, text = line[3:].partition(" : ")
+    return kind, {"text": text}
+
+
+def line_has(line, needle):
+    """`needle` in a transcript line as written, or in one of its hub
+    record's or obs record's string fields (`"` is `\\"` in the record's
+    JSON; the runtime writes `obs <kind> :: <json>` since issue 38 sha 2b)."""
+    if needle in line:
+        return True
+    rec = feed_rec(line) or obs_lines.read(line)
+    return bool(rec) and any(isinstance(v, str) and needle in v for v in rec[1].values())
+
+KEEP_EXT = (".log", ".err", ".out", ".jsonl", ".txt")
+KEEP_FILE_MAX = 2 << 20   # a file's last 2 MB
+KEEP_TOTAL_MAX = 20 << 20  # 20 MB a test
+
+
+def keep_logs(src, dest):
+    """Copy the logs of a red test's world (`src`: hub.log, journal, an inner
+    gate's logs...) to `dest` before the world goes: run_all's
+    RUN_ALL_KEEP, kept with the red run's logs (gate.sh's gate_prune). Each
+    file's last KEEP_FILE_MAX bytes, KEEP_TOTAL_MAX in all; the newest first.
+    The number of files copied."""
+    found = []
+    for d, dirs, files in os.walk(src):
+        dirs[:] = [x for x in dirs if x not in ("node_modules", "target", ".git")]
+        for f in files:
+            p = os.path.join(d, f)
+            if f.endswith(KEEP_EXT) and os.path.isfile(p) and not os.path.islink(p):
+                try:
+                    found.append((os.path.getmtime(p), p))
+                except OSError:
+                    pass
+    total = n = 0
+    for _, p in sorted(found, reverse=True):
+        if total >= KEEP_TOTAL_MAX:
+            break
+        try:
+            size = os.path.getsize(p)
+            take = min(size, KEEP_FILE_MAX, KEEP_TOTAL_MAX - total)
+            to = os.path.join(dest, os.path.relpath(p, src))
+            os.makedirs(os.path.dirname(to), exist_ok=True)
+            with open(p, "rb") as r, open(to, "wb") as w:
+                r.seek(size - take)
+                w.write(r.read(take))
+            total += take
+            n += 1
+        except OSError:
+            pass
+    return n
+
+
+def _term_is_exit(signum, frame):
+    # a TERM (the gate's sweep, a pool stopped) unwinds like an exit, so
+    # Env.close runs and keeps the red's logs; once: a second TERM kills
+    # as before, even if close blocks (a hub that won't stop)
+    signal.signal(signal.SIGTERM, signal.SIG_DFL)
+    raise SystemExit(128 + signum)
+
+
 class Env:
     def __init__(self, fake_env=None):
+        try:
+            if signal.getsignal(signal.SIGTERM) == signal.SIG_DFL:
+                signal.signal(signal.SIGTERM, _term_is_exit)
+        except ValueError:  # not the main thread
+            pass
         self.tmp = tempfile.mkdtemp(prefix="sb-e2e-", dir=short_tmp())
         self.ws = os.path.join(self.tmp, "ws")
         self.state = os.path.join(self.tmp, "st")
@@ -133,9 +222,7 @@ class Env:
             "BEND_PROVIDER_URL": "http://127.0.0.1:%s/v1/chat/completions" % port,
             "BEND_MODEL": "mistral-small-latest",
             "MISTRAL_API_KEY": "fake-key",
-            "BEND_MCP_INDEX": os.path.join(self.tmp, "mcp-index.txt"),
             **no_real_accounts(self.tmp),
-            "BEND_SKILLS_INDEX": os.path.join(self.tmp, "skills-index.txt"),
             "BEND_BG_ROOT": os.path.join(self.tmp, "bg"),
             # the agents' session logs (BISE-196) and their blobs: never
             # the real ~/.bise
@@ -159,40 +246,60 @@ class Env:
     def start_hub(self):
         refuse_real_run_dir(self.env, self.tmp)
         refuse_real_home(self.env)
+        refuse_real_keys(self.env)
         err = open(os.path.join(self.tmp, "hub.stderr"), "a")
         self.hub = subprocess.Popen([EXE, "sbd", "--workspace", self.ws], cwd=ROOT, env=self.env,
                                     stdin=subprocess.DEVNULL, stdout=err, stderr=err)
         sock = os.path.join(self.state, "hub.sock")
-        wait.until(lambda: os.path.exists(sock), 20, "the hub's socket %s" % sock, poll=0.05)
-        return Client(sock)
+        # a connect that works, never the file alone: the file is there
+        # before the hub listens (bind, then listen) and, at a restart,
+        # the last hub's file can still be there; a connect then was
+        # refused (proc_cleanup's second start under load, "[Errno 61]
+        # Connection refused"). wait.until polls through the refusal.
+        return wait.until(lambda: Client(sock), 20, "the hub listening on %s" % sock, poll=0.05)
 
-    def stop_hub(self):
-        c = Client(os.path.join(self.state, "hub.sock"))
-        c.send({"op": "stop_hub"})
+    def stop_hub(self, keep_agents=False):
+        stop_hub(os.path.join(self.state, "hub.sock"), keep_agents)
         self.hub.wait(timeout=20)
         self.hub = None
 
     def close(self):
+        # a red keeps its world's logs first, before the hub's stop: a swept
+        # test gets KILL 0.5 s after its TERM (gate.sh's gate_kill)
+        exc = sys.exc_info()[1]
+        red = os.environ.get("SB_KEEP") == "1" or (
+            exc is not None and not (isinstance(exc, SystemExit) and exc.code in (0, None)))
+        keep = os.environ.get("RUN_ALL_KEEP")
+        if red and keep:
+            print("kept %d log files of this world in %s" % (keep_logs(self.tmp, keep), keep), flush=True)
         if self.hub:
             try:
                 self.stop_hub()
             except Exception:
                 self.hub.kill()
         self.fake.kill()
-        # the HOME law, after the fact: its REPLs indexed none of his skills
-        # (raised only when the test itself passed: never hides its failure)
-        if sys.exc_info()[0] is None:
-            refuse_real_skills(self.env["BEND_SKILLS_INDEX"])
+        # the HOME law, after the fact: its REPLs' bridges indexed none of
+        # his skills (raised only when the test itself passed: never hides
+        # its failure)
+        if exc is None:
+            for idx in glob.glob(os.path.join(self.env["BEND_RUN_DIR"], "*", "plugins", "skills-index.txt")):
+                refuse_real_skills(idx)
         if os.environ.get("SB_KEEP") != "1":
             shutil.rmtree(self.tmp, ignore_errors=True)
         else:
             print("kept", self.tmp)
 
     def fake_requests(self):
+        """The fake provider's requests; each one's `user` with his words out of
+        their `<user_message id>` frame (msg-forward), as fake_provider acks them"""
         try:
-            return [json.loads(l) for l in open(self.fake_log)]
+            rs = [json.loads(l) for l in open(self.fake_log)]
         except FileNotFoundError:
             return []
+        for r in rs:
+            if isinstance(r.get("user"), str):
+                r["user"] = USER_FRAME.sub(r"\1", r["user"])
+        return rs
 
 
 def sh(cwd, script):
@@ -203,16 +310,114 @@ def out(cwd, script):
     return subprocess.run(["/bin/sh", "-c", script], cwd=cwd, check=True, capture_output=True, text=True).stdout.strip()
 
 
+def stop_hub(sock_path, keep_agents=False):
+    """Stop the hub of `sock_path` as `bise switchboard --stop` does
+    (switchboard::client::stop): `initialize`, then `hub/stop` with
+    `keep_agents`; then wait for its socket to go."""
+    s = socket.socket(socket.AF_UNIX)
+    s.connect(sock_path)
+    init = {"jsonrpc": "2.0", "id": 0, "method": "initialize", "params": {"proto": PROTO, "client": {"name": "e2e-stop"}}}
+    s.sendall((json.dumps(init) + "\n").encode())
+    s.settimeout(10)
+    f = s.makefile("r")
+    project = None
+    for line in f:
+        try:
+            v = json.loads(line)
+        except ValueError:
+            continue
+        if v.get("id") == 0 and "method" not in v:
+            project = (v.get("result") or {}).get("project")
+            break
+    if not project:
+        s.close()
+        raise AssertionError("initialize refused before hub/stop")
+    stop = {"jsonrpc": "2.0", "id": 1, "method": "hub/stop", "params": {"project": project, "keep_agents": keep_agents}}
+    s.sendall((json.dumps(stop) + "\n").encode())
+    s.settimeout(0.1)
+
+    def gone():
+        # what the hub writes is read away (a full socket buffer would
+        # keep it from stopping), as the CLI does
+        try:
+            s.recv(65536)
+        except (socket.timeout, OSError):
+            pass
+        return not os.path.exists(sock_path)
+
+    try:
+        # as the CLI: a hub that doesn't go in 5 s is left to the caller
+        wait.until(gone, 5, "the hub's socket gone after hub/stop", poll=0.05)
+    except AssertionError:
+        pass
+    finally:
+        s.close()
+
+
+PROTO = 1
+# the one-client notifications notices() lists, by their `kind` (a
+# response's words join them as a notice, as the terminal shows them)
+SAID = {"hub/notice": "notice"}
+
+
+def merge_archived(c, live, archived):
+    """agents-light (ad6321c7f): an agents event's live rows, then each
+    archived one as a row with `archived: true`. The event's `archived`
+    list replaces the one kept on `c` when it has one (always the first
+    event of a connection); none keeps it. bise_proto's Archived::merge,
+    the Rust clients' one merge."""
+    if archived is not None:
+        c.archived = list(archived)
+    kept = getattr(c, "archived", [])
+    return list(live) + [dict(a, archived=True, main=False) for a in kept]
+
+
 class Client:
-    def __init__(self, sock_path):
+    """A JSON-RPC 2.0 client of hub.sock (client-protocol): `initialize`
+    first, then the hub-wide notifications (hub/agents, hub/cards...)
+    keep `state`. An agent's lines are its transcript, read where the hub
+    writes them (the older `line` events were those lines, one by one)."""
+
+    def __init__(self, sock_path, name="e2e"):
         self.s = socket.socket(socket.AF_UNIX)
         self.s.connect(sock_path)
+        # the hub's state folder (a short socket's folder is a link to it)
+        self.agents_dir = os.path.join(os.path.realpath(os.path.dirname(sock_path)), "agents")
         self.q = queue.Queue()
         self.events = []
+        # what the hub said to this client (notices())
+        self.said = []
+        # the hub-wide notifications' latest params, by method
+        self.hub = {}
+        # every hub-wide notification with the time it was read:
+        # (time.time(), method, params), oldest first
+        self.note_log = []
         self.state = None
         self.lock = threading.Lock()
-        self.s.sendall(b'{"op":"hello"}\n')
+        self._tails = {}
+        self._rid = 0
+        self.send({"jsonrpc": "2.0", "id": "e2e-init", "method": "initialize",
+                   "params": {"proto": PROTO, "client": {"name": name, "version": "0"}}})
         threading.Thread(target=self._read, daemon=True).start()
+        init = wait.until(lambda: self._response("e2e-init"), 30, "initialize's result")
+        if "error" in init:
+            raise AssertionError("initialize refused: %r" % init)
+        self.init = init["result"]
+        self._project = self.init["project"]
+        self.send({"jsonrpc": "2.0", "method": "initialized"})
+
+    def _note(self, method, params):
+        """A hub-wide notification: the latest of its kind; agents and
+        cards are the state the helpers read (lock held)."""
+        self.hub[method] = params
+        self.note_log.append((time.time(), method, params))
+        if method in ("hub/agents", "hub/cards"):
+            st = dict(self.state or {"agents": [], "cards": []})
+            key = method.split("/")[1]
+            st[key] = params.get(key, [])
+            if method == "hub/agents":
+                st["agents"] = merge_archived(self, st["agents"], params.get("archived"))
+            self.state = st
 
     def _read(self):
         f = self.s.makefile("r")
@@ -223,29 +428,148 @@ class Client:
                 continue
             with self.lock:
                 self.events.append(v)
-                if v.get("ev") == "state":
-                    self.state = v
+                # initialize's state, in the reader's order: a notification
+                # read after it is newer (one read before it never is: the
+                # hub answers first)
+                if v.get("id") == "e2e-init" and "result" in v:
+                    for n in v["result"]["hub"]["state"]:
+                        self._note(n["method"], n["params"])
+                elif "method" in v and "id" not in v:
+                    params = v.get("params") or {}
+                    if v["method"] in SAID:
+                        self.said.append(dict(params, kind=SAID[v["method"]]))
+                    elif v["method"].startswith("hub/"):
+                        self._note(v["method"], params)
+                # a response's words (command/run's notice, a refusal)
+                # read as the hub's notice, as the terminal shows them
+                if "jsonrpc" in v and "method" not in v:
+                    words = (v.get("result") or {}).get("notice") or (v.get("error") or {}).get("message")
+                    if words:
+                        self.said.append({"kind": "notice", "text": words, "rpc": v.get("id")})
+
+    def _response(self, rid):
+        with self.lock:
+            return next((e for e in self.events if e.get("id") == rid and "method" not in e), None)
+
+    def notes(self, method):
+        """The params of every `method` notification so far, in order."""
+        with self.lock:
+            return [e.get("params") or {} for e in self.events if e.get("method") == method and "id" not in e]
 
     def send(self, v):
         self.s.sendall((json.dumps(v) + "\n").encode())
 
-    def say(self, text, focus="main"):
-        self.send({"op": "input", "focus": focus, "text": text})
+    def say(self, text, focus="main", **opts):
+        """What he types to `focus` (command/run: the hub's one parser);
+        its answer is not waited for. `opts`: turn/send's (files, via...)
+        through command/run's flattened SendOpts."""
+        self._rid += 1
+        params = dict(opts, project=self.project(), agent=focus, line=text)
+        self.send({"jsonrpc": "2.0", "id": "e2e-%d" % self._rid, "method": "command/run", "params": params})
+
+    def call(self, method, params=None):
+        """A JSON-RPC request, sent: its id (a request whose answer may
+        never come, as a restart's)."""
+        self._rid += 1
+        rid = "e2e-%d" % self._rid
+        msg = {"jsonrpc": "2.0", "id": rid, "method": method}
+        if params is not None:
+            msg["params"] = params
+        self.send(msg)
+        return rid
+
+    def restart(self):
+        """/restart from the hub's side (version/restart), not waited for:
+        the hub goes away."""
+        self.call("version/restart", {"project": self.project()})
+
+    def rpc(self, method, params=None, timeout=30):
+        """A JSON-RPC request on this hello connection (client-protocol):
+        its response, once it comes."""
+        rid = self.call(method, params)
+
+        def got():
+            with self.lock:
+                return next((e for e in self.events if e.get("id") == rid and "method" not in e), None)
+        return wait.until(got, timeout, "the response to %s" % method)
+
+    def project(self):
+        """The hub's id, from initialize's result (no copy of hub_id)."""
+        return self._project
+
+    def interrupt(self, agent):
+        """ctrl+c on `agent` (turn/interrupt): its response."""
+        return self.rpc("turn/interrupt", {"project": self.project(), "agent": agent})
+
+    def answer(self, card, reply):
+        """his answer to card `card` (card/answer): its response."""
+        return self.rpc("card/answer", {"project": self.project(), "card": card, "reply": reply})
+
+    def approvals_set(self, mode=None):
+        """shift+tab (`toggle`), `/approvals yolo|auto`, or with no mode
+        `/approvals`' read (approvals/set): its response."""
+        params = {"project": self.project()}
+        if mode is not None:
+            params["mode"] = mode
+        return self.rpc("approvals/set", params)
+
+    def _tail(self, path):
+        """The lines of transcript `path` so far ("<ts>\\t<line>" each, the
+        hub's write), read on from where the last call stopped."""
+        at, lines, rest = self._tails.get(path, (0, [], b""))
+        try:
+            with open(path, "rb") as f:
+                f.seek(at)
+                got = f.read()
+        except FileNotFoundError:
+            return lines
+        if got:
+            *whole, rest = (rest + got).split(b"\n")
+            for raw in whole:
+                ts, tab, text = raw.decode("utf-8", "replace").partition("\t")
+                lines.append(text if tab and ts.isdigit() else raw.decode("utf-8", "replace"))
+            self._tails[path] = (at + len(got), lines, rest)
+        return lines
+
+    def feed(self, agent, kind):
+        """`agent`'s hub records of one kind, in order (feed_rec)."""
+        return [r for k, r in filter(None, map(feed_rec, self.lines(agent))) if k == kind]
+
+    def wait_feed(self, agent, kind, timeout=90, /, **want):
+        """Wait for a record of `kind` in `agent`'s feed whose fields are
+        `want` (`text_has=` a part of its text); the record. Positional
+        only: a record has fields named agent, kind, who."""
+        def hit(r):
+            return all((v in r.get("text", "")) if k == "text_has" else r.get(k) == v for k, v in want.items())
+        return self.wait(lambda: next((r for r in self.feed(agent, kind) if hit(r)), None), timeout,
+                         "%s %r in %s" % (kind, want, agent))
 
     def lines(self, agent=None):
-        with self.lock:
-            return [e["line"] for e in self.events if e.get("ev") == "line" and (agent is None or e["agent"] == agent)]
+        """`agent`'s transcript lines (every agent's with none), as the
+        hub wrote them."""
+        names = [agent] if agent else sorted(os.listdir(self.agents_dir)) if os.path.isdir(self.agents_dir) else []
+        return [l for n in names for l in self._tail(os.path.join(self.agents_dir, n, "transcript.log"))]
 
     def notices(self):
+        """What the hub said to this client, in order: hub/notice's
+        params with their `kind` (notice), and a response's notice or
+        refusal words as a notice."""
         with self.lock:
-            return [e for e in self.events if e.get("ev") in ("notice", "confirm")]
+            return list(self.said)
 
     def agent(self, name):
+        """`name`'s row of hub/agents with the hub's own words the tests
+        wait on: `status` (the row's phase: starting, stopped; archived;
+        else its status; the row's own in `row_status`) and `waiting_on`
+        ("you" or an agent's name; the row's {who, name} in `waits_on`)."""
         with self.lock:
             st = self.state or {}
         for a in st.get("agents", []):
             if a["name"] == name:
-                return a
+                word = a.get("phase") or ("archived" if a.get("archived") else a["status"])
+                w = a.get("waiting_on") or {}
+                on = {"you": "you", "agent": w.get("name")}.get(w.get("who"))
+                return dict(a, status=word, row_status=a["status"], waiting_on=on, waits_on=a.get("waiting_on"))
         return None
 
     def cards(self):
@@ -257,7 +581,9 @@ class Client:
         return wait.until(pred, timeout, what)
 
     def wait_line(self, agent, needle, timeout=90):
-        self.wait(lambda: any(needle in l for l in self.lines(agent)), timeout, "%r in %s" % (needle, agent))
+        """A line of `agent`'s feed that has `needle`: as written, or in
+        one of its record's text fields (a record's JSON escapes quotes)."""
+        self.wait(lambda: any(line_has(l, needle) for l in self.lines(agent)), timeout, "%r in %s" % (needle, agent))
 
     def wait_status(self, name, statuses, timeout=90):
         if isinstance(statuses, str):
@@ -275,6 +601,19 @@ def check(cond, msg):
         raise AssertionError(msg)
 
 
+def seed_tasks(state, ws, names):
+    """A throwaway hub's journal before its start: main's tasks `names`,
+    active, working in `ws` (shared). The one place a test writes a
+    journal (architect m_14659): a change of sb-core's task_created shape
+    breaks here, loudly."""
+    os.makedirs(state, exist_ok=True)
+    space = {"mode": "shared", "path": ws, "branch": None, "base_commit": None, "dropped": False}
+    with open(os.path.join(state, "journal.jsonl"), "a") as f:
+        for i, name in enumerate(names):
+            f.write(json.dumps({"type": "task_created", "name": name, "parent": "main", "ws": space, "at_ms": i + 1,
+                                "brief": {"objective": "fake objective of %s" % name, "context": ""}}) + "\n")
+
+
 # ---- scenarios ----
 
 def t_spawn_and_auto_reply(E, c):
@@ -285,7 +624,7 @@ def t_spawn_and_auto_reply(E, c):
     c.wait(lambda: os.path.exists(os.path.join(E.ws, "t1.txt")), 90, "t1.txt written in the workspace")
     check(open(os.path.join(E.ws, "t1.txt")).read().strip() == "hello-from-t1", "t1.txt content")
     # t1's turn ends: its reply comes back to main automatically
-    c.wait_line("main", "sb msg-in : t1 m_", 90)
+    c.wait_feed("main", "msg-in", 90, **{"from": "t1"})
     c.wait_idle("main", "t1")
     # main's turn on the reply may start after the idle seen above (the
     # msg-in line comes first): wait for its model call
@@ -298,8 +637,9 @@ def t_spawn_and_auto_reply(E, c):
     check(any("<bise_state>" in r["last_user"] for r in reqs), "the board is injected as the last message")
     # BISE-126: after t1's turn, one one-shot call gives its role line
     # (the fake provider answers "Fake Role Line."; the hub cleans it)
-    c.wait(lambda: c.agent("t1")["role"] == "fake role line", 60, "t1's role line (now %r)" % c.agent("t1").get("role"))
-    check(c.agent("main")["role"] == "", "main has no role line")
+    # hub/agents leaves an empty role out
+    c.wait(lambda: c.agent("t1").get("role") == "fake role line", 60, "t1's role line (now %r)" % c.agent("t1").get("role"))
+    check(c.agent("main").get("role", "") == "", "main has no role line")
     roles = [r for r in E.fake_requests() if r["agent"] == "(role line)"]
     check(len(roles) == 1, "one role-line call for t1's turn: %d" % len(roles))
     check("hello-from-t1" in roles[0]["user"], "the call reads the objective: " + roles[0]["user"][:300])
@@ -309,13 +649,13 @@ def t_spawn_and_auto_reply(E, c):
 
 def t_direct_message_and_note(E, c):
     c.wait_idle("main", "t1")
-    c.send({"op": "focus", "focus": "t1"})
+    check(c.rpc("client/focus", {"project": c.project(), "focus": "t1"}).get("result") == {}, "focus answered")
     c.say("parle-moi directement", focus="t1")
-    c.wait_line("t1", "sb you : parle-moi directement")
+    c.wait_feed("t1", "you", 90, text="parle-moi directement")
     c.wait_line("t1", "ack: parle-moi directement")
     c.wait_idle("t1")
-    c.send({"op": "focus", "focus": "main"})
-    c.wait_line("main", "sb direct : You talked to @t1 (1 message)")
+    check(c.rpc("client/focus", {"project": c.project(), "focus": "main"}).get("result") == {}, "focus answered")
+    c.wait_feed("main", "direct", 90, text="You talked to @t1 (1 message)")
     c.say("et alors ?")
     c.wait(lambda: any(r["agent"] == "main" and r["user"].endswith("et alors ?") for r in E.fake_requests()), 60,
            "main's request with the new message")
@@ -326,9 +666,11 @@ def t_direct_message_and_note(E, c):
     c.wait_idle("main")
     before = len([r for r in E.fake_requests() if r["agent"] == "main"])
     c.say("@t1 route explicite")
-    c.wait_line("main", "sb route : you → @t1 : route explicite")
+    c.wait_feed("main", "route", 90, who="t1", said="route explicite")
     # from main's view the task reads it tagged (RFC 0003 §5.1)
-    c.wait_line("t1", 'ack: <user_message via="main"> route explicite')
+    # (its frame carries the message id too since msg-forward: `<user_message id="m_6" via="main">`)
+    c.wait(lambda: any(line_has(l, 'ack: <user_message id="m_') and line_has(l, '" via="main"> route explicite')
+                       for l in c.lines("t1")), 90, "t1 acks the routed frame")
     c.wait_idle("t1")
     check(len([r for r in E.fake_requests() if r["agent"] == "main"]) == before, "an explicit route costs no main turn")
 
@@ -352,28 +694,33 @@ def t_escalation_card(E, c):
     c.say('/new t3: {{bash: sb send main --expect-reply "v1 ou v2 ?"}}')
     c.say('/new t3b: {{bash: sb send main --expect-reply "t3b asks main" && sb status blocked --note "t3b needs a key" && sb report blocked "t3b is stuck"}}')
     c.wait(lambda: c.agent("t3") is not None and c.agent("t3b") is not None, 60, "t3 and t3b")
-    c.wait(lambda: seen.append(len(c.cards())) or (any(l.startswith("sb msg-in : t3 ") for l in c.lines("main"))
+    c.wait(lambda: seen.append(len(c.cards())) or (any(r["from"] == "t3" for r in c.feed("main", "msg-in"))
                    and any("[report: blocked] t3b is stuck" in l for l in c.lines("main"))), 90 * 2,
            "both agents' messages in main's feed")
     c.wait_idle("main", "t3", "t3b")
     check(not c.cards() and not any(seen), "no card in the user's inbox: %r / %r" % (c.cards(), seen))
-    check(isinstance(c.agent("main").get("inbox"), int), "main's inbox count in the state: %r" % c.agent("main"))
-    check(any(r["agent"] == "main" and "@t3b is blocked: t3b needs a key" in r["user"] for r in E.fake_requests()),
+    # hub/agents leaves a 0 count out
+    check(isinstance(c.agent("main").get("inbox", 0), int), "main's inbox count in the state: %r" % c.agent("main"))
+    # as a new turn's message, or (a fast hub) steered into main's turn
+    # mid-way: then it is an earlier message of the next request
+    blocked = "@t3b is blocked: t3b needs a key"
+    check(any(r["agent"] == "main" and (blocked in r["user"] or any(blocked in u for u in r.get("users") or []))
+              for r in E.fake_requests()),
           "the blocked status went to main")
     msg_id = None
-    for l in c.lines("main"):
-        if l.startswith("sb msg-in : t3 m_") and "v1 ou v2" in l:
-            msg_id = l.split()[4]
+    for r in c.feed("main", "msg-in"):
+        if r.get("from") == "t3" and "v1 ou v2" in r.get("body", "") and r.get("id"):
+            msg_id = "m_%d" % r["id"]
     check(msg_id, "the question id")
-    c.say("[[bash: sb card --for %s \"v1 ou v2 ?\"]]" % msg_id)
+    c.say("[[bash: sb notify --for %s \"v1 ou v2 ?\"]]" % msg_id)
     c.wait(lambda: any(cd["kind"] == "question" for cd in c.cards()), 60, "a question card")
     card = [cd for cd in c.cards() if cd["kind"] == "question"][0]
     check(card["agent"] == "t3", "the card is t3's: %r" % card)
     c.wait_idle("main")
     # escalated: main can neither answer nor close it
     c.say('[[bash: sb send t3 --reply-to %s "v1"; sb close %d; echo rc=$?]]' % (msg_id, card["id"]))
-    c.wait_line("main", "is in the user's inbox (card #%d): only the user answers it" % card["id"], 60)
-    c.wait_line("main", "card #%d is in the user's inbox: only the user answers or closes it" % card["id"], 60)
+    c.wait_line("main", "is in the user's inbox (notification #%d): only the user answers it" % card["id"], 60)
+    c.wait_line("main", "notification #%d is in the user's inbox: only the user answers or closes it" % card["id"], 60)
     c.wait_idle("main")
     check([cd["id"] for cd in c.cards()] == [card["id"]], "the card stays: %r" % c.cards())
     # only the user's answer resolves it, and it reaches t3
@@ -388,7 +735,8 @@ def t_escalation_card(E, c):
 def t_worktree_drop_restore(E, c):
     c.wait_idle("main")
     c.say('/new -w t4: {{bash: echo wt > wt.txt && git add wt.txt && git commit -qm wt && echo committed}}')
-    c.wait(lambda: c.agent("t4") is not None, 60, "t4")
+    # hub-loop: its worktree is made off the hub's loop, then its row has it
+    c.wait(lambda: (c.agent("t4") or {}).get("branch") == "sb/t4", 60, "t4 placed")
     a = c.agent("t4")
     check(a["mode"] == "worktree" and a["branch"] == "sb/t4", "worktree mode: %r" % a)
     wt = a["path"]
@@ -399,11 +747,12 @@ def t_worktree_drop_restore(E, c):
     c.wait_idle("t4")
     check(out(wt, "git log -1 --format=%s") == "wt", "the commit is on the task's branch")
     check(not os.path.exists(os.path.join(E.ws, "wt.txt")), "the workspace is untouched")
+    # his /archive asks with the 1/2 drop card (drop-card): 1 archives
     c.say("/archive t4")
-    c.wait(lambda: any(n.get("ev") == "confirm" for n in c.notices()), 30, "a confirmation")
-    conf = [n for n in c.notices() if n.get("ev") == "confirm"][-1]
-    check("1 unpushed commit" in conf["text"], conf["text"])
-    c.send({"op": "confirm", "id": conf["id"], "yes": True})
+    c.wait(lambda: any(x["kind"] == "drop" and x["agent"] == "t4" for x in c.cards()), 30, "the archive card")
+    card = [x for x in c.cards() if x["kind"] == "drop" and x["agent"] == "t4"][-1]
+    check("1 unpushed commit is kept" in card["text"] and "1. archive it" in card["text"], card["text"])
+    check("error" not in c.answer(card["id"], "1"), "the card is answered")
     c.wait_status("t4", "archived", 30)
     check(not os.path.exists(wt), "worktree removed")
     check(not os.path.exists(os.path.dirname(wt)), "and its folder")
@@ -627,13 +976,13 @@ def t_main_controls(E, c):
     c.wait_idle("t1")
     # BISE-299: main cannot close a card of the user's inbox; it withdraws
     # its own, with a why the user reads
-    c.say('[[bash: sb card "e2e question?"]]')
+    c.say('[[bash: sb notify "e2e question?"]]')
     c.wait(lambda: any(cd["kind"] == "question" for cd in c.cards()), 60, "a question card")
     card = [cd for cd in c.cards() if cd["kind"] == "question"][0]
     c.wait_idle("main")
-    c.say('[[bash: sb card --withdraw %d "moot now"]]' % card["id"])
+    c.say('[[bash: sb notify --withdraw %d "moot now"]]' % card["id"])
     c.wait(lambda: not c.cards(), 60, "card withdrawn by main")
-    c.wait_line("main", "#%d withdrawn by main: moot now" % card["id"], 30)
+    c.wait_feed("main", "card-closed", 30, id=card["id"], res="withdrawn by main: moot now")
     c.wait_idle("main")
     # main renames a task; the old name still works
     c.say("/new t5: {{bash: echo t5}}")
@@ -669,7 +1018,7 @@ def t_crash_status_and_tasks(E, c):
     # a task crashes: main hears it from the hub
     pid = open(os.path.join(E.state, "agents", "t1", "repl.pid")).read().strip()
     os.kill(int(pid), 9)
-    c.wait_line("main", "sb msg-in : switchboard", 60)
+    c.wait_feed("main", "msg-in", 60, **{"from": "switchboard"})
     c.wait(lambda: any(r["agent"] == "main" and "agent @t1 crashed" in r["user"] for r in E.fake_requests()), 60,
            "main's model got the crash notification")
     c.wait_status("t1", ["idle", "done", "blocked"], 60)

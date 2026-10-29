@@ -138,7 +138,6 @@ fn law_the_three_uses_read_one_list() {
         home: "/h".into(),
         user_tmp: None,
         run: None,
-        links: vec![],
         client_socks: vec![],
     };
     let s = Secrets::of(&spec.bise, &spec.home);

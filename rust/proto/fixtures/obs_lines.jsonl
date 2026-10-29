@@ -1,0 +1,30 @@
+{"text":"  obs: turn_started","rec":"obs turn_started :: {}"}
+{"text":"  obs: assistant: <think>hm</think>salut","rec":"obs assistant :: {\"text\":\"<think>hm</think>salut\"}"}
+{"text":"  obs: assistant:","rec":"obs assistant :: {\"text\":\"\"}"}
+{"text":"  obs: tool_started #3","rec":"obs tool_started :: {\"call\":3}"}
+{"text":"  obs: tool_finished #3 ok","rec":"obs tool_finished :: {\"call\":3,\"ok\":true}"}
+{"text":"  obs: tool_finished #4 failed","rec":"obs tool_finished :: {\"call\":4,\"ok\":false}"}
+{"text":"  obs: tool_result_committed #3","rec":"obs tool_result_committed :: {\"call\":3}"}
+{"text":"  obs: steering_received: look at the tests","rec":"obs steering_received :: {\"text\":\"look at the tests\"}"}
+{"text":"  obs: steering_rejected: no turn running","rec":"obs steering_rejected :: {\"reason\":\"no turn running\"}"}
+{"text":"  obs: steered: you sent 1 note","rec":"obs steered :: {\"text\":\"you sent 1 note\"}"}
+{"text":"  obs: notification_received: m_12","rec":"obs notification_received :: {\"text\":\"m_12\"}"}
+{"text":"  obs: notification_delivered: m_12","rec":"obs notification_delivered :: {\"text\":\"m_12\"}"}
+{"text":"  obs: provider_retry: 2/10 · provider 529 (transient) · retry in 4s","rec":"obs provider_retry :: {\"delay_ms\":4000,\"n\":2,\"of\":10,\"why\":\"provider 529 (transient)\"}"}
+{"text":"  obs: harness_restarted: the harness crashed (exit 134) and restarted","rec":"obs harness_restarted :: {\"note\":\"the harness crashed (exit 134) and restarted\"}"}
+{"text":"  obs: candidate_discarded: empty reply","rec":"obs candidate_discarded :: {\"cause\":\"empty reply\"}"}
+{"text":"  obs: compaction_started #4 (auto)","rec":"obs compaction_started :: {\"auto\":true,\"compaction\":4}"}
+{"text":"  obs: compaction_started #5 (manual)","rec":"obs compaction_started :: {\"auto\":false,\"compaction\":5}"}
+{"text":"  obs: context_compaction_failed: too big","rec":"obs context_compaction_failed :: {\"code\":\"too big\"}"}
+{"text":"  obs: compaction_done: ## Who I am I am the agent debt-t5...","rec":"obs compaction_done :: {\"summary\":\"## Who I am I am the agent debt-t5...\"}"}
+{"text":"  obs: session_restored: 12 messages","rec":"obs session_restored :: {\"messages\":12}"}
+{"text":"  obs: model_swapped: chatgpt/gpt-6.1-sol chatgpt/gpt-6-luna","rec":"obs model_swapped :: {\"from\":\"chatgpt/gpt-6.1-sol\",\"to\":\"chatgpt/gpt-6-luna\"}"}
+{"text":"  obs: usage: model=fake/claude-x in=3000 out=10 cache_read=2000 cache_write=5","rec":"obs usage :: {\"cache_read\":2000,\"cache_write\":5,\"input\":3000,\"model\":\"fake/claude-x\",\"output\":10}"}
+{"text":"  obs: null_iteration","rec":"obs null_iteration :: {}"}
+{"text":"  obs: turn_done: completed","rec":"obs turn_done :: {\"end\":\"completed\",\"why\":\"\"}"}
+{"text":"  obs: turn_done: interrupted","rec":"obs turn_done :: {\"end\":\"interrupted\",\"why\":\"\"}"}
+{"text":"  obs: turn_done: failed: interrupted by main","rec":"obs turn_done :: {\"end\":\"interrupted\",\"why\":\"main\"}"}
+{"text":"  obs: turn_done: failed: provider 500","rec":"obs turn_done :: {\"end\":\"failed\",\"why\":\"provider 500\"}"}
+{"text":"  obs: turn_stalled: execution budget exhausted","rec":"obs turn_stalled :: {\"why\":\"execution budget exhausted\"}"}
+{"text":"  obs: reload: restarting the harness with the latest code","rec":"obs reload :: {\"refused\":false,\"text\":\"restarting the harness with the latest code\"}"}
+{"text":"  obs: reload refused: not between turns — finish or interrupt the pending turn first","rec":"obs reload :: {\"refused\":true,\"text\":\"not between turns — finish or interrupt the pending turn first\"}"}

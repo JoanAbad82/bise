@@ -1,0 +1,58 @@
+{
+  "about": "agents-light (architect m_37220): the agents events a client gets in order, and the rows it has after each. One fixture for both merges: rows::Archived (Rust, rows/agents_tests.rs) and the desktop's store/archived.ts (archived.test.ts).",
+  "steps": [
+    {
+      "what": "the first event carries the list: live rows then the archived ones, each from its light row only",
+      "ev": {"ev": "agents", "project": "acme", "agents": [
+        {"name": "main", "main": true, "status": "idle", "archived": false, "title": "", "purpose": "", "since_ms": 5, "waits": 0, "dir": "main", "watching": []}
+      ], "archived": [
+        {"name": "old-fix", "dir": "old-fix", "status": "done", "since_ms": 9, "about": "fixed in 0.4"},
+        {"name": "api", "aliases": ["api-v1"], "dir": "api.2", "status": "done", "since_ms": 7}
+      ]},
+      "rows": [
+        {"name": "main", "main": true, "status": "idle", "archived": false, "title": "", "purpose": "", "since_ms": 5, "waits": 0, "dir": "main", "watching": []},
+        {"name": "old-fix", "main": false, "status": "done", "archived": true, "title": "fixed in 0.4", "purpose": "", "since_ms": 9, "waits": 0, "dir": "old-fix", "watching": []},
+        {"name": "api", "main": false, "status": "done", "archived": true, "title": "", "purpose": "", "since_ms": 7, "waits": 0, "dir": "api.2", "aliases": ["api-v1"], "watching": []}
+      ]
+    },
+    {
+      "what": "a live change without the list: the archived rows kept",
+      "ev": {"ev": "agents", "project": "acme", "agents": [
+        {"name": "main", "main": true, "status": "working", "archived": false, "title": "", "purpose": "", "since_ms": 12, "waits": 0, "dir": "main", "watching": []}
+      ]},
+      "rows": [
+        {"name": "main", "main": true, "status": "working", "archived": false, "title": "", "purpose": "", "since_ms": 12, "waits": 0, "dir": "main", "watching": []},
+        {"name": "old-fix", "main": false, "status": "done", "archived": true, "title": "fixed in 0.4", "purpose": "", "since_ms": 9, "waits": 0, "dir": "old-fix", "watching": []},
+        {"name": "api", "main": false, "status": "done", "archived": true, "title": "", "purpose": "", "since_ms": 7, "waits": 0, "dir": "api.2", "aliases": ["api-v1"], "watching": []}
+      ]
+    },
+    {
+      "what": "a restore: old-fix live again, the list without it",
+      "ev": {"ev": "agents", "project": "acme", "agents": [
+        {"name": "main", "main": true, "status": "working", "archived": false, "title": "", "purpose": "", "since_ms": 12, "waits": 0, "dir": "main", "watching": []},
+        {"name": "old-fix", "main": false, "status": "idle", "archived": false, "title": "fixed in 0.4", "purpose": "an old fix", "since_ms": 20, "waits": 0, "dir": "old-fix", "last_pos": 40, "watching": []}
+      ], "archived": [
+        {"name": "api", "aliases": ["api-v1"], "dir": "api.2", "status": "done", "since_ms": 7}
+      ]},
+      "rows": [
+        {"name": "main", "main": true, "status": "working", "archived": false, "title": "", "purpose": "", "since_ms": 12, "waits": 0, "dir": "main", "watching": []},
+        {"name": "old-fix", "main": false, "status": "idle", "archived": false, "title": "fixed in 0.4", "purpose": "an old fix", "since_ms": 20, "waits": 0, "dir": "old-fix", "last_pos": 40, "watching": []},
+        {"name": "api", "main": false, "status": "done", "archived": true, "title": "", "purpose": "", "since_ms": 7, "waits": 0, "dir": "api.2", "aliases": ["api-v1"], "watching": []}
+      ]
+    },
+    {
+      "what": "an empty list replaces it (Some([]) is not None)",
+      "ev": {"ev": "agents", "project": "acme", "agents": [], "archived": []},
+      "rows": []
+    },
+    {
+      "what": "an older hub: its archived rows in full inside agents, no list: as they are",
+      "ev": {"ev": "agents", "project": "acme", "agents": [
+        {"name": "old", "main": false, "status": "done", "archived": true, "title": "t", "purpose": "p", "since_ms": 3, "waits": 0, "dir": "old", "report": {"kind": "done", "text": "t", "at_ms": 3}, "watching": []}
+      ]},
+      "rows": [
+        {"name": "old", "main": false, "status": "done", "archived": true, "title": "t", "purpose": "p", "since_ms": 3, "waits": 0, "dir": "old", "report": {"kind": "done", "text": "t", "at_ms": 3}, "watching": []}
+      ]
+    }
+  ]
+}

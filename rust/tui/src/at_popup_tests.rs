@@ -31,6 +31,19 @@ pub(crate) fn ws() -> &'static str {
         for f in files {
             std::fs::write(root.join(f), "").unwrap();
         }
+        // set mtimes (a folder lists the newest first, at-recent): all the
+        // same, sb/ newer, so `@rust/tui/src/` reads sb/, files.rs, input.rs
+        let at = |p: &str, s: u64| {
+            let t = std::time::UNIX_EPOCH + std::time::Duration::from_secs(s);
+            std::fs::File::open(root.join(p)).and_then(|f| f.set_modified(t)).unwrap();
+        };
+        for f in files {
+            at(f, 1_700_000_000);
+        }
+        for d in ["rust", "rust/tui", "rust/tui/src", "docs", "docs/my notes", "docs/émoji 👍", "empty"] {
+            at(d, 1_700_000_000);
+        }
+        at("rust/tui/src/sb", 1_700_000_060);
         root.to_string_lossy().into_owned()
     })
 }
@@ -101,7 +114,7 @@ fn browse_into_folders_then_pick_a_file() {
     // → on a folder: the popup lists its entries, the `@` stays
     key(&mut app, KeyCode::Right);
     assert_eq!(text(&app), ("@rust/tui/", 10));
-    // folders first, the folder itself last (a recent pick of another
+    // the newest first, the folder itself last (a recent pick of another
     // test may come first: compare as a set)
     let mut r = rows(&app);
     assert_eq!(r.pop().as_deref(), Some("rust/tui/"));
@@ -115,9 +128,10 @@ fn browse_into_folders_then_pick_a_file() {
     // typing narrows inside the folder
     typed(&mut app, "fi");
     assert_eq!(rows(&app), ["rust/tui/src/files.rs"]);
-    // Enter on a file: the final reference, the popup closed
+    // Enter on a file: its chip where the `@` was, the cursor after it,
+    // the popup closed (at-chips)
     key(&mut app, KeyCode::Enter);
-    assert_eq!(text(&app), ("rust/tui/src/files.rs ", 22));
+    assert_eq!(text(&app), ("[File #1] ", 10));
     assert!(rows(&app).is_empty());
 }
 
@@ -130,7 +144,7 @@ fn tab_browses_a_folder_and_inserts_a_file() {
     assert_eq!(app.ed.text, "look at @rust/tui/");
     select(&mut app, "rust/tui/Cargo.toml");
     key(&mut app, KeyCode::Tab);
-    assert_eq!(app.ed.text, "look at rust/tui/Cargo.toml ");
+    assert_eq!(app.ed.text, "look at [File #1] ");
 }
 
 #[test]
@@ -177,7 +191,8 @@ fn inline_browse_keeps_the_rest_of_the_line() {
     key(&mut app, KeyCode::Enter);
     select(&mut app, "rust/tui/Cargo.toml");
     key(&mut app, KeyCode::Enter);
-    assert_eq!(text(&app), ("see rust/tui/Cargo.toml now", 24));
+    // the file's chip where the `@` was, the cursor after it (at-chips)
+    assert_eq!(text(&app), ("see [File #1] now", 14));
 }
 
 #[test]
@@ -202,7 +217,7 @@ fn a_folder_with_a_space_is_browsed_quoted() {
     assert_eq!(app.ed.text, "@\"docs/my notes/");
     assert_eq!(rows(&app)[0], "docs/my notes/a.md");
     key(&mut app, KeyCode::Enter);
-    assert_eq!(app.ed.text, "\"docs/my notes/a.md\" ");
+    assert_eq!(app.ed.text, "[File #1] ");
     // up from a quoted folder
     app.ed.set("@\"docs/my notes/", 16);
     key(&mut app, KeyCode::Left);
@@ -326,14 +341,14 @@ fn dot_dot_browses_outside_the_workspace() {
     let r = rows_read(&app);
     assert_eq!(r.last().map(String::as_str), Some(format!("../{me}/").as_str()));
     assert!(r.contains(&format!("../{me}/rust/")) && r.contains(&format!("../{me}/README.md")), "{r:?}");
-    // tab browses into a folder, ⏎ on a file inserts it as typed
+    // tab browses into a folder, ⏎ on a file attaches it (its chip)
     select(&mut app, &format!("../{me}/rust/"));
     key(&mut app, KeyCode::Tab);
     assert_eq!(app.ed.text, format!("@../{me}/rust/"));
     typed(&mut app, "tui/Ca");
     select(&mut app, &format!("../{me}/rust/tui/Cargo.toml"));
     key(&mut app, KeyCode::Enter);
-    assert_eq!(app.ed.text, format!("../{me}/rust/tui/Cargo.toml "));
+    assert_eq!(app.ed.text, "[File #1] ");
     // ← goes one folder up, back to the workspace from `@../`
     app.ed.clear();
     typed(&mut app, "@../");

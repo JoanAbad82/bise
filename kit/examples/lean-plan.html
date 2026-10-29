@@ -1,0 +1,26 @@
+<section data-kit="heading" data-id="title"><p>lean-install · for Benjamin's feedback</p><h1>lean installs</h1></section>
+<section data-kit="plan" data-id="plan" data-agent="lean-install" data-do="start the plan">
+  <h3>make installs lean by default</h3>
+  <p>3 PRs, about −2.6 GB and −2 min 40 for each new worktree: pnpm installs lean by default, AGENTS.md says which install to run, and win32 leaves the platform binaries (that one goes through CI).</p>
+  <ol>
+    <li data-id="p1"><strong>pnpm installs lean by default</strong> scripts/ts-install.sh skips le-chat-mobile, react-native-selectable-area and le-chat-desktop; <code>--all</code> keeps the full install.</li>
+    <li data-id="p2"><strong>AGENTS.md says which install to run</strong> the root and ts/ AGENTS.md, one line in the mobile and desktop ones. lands with 1.</li>
+    <li data-id="p3" data-optional><strong>win32 leaves the platform binaries</strong> after checking no job needs it. touches CI, so it goes through a CI run first.</li>
+  </ol>
+</section>
+<section data-kit="compare" data-id="others" data-for="plan">
+  <ol>
+    <li data-id="keep-win32" data-do="start it, but keep win32"><h3>1 and 2 only</h3><p>the same gain for new worktrees; the platform binaries stay as they are. no CI run.</p></li>
+    <li data-id="arm64" data-do="start all 3 and linux/arm64"><h3>all 3, and linux/arm64 to the CI images</h3><p>up to −3.5 GB more on CI cold installs; needs the owner of #13518 first.</p></li>
+  </ol>
+</section>
+<section data-kit="table" data-id="measures">
+  <table>
+    <thead><tr><th>install</th><th>size</th><th>time</th></tr></thead>
+    <tbody>
+      <tr><td>today</td><td>4.1 GB</td><td>3 min 55</td></tr>
+      <tr><td>lean</td><td>1.5 GB</td><td>1 min 15</td></tr>
+    </tbody>
+  </table>
+  <p>a new worktree, cold pnpm store, measured on this laptop.</p>
+</section>

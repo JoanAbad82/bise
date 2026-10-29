@@ -7,6 +7,7 @@
 
 use crate::render::{hung_rows, G_NOTE};
 use crate::theme::*;
+use bise_proto::words::settings;
 use ratatui::style::{Modifier, Style};
 use ratatui::text::{Line, Span};
 
@@ -70,12 +71,11 @@ pub(crate) fn lines(row: &Row, width: usize) -> Vec<Line<'static>> {
     match row {
         Row::Plan { tag, short, subject, since, count, commits, dry } => {
             let what = match (*count, since.is_empty()) {
-                (_, true) => "the first release".to_string(),
-                (1, false) => format!("1 commit since {}", since),
-                (n, false) => format!("{} commits since {}", n, since),
+                (_, true) => settings::release_first.to_string(),
+                (n, false) => settings::release_since(n, since),
             };
             let mut head = vec![
-                Span::styled("release ", text_st),
+                Span::styled(settings::release_head, text_st),
                 Span::styled(tag.clone(), text_st.add_modifier(Modifier::BOLD)),
                 sep(),
                 Span::styled(format!("{} ", short), faint_st),
@@ -84,7 +84,7 @@ pub(crate) fn lines(row: &Row, width: usize) -> Vec<Line<'static>> {
                 Span::styled(what, text_st),
             ];
             if *dry {
-                head.push(Span::styled(" · dry run", dim_st));
+                head.push(Span::styled(settings::release_dry, dim_st));
             }
             let mut out = one(lead(G_NOTE, faint_st), head, width);
             for (h, s) in commits {
@@ -96,7 +96,7 @@ pub(crate) fn lines(row: &Row, width: usize) -> Vec<Line<'static>> {
             }
             let more = count.saturating_sub(commits.len());
             if more > 0 {
-                out.push(Line::from(vec![Span::raw("   "), Span::styled(format!("and {} more", more), dim_st)]));
+                out.push(Line::from(vec![Span::raw("   "), Span::styled(settings::release_more(more), dim_st)]));
             }
             out
         }
@@ -122,8 +122,7 @@ pub(crate) fn lines(row: &Row, width: usize) -> Vec<Line<'static>> {
                 }
             } else {
                 let n = tail.len();
-                let word = if n == 1 { "line" } else { "lines" };
-                out.push(Line::from(vec![Span::raw("   "), Span::styled(format!("▸ {} more {}", n, word), dim_st)]));
+                out.push(Line::from(vec![Span::raw("   "), Span::styled(settings::release_more_lines(n), dim_st)]));
             }
             out
         }

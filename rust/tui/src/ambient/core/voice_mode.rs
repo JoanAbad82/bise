@@ -29,9 +29,8 @@ use super::*;
 use crate::voicemode::config::VoiceModeConfig;
 use crate::voicemode::turn::{self, Act, Jobs, SpaceKey, VoiceMode};
 use crate::voicemode::{Phase as Pane, Who};
-use bise_proto::draft::AppCmd;
+use bise_proto::app_cmd::AppCmd;
 use bise_proto::hub::HubEv;
-use bise_proto::rows::Status;
 use bise_proto::thread::EntryKind;
 
 /// Opens voice mode's ports, jobs and settings (live: the default mic and
@@ -54,6 +53,30 @@ pub(super) struct VoiceOn {
     /// a note to carry on the next event
     note: Option<String>,
     levels: (f32, f32),
+    /// the agent entries handed to the controller to say, (pos, text), the
+    /// last few: `lit`'s pos is the one whose text the controller lights
+    handed: std::collections::VecDeque<(u64, String)>,
+    /// `lit` goes out: from an answer handed to be said until his next
+    /// turn is sent
+    lit_on: bool,
+}
+
+/// How many said entries `handed` keeps.
+const HANDED_KEEP: usize = 8;
+
+/// `voice_mode`'s `lit` (amb-web m_16805): the entry the controller lights
+/// (the last handed one with its text), how far it is said in UTF-16 code
+/// units of the text, as JS slices it (the end of the last said word;
+/// spans are byte ranges of the text; architect m_16910: the only reader
+/// is TS, and an emoji before the cut would shift scalars by one), and
+/// whether he cut in.
+fn lit_of(handed: &std::collections::VecDeque<(u64, String)>, lit: &crate::voicemode::Lit) -> Option<Value> {
+    use crate::voicemode::LitState;
+    let pos = handed.iter().rev().find(|(_, t)| *t == lit.text)?.0;
+    let end = lit.spans.iter().filter(|(_, s)| *s == LitState::Said).map(|(r, _)| r.end).max().unwrap_or(0);
+    let said = lit.text.get(..end).map_or(0, |s| s.encode_utf16().count());
+    let cut = lit.spans.iter().any(|(_, s)| *s == LitState::Cut);
+    Some(json!({"pos": pos, "said": said, "cut": cut}))
 }
 
 impl Core {
@@ -145,6 +168,8 @@ impl Core {
             last: None,
             note: None,
             levels: (0.0, 0.0),
+            handed: Default::default(),
+            lit_on: false,
         });
         self.voice_sub(Some((project, agent)));
     }
@@ -173,9 +198,15 @@ impl Core {
     }
 
     /// His typed send to the agent voice mode waits on: its answer is said.
+    /// Typed or said, a send to that agent is his next turn: the last
+    /// answer is no longer lit (as for his voice turn's Act::Send).
     pub(super) fn voice_mode_typed(&mut self, project: &str, agent: &str) {
         let Some(v) = self.voice_on.as_mut() else { return };
-        if v.project == project && v.vm.agent() == agent && v.vm.typing() {
+        if v.project != project || v.vm.agent() != agent {
+            return;
+        }
+        v.lit_on = false;
+        if v.vm.typing() {
             v.vm.typed_sent();
         }
     }
@@ -184,10 +215,10 @@ impl Core {
     pub(super) fn voice_mode_hub(&mut self, ev: &HubEv) {
         let Some(project) = self.voice_on.as_ref().map(|v| v.project.clone()) else { return };
         match ev {
-            HubEv::Agents { project: p, agents } if *p == project => {
+            HubEv::Agents { project: p, agents, .. } if *p == project => {
                 let Some(v) = self.voice_on.as_mut() else { return };
                 let agent = v.vm.agent().to_string();
-                let running = agents.iter().any(|a| a.name == agent && a.status == Status::Working);
+                let running = agents.iter().any(|a| a.name == agent && a.status.working());
                 v.vm.on_turn(&agent, running);
             }
             HubEv::Entry { project: p, agent, entry } if *p == project && entry.kind == EntryKind::Agent => {
@@ -203,13 +234,18 @@ impl Core {
                 }
                 let spoken = crate::voicemode::speak::speakable(&entry.text, lang.as_deref());
                 v.vm.on_message(agent, &entry.text, spoken);
+                if v.handed.len() >= HANDED_KEEP {
+                    v.handed.pop_front();
+                }
+                v.handed.push_back((entry.pos, entry.text.clone()));
+                v.lit_on = true;
             }
             _ => {}
         }
     }
 
     fn agent_working(&self, project: &str, agent: &str) -> bool {
-        self.project_rows().into_iter().filter(|(p, _, _)| p == project).flat_map(|(_, agents, _)| agents).any(|a| a.name == agent && a.status == Status::Working)
+        self.project_rows().into_iter().filter(|(p, _, _)| p == project).flat_map(|(_, agents, _)| agents).any(|a| a.name == agent && a.status.working())
     }
 
     /// The clock: the controller's step, its acts, its state on change.
@@ -220,6 +256,10 @@ impl Core {
         for a in acts {
             match a {
                 Act::Send { agent, text } => {
+                    // his next turn: the last answer is no longer lit
+                    if let Some(v) = self.voice_on.as_mut() {
+                        v.lit_on = false;
+                    }
                     if let Some(line) = self.voice_answer_agent(&project, &agent, &text) {
                         if let Some(v) = self.voice_on.as_mut() {
                             v.vm.show_heard(line, now);
@@ -256,9 +296,10 @@ impl Core {
         };
         let heard = (view.who == Who::You && !words.is_empty() && matches!(state, "hearing" | "sending")).then(|| words.clone());
         let said = (matches!(view.who, Who::Agent(_)) && !words.is_empty() && state == "speaking").then_some(words);
+        let lit = if v.lit_on { v.vm.lit().and_then(|l| lit_of(&v.handed, &l)) } else { None };
         let ev = strip_nulls(json!({
             "ev": "voice_mode", "project": v.project, "agent": view.agent, "on": true, "state": state,
-            "heard": heard, "said": said, "muted": view.muted, "note": v.note.clone(), "fail": fail,
+            "heard": heard, "said": said, "muted": view.muted, "note": v.note.clone(), "fail": fail, "lit": lit,
         }));
         let mut out = Vec::new();
         if v.last.as_ref() != Some(&ev) {
@@ -285,4 +326,32 @@ fn strip_nulls(mut v: Value) -> Value {
         m.retain(|k, x| !x.is_null() && !(k == "muted" && *x == Value::Bool(false)));
     }
     v
+}
+
+#[cfg(test)]
+mod tests {
+    use super::lit_of;
+    use crate::voicemode::{Lit, LitState};
+
+    /// Law (architect m_16910): `said` is what JS's `text.slice(0, said)`
+    /// needs: with an emoji (two UTF-16 units, one scalar, four bytes) and
+    /// an accent before the said word, the slice ends exactly after it.
+    #[test]
+    fn lit_said_is_the_js_slice_length_past_an_emoji() {
+        let text = "Café 🚀 prêt, warm runs skip it.";
+        let end = text.find(',').unwrap(); // "Café 🚀 prêt" said
+        let lit = Lit {
+            agent: "perf".into(),
+            text: text.into(),
+            spans: vec![(0..end, LitState::Said), (end..text.len(), LitState::ToSay)],
+        };
+        let handed = [(40, text.to_string())].into_iter().collect();
+        let v = lit_of(&handed, &lit).expect("the handed entry");
+        let said = v["said"].as_u64().unwrap() as usize;
+        let js: Vec<u16> = text.encode_utf16().collect();
+        assert_eq!(String::from_utf16(&js[..said]).unwrap(), "Café 🚀 prêt", "the JS slice ends after the said word");
+        assert_eq!(said, text[..end].chars().count() + 1, "the emoji counts two, not one");
+        assert_eq!(v["pos"], 40);
+        assert_eq!(v["cut"], false);
+    }
 }

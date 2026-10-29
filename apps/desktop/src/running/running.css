@@ -1,0 +1,78 @@
+/* src/running (nm-pages-a, bise fait mac: page native-mac §6 and §8): the processes screen. ds tokens
+   only, 4 px grid, no accent. The banner, the filters, the group labels and the rows are the ds's
+   (PageBanner, FilterRow + Filters, GroupLabel, ListRow): here only the column, the rows' words and
+   marks, and the selected one's output beside the list. */
+.run-screen { display: flex; flex-direction: column; height: 100%; min-height: 0; outline: none; }
+/* under the banner (it spans the whole content area: designer m_43401), the list and its output */
+.run-body { flex: 1 1 auto; min-height: 0; display: flex; }
+.run-screen > .b-banner { flex: none; margin-bottom: 0; }
+.run-main { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; }
+/* the lead, the filters and the list in one scroller (designer m_39330: the lead scrolls away); the
+   floating composer's room at its foot (--float-room). Beside the pane (always, over 1000 px) the
+   list is its own column: the page's centring would squeeze it, so its sides are the page's least,
+   --pad-column (ui-review qa g5) */
+.run-scroll { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: var(--s-6) 0 var(--float-room); box-sizing: border-box; }
+/* the banner (ds PageBanner) takes the list's width, 24 from its edges; the rest its column */
+.run-scroll > :not(.b-banner) { margin-inline: var(--pad-column); }
+@media (max-width: 1000px) { .run-screen:not(.has-pane) .run-scroll > :not(.b-banner) { margin-inline: var(--pad-page-x); } }
+.run-n { margin-left: var(--s-1); color: var(--c-text-3); }
+.run-search { margin-left: auto; }
+.run-list { margin-top: var(--s-2); }
+/* the state column: a --c-ok dot while it runs, a check, a --c-err x, a minus (§8's line icons) */
+.run-mark { display: inline-flex; align-items: center; }
+.run-wave { font: 400 var(--f-ui); color: var(--c-text-3); }
+.run-err { display: inline-flex; color: var(--c-err); }
+/* the command in mono 12 (§8), its program then its arguments dimmer */
+.run-cmd { font: 400 var(--f-mono); }
+.run-prog { color: var(--c-text); }
+.run-args { color: var(--c-text-2); }
+.run-row[data-state='stopping'] .l2 { color: var(--c-text-3); }
+/* its address on the second line, the 'open' line icon after it (no '↗' glyph) */
+.run-url > .b-app-icon { margin-left: var(--s-1); vertical-align: -2px; }
+
+/* the selected one's output: beside the list, half the screen; its sides the list's (16, designer m_41694 #13) */
+.run-pane { container: run-pane / inline-size; flex: 0 0 52%; min-width: 0; box-sizing: border-box; display: flex; flex-direction: column; border-left: 1px solid var(--c-line); padding: var(--s-5) var(--s-4) 0; gap: var(--s-3); }
+.run-pane.none { padding-top: var(--s-8); }
+.run-phead { display: flex; align-items: center; gap: var(--s-3); min-width: 0; min-height: var(--h-control-sm); }
+.run-back { display: none; align-items: center; gap: var(--s-1); border: 0; background: transparent; padding: 0; font: 400 var(--f-ui); color: var(--c-text-2); }
+.run-meta { flex: 1 1 auto; min-width: 0; display: flex; flex-wrap: nowrap; overflow: hidden; gap: var(--s-4); white-space: nowrap; font: var(--t-12) var(--font-ui); color: var(--c-text-2); font-variant-numeric: tabular-nums; }
+.run-meta > span { flex: none; }
+.run-meta > .run-m-where { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.run-pacts { flex: none; margin-left: auto; display: flex; gap: var(--s-1); }
+.run-act { height: var(--h-control-sm); padding: 0 var(--pad-control-x-sm); border: 0; border-radius: var(--r-2); background: transparent; box-shadow: inset 0 0 0 1px var(--c-line); font: var(--t-12) var(--font-ui); color: var(--c-text); }
+.run-act:hover { background: var(--c-hover); }
+/* stop asked: now it says the danger (designer m_41694 #8) */
+.run-act.ask { color: var(--c-err); box-shadow: inset 0 0 0 1px currentColor; }
+/* the whole command: wrapped, a long path broken anywhere, 8 lines then its own scroll (Gabriel's ask) */
+.run-pcmd { flex: none; margin: 0; max-height: calc(8 * 1.5 * var(--t-13)); overflow-y: auto; padding: var(--s-2) var(--s-3); border-radius: var(--r-2); box-shadow: inset 0 0 0 1px var(--c-line); font: var(--t-13)/1.5 var(--font-mono); white-space: pre-wrap; overflow-wrap: anywhere; }
+.run-pcmd code { font: inherit; }
+.run-find { display: flex; align-items: center; gap: var(--s-2); }
+.run-find .b-field { width: 240px; box-sizing: border-box; height: var(--h-control-sm); }
+.run-find-none { font: var(--t-12) var(--font-ui); color: var(--c-text-3); }
+/* the output on a terminal surface (designer m_38536): raised fill, r 8, 12 px inside, under the command to
+   just above the keys line; long lines wrap at its width (designer m_41694 #9) */
+.run-box { position: relative; flex: 1 1 auto; min-height: 0; display: flex; }
+.run-term { flex: 1 1 auto; min-width: 0; min-height: 0; box-sizing: border-box; padding: var(--s-3); border-radius: var(--r-2); background: var(--c-raised); overflow: hidden; }
+.run-term .xterm { height: 100%; }
+/* xterm.css paints its viewport black under the rows: the palette's ground, as the rows' (the probe's black strip) */
+.run-term .xterm .xterm-viewport { background-color: transparent; }
+/* nothing printed yet: one line where its first line will be, faded in late so a quick answer never flashes it */
+.run-quiet { position: absolute; top: var(--s-3); left: var(--s-3); right: var(--s-3); margin: 0; font: 12px/1.5 var(--font-mono); color: var(--c-text-3); pointer-events: none; animation: run-quiet-in var(--d-fast, 120ms) ease-out 300ms both; }
+@keyframes run-quiet-in { from { opacity: 0; } to { opacity: 1; } }
+.run-jump { position: absolute; right: var(--s-3); bottom: var(--s-3); height: var(--h-control-sm); padding: 0 var(--pad-control-x-sm); border: 0; border-radius: var(--r-2); background: var(--c-bg, var(--p-bg)); box-shadow: inset 0 0 0 1px var(--c-line); font: var(--t-12) var(--font-ui); color: var(--c-text-2); }
+.run-jump:hover { color: var(--c-text); }
+.run-none { flex: 1 1 auto; margin: 0; padding: var(--s-2) 0; font: var(--t-13) var(--font-ui); color: var(--c-text-3); }
+.run-icon { display: inline-flex; align-items: center; justify-content: center; width: var(--h-control-sm); height: var(--h-control-sm); padding: 0; border: 0; border-radius: var(--r-1); background: none; color: var(--c-text-3); }
+.run-icon:hover { color: var(--c-text); background: var(--c-hover); }
+.run-icon:focus-visible, .run-act:focus-visible, .run-back:focus-visible { outline: 0; box-shadow: 0 0 0 2px var(--c-focus); }
+/* one line, a narrow pane drops parts whole (designer m_41800 #1 #2): the head pid, then cpu · MB */
+@container run-pane (max-width: 560px) { .run-m-pid { display: none; } }
+@container run-pane (max-width: 480px) { .run-m-usage { display: none; } }
+
+/* under 1000 px the output replaces the list, with '← processes' */
+@media (max-width: 1000px) {
+  .run-screen.has-pane .run-main { display: none; }
+  .run-screen.has-pane .run-pane { flex: 1 1 auto; border-left: 0; }
+  .run-back { display: inline-flex; }
+  .run-pane.none { display: none; }
+}

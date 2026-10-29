@@ -1,0 +1,124 @@
+/* src/artifacts (amb-kit): the artifacts screen, panel A's list, one artifact open (desktop-screens v6,
+   designer m_11837). ds tokens only; real px as signed. */
+.art-screen { display: flex; flex-direction: column; height: 100%; min-height: 0; box-sizing: border-box; }
+/* the screen takes the focus for its keys: never a ring around it (designer m_24208) */
+.art-screen:focus { outline: 0; }
+/* the lead, the filters and the cards in one scroller (designer m_39330: the lead scrolls away with
+   the page), the page's sides --pad-column (the cards take the width, mockup 7), 24 under the bar,
+   the floating composer's room at its foot (--float-room); in it the list and its drop zone take
+   their height, the scroller scrolls */
+.art-scroll { flex: 1 1 auto; min-height: 0; overflow-y: auto; outline: none; padding: 0 0 var(--float-room); }
+/* the banner (ds PageBanner) 24 from the page's edges; the rest on the page's sides */
+.art-scroll > :not(.b-banner) { margin-inline: var(--pad-column); }
+.art-scroll .art-add-drop, .art-scroll .art-list { flex: none; min-height: 0; overflow: visible; }
+.art-scroll > .b-filter-row + .art-lib { margin-top: var(--s-4); }
+
+.art-list { flex: 1 1 auto; min-height: 0; overflow-y: auto; outline: none; }
+.art-day-h { padding: var(--s-4) var(--pad-row-x) var(--gap-tight); font: 600 11.5px/1.2 var(--font-ui); color: var(--c-text-3); }
+.art-row { display: grid; align-items: center; gap: var(--gap-block); min-height: var(--h-row); padding: 0 var(--pad-row-x); border-radius: var(--r-2); color: var(--c-text); font: var(--t-13) var(--font-ui); }
+.art-row:hover { background: var(--c-hover); }
+.art-row.on { background: color-mix(in srgb, var(--c-text) 9%, transparent); }
+.art-g { font: var(--t-13) var(--font-mono); color: var(--c-text-2); text-align: center; }
+.art-title { display: flex; align-items: center; gap: var(--gap-inline); min-width: 0; }
+.art-t { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+/* his 'petit new rose' (try gate D4, regression R10): the ds accent chip's pink, the word says it too */
+.art-new { flex: none; height: 16px; padding: 0 var(--s-2); border-radius: 999px; font: 600 var(--t-11)/16px var(--font-ui); color: var(--c-accent); background: var(--c-accent-soft); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--c-accent) 45%, transparent); }
+@media (max-width: 900px) {
+  .art-screen { padding: var(--s-4) var(--s-4) 0; }
+}
+/* panel A: two lines, the glyph at the first line */
+.art-list.panel .art-row { grid-template-columns: 14px minmax(0, 1fr); align-items: start; padding: var(--s-2) var(--pad-row-x); }
+.art-list.panel .art-g { padding-top: 1px; }
+.art-two { display: flex; flex-direction: column; gap: 0; min-width: 0; }
+.art-sub { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font: var(--t-12) var(--font-ui); color: var(--c-text-2); }
+
+.art-keys { flex: none; display: flex; gap: 3ch; padding: var(--s-2) 0 var(--s-3); border-top: 1px solid var(--c-line); font: var(--t-12) var(--font-ui); color: var(--c-text-3); }
+.art-keys b { font-weight: 500; color: var(--c-text-2); }
+/* the archived ones left behind (the TUI's faint '2 archived' row): a quiet line, a click shows them */
+.art-archived { flex: none; display: block; width: 100%; padding: var(--s-2); border: 0; background: none; text-align: left; font: var(--t-12) var(--font-ui); color: var(--c-text-3); }
+.art-archived:hover { color: var(--c-text-2); text-decoration: underline; text-underline-offset: 3px; }
+.art-archived:focus-visible { outline: 2px solid var(--c-text); outline-offset: 2px; border-radius: 3px; }
+.art-empty { padding: var(--s-8) var(--pad-row-x); font: var(--t-14) var(--font-read); color: var(--c-text-2); }
+/* an id the list no longer has (artifacts/gone.ts, designer m_46415): two lines at the content's
+   left edge, 24 from the top, never centred in the void */
+.art-gone { display: flex; flex-direction: column; align-items: flex-start; gap: var(--s-1); padding: var(--s-6) var(--s-6) 0; }
+.art-gone p { margin: 0; }
+.art-gone-line { font: var(--t-13) var(--font-ui); color: var(--c-text-2); }
+.art-gone-on { font: var(--t-12) var(--font-ui); color: var(--c-text-3); }
+.art-gone-link { padding: 0; border: 0; background: none; font: inherit; color: inherit; }
+.art-gone-link:hover { color: var(--c-text-2); text-decoration: underline; text-underline-offset: 3px; }
+.art-gone-link:focus-visible { outline: 2px solid var(--c-text); outline-offset: 2px; border-radius: 3px; }
+/* the page doesn't answer (page-unreach): why, in place of the frame, on the same paper; never blank */
+.art-down { width: 100%; height: 100%; box-sizing: border-box; display: flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: var(--s-2); padding: var(--s-8); border-radius: var(--r-3); background: var(--c-solid); box-shadow: var(--e-1); }
+.art-down-title { font: 600 var(--t-15) var(--font-ui); color: var(--c-text); }
+.art-down-line { max-width: 52ch; font: var(--t-14) var(--font-read); color: var(--c-text-2); }
+.art-down-mono { font: var(--t-13) var(--font-mono); color: var(--c-text-2); }
+.art-down-path { padding: 0; border: 0; background: none; text-align: left; text-decoration: underline; text-decoration-color: var(--c-line); text-underline-offset: 3px; }
+.art-down-path:hover { color: var(--c-text); }
+.art-down-path:focus-visible { outline: 2px solid var(--c-text); outline-offset: 2px; border-radius: 3px; }
+/* designer m_38170: a ghost button, 1 px line, r 6, 28 high, 16 px under the line */
+.art-down-again { margin-top: var(--s-2); height: var(--h-control-sm); padding: 0 var(--s-3); border: 1px solid var(--c-line); border-radius: var(--r-1); background: none; font: var(--t-13) var(--font-ui); color: var(--c-text-2); }
+.art-down-again:hover { color: var(--c-text); background: var(--c-hover); }
+.art-down-again:focus-visible { outline: 2px solid var(--c-text); outline-offset: 2px; }
+
+/* one artifact open */
+.art-open { display: flex; flex-direction: column; height: 100%; min-height: 0; }
+.art-open-head { flex: none; display: flex; align-items: center; gap: var(--s-3); height: var(--h-head); box-sizing: border-box; padding: 0 var(--s-4); border-bottom: 1px solid var(--c-line); }
+.art-open-t { display: flex; flex-direction: column; min-width: 0; }
+.art-open-title { min-width: 0; flex: 0 1 auto; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font: 600 var(--t-15) var(--font-ui); color: var(--c-text); }
+.art-open-sub { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font: var(--t-12) var(--font-ui); color: var(--c-text-2); }
+.art-open-end { margin-left: auto; display: inline-flex; align-items: center; gap: var(--s-1); flex: none; }
+.art-v { font-family: var(--font-mono); }
+.art-open-body { flex: 1 1 auto; min-height: 0; display: flex; justify-content: center; padding: var(--s-4); background: color-mix(in srgb, var(--c-text) 3%, transparent); overflow: hidden; }
+/* at 800 the open head gives the title the room: no meta line, '↗' alone, 'v2 ⌄' */
+@media (max-width: 900px) {
+  .art-open-sub, .art-open .art-wide { display: none; }
+}
+/* the versions picker's row: 'v2  the current one  14:02' (the time its trailing item) */
+.art-v-words { margin-left: var(--gap-inline); color: var(--c-text-2); }
+/* his words about it, under the page: the thread's composer, the 680 column */
+.art-open-composer { flex: none; display: flex; flex-direction: column; align-items: stretch; width: 100%; max-width: 712px; margin: 0 auto; padding: 0 var(--pad-panel) var(--pad-panel); box-sizing: border-box; }
+/* it wears .th-screen for the docked inbox's look, never its full height: the page keeps the room (designer m_20594) */
+.art-open-composer.th-screen { height: auto; }
+/* under 1000 px the page keeps at least half the height: an open item scrolls under it, the composer
+   stays (designer m_26818) */
+.art-open-composer { max-height: 50%; }
+.art-open-composer > .inbox-block { flex: 0 1 auto; min-height: 0; overflow-y: auto; }
+.art-paper { width: 100%; height: 100%; border: 0; border-radius: var(--r-3); background: var(--c-solid); box-shadow: var(--e-1); }
+
+/* giving files (give.ts, designer's pick 4 m_23868): the dashed zone over a thread's rows or an
+   artifacts list, only while he drags files; '+ add' in a list's head */
+.art-add-drop { position: relative; display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; }
+/* not for him, so never accent (designer m_24208): text-3 dashes, the ink's 4% tint, words in
+   text-2, r 12, 8 px in from the area's edge; what is under it dims to 20% */
+.art-give {
+  position: absolute;
+  inset: var(--s-2);
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1.5px dashed var(--c-text-3);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--c-text) 4%, transparent);
+}
+.art-give-words { pointer-events: none; padding: 0 var(--s-4); text-align: center; white-space: nowrap; font: 500 var(--t-14) var(--font-ui); color: var(--c-text-2); }
+.art-add-drop:has(> .art-give) > :not(.art-give) { opacity: 0.2; }
+/* a zone under 120 px (the right bar's ARTIFACTS, Drops.tsx SHORT_ZONE_PX): what is under it hides
+   whole, its head too; only the words show, centred (designer m_24293) */
+.art-add-drop[data-short] > :not(.art-give) { opacity: 0; }
+/* the hub's live words under the head (art-live, designer m_23868): 28 px, text-2; '← v2' 16 px
+   after the line, text-2, underlined on hover */
+.art-live { flex: none; display: flex; align-items: center; gap: var(--s-4); height: var(--h-control-sm); padding: 0 var(--s-4); border-bottom: 1px solid var(--c-line); font: var(--t-12) var(--font-ui); color: var(--c-text-2); white-space: nowrap; overflow: hidden; }
+.art-live-back { border: 0; padding: 0; background: none; font: inherit; color: var(--c-text-2); }
+.art-live-back:hover { text-decoration: underline; text-underline-offset: 3px; }
+.art-live-back:focus-visible { outline: 2px solid var(--c-focus); outline-offset: 2px; border-radius: 3px; }
+/* after 'save a copy…' (art-save): a long folder ellipsizes, 'show in Finder' stays */
+.art-saved-to { display: flex; min-width: 0; overflow: hidden; white-space: pre; text-overflow: ellipsis; }
+/* the folder cut at a slash from the left ('…/tmp/', FolderFit), the name whole (designer m_26482, m_26488) */
+.art-saved-dir { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.art-saved-name { flex: none; max-width: 60%; overflow: hidden; text-overflow: ellipsis; }
+.art-saved-err { flex: none; color: var(--c-err); }
+.art-save-ico { display: block; color: var(--c-text-3); }
+.b-ibtn:hover > .art-save-ico, .b-ibtn:focus-visible > .art-save-ico { color: var(--c-ink); }
+.art-live > .art-live-back { flex: none; }

@@ -257,7 +257,7 @@ def tool_ok(+c: Ctx) -> Bool:
   match c:
     case Ctx{_, +cmd, _, _, _}:
       match cmd:
-        case T.ToolOk{_, _}:
+        case T.ToolOk{_, _, _}:
           True{}
         case _:
           False{}
@@ -283,9 +283,9 @@ def tool_ids(+c: Ctx) -> List<&2, U32>:
   match c:
     case Ctx{_, +cmd, _, +pending, _}:
       match cmd:
-        case T.ToolOk{+id, _}:
+        case T.ToolOk{+id, _, _}:
           Con{id, Nil{}}
-        case T.ToolFail{+id, _}:
+        case T.ToolFail{+id, _, _}:
           Con{id, Nil{}}
         case T.Interrupt{}:
           pending_ids(pending)
@@ -782,8 +782,8 @@ def post_ev(+c: Ctx, +inputs: Nat, +actions: U32, o: T.Obs) -> List<&2, String>:
         J.obj(Con{J.kv("id", u32(comp_id(c))),
           Con{J.kv("attempt", J.num(1n)),
             Con{J.kv("error", err("other", code)), Nil{}}}})), Nil{}}
-    case T.TurnDone{+out}:
-      Con{turn_ended(out, inputs, actions), Nil{}}
+    case T.TurnDone{+end, +why}:
+      Con{turn_ended(T.turn_words(end, why), inputs, actions), Nil{}}
     case _:
       Nil{}
 

@@ -1,0 +1,4 @@
+{ "mcpServers": {
+  "notes": { "command": "${CLAUDE_PLUGIN_ROOT}/bin/notes-mcp", "args": ["--dir", "${CLAUDE_PLUGIN_ROOT}/data"], "env": { "NOTES_TOKEN": "${NOTES_TOKEN}" } },
+  "search": { "command": "npx", "args": ["-y", "notes-search-mcp"], "alwaysAllow": ["find"] }
+} }

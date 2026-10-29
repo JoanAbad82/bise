@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>start with bise desktop · bise docs</title>
+<meta name="description" content="download bise desktop, drag it to Applications, and the first launch asks for a model, your projects, and what to do first.">
+<link rel="canonical" href="https://bise.dev/docs/desktop">
+<meta name="theme-color" content="#f2ede2">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="alternate" type="text/markdown" href="/docs/desktop.md">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="bise">
+<meta property="og:url" content="https://bise.dev/docs/desktop">
+<meta property="og:title" content="start with bise desktop · bise docs">
+<meta property="og:description" content="download bise desktop, drag it to Applications, and the first launch asks for a model, your projects, and what to do first.">
+<meta property="og:image" content="https://bise.dev/og.png?v=paper">
+<meta name="twitter:card" content="summary_large_image">
+<script>{ const q = location.search; let a = /[?&]terminal\b/.test(q) ? 'terminal' : /[?&]desktop\b/.test(q) ? 'desktop' : null; try { if (a) localStorage.setItem('bise-docs-app', a); else a = localStorage.getItem('bise-docs-app'); } catch {} document.documentElement.classList.add('app-' + (a === 'terminal' ? 'terminal' : 'desktop')); }</script>
+<script>{ const q = location.search; let d = null; try { d = localStorage.getItem('bise-theme'); } catch {} if (/[?&]dark\b/.test(q) || (!/[?&]light\b/.test(q) && (d ?? (matchMedia('(prefers-color-scheme: dark)').matches ? '1' : '0')) === '1')) document.documentElement.classList.add('pd'); }</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,600;1,6..72,400&family=Caveat:wght@500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/docs/docs.css">
+</head>
+<body>
+<header class="top">
+  <button class="menu" type="button" aria-label="the pages" aria-expanded="false">≡</button>
+  <a class="logo" href="/">bise <span class="acc">:*</span></a>
+  <a class="docs" href="/docs">docs</a>
+  <div class="search">
+    <input type="search" placeholder="/ search" aria-label="search the docs" autocomplete="off" spellcheck="false">
+    <div class="results" hidden></div>
+  </div>
+  <nav>
+    <a href="https://github.com/gvergnaud/bise">GitHub</a>
+    <button id="theme" type="button" title="light / dark">◐</button>
+  </nav>
+</header>
+<div class="wrap">
+  <aside class="side"><nav aria-label="the docs">
+<div class="appswitch" role="group" aria-label="your app"><button type="button" data-app="desktop" aria-pressed="false">desktop</button><button type="button" data-app="terminal" aria-pressed="false">terminal</button></div>
+<div class="grp">get started</div><ul>
+<li><a href="/docs">what bise is</a></li>
+<li><a href="/docs/desktop" class="here" aria-current="page" data-app="desktop">start with bise desktop</a></li>
+<li><a href="/docs/install" data-app="terminal">start with bise terminal</a></li>
+</ul>
+<div class="grp">models</div><ul>
+<li><a href="/docs/providers">providers and keys</a></li>
+<li><a href="/docs/subscriptions">subscriptions</a></li>
+<li><a href="/docs/models">models and roles</a></li>
+<li><a href="/docs/gateways">gateways and local models</a></li>
+</ul>
+<div class="grp">using bise</div><ul>
+<li><a href="/docs/agents">main and the agents</a></li>
+<li><a href="/docs/window" data-app="desktop">the desktop window <span class="tag">desktop</span></a></li>
+<li><a href="/docs/approvals">approvals</a></li>
+<li><a href="/docs/flow">landing work</a></li>
+<li><a href="/docs/voice">voice and fn</a></li>
+<li><a href="/docs/computer-use">computer use</a></li>
+</ul>
+<div class="grp">extend</div><ul>
+<li><a href="/docs/plugins">plugins and MCP</a></li>
+<li><a href="/docs/skills">instructions and skills</a></li>
+</ul>
+<div class="grp">reference</div><ul>
+<li><a href="/docs/settings" data-app="desktop">settings <span class="tag">desktop</span></a></li>
+<li><a href="/docs/config">config.toml</a></li>
+<li><a href="/docs/desktop-keys" data-app="desktop">keys and menus <span class="tag">desktop</span></a></li>
+<li><a href="/docs/keys" data-app="terminal">keys and commands <span class="tag">terminal</span></a></li>
+<li><a href="/docs/cli" data-app="terminal">the bise command <span class="tag">terminal</span></a></li>
+<li><a href="/docs/troubleshooting">troubleshooting</a></li>
+<li><a href="/docs/updates">updates</a></li>
+</ul>
+  </nav></aside>
+  <main>
+    <article data-app="desktop">
+      <div class="head">
+        <h1>start with bise desktop</h1>
+        <button class="copymd" type="button" data-md="/docs/desktop.md">copy as markdown</button>
+      </div>
+      <p class="lede">download bise desktop, drag it to Applications, and the first launch asks for a model, your projects, and what to do first.</p>
+<p class="only"><span>only in bise desktop</span> <a href="/docs/install?terminal" data-to="terminal">in bise terminal: one curl line ›</a></p>
+<h2 id="download"><a class="anchor" href="#download" aria-hidden="true">#</a>download</h2>
+<p>bise desktop runs on Macs with Apple silicon, macOS 14 or later. download it from <a href="https://bise.dev" rel="noopener">bise.dev</a>: it comes down as <code>bise-mac-arm64.dmg</code>, signed and notarized by Apple.</p>
+<ol><li>open it from your Downloads.</li><li>drag bise to Applications.</li><li>open bise from Applications. macOS asks once if you want to open an app from the internet: Open.</li></ol>
+<aside class="callout note"><span class="label">note</span><p>keep bise in Applications. it updates itself only from there; opened from the disk image or your Downloads, it offers to move itself first. see <a href="/docs/updates">updates</a>.</p></aside>
+<p>on an Intel Mac or on Linux, use <a href="/docs/install">bise terminal</a>: the same agents, in your terminal.</p>
+<h2 id="the-first-launch"><a class="anchor" href="#the-first-launch" aria-hidden="true">#</a>the first launch</h2>
+<p>four short steps. <code class="key">⏎</code> takes the step's button, <code class="key">esc</code> goes a step back, and <strong>skip for now</strong>, top right, leaves it for later.</p>
+<ol><li><strong>hello</strong>: bise says what it is.</li><li><strong>the model</strong>: a plan you already have, or a key. pick ChatGPT, OpenRouter, an API key or a coding plan key; a key bise finds in your shell or a <code>.env</code> file is offered first. bise checks it with one tiny call and shows what the model said. you add more later in settings › models. see <a href="/docs/providers">providers and keys</a> and <a href="/docs/subscriptions">subscriptions</a>.</li><li><strong>your projects</strong>: the repos bise found in your folder, with how recently each changed. tick the ones it should work in, or <strong>choose a folder…</strong>. each project gets its own main. you add more later with <code class="key">⌘N</code> or settings › projects.</li><li><strong>what should i do first?</strong>: write your first message to bise, or pick one of the ideas. <code class="key">⏎</code> sends it and opens bise with it running. <strong>open bise</strong> leaves without asking.</li></ol>
+<h2 id="permissions-for-fn"><a class="anchor" href="#permissions-for-fn" aria-hidden="true">#</a>permissions for fn</h2>
+<p>holding <code>fn</code> talks to bise from any app (see <a href="/docs/voice">voice and fn</a>). the first time you hold it, bise asks for three macOS permissions:</p>
+<div class="table"><table><thead><tr><th>permission</th><th>what for</th><th>without it</th></tr></thead><tbody><tr><td>Microphone</td><td>to hear you while you hold <code>fn</code></td><td><code>fn</code> can't hear you: you type in the spotlight instead</td></tr><tr><td>Accessibility</td><td><code>fn</code> everywhere, and to read the app in front (URL, file, selection)</td><td><code>fn</code> works only in bise's own windows</td></tr><tr><td>Screen Recording</td><td>the capture <code>fn</code> adds to your question</td><td><code>fn</code> sends your words without a capture</td></tr></tbody></table></div>
+<p><strong>not now</strong> keeps them off: your words still go to bise, typed in the spotlight (<code class="key">fn space</code>). settings › setup shows each one and asks again.</p>
+<h2 id="what-you-see"><a class="anchor" href="#what-you-see" aria-hidden="true">#</a>what you see</h2>
+<ul><li><strong>bise</strong>, at the top of the sidebar (<code class="key">⌘0</code>): your own agent. it sees every project and passes the work to the right one.</li><li><strong>your projects</strong> under it (<code class="key">⌘1</code> … <code class="key">⌘9</code>): each has its main, and the agents main starts.</li><li>the <strong>inbox</strong> (<code class="key">⌘I</code>): what your agents ask you, from every project.</li></ul>
+<p>the <a href="/docs/window">desktop window</a> page walks through each part. <a href="/docs/agents">main and the agents</a> says how the work runs.</p>
+<h2 id="the-terminal-too"><a class="anchor" href="#the-terminal-too" aria-hidden="true">#</a>the terminal too</h2>
+<p>bise desktop and <a href="/docs/install">bise terminal</a> run the same agents: the same projects, threads, keys and settings. you can open bise terminal in a project's folder while the window is open; both show the same threads.</p>
+    </article>
+    <nav class="pn"><a class="prev" href="/docs"><span>previous</span>what bise is</a><a class="next" href="/docs/install"><span>next</span>start with bise terminal</a></nav>
+    <footer>
+      <p>for agents: <a href="/docs/desktop.md">bise.dev/docs/desktop.md</a></p>
+      <p><a href="https://github.com/gvergnaud/bise/blob/main/site/docs/desktop.md">edit this page on GitHub</a></p>
+    </footer>
+  </main>
+  <aside class="toc"><div class="toch">on this page</div><ul><li class="l2"><a href="#download">download</a></li><li class="l2"><a href="#the-first-launch">the first launch</a></li><li class="l2"><a href="#permissions-for-fn">permissions for fn</a></li><li class="l2"><a href="#what-you-see">what you see</a></li><li class="l2"><a href="#the-terminal-too">the terminal too</a></li></ul></aside>
+</div>
+<script src="/docs/docs.js" defer></script>
+</body>
+</html>

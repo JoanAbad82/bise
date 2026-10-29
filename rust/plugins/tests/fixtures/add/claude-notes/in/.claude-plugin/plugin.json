@@ -1,0 +1,8 @@
+{
+  "name": "notes",
+  "version": "1.2.0",
+  "description": "Keep notes in a local folder.",
+  "author": "Ada",
+  "commands": "./commands",
+  "keywords": ["notes", "files"]
+}

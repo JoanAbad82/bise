@@ -1,63 +1,91 @@
 //! `/plugins` in the TUI (docs/plugins.md).
 //!
+//! - [`rows`]: the Plugins list (bend_plugins::catalog::rows), for the
+//!   desktop's core and the TUI's screen; [`connect`] and [`refresh`]
+//!   run a connector's connect and a catalog fetch on their own thread.
 //! - `/plugins`: the plugins of the workspace (the static listing).
-//! - `/plugins enable|disable NAME`: edits `~/.bend-harness/plugins.json`;
+//! - `/plugins on|off ID`: edits `plugins.json` (bend_plugins::state);
 //!   applies at the next `/reload` (or task restart).
 //! - `/plugins login [NAME]`: the browser login of a remote MCP server
 //!   (bend_plugins::login), in the background: its lines come back
 //!   through [`pump`]; every agent's bridge sees the new tokens and
 //!   connects the server. `/plugins logout NAME` forgets them.
+//! - `/plugins remove NAME`: asks once; `/plugins remove NAME yes`
+//!   removes a plugin of his folder with its secrets
+//!   (bend_plugins::remove).
 //! - [`pump`] also says once per server and per TUI run, when a session
 //!   found that one needs a login: `linear needs a login: /plugins login`.
 
+use bise_proto::words::settings;
 use std::path::Path;
 
-/// The plugins of `workspace` as rows (the desktop's `plugins` event, P.1):
-/// bend_plugins' resolution (built-in, user and workspace plugins, their
-/// state) and, for each, its remote MCP servers that log in, with the
-/// state `/plugins login` shows (needs a login, logged in, not logged in;
-/// `pending`: a login whose browser is open, by name). The TUI's popup
-/// reads the same resolution ([`choices`]).
-pub(crate) fn rows(workspace: &Path, pending: &[String]) -> Vec<bise_proto::draft::Plugin> {
-    let res = bend_plugins::resolve::resolve(&bend_plugins::resolve::Roots::standard(Some(workspace)));
-    let (secrets, sd) = (bend_plugins::oauth::store_dir(), bend_plugins::status::dir());
-    let targets = bend_plugins::login::targets(workspace);
-    res.plugins
-        .iter()
-        .map(|p| bise_proto::draft::Plugin {
-            name: p.name.clone(),
-            state: p.state.as_str().into(),
-            scope: p.scope.as_str().into(),
-            what: p.description.clone().filter(|d| !d.trim().is_empty()),
-            logins: targets.iter().filter(|t| t.plugin == p.name).map(|t| login_row(t, &secrets, &sd, pending)).collect(),
-        })
-        .collect()
-}
-
-/// One server's login as a row: what `/plugins login`'s popup says, as data.
-fn login_row(t: &bend_plugins::login::Target, secrets: &Path, sd: &Path, pending: &[String]) -> bise_proto::draft::PluginLogin {
-    let last = bend_plugins::status::read(sd, &t.plugin, &t.server.id);
-    let state = if pending.contains(&t.name) {
-        "pending"
-    } else if last.as_ref().is_some_and(|s| s.login) {
-        "needs"
-    } else if bend_plugins::login::logged_in(t, secrets) {
-        "in"
-    } else {
-        "out"
+/// The Plugins list of `workspace` (the desktop's `plugins` and `browse`
+/// events, the TUI's /plugins screen): bend_plugins::catalog::rows, the
+/// one builder, on what each owner reads now (`pending`: the logins whose
+/// browser is open, by name). The connectors from their cache only, never
+/// a fetch ([`refresh`] fetches, on its own thread).
+pub(crate) fn rows(workspace: &Path, pending: &[String]) -> Vec<bise_proto::app_rows::Plugin> {
+    use bend_plugins::{catalog, connectors, oauth, resolve, skills, state, status};
+    let res = resolve::resolve(&resolve::Roots::standard(Some(workspace)));
+    let cat = connectors::cached(&bise_home::Home::from_env().connectors_cache());
+    let st = state::read(&state::state_path());
+    let (sd, od) = (status::dir(), oauth::store_dir());
+    // the skills folders main reads (the user's view), off ones too; a
+    // short wait per folder: a stuck one is skipped (bend_plugins::skills)
+    let home = std::env::var_os("HOME").filter(|h| !h.is_empty()).map(std::path::PathBuf::from);
+    let app = resolve::builtin_root().and_then(|r| r.parent().map(Path::to_path_buf));
+    let bise = skills::BiseSkills::of(true, bise_home::projects::desktop_for(workspace));
+    let found = skills::scan(&skills::roots(home.as_deref(), workspace, app.as_deref(), bise), std::time::Duration::from_millis(300));
+    let inputs = catalog::Inputs {
+        resolution: &res,
+        catalog: &cat,
+        skills: &found.skills,
+        state: &st,
+        status_dir: Some(&sd),
+        oauth_dir: Some(&od),
+        pending_logins: pending,
     };
-    bise_proto::draft::PluginLogin {
-        name: t.name.clone(),
-        host: t.server.host(),
-        state: state.into(),
-        tools: last.and_then(|s| s.tools.ok()).map(|n| n as u32),
-    }
+    catalog::rows(&inputs)
 }
 
-/// Turn plugin `name` on or off through bend_plugins' one writer.
-pub(crate) fn set(name: &str, on: bool) -> Result<bool, String> {
+/// Why his Mistral connectors may be missing or old (their cache's last
+/// problem), for the `plugins` and `browse {mistral}` events.
+pub(crate) fn connectors_problem() -> Option<bise_proto::app_rows::ConnectorsProblem> {
+    let cat = bend_plugins::connectors::cached(&bise_home::Home::from_env().connectors_cache());
+    bend_plugins::catalog::problem(&cat)
+}
+
+/// Connect Mistral connector `id` (`plugin_connect`, `/plugins
+/// connect`): his browser or one click, then the catalog polled until it
+/// is ready (up to 5 min), all on its own thread, never a draw or core
+/// loop; `say` gets each step's line, `done` its end.
+pub(crate) fn connect(id: &str, say: impl Fn(String) + Send + 'static, done: impl FnOnce(Result<(), String>) + Send + 'static) -> Result<(), String> {
+    let id = bend_plugins::id::PluginId::parse(id)?;
+    if !matches!(id, bend_plugins::id::PluginId::Mistral { .. }) {
+        return Err(format!("{id} is not a Mistral connector"));
+    }
+    std::thread::spawn(move || {
+        let r = bend_plugins::connectors::connect_now(&id, &|l| say(l.to_string()));
+        done(r.map(|_| ()));
+    });
+    Ok(())
+}
+
+/// The Mistral catalog fetched again now (`plugins_refresh`, `/plugins
+/// refresh`), on its own thread; `done` with the fetch's problem, if any.
+pub(crate) fn refresh(done: impl FnOnce(Option<String>) + Send + 'static) {
+    std::thread::spawn(move || {
+        let cat = bend_plugins::connectors::refresh();
+        done(cat.error.map(|p| p.to_string()));
+    });
+}
+
+/// Turn plugin or part `id` (any `PluginId`) on or off through
+/// bend_plugins' one writer.
+pub(crate) fn set(id: &str, on: bool) -> Result<bool, String> {
+    let id = bend_plugins::id::PluginId::parse(id)?;
     let path = bend_plugins::state::state_path();
-    bend_plugins::state::set_enabled(&path, name, on).map_err(|e| format!("{}: {e}", path.display()))
+    bend_plugins::state::set(&path, &id, on).map_err(|e| format!("{}: {e}", path.display()))
 }
 
 /// Forget the login of server `name` (`/plugins logout NAME`).
@@ -68,40 +96,115 @@ pub(crate) fn logout(workspace: &Path, name: &str) -> Result<String, String> {
     Ok(t.name.clone())
 }
 
-/// The plugins of `workspace` matching `q` (the `/plugins enable|disable`
-/// argument, BISE-117). Resolved again at most every 5 s: the popup asks
-/// at every frame.
+/// Remove plugin `name` of his plugins folder (`/plugins remove NAME
+/// yes`): bend_plugins::remove, its refusals as their words.
+pub(crate) fn remove(workspace: &Path, name: &str) -> Result<(), String> {
+    let id = bend_plugins::id::PluginId::parse(name)?;
+    bend_plugins::remove::remove(&bend_plugins::add::Ctx::standard(), Some(workspace), &id).map_err(|e| e.to_string())
+}
+
+/// The plugins of `workspace` matching `q` (the `/plugins on|off`
+/// argument, BISE-117), from the rows the screen shows: `blender   plugin
+/// · 1 skill · 23 tools · on`; once he types, their parts and tools too
+/// (`blender#tool:blender/execute_python   a tool of blender · on`).
+/// The rows are read again at most every 5 s: the popup asks at every
+/// frame. `/skills on|off`: the skills folders and their skills.
 pub(crate) fn choices(workspace: &Path, q: &str, typed: &str) -> Vec<crate::commands::Choice> {
     if matches!(typed.split_whitespace().nth(1), Some("login" | "logout")) {
         return login_choices(workspace, q);
     }
-    use std::cell::RefCell;
-    use std::time::{Duration, Instant};
-    type Cached = Option<(std::path::PathBuf, Instant, Vec<(String, String)>)>;
-    thread_local! {
-        static CACHE: RefCell<Cached> = const { RefCell::new(None) };
+    if typed.split_whitespace().nth(1) == Some("connect") {
+        return connect_choices(&cached_rows(workspace), q);
     }
-    let all = CACHE.with(|c| {
-        let mut c = c.borrow_mut();
-        let fresh = c.as_ref().is_some_and(|(w, t, _)| w == workspace && t.elapsed() < Duration::from_secs(5));
-        if !fresh {
-            let res = bend_plugins::resolve::resolve(&bend_plugins::resolve::Roots::standard(Some(workspace)));
-            let list = res
-                .plugins
-                .iter()
-                .map(|p| {
-                    let what = p.description.clone().unwrap_or_default();
-                    (p.name.clone(), format!("{} · {}", p.state.as_str(), what).trim_end_matches(" · ").to_string())
-                })
-                .collect();
-            *c = Some((workspace.to_path_buf(), Instant::now(), list));
+    let skills = typed.starts_with("/skills");
+    let all = cached_rows(workspace);
+    let state = |on: bool| if on { settings::plugins_mark_on } else { settings::plugins_mark_off };
+    let mut out = Vec::new();
+    for p in all.iter().filter(|p| p.state != bise_proto::app_rows::PluginState::Available) {
+        if skills && p.kind != bise_proto::app_rows::PluginKind::Skills && !p.parts.iter().any(|x| x.kind == bise_proto::app_rows::PartKind::Skill) {
+            continue;
         }
-        c.as_ref().map(|(_, _, l)| l.clone()).unwrap_or_default()
-    });
-    all.into_iter()
-        .filter(|(n, _)| crate::commands::matches(q, &[n]))
-        .map(|(n, d)| crate::commands::Choice { value: n.clone(), label: n, desc: d, mark: None })
+        if crate::commands::matches(q, &[&p.id, &p.title]) {
+            let desc = [screen::kind_word(p), &screen::summary(p), state(p.on)].iter().filter(|s| !s.is_empty()).copied().collect::<Vec<_>>().join(" · ");
+            out.push(crate::commands::Choice { value: p.id.clone(), label: p.id.clone(), desc, mark: None });
+        }
+        if q.is_empty() {
+            continue;
+        }
+        for x in p.parts.iter().flat_map(|x| std::iter::once(x).chain(x.tools.iter())) {
+            if skills && x.kind != bise_proto::app_rows::PartKind::Skill {
+                continue;
+            }
+            if crate::commands::matches(q, &[&x.id]) {
+                let desc = settings::plugins_choice_part(screen::part_word(x.kind), &p.title, state(x.on));
+                out.push(crate::commands::Choice { value: x.id.clone(), label: x.id.clone(), desc, mark: None });
+            }
+        }
+    }
+    out
+}
+
+/// `/plugins connect`'s rows: the connectors that wait for him, then
+/// those in Browse.
+fn connect_choices(all: &[Plugin], q: &str) -> Vec<crate::commands::Choice> {
+    all.iter()
+        .filter(|p| p.kind == bise_proto::app_rows::PluginKind::Mistral && p.action.is_some())
+        .filter(|p| crate::commands::matches(q, &[&p.id, &p.title]))
+        .map(|p| crate::commands::Choice { value: p.id.clone(), label: p.title.clone(), desc: p.what.clone().unwrap_or_default(), mark: None })
         .collect()
+}
+
+/// The popup's rows: the worker's latest (the popup asks at every
+/// frame), a new read asked when they are older than 5 s.
+fn cached_rows(workspace: &Path) -> Vec<Plugin> {
+    let fresh = lock(&BUILT).as_ref().is_some_and(|b| b.workspace == workspace && b.at.elapsed() < Duration::from_secs(5));
+    if !fresh {
+        ask_rows(workspace);
+    }
+    lock(&BUILT).as_ref().filter(|b| b.workspace == workspace).map(|b| b.rows.clone()).unwrap_or_default()
+}
+
+// ---- the rows' worker ----
+
+/// Rows the worker built, for one workspace, at one moment.
+struct Built {
+    workspace: std::path::PathBuf,
+    at: Instant,
+    rows: Vec<Plugin>,
+}
+
+/// The worker's latest rows; whether it runs; whether it must run again
+/// (asked while it ran: a toggle it may have read before).
+static BUILT: Mutex<Option<Built>> = Mutex::new(None);
+static BUSY: Mutex<bool> = Mutex::new(false);
+static AGAIN: Mutex<bool> = Mutex::new(false);
+
+fn lock<T>(m: &Mutex<T>) -> std::sync::MutexGuard<'_, T> {
+    m.lock().unwrap_or_else(|e| e.into_inner())
+}
+
+/// Build the rows off the draw thread (`catalog::rows` reads files and
+/// scans skills folders): one build at a time; asked while one runs, it
+/// runs once more after.
+fn ask_rows(workspace: &Path) {
+    {
+        let mut busy = lock(&BUSY);
+        if *busy {
+            *lock(&AGAIN) = true;
+            return;
+        }
+        *busy = true;
+    }
+    let ws = workspace.to_path_buf();
+    std::thread::spawn(move || loop {
+        let rows = rows(&ws, &pending());
+        *lock(&BUILT) = Some(Built { workspace: ws.clone(), at: Instant::now(), rows });
+        let mut busy = lock(&BUSY);
+        if !std::mem::take(&mut *lock(&AGAIN)) {
+            *busy = false;
+            return;
+        }
+    });
 }
 
 /// `/plugins login`'s rows (designer): `linear   mcp.linear.app · needs
@@ -157,11 +260,11 @@ fn login(workspace: &Path, name: &str) -> String {
     {
         let mut r = RUNNING.lock().unwrap_or_else(|e| e.into_inner());
         if r.contains(&t.name) {
-            return format!("the login to {} is still open in your browser", t.name);
+            return settings::plugins_login_open(&t.name);
         }
         r.push(t.name.clone());
     }
-    let first = format!("opening your browser to log in to {}…", t.name);
+    let first = settings::plugins_login_opening(&t.name);
     std::thread::spawn(move || {
         let (secrets, sd) = (bend_plugins::oauth::store_dir(), bend_plugins::status::dir());
         let name = t.name.clone();
@@ -212,7 +315,7 @@ pub(crate) fn pending_lines(workspace: &Path) -> Vec<String> {
         let needs = bend_plugins::status::read(&sd, &t.plugin, &t.server.id).is_some_and(|s| s.login);
         if needs && !w.said.contains(&t.name) && !running.contains(&t.name) {
             w.said.push(t.name.clone());
-            out.push(format!("{} needs a login: /plugins login", t.name));
+            out.push(settings::plugins_needs_login(&t.name));
         } else if !needs {
             // logged in since: a later 401 is said again
             w.said.retain(|n| *n != t.name);
@@ -244,21 +347,28 @@ pub(crate) fn command(typed: &str, workspace: &Path) -> String {
             let (secrets, sd) = (bend_plugins::oauth::store_dir(), bend_plugins::status::dir());
             let ts = bend_plugins::login::targets(workspace);
             if ts.is_empty() {
-                return "no remote MCP server that logs in (one without an Authorization header in its mcp.json)".into();
+                return settings::plugins_no_login.into();
             }
             let rows: Vec<String> = ts.iter().map(|t| format!("  {}   {}", t.name, bend_plugins::login::state(t, &secrets, &sd))).collect();
             format!("/plugins {} NAME:\n{}", sub, rows.join("\n"))
         }
         (Some("logout"), Some(name)) => match logout(workspace, name) {
-            Ok(n) => format!("logged out of {n}."),
+            Ok(n) => settings::plugins_logged_out(n),
             Err(e) => e,
         },
-        (Some(sub @ ("enable" | "disable")), Some(name)) => match set(name, sub == "enable") {
-            Ok(changed) => format!(
-                "{} {}{} — applies at the next /reload",
+        // asked once: the same line with `yes` removes it
+        (Some("remove"), Some(name)) => match words.next() {
+            Some("yes") => match remove(workspace, name) {
+                Ok(()) => settings::plugins_removed(name),
+                Err(e) => e,
+            },
+            _ => settings::plugins_remove_ask(name),
+        },
+        (Some(sub @ ("on" | "off")), Some(name)) => match set(name, sub == "on") {
+            Ok(changed) => settings::plugins_set(
                 name,
-                if sub == "enable" { "enabled" } else { "disabled" },
-                if changed { "" } else { " (unchanged)" }
+                if sub == "on" { settings::plugins_enabled } else { settings::plugins_disabled },
+                if changed { "" } else { settings::plugins_unchanged },
             ),
             Err(e) => e,
         },
@@ -266,8 +376,350 @@ pub(crate) fn command(typed: &str, workspace: &Path) -> String {
             let text = bend_plugins::cli::listing(workspace);
             format!("plugins ({})\n{}", workspace.display(), text.trim_end())
         }
-        _ => "usage: /plugins [list] | /plugins enable NAME | /plugins disable NAME | /plugins login [NAME] | /plugins logout NAME".into(),
+        _ => settings::plugins_usage.into(),
     }
+}
+
+
+// ---- the screen (plugins_screen.rs: its state, lines and keys) ----
+
+use crate::plugins_screen::{self as screen, Effect, Found, Market};
+use bise_proto::app_rows::Plugin;
+use std::time::{Duration, Instant};
+
+/// How often the open screen reads the rows again (a toggle elsewhere, a
+/// login that ended, a server that connected).
+const REREAD: Duration = Duration::from_secs(2);
+/// How long a note stays on the divider.
+const NOTE_FOR: Duration = Duration::from_secs(6);
+
+/// `/plugins` open: the pure screen and what the shell read for it.
+pub(crate) struct Open {
+    pub(crate) sc: screen::Screen,
+    pub(crate) rows: Vec<Plugin>,
+    pub(crate) markets: Vec<Market>,
+    pub(crate) found: Option<Vec<Found>>,
+    /// when the worker was last asked, and the build shown
+    read_at: Option<Instant>,
+    got: Option<Instant>,
+    note_at: Option<Instant>,
+    /// screen row → the id it selects (the last frame's)
+    hits: Vec<(u16, String)>,
+}
+
+impl Open {
+    pub(crate) fn new(sc: screen::Screen) -> Open {
+        Open { sc, rows: Vec::new(), markets: Vec::new(), found: None, read_at: None, got: None, note_at: None, hits: Vec::new() }
+    }
+
+    fn note(&mut self, words: String, bad: bool) {
+        self.sc.note = Some((words, bad));
+        self.note_at = Some(Instant::now());
+    }
+}
+
+/// The logins open in his browser, by server name.
+fn pending() -> Vec<String> {
+    RUNNING.lock().unwrap_or_else(|e| e.into_inner()).clone()
+}
+
+/// `/plugins` (every kind) or `/skills` (the skills folders), the add
+/// menu open when `add`.
+pub(crate) fn open(app: &mut crate::app::App, kind: screen::Kind, add: bool) {
+    let sc = screen::Screen { kind, add: add.then_some(screen::Add::Menu { sel: 0 }), ..Default::default() };
+    app.plugins = Some(Open::new(sc));
+    // Browse's marketplaces, from their clones (cloned once if missing)
+    crate::plugins_add::read_markets(false);
+    reread(app, true);
+}
+
+/// Ask the worker for the rows again when [`REREAD`] passed (or `now`:
+/// after his toggle), and take its latest.
+fn reread(app: &mut crate::app::App, now: bool) {
+    let ws = std::path::PathBuf::from(crate::sb::workspace(app).unwrap_or_default());
+    let Some(o) = app.plugins.as_mut() else { return };
+    if now || o.read_at.is_none_or(|t| t.elapsed() >= REREAD) {
+        o.read_at = Some(Instant::now());
+        ask_rows(&ws);
+    }
+    if let Some(b) = lock(&BUILT).as_ref().filter(|b| b.workspace == ws && o.got.is_none_or(|g| b.at > g)) {
+        o.rows = b.rows.clone();
+        o.got = Some(b.at);
+    }
+    // a failure stays until his next key
+    if o.note_at.is_some_and(|t| t.elapsed() >= NOTE_FOR) && !o.sc.note.as_ref().is_some_and(|(_, bad)| *bad) {
+        o.sc.note = None;
+        o.note_at = None;
+    }
+    screen::settle(&mut o.sc, &o.rows, &o.markets);
+}
+
+pub(crate) fn draw(app: &mut crate::app::App, frame: &mut ratatui::Frame) {
+    use ratatui::widgets::{Clear, Paragraph};
+    if app.plugins.is_none() {
+        return;
+    }
+    crate::plugins_add::pump(app);
+    reread(app, false);
+    let full = frame.area();
+    crate::pointer::region(full, crate::pointer::Shape::Default);
+    frame.render_widget(Clear, full);
+    if full.width < 30 || full.height < 10 {
+        return;
+    }
+    let Some(o) = app.plugins.as_ref() else { return };
+    let title = screen::title(&o.sc, &o.rows);
+    let area = crate::artifacts_screen::draw_frame(app, frame, full, &title);
+    let Some(o) = app.plugins.as_mut() else { return };
+    let (w, h) = (area.width as usize + 2, area.height as usize);
+    let found = o.found.as_ref().map(|f| f.iter().map(|x| format!("{} {}", x.from, x.servers.len())).collect::<Vec<_>>().join(", "));
+    let body = screen::body(&o.sc, &o.rows, &o.markets, found.as_deref(), w);
+    // the lines take the frame's margin but its outer column (the `›`
+    // of plugins-ui's screens sits there)
+    let area = ratatui::layout::Rect { x: area.x.saturating_sub(1).max(full.x + 1), width: (area.width + 2).min(full.width.saturating_sub(2)), ..area };
+    let (lines, hits) = screen::window(&mut o.sc, body, h.saturating_sub(2));
+    o.hits = hits.into_iter().map(|(i, id)| (area.y + i as u16, id)).collect();
+    let body_area = ratatui::layout::Rect { height: area.height.saturating_sub(2), ..area };
+    frame.render_widget(Paragraph::new(lines), body_area);
+    // the divider: `├─ plugins ── 27 · 1 off ─┤`, then the keys
+    let y = area.bottom().saturating_sub(2);
+    let (right, bad) = screen::divider_right(&o.sc, &o.rows);
+    divider(frame.buffer_mut(), full, y, &title, &right, bad);
+    let keys = screen::key_bar(&o.sc, &o.rows, w);
+    frame.render_widget(Paragraph::new(keys), ratatui::layout::Rect { y: y + 1, height: 1, ..area });
+    crate::textlayer::text(area);
+    for (y, _) in &o.hits {
+        crate::pointer::region(ratatui::layout::Rect { x: area.x, y: *y, width: area.width, height: 1 }, crate::pointer::Shape::Pointer);
+    }
+}
+
+/// The screen's divider on row `y`: its name left, `right` right (the
+/// note in the accent, a failure in the error color).
+fn divider(buf: &mut ratatui::buffer::Buffer, full: ratatui::layout::Rect, y: u16, name: &str, right: &str, bad: bool) {
+    use ratatui::style::Style;
+    use unicode_width::UnicodeWidthStr;
+    let st = crate::chrome::line_style();
+    let (l, r) = (full.x, full.right().saturating_sub(1));
+    if y >= full.bottom() || r <= l + 4 {
+        return;
+    }
+    for x in l..=r {
+        buf[(x, y)].set_symbol("─").set_style(st);
+    }
+    buf[(l, y)].set_symbol("├");
+    buf[(r, y)].set_symbol("┤");
+    let label = format!(" {name} ");
+    buf.set_stringn(l + 2, y, &label, (r - l) as usize - 3, Style::default().fg(crate::theme::dim()));
+    let room = (r - l) as usize - label.width() - 6;
+    if !right.is_empty() && room > 4 {
+        let t = format!(" {} ", screen_cut(right, room));
+        let c = if bad { crate::theme::error() } else if right.starts_with('✓') { crate::theme::accent() } else { crate::theme::dim() };
+        buf.set_string(r - 1 - t.width() as u16, y, &t, Style::default().fg(c));
+    }
+}
+
+fn screen_cut(s: &str, w: usize) -> String {
+    use unicode_width::UnicodeWidthStr;
+    if s.width() <= w {
+        return s.to_string();
+    }
+    let mut out: String = String::new();
+    for c in s.chars() {
+        if out.width() + 2 > w {
+            break;
+        }
+        out.push(c);
+    }
+    out + "…"
+}
+
+/// Keys while open: the pure screen decides, the shell runs its effect.
+pub(crate) fn on_key(app: &mut crate::app::App, k: &crossterm::event::KeyEvent) -> bool {
+    use crossterm::event::KeyEventKind;
+    let Some(o) = app.plugins.as_mut() else { return false };
+    if k.kind != KeyEventKind::Press {
+        return true;
+    }
+    let e = screen::key(&mut o.sc, &o.rows, &o.markets, k);
+    run(app, e);
+    true
+}
+
+/// The mouse while open: the wheel moves, a click selects a row, a click
+/// on the selected one opens it.
+pub(crate) fn mouse(app: &mut crate::app::App, m: &crossterm::event::MouseEvent) -> bool {
+    use crossterm::event::{KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEventKind};
+    let Some(o) = app.plugins.as_mut() else { return false };
+    let press = |c: KeyCode| KeyEvent::new(c, KeyModifiers::NONE);
+    match m.kind {
+        MouseEventKind::ScrollUp => {
+            for _ in 0..3 {
+                screen::key(&mut o.sc, &o.rows, &o.markets, &press(KeyCode::Up));
+            }
+        }
+        MouseEventKind::ScrollDown => {
+            for _ in 0..3 {
+                screen::key(&mut o.sc, &o.rows, &o.markets, &press(KeyCode::Down));
+            }
+        }
+        MouseEventKind::Down(MouseButton::Left) => {
+            let Some(id) = o.hits.iter().find(|(y, _)| *y == m.row).map(|(_, id)| id.clone()) else { return true };
+            let again = match (&mut o.sc.add, o.sc.opened.is_some()) {
+                (Some(screen::Add::Menu { sel }), _) | (Some(screen::Add::Import { sel, .. }), _) => {
+                    let i = id.parse().unwrap_or(0);
+                    std::mem::replace(sel, i) == i
+                }
+                (Some(_), _) => false,
+                (None, true) => o.sc.part.replace(id.clone()).as_deref() == Some(id.as_str()),
+                (None, false) => o.sc.sel.replace(id.clone()).as_deref() == Some(id.as_str()),
+            };
+            if again {
+                let e = screen::key(&mut o.sc, &o.rows, &o.markets, &press(KeyCode::Enter));
+                run(app, e);
+            }
+        }
+        _ => {}
+    }
+    true
+}
+
+/// Run what a key asked.
+fn run(app: &mut crate::app::App, e: Effect) {
+    let ws = crate::sb::workspace(app).unwrap_or_default();
+    match e {
+        Effect::None => return,
+        Effect::Close => {
+            app.plugins = None;
+            return;
+        }
+        Effect::Set { id, title, on, turn } => {
+            let said = match set(&id, on) {
+                Ok(_) => (screen::done_note(&title, on, turn), false),
+                Err(e) => (e, true),
+            };
+            if let Some(o) = app.plugins.as_mut() {
+                o.note(said.0, said.1);
+            }
+        }
+        Effect::Login(name) => {
+            let first = login(Path::new(&ws), &name);
+            if let Some(o) = app.plugins.as_mut() {
+                o.note(first, false);
+            }
+        }
+        Effect::Connect(id) => {
+            let title = app.plugins.as_ref().and_then(|o| o.rows.iter().find(|p| p.id == id)).map_or(id.clone(), |p| p.title.clone());
+            connect_said(&id, &title);
+            if let Some(o) = app.plugins.as_mut() {
+                o.note(settings::plugins_connecting(&title), false);
+            }
+        }
+        Effect::Try(text) => {
+            app.plugins = None;
+            crate::sb::focus(app, "main");
+            app.ed.set(&text, text.len());
+            return;
+        }
+        Effect::OpenFolder(path) => {
+            crate::links::open(&format!("file://{path}"));
+        }
+        Effect::Agent(words) => {
+            app.plugins = None;
+            let evs = crate::sb::handle_input(app, &format!("/new {}", bend_plugins::add::agent_brief(&words)));
+            for ev in evs {
+                crate::feed::push_event(&mut app.events, &mut app.cache, ev);
+            }
+            app.flash = Some((settings::plugins_agent_started.to_string(), Instant::now()));
+            return;
+        }
+        other => crate::plugins_add::run(app, other),
+    }
+    reread(app, true);
+}
+
+/// Connect a Mistral connector ([`connect`], its own thread): its lines
+/// come back to the thread like a login's, then how it ended.
+fn connect_said(id: &str, title: &str) {
+    let title = title.to_string();
+    let r = connect(id, say, move |r| match r {
+        Ok(()) => say(settings::plugins_connect_done(&title)),
+        Err(e) => say(e),
+    });
+    if let Err(e) = r {
+        say(e);
+    }
+}
+
+/// A plugin or a part by what he typed (its id, a plugin's name or
+/// title): its id, its words for the note, whether it reaches the prompt.
+fn named(rows: &[Plugin], typed: &str) -> Option<(String, String, bool)> {
+    let t = typed.trim();
+    if let Some(p) = rows.iter().find(|p| p.id == t || p.name == t || p.title.eq_ignore_ascii_case(t)) {
+        return Some((p.id.clone(), p.title.clone(), screen::reaches_prompt(p, None)));
+    }
+    rows.iter().find_map(|p| {
+        p.parts.iter().flat_map(|x| std::iter::once(x).chain(x.tools.iter())).find(|x| x.id == t).map(|x| (x.id.clone(), format!("{} › {}", p.title, x.name), screen::reaches_prompt(p, Some(x))))
+    })
+}
+
+/// `/plugins …` and `/skills …`: the screen opens (bare, `add`), a
+/// toggle says what happened on the divider, the rest prints lines.
+pub(crate) fn slash(app: &mut crate::app::App, typed: &str) -> Vec<String> {
+    let ws = std::path::PathBuf::from(crate::sb::workspace(app).unwrap_or_default());
+    let mut words = typed.split_whitespace();
+    let skills = words.next() == Some("/skills");
+    let kind = if skills { screen::Kind::Skills } else { screen::Kind::All };
+    match (words.next(), words.next()) {
+        (None, _) => open(app, kind, false),
+        (Some("add"), None) if !skills => open(app, kind, true),
+        (Some(sub @ ("on" | "off")), Some(name)) => {
+            let rows = rows(&ws, &pending());
+            let on = sub == "on";
+            let (id, title, turn) = named(&rows, name).unwrap_or_else(|| (name.to_string(), name.to_string(), true));
+            if rows.iter().any(|p| p.id == id && p.locked) {
+                return vec![settings::plugins_locked(&title)];
+            }
+            match set(&id, on) {
+                Ok(_) => app.flash = Some((screen::done_note(&title, on, turn), Instant::now())),
+                Err(e) => return vec![e],
+            }
+        }
+        (Some("connect"), Some(name)) if !skills => {
+            let rows = rows(&ws, &pending());
+            let p = rows.iter().find(|p| p.kind == bise_proto::app_rows::PluginKind::Mistral && (p.id == name || p.name == name || p.title.eq_ignore_ascii_case(name)));
+            let id = p.map_or_else(|| bend_plugins::id::PluginId::mistral(name).to_string(), |p| p.id.clone());
+            let title = p.map_or(name, |p| p.title.as_str());
+            connect_said(&id, title);
+            return vec![settings::plugins_connecting(title)];
+        }
+        (Some("refresh"), None) if !skills => refresh_said(),
+        _ if skills => return vec![settings::skills_usage.to_string()],
+        _ => return command(typed, &ws).lines().map(String::from).collect(),
+    }
+    Vec::new()
+}
+
+/// `/plugins refresh` ([`refresh`], its own thread): its line comes back
+/// to the thread.
+fn refresh_said() {
+    refresh(|e| {
+        say(match e {
+            None => settings::plugins_refreshed.to_string(),
+            Some(e) => settings::plugins_refresh_failed(e),
+        })
+    });
+}
+
+/// The screen on given rows (the render tests: no file read for 2 s).
+#[cfg(test)]
+pub(crate) fn open_on(app: &mut crate::app::App, sc: screen::Screen, rows: Vec<Plugin>, markets: Vec<Market>) {
+    let mut o = Open::new(sc);
+    o.rows = rows;
+    o.markets = markets;
+    o.read_at = Some(Instant::now());
+    o.got = Some(Instant::now());
+    screen::settle(&mut o.sc, &o.rows, &o.markets);
+    app.plugins = Some(o);
 }
 
 #[cfg(test)]
@@ -286,6 +738,9 @@ mod tests {
         assert!(command("/plugins login", &dir).starts_with("no remote MCP server that logs in"));
         assert!(command("/plugins login nope", &dir).starts_with("no remote MCP server named nope"));
         assert!(choices(&dir, "", "/plugins login ").is_empty());
+        // remove asks once and refuses what isn't his
+        assert_eq!(command("/plugins remove pay", &dir), settings::plugins_remove_ask("pay"));
+        assert!(command("/plugins remove mistral:gmail yes", &dir).contains("Mistral connector"));
         let _ = std::fs::remove_dir_all(&dir);
     }
 }

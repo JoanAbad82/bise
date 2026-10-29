@@ -25,6 +25,10 @@
 #              (update-card), so write them for users: what they can do
 #              now, no commit hashes. Works on the draft before
 #              --publish, and on a published release (fixes its notes).
+#   --not-tip-green "<why>"  tag a sha main's tip gate never passed
+#              (scripts/tip_green.py: else a new tag needs the sha in
+#              ~/.bise/gate/green-shas.tsv); only when main names it, the
+#              line 'not-tip-green <sha>: <why>' goes to the release log
 #   --dry-run  say what would be done, change nothing
 #   --next-tag print the tag a release would take now (default above),
 #              change nothing (/release-bise's preview, BISE-235)
@@ -59,7 +63,7 @@ set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 REPO_DIR="$(cd "$HERE" && git rev-parse --show-toplevel)"
 SITE_INSTALL="$REPO_DIR/site/install.sh"
-repo=gvergnaud/bise channel="" tag="" rev=HEAD notes="" whats_new="" draft=0 dry=0 local=0 publish=0 remote="" next=0
+repo=gvergnaud/bise channel="" tag="" rev=HEAD notes="" whats_new="" draft=0 dry=0 local=0 publish=0 remote="" next=0 not_green=""
 adds=() froms=()
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -76,6 +80,7 @@ while [ $# -gt 0 ]; do
     --publish) publish=1 ;;
     --dry-run) dry=1 ;;
     --next-tag) next=1 ;;
+    --not-tip-green) not_green="$2"; shift ;;
     -h|--help) sed -n '2,57p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     -*) echo "publish-release: unknown argument $1" >&2; exit 2 ;;
     *) tag="$1" ;;
@@ -235,12 +240,28 @@ if [ -z "$remote_sha" ]; then
   fi
   local_sha="$(git -C "$REPO_DIR" rev-parse -q --verify "refs/tags/$tag^{commit}" || true)"
   [ -z "$local_sha" ] || [ "$local_sha" = "$commit" ] || die "the local tag $tag is on ${local_sha:0:12}, not ${commit:0:12}"
+  # a new tag only on a sha main's tip gate passed, or one main names (main m_36204): the line
+  # (tip-green / not-tip-green <why>) goes to the release log
+  if [ -z "$local_sha" ]; then
+    tg="$(python3 -B "$REPO_DIR/scripts/tip_green.py" "$commit" --repo "$REPO_DIR" ${not_green:+--not-tip-green "$not_green"})" \
+      || die "$tg"
+    say "$tg"
+  fi
   if [ "$dry" = 1 ]; then
     say "dry run: would tag ${commit:0:12} $tag, git push $remote $tag, watch release.yml, show the draft"
     exit 0
   fi
-  [ -n "$local_sha" ] || git -C "$REPO_DIR" tag -a "$tag" -m "bise $version" "$commit"
-  git -C "$REPO_DIR" push "$remote" "refs/tags/$tag"
+  # unsigned, whatever the user's git config says: with tag.gpgsign and
+  # an ssh key in an agent like Secretive, git tag waits on a prompt
+  # nobody sees and the release never starts (-30, -31, -32)
+  if [ -z "$local_sha" ]; then
+    say "tagging ${commit:0:12} $tag (unsigned)"
+    git -C "$REPO_DIR" -c tag.gpgsign=false tag -a "$tag" -m "bise $version" "$commit" \
+      || die "cannot make the tag $tag on ${commit:0:12}"
+  fi
+  say "pushing $tag to $remote"
+  GIT_TERMINAL_PROMPT=0 git -C "$REPO_DIR" push "$remote" "refs/tags/$tag" \
+    || die "cannot push $tag to $remote (git auth? gh auth setup-git)"
   say "pushed $tag (${commit:0:12}): release.yml builds both arches (~15-60 min; macOS minutes cost 10x on a private repo)"
 elif [ "$dry" = 1 ]; then
   say "dry run: $tag is on GitHub (${remote_sha:0:12}), release $st: would watch release.yml, show the draft$([ "$publish" = 1 ] && echo ", publish it")"
@@ -276,17 +297,54 @@ gh release download "$tag" -R "$repo" -p latest.json -p install.sh -p nix-source
   || die "the draft is not what install.sh and bise update read: fix before publishing"
 site_check "$work/install.sh"
 
+# nix_sources_refused <root> <file>: why the release's nix-sources.json must
+# not be committed into <root> (empty: commit it). Only into a checkout of
+# $repo (a remote on github.com/$repo), only for $tag published on $repo
+# (not a draft), and only sources whose every URL is that tag's download
+# URL. fc1883f2a: a test's fake release (o/r v0.0.6) was committed into
+# the real repo and pushed to main; each of these refuses that.
+nix_sources_refused() {
+  local root="$1" file="$2" r ok="" u
+  for r in $(git -C "$root" remote 2>/dev/null); do
+    case "$(git -C "$root" remote get-url "$r" 2>/dev/null)" in
+      *github.com[:/]"$repo"|*github.com[:/]"$repo".git) ok=1 ;;
+    esac
+  done
+  [ -n "$ok" ] || { echo "$root is not a checkout of github.com/$repo"; return; }
+  [ "$(gh release view "$tag" -R "$repo" --json isDraft --jq .isDraft 2>/dev/null)" = false ] \
+    || { echo "$tag is not a published release of $repo"; return; }
+  u="https://github.com/$repo/releases/download/$tag/"
+  python3 -c 'import json, sys
+n = json.load(open(sys.argv[1]))
+urls = [v["url"] for v in n.values() if isinstance(v, dict) and "url" in v]
+sys.exit(0 if urls and all(x.startswith(sys.argv[2]) for x in urls) else 1)' "$file" "$u" \
+    || echo "its URLs are not all under $u"
+}
+
 # 4. publish
 if [ "$publish" = 1 ] && [ "$st" = draft ]; then
   gh release edit "$tag" -R "$repo" --draft=false --latest >/dev/null
   say "published $tag: the latest release, every install reads $channel/latest.json"
   # the flake (nix/sources.json) installs this release from now on: the
-  # release's nix-sources.json (make-release.sh), committed here, never by hand
-  root="$(git rev-parse --show-toplevel)"
+  # release's nix-sources.json (make-release.sh), committed here, never by hand.
+  # Here = this script's repo, never the caller's cwd: test-release-gh.sh
+  # runs a copy in a throwaway repo from the real one, and the commit went
+  # into the real one (fake sources landed on main: fc1883f2a)
+  root="$REPO_DIR"
   if [ -f "$work/nix-sources.json" ] && ! cmp -s "$work/nix-sources.json" "$root/nix/sources.json"; then
-    mkdir -p "$root/nix" && cp "$work/nix-sources.json" "$root/nix/sources.json"
-    git -C "$root" commit -q -m "nix: sources for ${tag#v}" -- nix/sources.json \
-      && say "committed nix/sources.json for ${tag#v}: push main so 'nix profile install github:$repo' gets it"
+    why="$(nix_sources_refused "$root" "$work/nix-sources.json")"
+    if [ -n "$why" ]; then
+      say "nix/sources.json NOT committed: $why"
+    else
+      mkdir -p "$root/nix" && cp "$work/nix-sources.json" "$root/nix/sources.json"
+      # (add first: a repo without it yet can't commit an untracked pathspec)
+      if git -C "$root" add -- nix/sources.json \
+         && git -C "$root" commit -q -m "nix: sources for ${tag#v}" -- nix/sources.json; then
+        say "committed nix/sources.json for ${tag#v}: push main so 'nix profile install github:$repo' gets it"
+      else
+        say "could not commit nix/sources.json in $root: commit it by hand ('nix: sources for ${tag#v}')"
+      fi
+    fi
   fi
 else
   say "not published: try it (gh release download $tag -R $repo), then: $0 $tag --publish"

@@ -36,7 +36,6 @@ pub(crate) struct Scene {
     preview: bool,
     archived_open: bool,
     drop_ask: bool,
-    confirm: bool,
     card: (bool, Option<u64>, usize),
 }
 
@@ -48,7 +47,6 @@ pub(crate) fn scene(app: &App) -> Scene {
         preview: sb.preview,
         archived_open: sb.archived_open,
         drop_ask: sb.drop_ask.is_some(),
-        confirm: sb.confirm.is_some(),
         card: (sb.card.open, sb.card.sel, sb.card.scroll),
     }
 }
@@ -65,7 +63,7 @@ pub(crate) fn key(app: &mut App, k: &crossterm::event::KeyEvent, popup_open: boo
         let plain = !k.modifiers.intersects(KeyModifiers::CONTROL | KeyModifiers::ALT | KeyModifiers::SUPER);
         match k.code {
             KeyCode::Char('y') | KeyCode::Char('Y') if plain => {
-                sb.send_input(format!("/archive {}", name));
+                sb.call("agent/archive", serde_json::json!({"agent": name, "force": false}), super::rpc::Then::Line);
                 return true;
             }
             KeyCode::Char('n') | KeyCode::Char('N') if plain => return true,
@@ -92,7 +90,7 @@ pub(crate) fn key(app: &mut App, k: &crossterm::event::KeyEvent, popup_open: boo
                 if k.code == KeyCode::Enter {
                     let v = if sb.focus == name { text.clone() } else { format!("@{} {}", name, text) };
                     sb.send_input(v.clone());
-                    push_event(&mut app.events, &mut app.cache, Ev::You(v, Mark::Sent, false));
+                    push_event(&mut app.events, &mut app.cache, Ev::You(v.into(), Mark::Sent, false, None));
                 }
                 return true;
             }
@@ -103,7 +101,7 @@ pub(crate) fn key(app: &mut App, k: &crossterm::event::KeyEvent, popup_open: boo
     match (k.code, k.modifiers) {
         (KeyCode::Char('c'), KeyModifiers::CONTROL) if pending && !interrupt_requested => {
             let f = sb.focus.clone();
-            sb.send(json!({"op": "interrupt", "agent": f}));
+            sb.call("turn/interrupt", json!({"agent": f}), super::rpc::Then::Shown);
             // computer-use-design.md §7.3: it lets go of Chrome and its apps too
             if crate::computer_use::driving(&f).is_some() {
                 crate::computer_use::stop(&sb.dir_of(&f));
@@ -157,10 +155,6 @@ pub(crate) fn key(app: &mut App, k: &crossterm::event::KeyEvent, popup_open: boo
             true
         }
         (KeyCode::Esc, _) if !popup_open => {
-            if let Some((id, _)) = sb.confirm.take() {
-                sb.send(json!({"op": "confirm", "id": id, "yes": false}));
-                return true;
-            }
             if sb.selected.is_some() || sb.preview {
                 sb.selected = None;
                 sb.preview = false;
@@ -185,8 +179,10 @@ pub(crate) fn key(app: &mut App, k: &crossterm::event::KeyEvent, popup_open: boo
             false
         }
         _ if matches!(nav, Some(Nav::Goto(_))) => {
-            // the number shown in the panel (it stays while the agent lives)
+            // the number shown in the panel (the hub's rank, held a moment
+            // after the jump so ⌥1 ⌥2 ⌥3 never shift: numbers.rs)
             if let Some(t) = nav.and_then(|n| if let Nav::Goto(i) = n { sb.agent_numbered(i) } else { None }) {
+                sb.jumped();
                 focus(app, &t);
             }
             true

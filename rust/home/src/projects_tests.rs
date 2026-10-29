@@ -159,13 +159,13 @@ fn update_writes_whole_and_an_error_writes_nothing() {
     assert!(matches!(p, Added::New(ref p) if p.path == root.join("code/api")));
     assert!(add_path(&home, &ws, &root.join("nope"), None, 3).unwrap_err().contains("no such folder"));
     assert!(add_path(&home, &ws, &ws, None, 3).is_err());
-    let before = std::fs::read_to_string(home.projects_file().unwrap()).unwrap();
+    let before = std::fs::read_to_string(home.projects_file()).unwrap();
     assert!(update(&home, |l| remove(l, "zz")).is_err());
-    assert_eq!(std::fs::read_to_string(home.projects_file().unwrap()).unwrap(), before);
+    assert_eq!(std::fs::read_to_string(home.projects_file()).unwrap(), before);
     let rows = list(&home, &ws);
     assert_eq!(rows.iter().map(|r| r.name.as_str()).collect::<Vec<_>>(), ["bise", "api"]);
     // a newer bise's file is never written over
-    std::fs::write(home.projects_file().unwrap(), r#"{"v":2,"projects":[]}"#).unwrap();
+    std::fs::write(home.projects_file(), r#"{"v":2,"projects":[]}"#).unwrap();
     assert!(update(&home, |_| Ok(())).unwrap_err().contains("newer bise"));
 }
 
@@ -193,12 +193,3 @@ fn racing_writers_lose_no_add() {
     assert_eq!(l.iter().map(|p| p.order).collect::<Vec<_>>(), (0..16).collect::<Vec<u32>>());
 }
 
-#[test]
-fn the_legacy_layout_has_home_only_and_refuses_writes() {
-    let m: std::collections::HashMap<String, String> = [("HOME".to_string(), "/h".to_string())].into();
-    let home = Home::from_lookup(&move |k: &str| m.get(k).cloned());
-    assert_eq!(home.layout(), Layout::Legacy);
-    assert_eq!(home.projects_file(), None);
-    assert_eq!(list(&home, Path::new("/h/bise")).len(), 1);
-    assert_eq!(update(&home, |_| Ok(())).unwrap_err(), LEGACY);
-}

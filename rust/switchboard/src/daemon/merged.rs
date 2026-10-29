@@ -11,8 +11,11 @@
 //! Interim source (architect m_9058): `by` still reads main's feed text
 //! (`sb landed :` lines); the structured fix is a land
 //! record the hub writes through sb-core when it lands (agent, from, to,
-//! at), which this file then reads instead.
+//! at), which this file then reads instead. TODO(land-record): that
+//! record exists now (`crate::land_record`, `lands.jsonl`, the revert
+//! guard reads it): move `by` onto it.
 
+use super::rpc::Typed;
 use super::*;
 use crate::proto_view;
 use bise_proto::hub::HubEv;
@@ -24,12 +27,11 @@ impl Shell {
     /// Today's merged list to every typed connection (a feature merged:
     /// `Effect::MergedChanged`).
     pub(super) fn merged_all(&mut self) {
-        let ids = self.typed_ids();
-        self.merged_typed(ids);
+        self.merged_typed(Typed::All);
     }
 
-    pub(super) fn merged_typed(&mut self, ids: Vec<ClientId>) {
-        if ids.is_empty() {
+    pub(super) fn merged_typed(&mut self, to: Typed) {
+        if self.nobody(&to) {
             return;
         }
         let shared = PathBuf::from(&self.hub.workspace);
@@ -38,9 +40,7 @@ impl Shell {
         let tx = self.tx.clone();
         std::thread::spawn(move || {
             let v = HubEv::Merged { project, items: scan(&shared, transcript.as_deref()) }.to_value();
-            for id in ids {
-                let _ = tx.send(Msg::ToClient { id, v: v.clone() });
-            }
+            let _ = tx.send(Msg::Typed { to, v });
         });
     }
 }

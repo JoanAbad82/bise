@@ -1,0 +1,399 @@
+// The hero film's camera (page bims-film v4, the director's rules): which shot plays at film time T
+// (cast.ts SHOTS, written ahead from bims' interest table, so it replays), how the camera gets there
+// (it leaves LEAD_S before the action; it glides, never cuts: GLIDE_IN_S inside an office, GLIDE_ACROSS_S
+// from one to another with a rise to OFFICE size halfway, like a drone), how it follows a moving
+// subject (a damped spring, ~0.5 s behind, never a shake), where the subject sits in the frame (SAFE:
+// the town's middle, the left 20% fading into the page's text), and when the visitor has the camera
+// (a drag, a pinch, a click on a bim) and gives it back (RESUME_IDLE_S without a gesture, his
+// pointer off the town, or resumeFilm()). A Cam is zoom.ts's: the town's fit seen `zoom` times closer, centred at (u, v),
+// fractions of the fit. Pure: the film hands it the geometry and the time. Owner: hero-town.
+import type { Cam } from '../bims/zoom';
+import { FILM_S, type Shot, type Size, type Subject } from './cast';
+
+/** the camera leaves this long before a shot's action (it arrives as it starts) */
+export const LEAD_S = 1.5;
+/** a glide inside one office, s */
+export const GLIDE_IN_S = 1.6;
+/** a glide from one office (or the wide) to another, s: it rises to OFFICE size halfway */
+export const GLIDE_ACROSS_S = 2.4;
+/** the shortest glide (designer m_30848) */
+export const GLIDE_MIN_S = 0.6;
+/** the follow spring's stiffness (critically damped: ~2/W s behind a walking bim) */
+export const SPRING_W = 4;
+/** without a gesture this long (and his pointer off the town), the film takes the camera back (designer m_30837) */
+export const RESUME_IDLE_S = 20;
+/** its glide back to the film's shot */
+export const RESUME_S = 2.4;
+/** the closest the visitor (or a close-up) gets, over the town's fit */
+export const MAX_ZOOM = 28;
+
+/** where the subject sits, fractions of the frame: past the page's fade (its left 40%), above the feed (bottom right), under the controls (top right): designer m_32742 */
+export const SAFE = { x: 0.55, y: 0.36 } as const;
+/** what a whole-town or a whole-office shot fits into, fractions of the frame */
+/** the wide: the offices' bounding box centred at ~58% across, past the box's 22% fade (designer m_31061), the band at mid height (bims m_31230) */
+export const WIDE_BOX = { x0: 0.27, x1: 0.89, y0: 0.11, y1: 0.89 } as const;
+export const OFFICE_BOX = { x0: 0.3, x1: 0.85, y0: 0.1, y1: 0.9 } as const;
+/**
+ * where a whole-office shot puts its office's middle (its box's centre), fractions of the frame: high
+ * enough that its bims sit near SAFE (designer m_32834: aimed off the fit, it sat at ~65% / 65%, the
+ * top a lawn and the far desks under the feed); the map's edge closes the zoom, never slides it
+ */
+export const OFFICE_AIM = { x: SAFE.x, y: 0.4 } as const;
+/** an OFFICE shot this much closer than its box's fit (bims m_31057: the office ~70% of the frame) */
+export const OFFICE_TIGHT = 1.3;
+/** each size past OFFICE: how much closer than that office's own OFFICE shot (follow: a bim ≥ 22 px at 1440, bims m_31555) */
+export const CLOSER: Readonly<Record<Exclude<Size, 'wide' | 'office'>, number>> = { tight: 1.6, follow: 2.6, close: 3.2, closest: 13 };
+
+/** a rectangle on the fit, fractions (u right, v down) */
+export interface Box {
+  readonly u0: number;
+  readonly u1: number;
+  readonly v0: number;
+  readonly v1: number;
+}
+
+/** a point on the fit, fractions */
+export interface At {
+  readonly u: number;
+  readonly v: number;
+}
+
+const clamp = (x: number, lo: number, hi: number): number => Math.min(hi, Math.max(lo, x));
+
+/**
+ * the farthest the camera goes: just past the town's fit. the renderer shows its plain fit for any
+ * zoom ≤ 1 and drops the pan (zoom.ts atFit), so the wide stays above 1 to centre the offices
+ */
+export const MIN_ZOOM = 1.001;
+/** how far past the town's fit the view may slide, fractions of the view (the page's paper shows there) */
+export const PAST = 0.2;
+
+/**
+ * A cam held on the town: zoom in [MIN_ZOOM, MAX_ZOOM], its view never more than PAST of itself off
+ * the fit's edges (closer than the fit) or the fit never more than that out of view (farther). Pure.
+ */
+export function holdCam(c: Cam): Cam {
+  const zoom = clamp(Number.isFinite(c.zoom) ? c.zoom : 1, MIN_ZOOM, MAX_ZOOM);
+  const half = 0.5 / zoom;
+  // the view may slide PAST of its own size off the fit (the paper round the lawn): the wide centres the offices
+  const past = PAST / zoom;
+  const lo = Math.min(half, 1 - half) - past;
+  const hi = Math.max(half, 1 - half) + past;
+  return { zoom, u: clamp(c.u, lo, hi), v: clamp(c.v, lo, hi) };
+}
+
+/** The cam that shows `box` whole inside `into` (fractions of the frame), as close as that allows. Pure. */
+export function fitCam(box: Box, into: { x0: number; x1: number; y0: number; y1: number }): Cam {
+  const zw = (into.x1 - into.x0) / Math.max(1e-6, box.u1 - box.u0);
+  const zh = (into.y1 - into.y0) / Math.max(1e-6, box.v1 - box.v0);
+  const zoom = Math.max(MIN_ZOOM, Math.min(zw, zh));
+  const cu = (box.u0 + box.u1) / 2;
+  const cv = (box.v0 + box.v1) / 2;
+  const fx = (into.x0 + into.x1) / 2;
+  const fy = (into.y0 + into.y1) / 2;
+  return holdCam({ zoom, u: cu - (fx - 0.5) / zoom, v: cv - (fy - 0.5) / zoom });
+}
+
+/** The cam that puts `at` on the frame's point (fx, fy) at this zoom. Pure. */
+export function aimCam(at: At, zoom: number, fx: number = SAFE.x, fy: number = SAFE.y): Cam {
+  return holdCam({ zoom, u: at.u - (fx - 0.5) / zoom, v: at.v - (fy - 0.5) / zoom });
+}
+
+/**
+ * A film shot's cam: `at` on the frame's point (fx, fy), at least `zoom`, closer when that point
+ * would show the map's edge (kiln near the edge: holdCam slid the view back and left kiln in the
+ * frame's bottom fifth, designer m_32291). The subject never moves off its point; the zoom gives. Pure.
+ */
+export function aimInMap(at: At, zoom: number, fx: number = SAFE.x, fy: number = SAFE.y, ground: readonly At[] | null = null): Cam {
+  const eps = 1e-6;
+  const u = clamp(at.u, eps, 1 - eps);
+  const v = clamp(at.v, eps, 1 - eps);
+  const least = Math.max(fx / u, (1 - fx) / (1 - u), fy / v, (1 - fy) / (1 - v));
+  let z = Math.min(MAX_ZOOM, Math.max(zoom, least));
+  // the lawn under the whole frame but the page's left fade (designer m_32505: no paper in a film
+  // shot, its top corners too): closer until every corner of the frame is on the lawn
+  if (ground !== null && ground.length >= 3 && inside(ground, at)) {
+    const covered = (k: number): boolean =>
+      [
+        [FADE_X, 0],
+        [1, 0],
+        [FADE_X, 1],
+        [1, 1],
+      ].every(([cx = 0, cy = 0]) => inside(ground, { u: at.u + (cx - fx) / k, v: at.v + (cy - fy) / k }));
+    if (!covered(z)) {
+      let lo = z;
+      let hi = MAX_ZOOM;
+      if (covered(hi)) {
+        for (let i = 0; i < 24; i++) {
+          const mid = Math.sqrt(lo * hi);
+          if (covered(mid)) hi = mid;
+          else lo = mid;
+        }
+      }
+      z = hi;
+    }
+  }
+  return aimCam(at, z, fx, fy);
+}
+
+/** the frame's left part the page fades into its paper (designer m_30849: its left 40% since designer m_32728) */
+export const FADE_X = 0.4;
+
+/** Whether a point is inside a convex polygon (its corners in order, either way round). Pure. */
+export function inside(poly: readonly At[], p: At): boolean {
+  let sign = 0;
+  for (let i = 0; i < poly.length; i++) {
+    const a = poly[i];
+    const b = poly[(i + 1) % poly.length];
+    if (!a || !b) return false;
+    const cross = (b.u - a.u) * (p.v - a.v) - (b.v - a.v) * (p.u - a.u);
+    if (Math.abs(cross) < 1e-12) continue;
+    const s = Math.sign(cross);
+    if (sign === 0) sign = s;
+    else if (s !== sign) return false;
+  }
+  return true;
+}
+
+/** Where a point of the fit shows in a cam's frame, fractions. Pure. */
+export function inFrame(c: Cam, at: At): At {
+  return { u: 0.5 + (at.u - c.u) * c.zoom, v: 0.5 + (at.v - c.v) * c.zoom };
+}
+
+/** What the film tells the director of its world now (fit fractions); null: not known yet. */
+export interface Geometry {
+  /** the three offices together, their buildings and the park */
+  town(): Box | null;
+  office(id: string): Box | null;
+  /** an office's spot (its island, lounge, park, main's desk) */
+  spot(office: string, spot: 'island' | 'lounge' | 'park' | 'main'): At | null;
+  /** a bim: its body's middle; null when it is not in the office (gone, not posed yet) */
+  bim(office: string, name: string): At | null;
+  /** the lawn's top, its corners on the fit in order round it (a diamond): a film shot shows nothing past it */
+  ground?(): readonly At[] | null;
+  /** the frame, css px, and a bim's height in it at the fit (zoom 1): what FOCUS sizes a bim by */
+  frame?(): Frame | null;
+}
+
+/** the frame the film plays in, css px; `bim`: a bim's height (feet to head) at the town's fit */
+export interface Frame {
+  readonly w: number;
+  readonly h: number;
+  readonly bim: number;
+}
+
+/**
+ * a shot on a bim (or a pair, or main's desk): the least height of a bim, fractions of the frame's
+ * height, on a desktop frame and a narrow one (Gabriel: « s'approcher plus [du bim qui fait le truc
+ * intéressant], surtout sur mobile, où la map entière est petite »). Past its size's own zoom: the
+ * camera only comes closer.
+ */
+export const FOCUS: Readonly<Record<'tight' | 'follow' | 'close', { readonly desk: number; readonly narrow: number }>> = {
+  tight: { desk: 0.07, narrow: 0.1 },
+  follow: { desk: 0.1, narrow: 0.15 },
+  close: { desk: 0.14, narrow: 0.2 },
+};
+/** a frame this narrow (css px) or narrower takes FOCUS's narrow heights; as wide or wider, its desk ones; between, a blend */
+export const NARROW_W = { narrow: 480, desk: 720 } as const;
+
+/** how narrow a frame is: 0 desk, 1 narrow (a phone), by its width. Pure. */
+export const narrowness = (w: number): number => clamp((NARROW_W.desk - w) / (NARROW_W.desk - NARROW_W.narrow), 0, 1);
+
+/** the zoom that shows a bim `frac` of the frame's height. Pure. */
+export const bimZoom = (f: Frame, frac: number): number => (frac * f.h) / Math.max(1e-6, f.bim);
+
+/** a shot's FOCUS zoom on this frame, null: not a focus shot (an office, the wide, the closest). Pure. */
+export function focusZoom(shot: Shot, f: Frame | null): number | null {
+  if (f === null || f.w <= 0 || f.h <= 0 || f.bim <= 0) return null;
+  if (shot.subject.k === 'office' || shot.subject.k === 'town') return null;
+  if (shot.size !== 'tight' && shot.size !== 'follow' && shot.size !== 'close') return null;
+  const n = narrowness(f.w);
+  const want = FOCUS[shot.size];
+  return bimZoom(f, want.desk + (want.narrow - want.desk) * n);
+}
+
+/** a pair's two bims stay this far inside the frame (fractions), its left past the page's fade on a desk frame */
+export const PAIR_IN = 0.08;
+
+/** The office a subject is in, null for the town. Pure. */
+export const officeOf = (s: Subject): string | null => (s.k === 'town' ? null : s.office);
+
+/** The cam a shot wants now (its subject where it is now), `back` times farther. null: its subject is not there. Pure. */
+export function shotCam(shot: Shot, g: Geometry): Cam | null {
+  const c = sizedCam(shot, g);
+  return c === null || shot.back === undefined ? c : { ...c, zoom: Math.max(MIN_ZOOM, c.zoom / shot.back) };
+}
+
+function sizedCam(shot: Shot, g: Geometry): Cam | null {
+  const s = shot.subject;
+  if (shot.size === 'wide' || s.k === 'town') {
+    const b = g.town();
+    return b ? fitCam(b, WIDE_BOX) : null;
+  }
+  const ob = g.office(s.office);
+  if (!ob) return null;
+  const office = fitCam(ob, OFFICE_BOX);
+  let at: At | null;
+  switch (s.k) {
+    case 'office':
+      at = null;
+      break;
+    case 'spot':
+      at = g.spot(s.office, s.spot);
+      break;
+    case 'bim':
+      at = g.bim(s.office, s.name);
+      break;
+    case 'pair': {
+      const a = g.bim(s.office, s.names[0]);
+      const b = g.bim(s.office, s.names[1]);
+      at = a && b ? { u: (a.u + b.u) / 2, v: (a.v + b.v) / 2 } : (a ?? b);
+      break;
+    }
+  }
+  const middle = { u: (ob.u0 + ob.u1) / 2, v: (ob.v0 + ob.v1) / 2 };
+  const ground = g.ground?.() ?? null;
+  if (shot.size === 'office') {
+    return at === null ? aimInMap(middle, office.zoom * OFFICE_TIGHT, OFFICE_AIM.x, OFFICE_AIM.y, ground) : aimInMap(at, office.zoom * OFFICE_TIGHT, SAFE.x, SAFE.y, ground);
+  }
+  // a whole office closer than its OFFICE shot (the cold open's tight loft): its middle, that much closer
+  if (s.k === 'office') return aimInMap(middle, office.zoom * CLOSER[shot.size], OFFICE_AIM.x, OFFICE_AIM.y, ground);
+  // a subject gone missing (it left): its office's shot, never an empty frame
+  // (its OFFICE framing, on the lawn: the bare fit showed paper while order-test was not in yet, 0:40.5)
+  if (at === null) return aimInMap(middle, office.zoom * OFFICE_TIGHT, OFFICE_AIM.x, OFFICE_AIM.y, ground);
+  const fx = shot.frame?.x ?? SAFE.x;
+  const fy = shot.frame?.y ?? SAFE.y;
+  const frame = g.frame?.() ?? null;
+  // the bim that does the thing, big enough in the frame (FOCUS), a pair both in it
+  let zoom = Math.max(office.zoom * CLOSER[shot.size], focusZoom(shot, frame) ?? 0);
+  if (s.k === 'pair') zoom = Math.min(zoom, Math.max(office.zoom * CLOSER[shot.size], pairZoom(s, g, at, fx, fy, frame)));
+  return aimInMap(at, zoom, fx, fy, ground);
+}
+
+/** the closest a pair's shot gets with both its bims inside the frame (PAIR_IN in, past the page's fade on a desk frame). Pure. */
+function pairZoom(s: Extract<Subject, { k: 'pair' }>, g: Geometry, at: At, fx: number, fy: number, frame: Frame | null): number {
+  const left = frame === null ? FADE_X : FADE_X * (1 - narrowness(frame.w));
+  let z = MAX_ZOOM;
+  for (const n of s.names) {
+    const b = g.bim(s.office, n);
+    if (b === null) continue;
+    const du = b.u - at.u;
+    const dv = b.v - at.v;
+    // the bim's frame point fx + du·z stays in [left + PAIR_IN, 1 - PAIR_IN], fy + dv·z in [PAIR_IN, 1 - PAIR_IN]
+    if (du > 1e-9) z = Math.min(z, (1 - PAIR_IN - fx) / du);
+    if (du < -1e-9) z = Math.min(z, (fx - left - PAIR_IN) / -du);
+    if (dv > 1e-9) z = Math.min(z, (1 - PAIR_IN - fy) / dv);
+    if (dv < -1e-9) z = Math.min(z, (fy - PAIR_IN) / -dv);
+  }
+  return z;
+}
+
+/** The shot playing at film time T: the last one whose camera has left (LEAD_S before its action). Pure. */
+export function shotAt(shots: readonly Shot[], T: number): number {
+  // the first shot's camera leaves at the end of the loop before (0:00's LEAD_S is 4:58.5)
+  const first = shots[0];
+  if (first !== undefined && T >= first.at - (first.lead ?? LEAD_S) + FILM_S) return 0;
+  let i = shots.length - 1;
+  for (let k = 0; k < shots.length; k++) {
+    const s = shots[k];
+    if (s !== undefined && s.at - (s.lead ?? LEAD_S) <= T) i = k;
+  }
+  return i;
+}
+
+/** How long the glide into shot `to` lasts, and whether it rises on its way (from another office, or the wide). Pure. */
+export function glideOf(from: Shot | null, to: Shot): { readonly dur: number; readonly across: boolean } {
+  const a = from === null ? null : officeOf(from.subject);
+  const b = officeOf(to.subject);
+  const across = from !== null && a !== b && a !== null && b !== null;
+  const dur = to.glide ?? (from === null ? GLIDE_MIN_S : a === b ? GLIDE_IN_S : GLIDE_ACROSS_S);
+  return { dur: Math.max(GLIDE_MIN_S, dur), across };
+}
+
+/**
+ * Whether a shot's subject is in the world now (a bim that has not come in yet, or has left, is
+ * not): when that changes mid-shot the camera glides to its new target, never cuts. Pure.
+ */
+export function present(shot: Shot, g: Geometry): boolean {
+  const s = shot.subject;
+  if (s.k === 'bim') return g.bim(s.office, s.name) !== null;
+  if (s.k === 'pair') return g.bim(s.office, s.names[0]) !== null || g.bim(s.office, s.names[1]) !== null;
+  return true;
+}
+
+/** a wide's slow drift (bims-film v7: never still, 2-3 % of the frame a second): its sway, fractions of the frame */
+export const DRIFT = { amp: 0.04, period: 10 } as const;
+
+/**
+ * A wide `e` s after its camera left, swaying side to side: still at first (no jolt), at most
+ * 2π·amp/period (2.5 %) of the frame a second. Pure.
+ */
+export function drift(c: Cam, e: number): Cam {
+  const x = Math.max(0, e);
+  const sway = (DRIFT.amp / 2) * (1 - Math.cos((2 * Math.PI * x) / DRIFT.period));
+  return holdCam({ ...c, u: c.u + sway / c.zoom });
+}
+
+/** ease in and out (smootherstep) */
+export const ease = (x: number): number => {
+  // ease-in-out expo (Gabriel's review, main m_31507: no cut, only fluid moves), its ends pinned to 0 and 1
+  const t = clamp(x, 0, 1);
+  if (t <= 0) return 0;
+  if (t >= 1) return 1;
+  return t < 0.5 ? 2 ** (20 * t - 10) / 2 : (2 - 2 ** (-20 * t + 10)) / 2;
+};
+
+/**
+ * The glide's cam at fraction f (0..1) from `from` to `to`: zoom eased in log space (it reads as a
+ * steady move), the centre eased; `rise` (an across glide): never closer than that zoom at its
+ * middle (the drone's rise). Pure.
+ */
+export function glideCam(from: Cam, to: Cam, f: number, rise: number | null, curve: (x: number) => number = ease): Cam {
+  const s = curve(f);
+  const la = Math.log(from.zoom);
+  const lb = Math.log(to.zoom);
+  let lz = la + (lb - la) * s;
+  if (rise !== null) {
+    const mid = (la + lb) / 2;
+    const dip = Math.max(0, mid - Math.log(Math.max(1, rise)));
+    lz -= dip * 4 * s * (1 - s);
+  }
+  return holdCam({ zoom: Math.exp(lz), u: from.u + (to.u - from.u) * s, v: from.v + (to.v - from.v) * s });
+}
+
+/** A follow spring's state: the cam and its speed (log zoom, u, v per s). */
+export interface Spring {
+  readonly cam: Cam;
+  readonly vz: number;
+  readonly vu: number;
+  readonly vv: number;
+}
+
+export const still = (cam: Cam): Spring => ({ cam, vz: 0, vu: 0, vv: 0 });
+
+/** One step of the critically damped follow towards `to` after dt s (no overshoot, no shake). Pure. */
+export function springStep(s: Spring, to: Cam, dt: number): Spring {
+  const h = clamp(dt, 0, 0.1);
+  const w = SPRING_W;
+  const one = (x: number, v: number, target: number): [number, number] => {
+    // exact critically damped solution over h (stable at any frame rate)
+    const d = x - target;
+    const e = Math.exp(-w * h);
+    const c = v + w * d;
+    return [target + (d + c * h) * e, (v - w * c * h) * e];
+  };
+  const [lz, vz] = one(Math.log(s.cam.zoom), s.vz, Math.log(to.zoom));
+  const [u, vu] = one(s.cam.u, s.vu, to.u);
+  const [v, vv] = one(s.cam.v, s.vv, to.v);
+  return { cam: holdCam({ zoom: Math.exp(lz), u, v }), vz, vu, vv };
+}
+
+/** Who has the camera: the film, or the visitor (since his last gesture, wall clock s; following a bim he clicked). */
+export type Hands =
+  | { readonly k: 'film' }
+  | { readonly k: 'visitor'; readonly last: number; readonly follow: { readonly office: string; readonly name: string } | null };
+
+/** Whether the film takes the camera back now: RESUME_IDLE_S since his last gesture, his pointer off the town. Pure. */
+export function resumes(h: Hands, now: number, pointerOn: boolean): boolean {
+  return h.k === 'visitor' && !pointerOn && now - h.last >= RESUME_IDLE_S;
+}

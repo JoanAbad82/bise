@@ -42,7 +42,7 @@ The `run_typescript` tool executes TypeScript code in a V8 isolate (types are st
 ## What exists in the sandbox
 
 Available: standard JS built-ins (JSON, Math, Date, Promise, Object, Array, Map, Set, RegExp, Error classes, Symbol, Proxy, Reflect, WeakMap/WeakSet/WeakRef, BigInt, typed arrays, Intl, Temporal), async/await, generators, async generators, for-await, spread/destructuring, optional chaining, `encodeURIComponent`/`decodeURIComponent`.
-Also available as bare identifiers (no `tools.` prefix needed, dotted paths compose): `tools.<group>.<function>` connector functions, `search_tool_functions`, `bash` (call with the command string as the single argument), `skill` (call with `{ name: "<exact name>" }`), `self.compact`/`self.reload` (ack immediately, run at the end of the turn), `self.sleep` (call with the seconds: `await self.sleep(10)` or `await self.sleep({ seconds: 10 })`; bounds 0 < s < 20; the HOST sleeps once between replay rounds, the result replays by position).
+Also available as bare identifiers (no `tools.` prefix needed, dotted paths compose): `tools.<group>.<function>` connector functions, `search_tool_functions`, `bash` (call with the command string as the single argument), `skill` (call with `{ name: "<exact name>" }`), `self.compact` (compacts the conversation right after this call; your turn then goes on from the summary, so keep working and never end your turn or ask anyone to say 'continue' for it), `self.reload` (ack immediately, runs at the end of the turn), `self.sleep` (call with the seconds: `await self.sleep(10)` or `await self.sleep({ seconds: 10 })`; bounds 0 < s < 20; the HOST sleeps once between replay rounds, the result replays by position).
 `self.readImages(paths)` (alias `self.readImage`) shows local image files to the model: give one path or an array of paths (absolute, `~/`, or relative to your working directory); it checks each file exists and is a PNG/JPEG/GIF/WebP, and returns the `{ type: 'image', path }` blocks for your `return`. A missing file or another type throws with the reason. It runs locally: no tool call, nothing to replay. Examples: `return self.readImages(['shots/a.png', 'shots/b.png']);`, or with text: `return [{ type: 'text', text: 'before / after' }, ...self.readImages(['before.png', 'after.png'])];`
 
 ## What does NOT exist (and the traps)
@@ -52,7 +52,7 @@ TRAP: `typeof fetch` still prints "function" because unresolved identifiers fall
 
 ## Error handling
 
-- A tool call that fails does NOT throw: the error string becomes the awaited value. Check results before using them, and use try/catch around local code.
+- A tool call that fails (an error, or a call the user denied, with his note) REJECTS its promise with an Error (`name` 'ToolError', `tool` the function) whose message is the whole failure text. Catch it with try/catch, or use `Promise.allSettled` to keep the other calls' results; the program goes on. Uncaught, it ends the program with "program call failed: <text>". A stop (the user interrupts) ends the program whatever it catches.
 - If `main` throws or rejects, the tool fails with the error message (the model can read it and retry).
 - A syntax error in the TypeScript fails the whole call with "SyntaxError: ...".
 

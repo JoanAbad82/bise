@@ -44,12 +44,6 @@ type Frame is Data:
   FObjVal{key: String, kvs: List<&2, Sigma<&2, &2, String, _ => Json>>}
 
 # String parser types
-type StrCharKind is Data:
-  SCQuote{}
-  SCSlash{}
-  SCControl{}
-  SCOther{}
-
 type StrRes is Data:
   SErr{msg: String}
   SOk{val: String, rest: String}
@@ -77,7 +71,7 @@ type StrState is Data:
   StrNormal{}
   StrEscaping{}
   StrEscCheck{res: EscRes}
-  StrChar{kind: StrCharKind, c: U32}
+  StrChar{ctl: Bool, c: U32}
 
 type PtrUnescState is Data:
   PUNormal{}
@@ -183,6 +177,11 @@ type PrintTask is Data:
   PArr{items: List<&2, Json>}
   PObj{kvs: List<&2, Sigma<&2, &2, String, _ => Json>>}
   PLit{s: String}
+  # the n items of a big array (a comma first unless `first`), split in
+  # halves printed in parallel while `depth` lasts (stringify_go)
+  PItems{first: Bool, depth: Nat, n: Nat, items: List<&2, Json>}
+  # the output so far, printed in parallel halves: it replaces acc
+  PAcc{res: Result<&2, &2, String, List<&2, String>>}
 
 # Pretty printer stack task
 type PrettyTask is Data:
@@ -656,9 +655,8 @@ def list_filter(~f: Json -> Bool, +xs: List<&2, Json>) -> List<&2, Json>:
     case Nil{}:
       Nil{}
     case +h <> +t:
-      Bool.pick(List<&2, Json>, f(h),
-        h <> list_filter(~f, t),
-        list_filter(~f, t))
+      +rest = list_filter(~f, t)
+      Bool.pick(List<&2, Json>, f(h), h <> rest, rest)
 
 def arr_filter(~f: Json -> Bool, j: Json) -> Json:
   match j:
@@ -1110,10 +1108,39 @@ def escape_string(+s: String) -> String:
   +fuel = Nat.add(len, 10n)
   escape_str_loop(fuel, s, Nil{})
 
+# the escaped chars of one char, consed onto `rest` (escape_step, in order)
+def escape_onto(kind: EscCharKind, rest: String) -> String:
+  match kind:
+    case ECQuote{}:
+      SCon{Chr{92}, SCon{Chr{34}, rest}}
+    case ECSlash{}:
+      SCon{Chr{92}, SCon{Chr{92}, rest}}
+    case ECNewline{}:
+      SCon{Chr{92}, SCon{Chr{110}, rest}}
+    case ECCarriage{}:
+      SCon{Chr{92}, SCon{Chr{114}, rest}}
+    case ECTab{}:
+      SCon{Chr{92}, SCon{Chr{116}, rest}}
+    case ECBackspace{}:
+      SCon{Chr{92}, SCon{Chr{98}, rest}}
+    case ECFormFeed{}:
+      SCon{Chr{92}, SCon{Chr{102}, rest}}
+    case ECControl{+code}:
+      SCon{Chr{92}, SCon{Chr{117}, SCon{Chr{48}, SCon{Chr{48}, SCon{hex_to_char(U32.div(code, 16)), SCon{hex_to_char(U32.mod(code, 16)), rest}}}}}}
+    case ECOther{code}:
+      SCon{Chr{code}, rest}
+
+# `s` escaped, then `tail`: one pass, each char consed once (no length,
+# no reversal, no append: view_all's 30 MB spent most of its time here)
+def escape_onto_str(s: String, tail: String) -> String:
+  match s:
+    case SNil{}:
+      tail
+    case SCon{Chr{+code}, t}:
+      escape_onto(classify_esc_char(code), escape_onto_str(t, tail))
+
 def quote_string(+s: String) -> String:
-  +len = str_len(s)
-  +fuel = Nat.add(len, 10n)
-  "\"" ++ escape_str_loop(fuel, s, Nil{}) ++ "\""
+  SCon{Chr{34}, escape_onto_str(s, "\"")}
 
 def json_size_loop(fuel: Nat, +tasks: List<&2, SizeTask>, +acc: Nat) -> Nat:
   match fuel:
@@ -1170,64 +1197,138 @@ def join_chunks_loop(fuel: Nat, xs: List<&2, String>, cur: String) -> String:
         case h <> t:
           join_chunks_loop(p, t, h ++ cur)
 
-def stringify_loop(fuel: Nat, +tasks: List<&2, PrintTask>, +acc: List<&2, String>) -> Result<&2, &2, String, String>:
+# at least n items (walks n items at most: a small array pays nothing)
+def at_least(n: Nat, xs: List<&2, Json>) -> Bool:
+  match n:
+    case 0n:
+      True{}
+    case 1n+p:
+      match xs:
+        case Nil{}:
+          False{}
+        case _ <> t:
+          at_least(p, t)
+
+# an array's items after its "[": a big one (256 items or more) as
+# PItems, printed in parallel halves 6 levels deep (64 parts); a small
+# one item by item. A match, not Bool.pick: pick would count every array.
+def arr_tasks(big: Bool, +vh: Json, +vt: List<&2, Json>, +t: List<&2, PrintTask>) -> List<&2, PrintTask>:
+  match big:
+    case True{}:
+      PItems{True{}, 6n, 1n+List.length(&2, Json, vt), vh <> vt} <> PLit{"]"} <> t
+    case False{}:
+      PVal{vh} <> PArr{vt} <> PLit{"]"} <> t
+
+# PItems printed item by item: the first without a comma
+def items_tasks(first: Bool, items: List<&2, Json>, +t: List<&2, PrintTask>) -> List<&2, PrintTask>:
+  match first:
+    case True{}:
+      match items:
+        case Nil{}:
+          t
+        case h <> r:
+          PVal{h} <> PArr{r} <> t
+    case False{}:
+      PArr{items} <> t
+
+# two halves' output: `l` (with what came before) then `r`, chunks newest first
+def halves_join(l: Result<&2, &2, String, List<&2, String>>, r: Result<&2, &2, String, List<&2, String>>) -> Result<&2, &2, String, List<&2, String>>:
+  match l:
+    case Fail{e}:
+      Fail{e}
+    case Done{xs}:
+      match r:
+        case Fail{e}:
+          Fail{e}
+        case Done{ys}:
+          Done{List.append(&2, String, ys, xs)}
+
+# the output's chunks, newest first (joined once by stringify_loop). A
+# PItems with depth left splits its items in halves printed by a parallel
+# let: the left one gets `acc`, the right one starts empty, and PAcc
+# puts their joined output back as the new acc.
+def stringify_go(fuel: Nat, +tasks: List<&2, PrintTask>, +acc: List<&2, String>) -> Result<&2, &2, String, List<&2, String>>:
   match fuel:
     case 0n:
       match tasks:
         case Nil{}:
-          Done{join_chunks_loop(4294967295n, acc, "")}
+          Done{acc}
         case _:
           Fail{"fuel exhausted in stringify"}
     case 1n++p:
       match tasks:
         case Nil{}:
-          Done{join_chunks_loop(4294967295n, acc, "")}
+          Done{acc}
         case h <> t:
           match h:
             case PLit{s}:
-              stringify_loop(p, t, s <> acc)
+              stringify_go(p, t, s <> acc)
             case PVal{j}:
               match j:
                 case JNull{}:
-                  stringify_loop(p, t, "null" <> acc)
+                  stringify_go(p, t, "null" <> acc)
                 case JBool{b}:
                   match b:
                     case True{}:
-                      stringify_loop(p, t, "true" <> acc)
+                      stringify_go(p, t, "true" <> acc)
                     case False{}:
-                      stringify_loop(p, t, "false" <> acc)
+                      stringify_go(p, t, "false" <> acc)
                 case JNum{n}:
-                  stringify_loop(p, t, Nat.show(n) <> acc)
+                  stringify_go(p, t, Nat.show(n) <> acc)
                 case JNeg{n}:
-                  stringify_loop(p, t, Nat.show(n) <> "-" <> acc)
+                  stringify_go(p, t, Nat.show(n) <> "-" <> acc)
                 case JStr{s}:
-                  stringify_loop(p, t, quote_string(s) <> acc)
+                  stringify_go(p, t, quote_string(s) <> acc)
                 case JArr{vals}:
                   match vals:
                     case Nil{}:
-                      stringify_loop(p, t, "[]" <> acc)
+                      stringify_go(p, t, "[]" <> acc)
                     case vh <> vt:
-                      stringify_loop(p, PVal{vh} <> PArr{vt} <> PLit{"]"} <> t, "[" <> acc)
+                      stringify_go(p, arr_tasks(at_least(255n, vt), vh, vt, t), "[" <> acc)
                 case JObj{kvs}:
                   match kvs:
                     case Nil{}:
-                      stringify_loop(p, t, "{}" <> acc)
+                      stringify_go(p, t, "{}" <> acc)
                     case Tuple{k, v} <> kt:
-                      stringify_loop(p, PVal{v} <> PObj{kt} <> PLit{"}"} <> t, ":" <> quote_string(k) <> "{" <> acc)
+                      stringify_go(p, PVal{v} <> PObj{kt} <> PLit{"}"} <> t, ":" <> quote_string(k) <> "{" <> acc)
                 case JRaw{s}:
-                  stringify_loop(p, t, s <> acc)
+                  stringify_go(p, t, s <> acc)
             case PArr{items}:
               match items:
                 case Nil{}:
-                  stringify_loop(p, t, acc)
+                  stringify_go(p, t, acc)
                 case vh <> vt:
-                  stringify_loop(p, PVal{vh} <> PArr{vt} <> t, "," <> acc)
+                  stringify_go(p, PVal{vh} <> PArr{vt} <> t, "," <> acc)
             case PObj{kvs}:
               match kvs:
                 case Nil{}:
-                  stringify_loop(p, t, acc)
+                  stringify_go(p, t, acc)
                 case Tuple{k, v} <> kt:
-                  stringify_loop(p, PVal{v} <> PObj{kt} <> t, ":" <> quote_string(k) <> "," <> acc)
+                  stringify_go(p, PVal{v} <> PObj{kt} <> t, ":" <> quote_string(k) <> "," <> acc)
+            case PItems{first, depth, +n, +items}:
+              match depth:
+                case 0n:
+                  stringify_go(p, items_tasks(first, items, t), acc)
+                case 1n+q:
+                  +k = Nat.div(n, 2n)
+                  l r = stringify_go(p, [PItems{first, q, k, List.take(&2, Json, items, k)}], acc) stringify_go(p, [PItems{False{}, q, Nat.sub(n, k), List.drop(&2, Json, items, k)}], Nil{})
+                  stringify_go(p, PAcc{halves_join(l, r)} <> t, Nil{})
+            case PAcc{res}:
+              match res:
+                case Fail{e}:
+                  Fail{e}
+                case Done{xs}:
+                  stringify_go(p, t, xs)
+
+def stringify_loop.join(r: Result<&2, &2, String, List<&2, String>>) -> Result<&2, &2, String, String>:
+  match r:
+    case Fail{e}:
+      Fail{e}
+    case Done{acc}:
+      Done{join_chunks_loop(4294967295n, acc, "")}
+
+def stringify_loop(fuel: Nat, +tasks: List<&2, PrintTask>, +acc: List<&2, String>) -> Result<&2, &2, String, String>:
+  stringify_loop.join(stringify_go(fuel, tasks, acc))
 
 def stringify_checked(+j: Json) -> Result<&2, &2, String, String>:
   +size = json_size(j)
@@ -1331,26 +1432,46 @@ def pretty(j: Json) -> String:
 # 11. Parser Implementation (parse)
 # ==============================================================================
 
-def classify_str_char(+c: U32) -> StrCharKind:
-  Bool.pick(StrCharKind, U32.is_eq(c, 34), SCQuote{},
-    Bool.pick(StrCharKind, U32.is_eq(c, 92), SCSlash{},
-      Bool.pick(StrCharKind, U32.is_lt(c, 32), SCControl{},
-        SCOther{})))
+# The classifiers match on the code: a match runs one branch, where a
+# chain of Bool.pick computed every test and built every result for each
+# char (strict calls; .agents/skills/bend-perf/SKILL.md, pattern 1).
+
+def is_digit(+c: U32) -> Bool:
+  Bool.and(U32.is_ge(c, 48), U32.is_le(c, 57))
+
+def classify_char.digit(ok: Bool) -> CharKind:
+  match ok:
+    case True{}:
+      KindDigit{}
+    case False{}:
+      KindOther{}
 
 def classify_char(+c: U32) -> CharKind:
-  Bool.pick(CharKind, U32.is_eq(c, 91), KindLBracket{},
-    Bool.pick(CharKind, U32.is_eq(c, 93), KindRBracket{},
-      Bool.pick(CharKind, U32.is_eq(c, 123), KindLBrace{},
-        Bool.pick(CharKind, U32.is_eq(c, 125), KindRBrace{},
-          Bool.pick(CharKind, U32.is_eq(c, 34), KindQuote{},
-            Bool.pick(CharKind, U32.is_eq(c, 44), KindComma{},
-              Bool.pick(CharKind, U32.is_eq(c, 58), KindColon{},
-                Bool.pick(CharKind, U32.is_eq(c, 110), KindNull{},
-                  Bool.pick(CharKind, U32.is_eq(c, 116), KindTrue{},
-                    Bool.pick(CharKind, U32.is_eq(c, 102), KindFalse{},
-                      Bool.pick(CharKind, U32.is_eq(c, 45), KindMinus{},
-                        Bool.pick(CharKind, Bool.and(U32.is_ge(c, 48), U32.is_le(c, 57)), KindDigit{},
-                          KindOther{}))))))))))))
+  match c:
+    case 34:
+      KindQuote{}
+    case 44:
+      KindComma{}
+    case 58:
+      KindColon{}
+    case 123:
+      KindLBrace{}
+    case 125:
+      KindRBrace{}
+    case 91:
+      KindLBracket{}
+    case 93:
+      KindRBracket{}
+    case 110:
+      KindNull{}
+    case 116:
+      KindTrue{}
+    case 102:
+      KindFalse{}
+    case 45:
+      KindMinus{}
+    case _:
+      classify_char.digit(is_digit(c))
 
 def hex_digit_val(+c: U32) -> U32:
   Bool.pick(U32, Bool.and(U32.is_ge(c, 48), U32.is_le(c, 57)), U32.sub(c, 48),
@@ -1444,24 +1565,9 @@ def handle_unicode_hex4(h4: Hex4Res) -> EscRes:
     case H4Ok{val, rest}:
       check_surrogate(val, rest)
 
-def parse_escape_step(is_u: Bool, +c: U32, +rest: String) -> EscRes:
-  match is_u:
-    case True{}:
-      handle_unicode_hex4(parse_hex4(rest))
-    case False{}:
-      Bool.pick(EscRes, U32.is_eq(c, 34), EscChar{Chr{34}, rest},
-        Bool.pick(EscRes, U32.is_eq(c, 92), EscChar{Chr{92}, rest},
-          Bool.pick(EscRes, U32.is_eq(c, 47), EscChar{Chr{47}, rest},
-            Bool.pick(EscRes, U32.is_eq(c, 98), EscChar{Chr{8}, rest},
-              Bool.pick(EscRes, U32.is_eq(c, 102), EscChar{Chr{12}, rest},
-                Bool.pick(EscRes, U32.is_eq(c, 110), EscChar{Chr{10}, rest},
-                  Bool.pick(EscRes, U32.is_eq(c, 114), EscChar{Chr{13}, rest},
-                    Bool.pick(EscRes, U32.is_eq(c, 116), EscChar{Chr{9}, rest},
-                      EscErr{"invalid escape sequence"}))))))))
-
-def parse_escape_seq(+c: U32, rest: String) -> EscRes:
-  parse_escape_step(U32.is_eq(c, 117), c, rest)
-
+# a string's chars after its opening quote: the quote and the backslash
+# are patterns (one branch runs), any other char is checked once (a
+# control char is an error) by StrChar; an escape's char is a pattern too
 def parse_str.loop(fuel: Nat, st: StrState, s: String, acc: List<&2, Char>) -> StrRes:
   match fuel:
     case 0n:
@@ -1472,26 +1578,44 @@ def parse_str.loop(fuel: Nat, st: StrState, s: String, acc: List<&2, Char>) -> S
           match s:
             case SNil{}:
               SErr{"unterminated string literal"}
+            case SCon{'"', +t}:
+              SOk{str_from_rev_loop(acc, ""), t}
+            case SCon{'\\', +t}:
+              parse_str.loop(p, StrEscaping{}, t, acc)
             case SCon{Chr{+c}, +t}:
-              parse_str.loop(p, StrChar{classify_str_char(c), c}, t, acc)
+              parse_str.loop(p, StrChar{U32.is_lt(c, 32), c}, t, acc)
 
-        case StrChar{kind, c}:
-          match kind:
-            case SCQuote{}:
-              SOk{str_from_rev_loop(acc, ""), s}
-            case SCSlash{}:
-              parse_str.loop(p, StrEscaping{}, s, acc)
-            case SCControl{}:
+        case StrChar{ctl, c}:
+          match ctl:
+            case True{}:
               SErr{"unescaped control character in string"}
-            case SCOther{}:
+            case False{}:
               parse_str.loop(p, StrNormal{}, s, Chr{c} <> acc)
 
         case StrEscaping{}:
           match s:
             case SNil{}:
               SErr{"unterminated string escape"}
-            case SCon{Chr{+c}, +t}:
-              parse_str.loop(p, StrEscCheck{parse_escape_seq(c, t)}, "", acc)
+            case SCon{'"', +t}:
+              parse_str.loop(p, StrNormal{}, t, Chr{34} <> acc)
+            case SCon{'\\', +t}:
+              parse_str.loop(p, StrNormal{}, t, Chr{92} <> acc)
+            case SCon{'/', +t}:
+              parse_str.loop(p, StrNormal{}, t, Chr{47} <> acc)
+            case SCon{'b', +t}:
+              parse_str.loop(p, StrNormal{}, t, Chr{8} <> acc)
+            case SCon{'f', +t}:
+              parse_str.loop(p, StrNormal{}, t, Chr{12} <> acc)
+            case SCon{'n', +t}:
+              parse_str.loop(p, StrNormal{}, t, Chr{10} <> acc)
+            case SCon{'r', +t}:
+              parse_str.loop(p, StrNormal{}, t, Chr{13} <> acc)
+            case SCon{'t', +t}:
+              parse_str.loop(p, StrNormal{}, t, Chr{9} <> acc)
+            case SCon{'u', +t}:
+              parse_str.loop(p, StrEscCheck{handle_unicode_hex4(parse_hex4(t))}, "", acc)
+            case SCon{_, _}:
+              SErr{"invalid escape sequence"}
 
         case StrEscCheck{res}:
           match res:
@@ -1501,7 +1625,17 @@ def parse_str.loop(fuel: Nat, st: StrState, s: String, acc: List<&2, Char>) -> S
               SErr{msg}
 
 def is_json_ws(+c: U32) -> Bool:
-  Bool.or(U32.is_eq(c, 32), Bool.or(U32.is_eq(c, 9), Bool.or(U32.is_eq(c, 10), U32.is_eq(c, 13))))
+  match c:
+    case 32:
+      True{}
+    case 10:
+      True{}
+    case 9:
+      True{}
+    case 13:
+      True{}
+    case _:
+      False{}
 
 def skip_ws_loop(fuel: Nat, st: WsState, s: String) -> String:
   match fuel:
@@ -1525,14 +1659,29 @@ def skip_ws_loop(fuel: Nat, st: WsState, s: String) -> String:
 def skip_ws(s: String) -> String:
   skip_ws_loop(4294967295n, WsStart{}, s)
 
+def classify_num_char.digit(ok: Bool, +c: U32) -> NumCharKind:
+  match ok:
+    case True{}:
+      NCNonZeroDigit{U32.to_nat(U32.sub(c, 48))}
+    case False{}:
+      NCOther{c}
+
 def classify_num_char(+c: U32) -> NumCharKind:
-  Bool.pick(NumCharKind, U32.is_eq(c, 48), NCZero{},
-    Bool.pick(NumCharKind, Bool.and(U32.is_ge(c, 49), U32.is_le(c, 57)), NCNonZeroDigit{U32.to_nat(U32.sub(c, 48))},
-      Bool.pick(NumCharKind, U32.is_eq(c, 45), NCMinus{},
-        Bool.pick(NumCharKind, U32.is_eq(c, 43), NCPlus{},
-          Bool.pick(NumCharKind, U32.is_eq(c, 46), NCDot{},
-            Bool.pick(NumCharKind, Bool.or(U32.is_eq(c, 101), U32.is_eq(c, 69)), NCExp{},
-              NCOther{c}))))))
+  match c:
+    case 48:
+      NCZero{}
+    case 45:
+      NCMinus{}
+    case 43:
+      NCPlus{}
+    case 46:
+      NCDot{}
+    case 101:
+      NCExp{}
+    case 69:
+      NCExp{}
+    case _:
+      classify_num_char.digit(is_digit(c), c)
 
 def safe_mul_add(is_safe: Bool, acc: Nat, d: Nat) -> Nat:
   match is_safe:

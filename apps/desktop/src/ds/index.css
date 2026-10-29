@@ -1,0 +1,36 @@
+/* src/ds · every style of the design system, in desktop-ds v5's order. Import once, at the renderer's
+   root (import "../ds/index.css"). tokens.css is desktop-ds v5's, byte-equal (the check says so):
+   dark by default, light with the system or <html data-theme="light">. Components read only roles
+   (--c-*, --t-*, --s-*, --r-*, --e-*, --d-*, --ease-*), never the palette (--p-*). */
+@import "./tokens.css";
+@import "./md-tokens.css";
+@import "./css/base.css";
+@import "./css/prim.css";
+@import "./css/window.css";
+@import "./css/thread.css";
+@import "./css/composer.css";
+@import "./css/board.css";
+@import "./css/capsule.css";
+@import "./css/spotlight.css";
+@import "./css/sideviews.css";
+@import "./css/menus.css";
+@import "./css/tips.css";
+@import "./css/picker.css";
+@import "./css/dropdown.css";
+@import "./css/controls.css";
+@import "./css/toasts.css";
+@import "./css/cards.css";
+@import "./css/settings.css";
+@import "./css/onboarding.css";
+@import "./css/md.css";
+@import "./css/mark.css";
+@import "./css/gust.css";
+@import "./css/slide.css";
+@import "./css/ring.css";
+@import "./css/icons.css";
+@import "./css/banner.css";
+@import "./css/filters.css";
+@import "./css/listrow.css";
+@import "./css/more.css";
+@import "./css/motion.css";
+@import "./css/live.css";

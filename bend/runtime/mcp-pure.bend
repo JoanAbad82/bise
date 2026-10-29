@@ -7,90 +7,13 @@ import ../core/text.bend as Tx
 import ../core/wire.bend as W
 import ./provider-pure.bend as Pvp
 
-# ---- the published alias: a valid identifier (vibe_sdk requires it) ----
-# vibe's _normalize_name: anything outside [a-zA-Z0-9_-] flattens to
-# "_", the edges strip, the result caps at 256 (an empty name becomes
-# "unnamed"). tools.<alias>.<function> in the sandbox needs a clean
-# identifier; the connector id (used for the gateway URL) stays raw.
+# The connectors' aliases (vibe's normalize and dedupe), the bootstrap
+# URL and bise's image_generation note are Rust's now
+# (bend_plugins::connectors): the session's bridge writes the index.
 
-def norm_chr.ok(ok: Bool, +c: U32) -> String:
-  match ok:
-    case True{}:
-      SCon{Chr{c}, SNil{}}
-    case False{}:
-      "_"
-
-def norm_chr.digit(+c: U32) -> Bool:
-  Bool.and(U32.is_le(48, c), U32.is_le(c, 57))
-
-def norm_chr.alpha(+c: U32) -> Bool:
-  Bool.or(Bool.and(U32.is_le(65, c), U32.is_le(c, 90)),
-    Bool.and(U32.is_le(97, c), U32.is_le(c, 122)))
-
-def norm_chr.sym(+c: U32) -> Bool:
-  Bool.or(U32.is_eq(c, 95), U32.is_eq(c, 45))
-
-def norm_chr.ok2(d: Bool, a: Bool, s: Bool) -> Bool:
-  Bool.or(d, Bool.or(a, s))
-
-def norm_chr(+c: U32) -> String:
-  norm_chr.ok(norm_chr.ok2(norm_chr.digit(c), norm_chr.alpha(c),
-    norm_chr.sym(c)), c)
-
-def norm_go(s: String) -> String:
-  match s:
-    case SNil{}:
-      ""
-    case SCon{Chr{+c}, +t}:
-      String.append(norm_chr(c), norm_go(t))
-
-def trim_go.next(head_edge: Bool, tail_edge: Bool, +s: String) -> String:
-  match head_edge:
-    case True{}:
-      String.drop(s, 1n)
-    case False{}:
-      match tail_edge:
-        case True{}:
-          String.take(s, Nat.sub(String.length(s), 1n))
-        case False{}:
-          s
-
-# fuel-bound edge trim: one character per iteration, so 2*len fuel is
-# always enough (+s: the edges and the recursion each read the string)
-def trim_go(fuel: Nat, +s: String) -> String:
-  match fuel:
-    case 0n:
-      s
-    case 1n+k:
-      trim_go(k, trim_go.next(
-        Bool.or(String.starts_with(s, "_"), String.starts_with(s, "-")),
-        Bool.or(String.ends_with(s, "_"), String.ends_with(s, "-")), s))
-
-def norm_trim(+s: String) -> String:
-  trim_go(Nat.add(String.length(s), String.length(s)), s)
-
-def norm_pick(empty: Bool, +s: String) -> String:
-  match empty:
-    case True{}:
-      "unnamed"
-    case False{}:
-      s
-
-def norm_take.fits(fits: Bool, +s: String) -> String:
-  match fits:
-    case True{}:
-      s
-    case False{}:
-      String.take(s, 256n)
-
-def normalize_name(+s: String) -> String:
-  norm_pick(String.is_empty(s),
-    norm_take.fits(Nat.is_le(String.length(s), 256n),
-      norm_trim(norm_go(s))))
-
-# alias dedupe (vibe): colliding normalized aliases get _2, _3, ...
-# (the codebase patterns: leaf helpers first, the recursive def calls
-# itself by its own name, the recursive result rides as an argument)
+# whether a name is in a list (the codebase patterns: leaf helpers
+# first, the recursive def calls itself by its own name, the recursive
+# result rides as an argument)
 
 def seen_pick(hit: Bool, rest_res: Bool) -> Bool:
   match hit:
@@ -105,47 +28,6 @@ def seen_has(seen: List<&2, String>, +alias: String) -> Bool:
       False{}
     case Con{+h, rest}:
       seen_pick(String.eq(h, alias), seen_has(rest, alias))
-
-def suffix.base(+base: String, +n: Nat) -> String:
-  String.append(base, String.append("_", Nat.show(n)))
-
-# fuel = len(seen) + 2 tries: one suffix per seen alias, plus slack;
-# each try checks base_n against the seen list
-def suffix_go(fuel: Nat, +base: String, +n: Nat,
-    +seen: List<&2, String>, taken: Bool) -> String:
-  match fuel:
-    case 0n:
-      suffix.base(base, n)
-    case 1n+k:
-      match taken:
-        case True{}:
-          suffix_go(k, base, Nat.add(n, 1n), seen,
-            seen_has(seen, suffix.base(base, Nat.add(n, 1n))))
-        case False{}:
-          suffix.base(base, n)
-
-def dedupe.pick(taken: Bool, +alias: String, +seen: List<&2, String>)
-    -> String:
-  match taken:
-    case True{}:
-      # the loop starts by trying <alias>_2 (not the alias itself)
-      suffix_go(Nat.add(List.length(&2, String, seen), 2n), alias, 2n, seen,
-        seen_has(seen, suffix.base(alias, 2n)))
-    case False{}:
-      alias
-
-# +seen: both the collision check and the suffix search read the list
-def dedupe(+alias: String, +seen: List<&2, String>) -> String:
-  dedupe.pick(seen_has(seen, alias), alias, seen)
-
-
-
-# the bootstrap endpoint, exactly as the vibe CLI calls it: the
-# web_search builtin rides along as an MCP-callable connector, and
-# auth-actionable (not yet connected) connectors are included (they
-# stay out of the index: only ready connectors index their tools)
-def bootstrap_url() -> String:
-  "https://api.mistral.ai/v1/connectors/bootstrap?supports_mcp=true&include_auth_actionable_connectors=true&builtin_connectors=web_search"
 
 # ---- the index line format, parsed ----
 # line: "<cid> <cname> <tool> : #<desc>"
@@ -352,16 +234,36 @@ type Stage is Data:
   SCall{}
 
 # why a try stopped: no answer at all, an HTTP status (with its raw
-# body), or a JSON-RPC error the server answered
+# body), or a JSON-RPC error the server answered (its code as the JSON
+# text, "" when absent; its message, with its data when it has some)
 type Why is Data:
   WNet{e: Pvp.NetErr}
   WStatus{code: U32, body: String}
-  WRpc{said: String}
+  WRpc{code: String, said: String}
+
+# what kind of failure, so the model knows what to fix: its arguments,
+# a login, the tool's name, a pause, or nothing it can fix (the server,
+# the network)
+type Cause is Data:
+  KArgs{}
+  KAuth{}
+  KMissing{}
+  KRate{}
+  KServer{}
+  KTimeout{}
+  KNet{}
+  KTool{}
 
 # one try: the tool's answer, or where and why it stopped
 type Try is Data:
   TOk{ok: Bool, out: String}
   TFail{stage: Stage, why: Why}
+
+# a connector call with no Mistral key: said at once, nothing sent (an
+# empty bearer came back as the gateway's 'HTTP 401: Invalid API Key',
+# which read like a revoked key)
+def no_key_text() -> String:
+  "no Mistral key for connectors: run bise login mistral"
 
 # tries in total for one call (so at most 2 retries)
 def max_tries() -> Nat:
@@ -389,7 +291,7 @@ def session_gone(w: Why, +st: Stage) -> Bool:
     case WStatus{+code, +body}:
       Bool.and(is_call(st), Bool.or(U32.is_eq(code, 404),
         Bool.and(U32.is_eq(code, 400), session_words(body))))
-    case WRpc{+said}:
+    case WRpc{_, +said}:
       session_words(said)
 
 # a transport failure of tools/call: could the request have reached the
@@ -399,7 +301,7 @@ def net_sent(e: Pvp.NetErr) -> Bool:
   match e:
     case Pvp.NUrl{}:
       False{}
-    case Pvp.NDns{}:
+    case Pvp.NDns{_, _}:
       False{}
     case Pvp.NConnect{_, _}:
       False{}
@@ -416,7 +318,7 @@ def reached.call(w: Why) -> Bool:
       net_sent(e)
     case WStatus{+code, _}:
       U32.is_le(500, code)
-    case WRpc{+said}:
+    case WRpc{_, +said}:
       Bool.not(session_words(said))
 
 # may the tool have run? never when initialize is what failed
@@ -443,7 +345,7 @@ def transient(w: Why, +st: Stage) -> Bool:
       net_transient(e)
     case WStatus{+code, +body}:
       Bool.or(Pvp.retryable_status(code), session_gone(WStatus{code, body}, st))
-    case WRpc{+said}:
+    case WRpc{_, +said}:
       session_words(said)
 
 def retry(+st: Stage, +w: Why) -> Bool:
@@ -459,15 +361,179 @@ def again(t: Try) -> Bool:
 
 # ---- the words ----
 
+# the server's own words reach the model whole up to this bound (a
+# validation error lists every bad field; 200 cut them)
 def said_max() -> Nat:
-  200n
+  1500n
 
 def clip(+s: String) -> String:
   Bool.pick(String, Nat.is_lt(said_max(), String.length(s)),
     String.append(String.take(s, said_max()), "…"), s)
 
+# ---- secrets out of the server's words ----
+# A server may echo a header or a URL back: the word after "Bearer", the
+# value of a key=, token=, secret= or password= pair, and a word that
+# looks like a provider key (sk-, ghp_, xoxb-, ya29., AKIA...) become
+# [redacted]. The words are already squeezed (one space between them).
+
+def has_any(+s: String, ws: List<&2, String>) -> Bool:
+  match ws:
+    case Nil{}:
+      False{}
+    case Con{+w, rest}:
+      Bool.or(String.contains(s, w), has_any(s, rest))
+
+def starts_any(+s: String, ws: List<&2, String>) -> Bool:
+  match ws:
+    case Nil{}:
+      False{}
+    case Con{+w, rest}:
+      Bool.or(String.starts_with(s, w), starts_any(s, rest))
+
+def redact.kv.at(m: Maybe<&2, Nat>, +w: String) -> String:
+  match m:
+    case None{}:
+      "[redacted]"
+    case Some{+i}:
+      String.append(String.take(w, Nat.add(i, 1n)), "[redacted]")
+
+def redact.key_like(+w: String) -> Bool:
+  Bool.and(Nat.is_le(20n, String.length(w)),
+    starts_any(w, ["sk-", "ghp_", "gho_", "ghs_", "github_pat_", "xoxb-",
+      "xoxp-", "ya29.", "AKIA"]))
+
+def redact.word.plain(+w: String) -> String:
+  Bool.pick(String, has_any(String.to_lower(w), ["token=", "key=",
+      "secret=", "password=", "signature="]),
+    redact.kv.at(Tx.find(w, "=", 0n), w),
+    Bool.pick(String, redact.key_like(w), "[redacted]", w))
+
+def redact.word(after_bearer: Bool, +w: String) -> String:
+  match after_bearer:
+    case True{}:
+      "[redacted]"
+    case False{}:
+      redact.word.plain(w)
+
+def redact.go(ws: List<&2, String>, after_bearer: Bool) -> List<&2, String>:
+  match ws:
+    case Nil{}:
+      Nil{}
+    case Con{+w, rest}:
+      Con{redact.word(after_bearer, w),
+        redact.go(rest, String.eq(String.to_lower(w), "bearer"))}
+
+def redact(+s: String) -> String:
+  String.join(redact.go(String.split(s, ' '), False{}), " ")
+
+# what the model reads of the server's words: one line, no secret,
+# bounded
+def said_text(+s: String) -> String:
+  clip(redact(W.squeeze(s)))
+
 def said_part(+said: String) -> String:
-  Bool.pick(String, String.is_empty(said), "", String.append(": ", clip(said)))
+  Bool.pick(String, String.is_empty(said), "",
+    String.append(": ", said_text(said)))
+
+# ---- the kind of a failure ----
+
+def kind_name(k: Cause) -> String:
+  match k:
+    case KArgs{}:
+      "bad arguments"
+    case KAuth{}:
+      "auth"
+    case KMissing{}:
+      "not found"
+    case KRate{}:
+      "rate limit"
+    case KServer{}:
+      "server error"
+    case KTimeout{}:
+      "timeout"
+    case KNet{}:
+      "network"
+    case KTool{}:
+      "tool error"
+
+# a kind told by the server's words, else dflt (rate before auth: "quota
+# exceeded for this token"; auth before arguments: "invalid_token")
+def words_kind.l(+l: String, dflt: Cause) -> Cause:
+  Bool.pick(Cause, has_any(l, ["rate limit", "rate_limit", "ratelimit",
+      "too many requests", "quota"]), KRate{},
+    Bool.pick(Cause, has_any(l, ["unauthorized", "unauthenticated",
+        "forbidden", "permission", "invalid_token", "invalid token",
+        "access denied", "not authorized", "token expired", "expired token",
+        "credentials", "log in", "login"]), KAuth{},
+      Bool.pick(Cause, has_any(l, ["timed out", "timeout",
+          "deadline exceeded"]), KTimeout{},
+        Bool.pick(Cause, has_any(l, ["not found", "no such", "does not exist",
+            "unknown tool"]), KMissing{},
+          Bool.pick(Cause, has_any(l, ["invalid", "validation", "required",
+              "missing", "argument", "parameter", "unexpected keyword",
+              "must be", "malformed", "bad request", "schema"]), KArgs{},
+            dflt)))))
+
+def words_kind(+s: String, dflt: Cause) -> Cause:
+  words_kind.l(String.to_lower(s), dflt)
+
+# arguments are only the model's fault once they were sent (tools/call)
+def args_or(+st: Stage, dflt: Cause) -> Cause:
+  Bool.pick(Cause, is_call(st), KArgs{}, dflt)
+
+def status_kind(+code: U32, +body: String, +st: Stage) -> Cause:
+  Bool.pick(Cause, Bool.or(U32.is_eq(code, 401), U32.is_eq(code, 403)),
+      KAuth{},
+    Bool.pick(Cause, U32.is_eq(code, 429), KRate{},
+      Bool.pick(Cause, Bool.or(U32.is_eq(code, 408), U32.is_eq(code, 504)),
+          KTimeout{},
+        Bool.pick(Cause, session_gone(WStatus{code, body}, st), KServer{},
+          Bool.pick(Cause, U32.is_eq(code, 404), KMissing{},
+            Bool.pick(Cause, Bool.or(U32.is_eq(code, 400),
+                U32.is_eq(code, 422)),
+              words_kind(body, args_or(st, KServer{})), KServer{}))))))
+
+# JSON-RPC: -32602 invalid params (also MCP's answer to an unknown tool,
+# so its words go first), -32700 a body that is not JSON (the arguments
+# are put in raw), -32601 no such method or tool, -32001 the MCP SDKs'
+# request timeout; else the words
+def rpc_kind(+code: String, +said: String, +st: Stage) -> Cause:
+  Bool.pick(Cause, Bool.or(String.eq(code, "-32602"),
+      String.eq(code, "-32700")), words_kind(said, args_or(st, KServer{})),
+    Bool.pick(Cause, String.eq(code, "-32601"), KMissing{},
+      Bool.pick(Cause, String.eq(code, "-32001"), KTimeout{},
+        words_kind(said, KServer{}))))
+
+def net_kind(e: Pvp.NetErr) -> Cause:
+  match e:
+    case Pvp.NTimeout{}:
+      KTimeout{}
+    case _:
+      KNet{}
+
+def kind_of(+st: Stage, w: Why) -> Cause:
+  match w:
+    case WNet{e}:
+      net_kind(e)
+    case WStatus{+code, +body}:
+      status_kind(code, body, st)
+    case WRpc{+code, +said}:
+      rpc_kind(code, said, st)
+
+# the kinds where the model's arguments may be the cause: it gets the
+# tool's parameters and a check of what it sent (runtime/mcp-args.bend)
+def wants_schema(k: Cause) -> Bool:
+  match k:
+    case KArgs{}:
+      True{}
+    case KTool{}:
+      True{}
+    case _:
+      False{}
+
+def rpc_code_part(+code: String) -> String:
+  Bool.pick(String, String.is_empty(code), "",
+    String.concat([" (code ", code, ")"]))
 
 def is_url_err(e: Pvp.NetErr) -> Bool:
   match e:
@@ -494,10 +560,10 @@ def why_text(+host: String, w: Why) -> String:
       net_text(host, e)
     case WStatus{+code, +body}:
       String.concat([host, " answered HTTP ", U32.show(code),
-        said_part(W.err_said(body))])
-    case WRpc{+said}:
-      String.concat([host, " answered an error",
-        said_part(W.squeeze(said))])
+        said_part(W.err_text(body))])
+    case WRpc{+code, +said}:
+      String.concat([host, " answered an error", rpc_code_part(code),
+        said_part(said)])
 
 def phase.pick(st: Stage, gone: Bool) -> String:
   match st:
@@ -531,13 +597,24 @@ def safety(+st: Stage, +w: Why) -> String:
 def why_line(+host: String, +st: Stage, +w: Why) -> String:
   String.concat([phase(st, w), ": ", why_text(host, w)])
 
-# what the model reads when a call fails for good: the tool and its
-# server, the phase, the cause, the retries, and whether it is safe to
-# call again. n = the retries already made.
+# what the model reads when a call fails for good: the kind, the tool
+# and its server, the phase, the cause in the server's own words, the
+# retries, and whether it is safe to call again. n = the retries already
+# made. (A bad-arguments failure gets the tool's parameters after it:
+# runtime/mcp-args.bend.)
 def fail_text(+name: String, +host: String, +st: Stage, +w: Why, +n: Nat)
     -> String:
-  String.concat(["mcp call failed: ", name, " (", host, "), ",
-    why_line(host, st, w), ".", retried_text(n), safety(st, w)])
+  String.concat(["mcp call failed (", kind_name(kind_of(st, w)), "): ", name,
+    " (", host, "), ", why_line(host, st, w), ".", retried_text(n),
+    safety(st, w)])
+
+# what the model reads when the tool ran and answered an error
+# (isError): the kind, the tool and its server, and its words
+def tool_text(+name: String, +host: String, k: Cause, +said: String)
+    -> String:
+  String.concat(["mcp tool error (", kind_name(k), "): ", name, " (", host,
+    ") answered: ", Bool.pick(String, String.is_empty(String.trim(said)),
+      "(no text)", said_text(said)), "."])
 
 # a JSON-RPC answer may come as an event stream (Accept lists both):
 # then its last "data:" line is the answer

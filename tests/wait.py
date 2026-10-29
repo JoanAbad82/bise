@@ -15,11 +15,21 @@ Every timeout and window is for an idle machine: a loaded one gets it
 times load_factor(), read at each poll. On failure: AssertionError with
 what it waited for and the last value seen.
 
+Every timeout and window counts awake time (`now`: time.monotonic, the
+mach clock on macOS, which stops while the Mac sleeps), never the wall
+clock: a test that spans a sleep goes on after the wake with what was
+left of its wait. On the wall clock the sleep ate the whole wait (issue
+26: the Mac took 'Maintenance Sleep' under caffeinate -i, display off,
+and partial_e2e's 120 s wait failed at the wake, "timeout after 365 s").
+
 `time.sleep(` lives here and in tests/sleep_exceptions.txt only:
 tests/sleep_check.py (run_all.sh, gate.sh quick) refuses any other.
 """
 import os
 import time
+
+# awake seconds (see above): the one clock of every wait here
+now = time.monotonic
 
 # the tmux tests read the screen with a capture-pane: 0.2 s between two
 # (more is load the tests add themselves, 4 jobs in parallel)
@@ -54,7 +64,7 @@ def until(fn, timeout, what, poll=0.1):
     AssertionError raised by fn is a broken check: it propagates at once;
     any other exception is the last value seen, and the poll goes on (a
     file not written yet, a socket not open yet)."""
-    t0 = time.time()
+    t0 = now()
     last = None
     while True:
         try:
@@ -67,7 +77,7 @@ def until(fn, timeout, what, poll=0.1):
             if got:
                 return got
             last = got
-        spent = time.time() - t0
+        spent = now() - t0
         if spent >= timeout * load_factor():
             raise AssertionError("timeout after %.0f s (load x%.1f) waiting for %s; last seen: %s"
                                  % (spent, load_factor(), _what(what), _cut(last)))
@@ -80,13 +90,13 @@ def holds(fn, seconds, what, poll=0.1):
     fn's value at the first falsy one. It costs the whole window: wait for
     a sentinel instead wherever a later state proves the event was handled
     (a key typed after a click shows = the click was handled)."""
-    t0 = time.time()
+    t0 = now()
     while True:
         got = fn()
         if not got:
             raise AssertionError("after %.1f s, no longer true: %s; seen: %s"
-                                 % (time.time() - t0, _what(what), _cut(got)))
-        if time.time() - t0 >= seconds * load_factor():
+                                 % (now() - t0, _what(what), _cut(got)))
+        if now() - t0 >= seconds * load_factor():
             return got
         time.sleep(poll)
 
@@ -94,14 +104,14 @@ def holds(fn, seconds, what, poll=0.1):
 def stable(fn, timeout, what, quiet=0.4, poll=SCREEN_POLL):
     """fn's value once it has not changed for `quiet` s (a screen done
     redrawing); AssertionError after `timeout` s (times load_factor())."""
-    t0 = time.time()
-    last, since = fn(), time.time()
+    t0 = now()
+    last, since = fn(), now()
     while True:
         time.sleep(poll)
         got = fn()
         if got != last:
-            last, since = got, time.time()
-        elif time.time() - since >= quiet:
+            last, since = got, now()
+        elif now() - since >= quiet:
             return got
-        if time.time() - t0 >= timeout * load_factor():
+        if now() - t0 >= timeout * load_factor():
             raise AssertionError("timeout: %s never settled; last seen: %s" % (_what(what), _cut(last)))

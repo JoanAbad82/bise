@@ -26,6 +26,14 @@ const SAID_WORD: f32 = 0.29;
 /// the test setting BISE_AMBIENT_FAKE_VOICE (bise_home::env::test_setting);
 /// `get` reads AMBIENT_HARNESS, BISE_HOME and HOME.
 pub fn words_file(file: Option<String>, get: &dyn Fn(&str) -> Option<String>) -> Result<Option<PathBuf>, String> {
+    words_file_in(file, get, &|p| std::fs::canonicalize(p).unwrap_or_else(|_| p.to_path_buf()))
+}
+
+/// [`words_file`] with its path resolver given: the file system's in a run,
+/// a table in a test, so the rule is tested on his paths wherever the test
+/// runs (a gate's temp dir is under ~/.bise/gate, which the rule allows:
+/// amb-feed m_22626).
+pub fn words_file_in(file: Option<String>, get: &dyn Fn(&str) -> Option<String>, canon: &dyn Fn(&Path) -> PathBuf) -> Result<Option<PathBuf>, String> {
     let val = |k: &str| get(k).filter(|v| !v.trim().is_empty());
     let file = match (file.filter(|f| !f.trim().is_empty()), val("AMBIENT_HARNESS")) {
         (Some(f), _) => PathBuf::from(f),
@@ -35,7 +43,6 @@ pub fn words_file(file: Option<String>, get: &dyn Fn(&str) -> Option<String>) ->
     let Some(bise_home) = val("BISE_HOME") else {
         return Err("fake voice refused: BISE_HOME is not set (harness A only, never his own ~/.bise)".into());
     };
-    let canon = |p: &Path| std::fs::canonicalize(p).unwrap_or_else(|_| p.to_path_buf());
     let mine = canon(Path::new(&bise_home));
     // harness A's homes live under ~/.bise/gate (HOME is the isolated one
     // there, so HOME/.bise is BISE_HOME); elsewhere BISE_HOME must not be
@@ -79,10 +86,19 @@ impl Words {
     }
 }
 
-/// A mic that never opens a device: a voice-like level while open.
+/// A mic that never opens a device: a voice-like level while open, and
+/// [`QUIET_BLOCK`]s of quiet, so a take has sound like a real one (a take
+/// with no words is kept and dictate_retry runs end to end, amb-tools
+/// m_22412).
 pub struct FakeMic;
 
-struct FakeStream(Instant);
+/// One block of quiet every this long while the fake mic is open.
+pub const QUIET_BLOCK: Duration = Duration::from_millis(100);
+/// [`QUIET_BLOCK`] at the listener's 16 kHz.
+const QUIET_SAMPLES: usize = 1600;
+
+/// The open fake mic; dropped (the mic off), its quiet stops.
+struct FakeStream(Instant, Arc<AtomicBool>);
 
 impl MicStream for FakeStream {
     fn level(&self) -> f32 {
@@ -91,27 +107,71 @@ impl MicStream for FakeStream {
     }
 }
 
+impl Drop for FakeStream {
+    fn drop(&mut self) {
+        self.1.store(true, Ordering::SeqCst);
+    }
+}
+
 impl Mic for FakeMic {
-    fn open(&mut self, _blocks: Sender<MicBlock>) -> Result<Box<dyn MicStream>, String> {
-        Ok(Box::new(FakeStream(Instant::now())))
+    fn open(&mut self, blocks: Sender<MicBlock>) -> Result<Box<dyn MicStream>, String> {
+        let closed = Arc::new(AtomicBool::new(false));
+        let stop = closed.clone();
+        std::thread::spawn(move || {
+            while !stop.load(Ordering::SeqCst) {
+                let at = Instant::now();
+                std::thread::sleep(QUIET_BLOCK);
+                if stop.load(Ordering::SeqCst) || blocks.send(MicBlock { pcm: vec![0; QUIET_SAMPLES], at }).is_err() {
+                    return;
+                }
+            }
+        });
+        Ok(Box::new(FakeStream(Instant::now(), closed)))
     }
 }
 
 /// The listener: the talk's words, one every [`WORD_EVERY`] while fn is
-/// held, the rest at the flush (fn up).
-pub struct FakeListener(pub Words);
+/// held, the rest at the flush (fn up), `.1` after it: a batch request's
+/// time (BISE_VOICE_FAKE_HEARD_MS, [`flush_wait`]). Cancelled meanwhile,
+/// it drops them, as the real listener does.
+pub struct FakeListener(pub Words, pub Duration);
+
+/// BISE_VOICE_FAKE_HEARD_MS: how long the fake listener's flush takes
+/// (the dictation repro, m_22120: a transcription slower than 1.5 s lost
+/// his words). Unset or not a number: at once.
+pub fn flush_wait(setting: Option<String>) -> Duration {
+    Duration::from_millis(setting.and_then(|v| v.trim().parse().ok()).unwrap_or(0))
+}
 
 impl Listener for FakeListener {
     fn start(&self, _job: ListenJob, audio: Receiver<ListenMsg>, events: Sender<Heard>, cancel: Arc<AtomicBool>) {
         let text = self.0.take();
+        let wait = self.1;
         std::thread::spawn(move || {
             let mut words = text.split_whitespace().map(|w| format!(" {w}")).collect::<std::collections::VecDeque<_>>();
+            // a word every WORD_EVERY on its own clock: the mic's quiet
+            // blocks (every QUIET_BLOCK) never put it off
+            let mut next_word = Instant::now() + WORD_EVERY;
             loop {
                 if cancel.load(Ordering::SeqCst) {
                     return;
                 }
-                match audio.recv_timeout(WORD_EVERY) {
+                let msg = match next_word.checked_duration_since(Instant::now()) {
+                    Some(left) if !left.is_zero() => audio.recv_timeout(left),
+                    _ => Err(RecvTimeoutError::Timeout),
+                };
+                match msg {
                     Ok(ListenMsg::Flush) => {
+                        let until = Instant::now() + wait;
+                        while Instant::now() < until {
+                            if cancel.load(Ordering::SeqCst) {
+                                return;
+                            }
+                            std::thread::sleep(Duration::from_millis(10));
+                        }
+                        if cancel.load(Ordering::SeqCst) {
+                            return;
+                        }
                         let rest: String = words.drain(..).collect();
                         if !rest.is_empty() && events.send(Heard::Text(rest)).is_err() {
                             return;
@@ -122,6 +182,7 @@ impl Listener for FakeListener {
                     Ok(ListenMsg::Clear) => words.clear(),
                     Ok(ListenMsg::Audio(_)) => {}
                     Err(RecvTimeoutError::Timeout) => {
+                        next_word = Instant::now() + WORD_EVERY;
                         if let Some(w) = words.pop_front() {
                             if events.send(Heard::Text(w)).is_err() {
                                 return;
@@ -149,6 +210,7 @@ pub fn listen_job() -> ListenJob {
             key: String::new(),
             language: None,
             vocabulary: Vec::new(),
+            fallback: None,
         },
     }
 }

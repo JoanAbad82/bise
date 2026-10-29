@@ -198,7 +198,7 @@ pub struct Stt {
 
 impl Default for Stt {
     fn default() -> Stt {
-        let m = "mistral/voxtral-transcribe-3".to_string();
+        let m = "mistral/voxtral-mini-transcribe-3".to_string();
         Stt { model: m.clone(), options: vec![m], names: vec![("mistral".into(), "Mistral".into())], env: false }
     }
 }

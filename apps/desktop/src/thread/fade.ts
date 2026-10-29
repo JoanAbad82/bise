@@ -1,0 +1,150 @@
+// The new words of a streamed answer fade in (ambient's text-appearing v2,
+// signed by designer): a rehype step over the answer's tree, so every
+// element stays React's own (no DOM surgery). Owner: amb-win.
+//
+// `from` = how much of the answer's text (its rendered characters, in
+// order) was already shown. Past it:
+// - each new word is a span.th-w with its delay: the words of one update
+//   start evenly spread over ~300 ms (300 ms ÷ their count apart, each fades
+//   in 180 ms; designer m_17507, R40); once faded the thread renders again with `from` at the end and
+//   the spans are gone (plain text again: nothing above re-animates);
+// - a new list item, table row or code box fades as one (th-in), its dash
+//   or frame with it; in code, whole new lines fade (data-from on <code>:
+//   the code's own offset where the new lines start; Code.tsx draws them);
+// - `wave`: the working sign '∿' rides after the last word.
+// Pure on its tree: unit laws in fade.test.ts.
+
+export interface HNode {
+  type: string;
+  value?: string;
+  tagName?: string;
+  properties?: Record<string, unknown>;
+  children?: HNode[];
+}
+
+export interface FadeOpts {
+  /** characters of the answer's text already shown (no fade before it); Infinity: none fades */
+  from: number;
+  /** the '∿' after the last word (the answer still comes) */
+  wave?: boolean;
+  /** told the answer's whole length after each pass (the next update's `from`) */
+  onTotal?: (n: number) => void;
+}
+
+/** The new words of one update start evenly across this gap (R40: partials land every 400 ms). */
+export const SPREAD_MS = 300;
+const BLOCKS = new Set(['li', 'tr']);
+
+/**
+ * The delay between two new words of one update: their start times spread evenly over ~300 ms
+ * (designer m_17507, R40: partials land every 400 ms, so each chunk reads as a steady flow, not a
+ * pulse; 30 ms apart made every chunk land at once). Pure.
+ */
+export function staggerOf(words: number): number {
+  return words <= 0 ? 0 : SPREAD_MS / words;
+}
+
+function addClass(n: HNode, c: string): void {
+  const p = (n.properties ??= {});
+  const cur = p.className;
+  p.className = Array.isArray(cur) ? [...(cur as unknown[]), c] : typeof cur === 'string' ? [cur, c] : [c];
+}
+
+function textLen(n: HNode): number {
+  if (n.type === 'text') return n.value?.length ?? 0;
+  return (n.children ?? []).reduce((s, c) => s + textLen(c), 0);
+}
+
+/** The words of a text from character `at` on (whitespace runs are not words). */
+function wordsOf(s: string): string[] {
+  return s.split(/(\s+)/).filter((w) => w !== '');
+}
+
+/** How many new words the tree has past `from`, outside code. */
+function countNew(n: HNode, from: number, at: { i: number }, inPre: boolean): number {
+  if (n.type === 'text') {
+    const v = n.value ?? '';
+    const s = at.i;
+    at.i += v.length;
+    if (inPre || at.i <= from) return 0;
+    return wordsOf(v.slice(Math.max(0, from - s))).filter((w) => !/^\s+$/.test(w)).length;
+  }
+  const pre = inPre || n.tagName === 'pre';
+  return (n.children ?? []).reduce((k, c) => k + countNew(c, from, at, pre), 0);
+}
+
+function mark(n: HNode, from: number, at: { i: number }, w: { k: number; step: number }, inPre: boolean): void {
+  const kids = n.children;
+  if (kids === undefined) return;
+  const out: HNode[] = [];
+  for (const c of kids) {
+    if (c.type === 'text') {
+      const v = c.value ?? '';
+      const s = at.i;
+      at.i += v.length;
+      if (inPre || at.i <= from) {
+        out.push(c);
+        continue;
+      }
+      const cut = Math.max(0, from - s);
+      if (cut > 0) out.push({ type: 'text', value: v.slice(0, cut) });
+      for (const part of wordsOf(v.slice(cut))) {
+        if (/^\s+$/.test(part)) out.push({ type: 'text', value: part });
+        else {
+          const delay = Math.round(w.k * w.step);
+          w.k++;
+          out.push({ type: 'element', tagName: 'span', properties: { className: ['th-w'], style: `animation-delay:${String(delay)}ms` }, children: [{ type: 'text', value: part }] });
+        }
+      }
+      continue;
+    }
+    if (c.type === 'element') {
+      const start = at.i;
+      const len = textLen(c);
+      if (start >= from && len > 0 && (BLOCKS.has(c.tagName ?? '') || c.tagName === 'pre')) addClass(c, 'th-in');
+      if (c.tagName === 'code' && inPre && start + len > from) {
+        (c.properties ??= {}).dataFrom = String(Math.max(0, from - start));
+      }
+      mark(c, from, at, w, inPre || c.tagName === 'pre');
+    }
+    out.push(c);
+  }
+  n.children = out;
+}
+
+/**
+ * Where the '∿' goes: inline at the end of the last block with words (a
+ * paragraph, a list item, a heading); after a table or a code box, in the
+ * answer itself, drawn under that block with no height of its own
+ * (th-wave-under: ambient m_12439, else it took a line that went at the end).
+ */
+export function lastHome(root: HNode): { home: HNode; inline: boolean } {
+  let n = root;
+  for (;;) {
+    const last = [...(n.children ?? [])].reverse().find((c) => c.type === 'element');
+    if (last === undefined) return { home: n, inline: n !== root };
+    const t = last.tagName ?? '';
+    if (t === 'ul' || t === 'ol' || t === 'li' || t === 'blockquote') {
+      n = last;
+      continue;
+    }
+    if (t === 'p' || /^h[1-6]$/.test(t)) return { home: last, inline: true };
+    return { home: root, inline: false };
+  }
+}
+
+/** The rehype step: `[fade, opts]` in react-markdown's rehypePlugins. */
+export function fade(opts: FadeOpts) {
+  return (tree: HNode): void => {
+    const total = textLen(tree);
+    if (opts.from < total) {
+      const words = countNew(tree, opts.from, { i: 0 }, false);
+      mark(tree, opts.from, { i: 0 }, { k: 0, step: staggerOf(words) }, false);
+    }
+    if (opts.wave === true) {
+      const { home, inline } = lastHome(tree);
+      (home.children ??= []).push({ type: 'element', tagName: 'span', properties: { className: inline ? ['th-wave'] : ['th-wave', 'th-wave-under'], ariaHidden: 'true', dataTestid: 'thread.stream.wave' }, children: [{ type: 'text', value: '∿' }] });
+    }
+    opts.onTotal?.(total);
+  };
+}

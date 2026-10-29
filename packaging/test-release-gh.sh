@@ -35,6 +35,10 @@ W=/tmp/prg REL=/tmp/prg/rel PK=/tmp/prg/pack SRV=/tmp/prg/srv STUB=/tmp/prg/stub
 TOKEN=tok-good
 
 pass=0; fail=0
+# the repo this test runs from: never written (fc1883f2a: publish-release.sh
+# committed the fake release's nix/sources.json here and it reached main)
+real_state() { git -C "$REPO" rev-parse HEAD; git -C "$REPO" diff --cached | shasum; shasum < "$REPO/nix/sources.json"; }
+REAL_BEFORE="$(real_state)"
 ok()  { pass=$((pass + 1)); echo "  ok   $*"; }
 ko()  { fail=$((fail + 1)); echo "  FAIL $*"; }
 check() { local what="$1"; shift; if "$@" >/dev/null 2>&1; then ok "$what"; else ko "$what"; fi; }
@@ -216,6 +220,9 @@ echo "== publish-release.sh: tag, CI's draft, publish (stub gh, throwaway repo)"
 G=$W/git BARE=$W/bare.git GS=$W/ghs STUB2=$W/stub2
 mkdir -p "$G/packaging" "$GS/rel" "$STUB2"
 for f in publish-release.sh ci-release.sh check-release.py make-release.sh install.sh; do cp "$HERE/$f" "$G/packaging/"; done
+# publish-release.sh tags only a tip-green sha (scripts/tip_green.py, main m_36204): every commit of
+# this throwaway repo is green here (P writes them), the refusal is tests/publish_release_test.py's
+mkdir -p "$G/scripts" && cp "$HERE/../scripts/tip_green.py" "$G/scripts/"
 gitq() { git -C "$G" -c user.name=t -c user.email=t@t -c commit.gpgsign=false -c tag.gpgsign=false "$@" >/dev/null 2>&1; }
 gitq init -q -b main && gitq add -A && gitq commit -qm one
 git init -q --bare "$BARE"
@@ -302,7 +309,8 @@ if a[:2] == ["run", "watch"]:
 die("stub: " + " ".join(a), 2)
 EOF
 chmod 755 "$STUB2/gh"
-P() { env -i HOME="$W/home-rel" PATH="$STUB2:/usr/bin:/bin:/usr/sbin:/sbin" TMPDIR="$W/tmp/" \
+P() { mkdir -p "$W/home-rel/.bise/gate"; git -C "$G" rev-list --all | sed 's/$/	1	1	test	log/' >"$W/home-rel/.bise/gate/green-shas.tsv"
+  env -i HOME="$W/home-rel" PATH="$STUB2:/usr/bin:/bin:/usr/sbin:/sbin" TMPDIR="$W/tmp/" \
   GIT_AUTHOR_NAME=t GIT_AUTHOR_EMAIL=t@t GIT_COMMITTER_NAME=t GIT_COMMITTER_EMAIL=t@t \
   "$G/packaging/publish-release.sh" --repo o/r --url "$CH" "$@" 2>&1; }
 mkdir -p "$W/home-rel" "$W/tmp"
@@ -328,6 +336,7 @@ check "... no second run watched" test "$(grep -c '^run watch' "$GS/log")" = "$n
 check "... the flake's nix/sources.json committed: r6, linux, the tag's URLs" sh -c "
   [ \"\$(git -C '$G' log -1 --format=%s)\" = 'nix: sources for 0.0.6' ] &&
   python3 -c \"import json,sys; n=json.load(open('$G/nix/sources.json')); sys.exit(not (n['id'] == 'r6' and n['aarch64-linux']['url'] == 'https://github.com/o/r/releases/download/v0.0.6/bise-r6-linux-arm64.tar.gz' and 'x86_64-linux' in n and 'darwin-arm64' not in n))\""
+check "... the repo the test runs from: HEAD, index and nix/sources.json untouched" test "$(real_state)" = "$REAL_BEFORE"
 out="$(P v0.0.6 --publish)"; has "$out" "published already" && ok "again: already published, nothing done" || ko "again: $out"
 touch "$GS/rel/v0.0.6/stale"
 out="$(PATH="$STUB2:$PATH" "$HERE/ci-release.sh" v0.0.6 "$W/cidist" "$W/ci2" --repo o/r --url "$CH" --draft 2>&1)"
@@ -346,12 +355,47 @@ gitq tag v0.0.6x "$C1" && gitq push origin v0.0.6x
 out="$(PATH="$STUB2:$PATH" "$HERE/ci-release.sh" v0.0.6x "$W/cidist" "$W/ci3" --repo o/r --url "$CH" --draft 2>&1)" \
   && ok "CI rerun on a draft: files replaced, checked" || ko "rerun on draft: $out"
 check "... the stale file is gone" test ! -e "$GS/rel/v0.0.6x/old.tar.gz"
+# release.yml: the draft without darwin-x86_64 (off the desktop's path),
+# then --attach adds it, to a draft or a published release
+mkdir -p "$W/cidist3"; cp "$W/cidist"/bise-r6-darwin-arm64.* "$W/cidist"/bise-r6-linux-* "$W/cidist3/"
+gitq tag v0.0.9 "$C1" && gitq push origin v0.0.9
+CI3="PATH=$STUB2:$PATH"
+out="$(env "$CI3" "$HERE/ci-release.sh" v0.0.9 "$W/cidist3" "$W/ci9" --repo o/r --url "$CH" --commit "$C1" \
+  --targets "darwin-arm64 linux-x86_64 linux-arm64" --draft 2>&1)" \
+  && ok "CI's draft without darwin-x86_64" || ko "3-target draft: $out"
+check "... latest.json has no darwin-x86_64 yet" python3 -c "import json,sys; sys.exit('darwin-x86_64' in json.load(open('$GS/rel/v0.0.9/latest.json'))['targets'])"
+# what's new written and published before the Intel build is done
+python3 -c "import json; p='$GS/rel/v0.0.9/latest.json'; m=json.load(open(p)); m['notes']=['a new thing']; json.dump(m, open(p, 'w'))"
+rm "$GS/rel/v0.0.9/draft"
+out="$(env "$CI3" "$HERE/ci-release.sh" v0.0.9 "$W/cidist" "$W/ci9x" --repo o/r --url "$CH" --commit "$C1" --attach darwin-x86_64 2>&1)" \
+  && ok "--attach darwin-x86_64 to the published release, checked with 4 targets" || ko "attach: $out"
+check "... its archive and latest.json entry, the notes kept" python3 -c "
+import json, os, sys
+m = json.load(open('$GS/rel/v0.0.9/latest.json'))
+sys.exit(not (sorted(m['targets']) == ['darwin-arm64', 'darwin-x86_64', 'linux-arm64', 'linux-x86_64'] and m['notes'] == ['a new thing']
+              and os.path.exists('$GS/rel/v0.0.9/bise-r6-darwin-x86_64.tar.gz')))"
+out="$(env "$CI3" "$HERE/ci-release.sh" v0.0.9 "$W/cidist" "$W/ci9x" --repo o/r --url "$CH" --attach darwin-x86_64 2>&1)"
+has "$out" "nothing to do" && ok "--attach again: nothing to do" || ko "attach again: $out"
+mkdir -p "$W/cidist7"; cp "$W/cidist"/* "$W/cidist7/"
+pack r6 2026-01-07T00:00:00Z darwin-x86_64 "$C1" "$W/cidist7" >/dev/null
+out="$(env "$CI3" "$HERE/ci-release.sh" v0.0.9 "$W/cidist7" "$W/ci9y" --repo o/r --url "$CH" --attach darwin-x86_64 2>&1)" \
+  && ko "another darwin-x86_64 on a published release: accepted" \
+  || { has "$out" "never rewritten" && ok "another darwin-x86_64 on a published release: refused" || ko "attach other: $out"; }
+# a checkout of another repo than --repo never gets the release's sources
+gitq remote set-url origin https://github.com/x/y.git
+nb="$(git -C "$G" rev-parse HEAD)"
+out="$(P v0.0.6x --publish)"; has "$out" "is not a checkout of github.com/o/r" \
+  && ok "--publish from a checkout of another repo: nix/sources.json not committed" || ko "other repo: $out"
+check "... no commit" test "$(git -C "$G" rev-parse HEAD)" = "$nb"
+gitq remote set-url origin https://github.com/o/r.git
 touch "$GS/ci-fails"
 out="$(P v0.0.7 --rev "$C1")"; has "$out" "the run failed" && ok "a failed CI run: said, nothing published" || ko "failed run: $out"
 check "... no release" test ! -e "$GS/rel/v0.0.7"
 rm "$GS/ci-fails"
 out="$(P --local v0.0.8 --from "$W/cidist/bise-r6-darwin-arm64.tar.gz" --add "$W/cidist/bise-r6-darwin-x86_64.tar.gz" --dry-run)"
 has "$out" "check-release: ok" && has "$out" "release create v0.0.8" && ok "--local: lays out, checks, prints the gh command" || ko "--local: $out"
+
+check "the repo the test runs from: HEAD, index and nix/sources.json untouched" test "$(real_state)" = "$REAL_BEFORE"
 
 echo "== $pass passed, $fail failed"
 [ "$fail" = 0 ] && rm -rf "$W"

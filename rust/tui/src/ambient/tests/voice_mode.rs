@@ -113,7 +113,7 @@ fn his_turn_goes_to_the_agent_in_view_and_its_answer_is_said() {
     let mut l = String::new();
     while t.hub.r.read_line(&mut l).is_ok_and(|n| n > 0) {
         let v: Value = serde_json::from_str(l.trim()).unwrap();
-        assert!(v["op"] != "input", "nothing reached main: {v}");
+        assert!(v["method"] != "turn/send" && v["method"] != "command/run", "nothing reached main: {v}");
         l.clear();
     }
 }
@@ -168,6 +168,70 @@ fn quiet_says_nothing_mute_and_type_pause_the_mic() {
     assert!(t.vf.synth.lock().unwrap().iter().any(|c| c.text.starts_with("Warm")), "the typed turn's answer is said");
 }
 
+/// Law (amb-web m_16805): `lit` names the agent entry being said (its
+/// pos) and how far, in UTF-16 code units of that entry's text (as JS
+/// slices it; the emoji case is in core/voice_mode.rs), never past
+/// its end and never going back; a cut marks it `cut`; his next turn sent,
+/// `lit` is gone. No answer said yet: no `lit`.
+#[test]
+fn lit_says_which_entry_and_how_far_until_his_next_turn() {
+    let mut t = T::new();
+    let mut w = shop(&mut t);
+    on(&mut t, &mut w, "perf");
+    shop_next(&mut w);
+    let mut seen = t.take();
+    assert!(modes(&seen).iter().all(|v| v.get("lit").is_none()), "nothing said yet: no lit");
+    say(&mut t, &mut w, "why is the cold bench slow");
+    shop_next(&mut w);
+    let text = "Le cache froid est relu du disque à chaque passe. **Warm** runs skip it.";
+    answer(&mut t, &mut w, "perf", 40, text);
+    // its first sentence is synthesized, pushed, and plays to the end
+    // (the speaker already has voice mode's own sounds: the sentence's
+    // utt is the first pushed after its audio comes)
+    let before = t.vf.speaker.lock().unwrap().pushed.len();
+    let ev = t.vf.synth.lock().unwrap().first().expect("the first sentence goes to the synth").events.clone();
+    ev.send(crate::voicemode::Synth::Audio(vec![0.1; 4800])).unwrap();
+    ev.send(crate::voicemode::Synth::Done).unwrap();
+    let t0 = std::time::Instant::now();
+    let utt = loop {
+        w.until_ticking(&mut t, |_| true);
+        if let Some(p) = t.vf.speaker.lock().unwrap().pushed.get(before) {
+            break p.0;
+        }
+        assert!(t0.elapsed() < Duration::from_secs(3), "its audio reaches the speaker");
+    };
+    t.vf.speaker.lock().unwrap().clock = Some((utt, Duration::from_secs(10)));
+    w.until_ticking(&mut t, |o| modes(o).iter().any(|v| v["lit"]["said"].as_u64().is_some_and(|n| n > 0)));
+    seen.extend(t.take());
+    let lits: Vec<Value> = modes(&seen).iter().filter_map(|v| v.get("lit").cloned()).collect();
+    assert!(!lits.is_empty(), "lit while it speaks");
+    let max = text.encode_utf16().count() as u64;
+    let mut last = 0;
+    for l in &lits {
+        assert_eq!(l["pos"], 40, "the entry handed to be said: {l}");
+        let n = l["said"].as_u64().unwrap();
+        assert!(n <= max && n >= last, "UTF-16 units, within the text, never back: {lits:?}");
+        last = n;
+    }
+    // he cuts in: the rest stays unsaid, marked
+    typed(&mut t, json!({"cmd": "voice_cut"}));
+    w.until_ticking(&mut t, |o| modes(o).iter().any(|v| v["lit"]["cut"] == true));
+    // his next turn sent: no lit any more
+    say(&mut t, &mut w, "and the warm one");
+    w.until_ticking(&mut t, |_| true);
+    let after = modes(&t.take());
+    assert!(after.last().is_some_and(|v| v.get("lit").is_none()), "his next turn: lit gone: {after:?}");
+    // the next answer is lit; his TYPED next turn (tab, then send) puts it out too
+    shop_next(&mut w);
+    answer(&mut t, &mut w, "perf", 41, "Warm is 0.9 seconds.");
+    w.until_ticking(&mut t, |o| modes(o).iter().any(|v| v["lit"]["pos"] == 41));
+    typed(&mut t, json!({"cmd": "voice_type", "on": true}));
+    typed(&mut t, json!({"cmd": "send", "project": "shop", "agent": "perf", "text": "and the cold one?", "mode": "now"}));
+    w.until_ticking(&mut t, |_| true);
+    let typed_after = modes(&t.take());
+    assert!(typed_after.last().is_some_and(|v| v.get("lit").is_none()), "his typed next turn: lit gone: {typed_after:?}");
+}
+
 /// Law: cut: its voice stops and its running turn is stopped (`stop`
 /// on its project).
 #[test]
@@ -219,4 +283,24 @@ fn the_core_stopping_ends_voice_mode() {
     let last = modes(&t.core.take_out()).pop().expect("its last event");
     assert_eq!(last["on"], false);
     assert!(last["note"].as_str().is_some_and(|n| n.ends_with("bise stopped")), "{last}");
+}
+
+/// An off-screen run with no fake voice (architect m_22483): the app
+/// forwards every mic command, the core answers each at once with
+/// NO_MIC, and no mic ever opens (neither the core's nor voice mode's).
+#[test]
+fn off_screen_with_no_fake_voice_every_mic_command_is_refused_at_once() {
+    let mut t = T::off_screen();
+    let _w = shop(&mut t);
+    typed(&mut t, json!({"cmd": "dictate_start", "id": "d1"}));
+    let out = t.take();
+    assert!(out.contains(&json!({"ev": "dictation", "id": "d1", "text": "", "final": true, "error": crate::ambient::NO_MIC})), "{out:#?}");
+    t.cmd(Cmd::TalkStart);
+    let out = t.take();
+    assert!(out.contains(&json!({"ev": "error", "text": crate::ambient::NO_MIC})), "{out:#?}");
+    typed(&mut t, json!({"cmd": "voice_mode", "project": "shop", "agent": "perf", "on": true}));
+    let out = t.take();
+    assert!(out.contains(&json!({"ev": "error", "cmd": "voice_mode", "text": format!("voice mode: {}", crate::ambient::NO_MIC)})), "{out:#?}");
+    assert_eq!(t.fakes.mic.lock().unwrap().opened, 0, "the core's mic");
+    assert_eq!(t.vf.mic.lock().unwrap().opened, 0, "voice mode's mic");
 }

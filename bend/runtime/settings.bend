@@ -1,4 +1,4 @@
-# runtime/settings.bend — the config file (~/.bend-harness/config.toml).
+# runtime/settings.bend — the config file (~/.bise/config.toml).
 #
 # Where the file lives, reading it, and writing the commented template
 # on first run. The parsing itself is pure: core/config.bend.
@@ -8,7 +8,7 @@ import ./persist.bend as P
 import ./proc.bend as Proc
 import ./settings-pure.bend as Stp
 import ../core/config.bend as Cf
-# ---- the config file (~/.bend-harness/config.toml) ----
+# ---- the config file (~/.bise/config.toml) ----
 # The vibe CLI ergonomics: a commented template is written on first
 # run; every key answers the same precedence - environment variable >
 # config file > built-in default. BEND_CONFIG points at another path.
@@ -16,9 +16,9 @@ import ../core/config.bend as Cf
 def cfg_path_pick.home(empty: Bool, +home: String) -> String:
   match empty:
     case True{}:
-      "/tmp/bend-harness-config.toml"
+      "/tmp/.bise/config.toml"
     case False{}:
-      String.append(home, "/.bend-harness/config.toml")
+      String.append(home, "/.bise/config.toml")
 
 def cfg_path_pick.pick(empty: Bool, +custom: String, +home: String)
     -> String:

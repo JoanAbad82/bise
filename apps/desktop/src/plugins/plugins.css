@@ -1,0 +1,173 @@
+/* src/plugins (nm-pages-b, plug-desktop's before): the plugins place (page plugins v48; bise fait mac
+   §9: the ds PageBanner with the room in its box, the search in the bar, ds Filters and GroupLabels),
+   a plugin's page and a skill's tab (SkillTab.tsx). ds tokens only, the 4 px grid; colour only for
+   what waits on him (accent) and what failed (err). */
+/* the rhythm (ui-review #1): the sections (the hero, connect your tools, the list) --gap-page apart;
+   inside a section its blocks --gap-block apart. One column for every shell page: --w-col (#13,
+   designer m_41512). Two left edges: the column's, and a box's content at --pad-card-x (#12). */
+.plg-place { height: 100%; overflow-y: auto; box-sizing: border-box; padding: 0 0 calc(var(--float-room) + var(--s-2)); display: flex; flex-direction: column; gap: var(--gap-page); }
+.plg-place > .b-banner { margin-bottom: 0; }
+.plg-place > :not(.b-banner) { margin-inline: var(--pad-page-x); box-sizing: border-box; }
+.plg-add { margin-left: auto; }
+.plg-acc { color: var(--c-accent); }
+.plg-dim { color: var(--c-text-3); }
+.plg-n { margin-left: var(--s-1); color: var(--c-text-3); font-variant-numeric: tabular-nums; }
+.plg-mono { font-family: var(--font-mono); font-size: var(--t-12); }
+.plg-add-words { display: inline-flex; align-items: center; gap: var(--gap-inline); }
+.plg-sec { display: flex; flex-direction: column; gap: var(--gap-block); }
+
+/* the room: bims' diorama of his plugins' objects (Room.tsx), the banner's visual: it fills the
+   banner's box (360 x 176, 264 x 132 narrow), the canvas at 2.2:1 centred; without WebGL their icons
+   on a floor */
+.plg-room { width: 100%; height: 100%; position: relative; display: flex; align-items: center; justify-content: center; pointer-events: auto; }
+.plg-room-canvas { display: block; max-width: 100%; max-height: 100%; aspect-ratio: 2.2 / 1; outline: none; }
+/* an object under the pointer opens its plugin; zoomed, the floor drags the view (Room.tsx) */
+.plg-room-canvas[data-over] { cursor: pointer; }
+.plg-room-canvas[data-zoomed]:not([data-over]) { cursor: grab; }
+.plg-room-canvas[data-drag] { cursor: grabbing; }
+/* the hovered object's box over the canvas: the ds tip's mark (Room.tsx), nothing drawn */
+.plg-room-mark { position: absolute; }
+.plg-room-wait { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: var(--c-raised); }
+/* bled to the banner's edges (ds banner.css data-bleed): the canvas fills it, the room rests fitted in the visual box (render.ts resize); the fallback and '⤢ fit' keep to the box */
+.plg-room[data-bleed] > .plg-room-canvas { width: 100%; height: 100%; max-width: none; max-height: none; aspect-ratio: auto; }
+.plg-room[data-bleed] > .plg-room-wait { inset: calc(var(--b-vis-top) - 1px) calc(var(--s-3) - 1px) calc(var(--s-3) - 1px) 0; }
+.plg-room[data-bleed] > .bims-fit { right: calc(var(--s-3) - 1px + var(--s-1)); bottom: calc(var(--s-3) - 1px + var(--s-1)); }
+.plg-floor { display: flex; flex-wrap: wrap; justify-content: center; align-content: center; gap: var(--s-2); max-width: 100%; max-height: 100%; overflow: hidden; padding: var(--s-3); border-radius: var(--r-2); background: var(--c-sunken); }
+
+/* connect your tools: head t-15/600 and its count on one baseline, the sub 4 under, the cards 12
+   under (#8); one-line cards (#3); the import and other lines its foot, on a rule (#7) */
+.plg-band { container-type: inline-size; display: flex; flex-direction: column; gap: var(--gap-block); padding: var(--pad-card); border-radius: var(--r-4); background: var(--c-raised); box-shadow: inset 0 0 0 1px var(--c-line); }
+.plg-band-top { display: flex; flex-direction: column; gap: var(--gap-tight); }
+.plg-band-head { display: flex; align-items: baseline; gap: var(--gap-inline); font: var(--t-13) var(--font-ui); }
+.plg-band-h { font: 600 var(--t-15) var(--font-ui); color: var(--c-text); }
+.plg-band-count { margin-left: auto; color: var(--c-text-3); font-variant-numeric: tabular-nums; }
+.plg-band-sub { font: var(--t-13) var(--font-ui); color: var(--c-text-2); }
+/* 2 across in the column (3 left a card's words ~60 px beside its button), 1 when it narrows (#9);
+   bandCells keeps 2, 4 or 6 cells, so no hole either way */
+.plg-cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--gap-block); }
+@container (max-width: 480px) { .plg-cards { grid-template-columns: minmax(0, 1fr); } }
+.plg-card { display: flex; align-items: center; gap: var(--gap-block); padding: var(--pad-card); border: 0; border-radius: var(--r-2); background: var(--c-surface); box-shadow: inset 0 0 0 1px var(--c-line); font: var(--t-13) var(--font-ui); color: var(--c-text); text-align: left; min-width: 0; }
+.plg-card > .b-btn { flex: none; }
+.plg-card.more { justify-content: center; background: none; }
+.plg-card-words { flex: 1 1 auto; display: flex; flex-direction: column; min-width: 0; }
+.plg-card-words > span { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.plg-card-words .plg-dim { font-size: var(--t-12); }
+.plg-band-line { display: flex; align-items: center; justify-content: space-between; gap: var(--gap-inline); padding-top: var(--gap-block); border-top: 1px solid var(--c-line); font: var(--t-13) var(--font-ui); color: var(--c-text-2); }
+.plg-band-line + .plg-band-line { padding-top: 0; border-top: 0; }
+.plg-problem { display: flex; align-items: center; justify-content: space-between; gap: var(--gap-inline); font: var(--t-13) var(--font-ui); color: var(--c-text-2); }
+
+/* the kinds: the chosen one on the raised surface, its words full (#10) */
+.plg-kinds { display: flex; flex-wrap: wrap; gap: var(--gap-tight); padding-inline: var(--s-3); } /* on the filters' text edge (designer m_44023 #1) */
+.plg-kinds .b-chip[aria-expanded="true"] { background: var(--c-raised); color: var(--c-text); box-shadow: inset 0 0 0 1px var(--c-line-strong); }
+
+/* the list: group heads at the column's edge, a row's content at --pad-card-x (#12) */
+.plg-group { display: flex; flex-direction: column; gap: var(--gap-tight); }
+/* the group labels are ds GroupLabels (sentence case, never spaced capitals: x1b) */
+.plg-group > .b-glabel { margin-top: 0; }
+.plg-list { border-radius: var(--r-3); background: var(--c-raised); box-shadow: inset 0 0 0 1px var(--c-line); overflow: hidden; }
+.plg-row { display: flex; align-items: center; gap: var(--gap-block); min-height: var(--s-12); padding: var(--s-2) var(--pad-card-x); box-sizing: border-box; border-top: 1px solid var(--c-line); font: var(--t-13) var(--font-ui); color: var(--c-text); outline: none; }
+.plg-row:first-child { border-top: 0; }
+.plg-row:hover, .plg-row:focus-visible { background: var(--c-hover); }
+/* a skill whose tab is open: the list's one selected rule (--c-active), never the hover's look */
+.plg-row.on { background: var(--c-active); }
+.plg-row.part { min-height: var(--s-10); }
+/* off: its words in text-3, readable (#15), never faded by opacity */
+.plg-row.off .plg-title, .plg-row.off .plg-row-what { color: var(--c-text-3); }
+.plg-row-words { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 0; }
+.plg-row-name { display: flex; align-items: center; gap: var(--s-2); min-width: 0; }
+.plg-title { font-weight: 500; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.plg-tag { flex: none; padding: 0 var(--s-2); border-radius: var(--r-pill); box-shadow: inset 0 0 0 1px var(--c-line-strong); font: 400 var(--t-12)/var(--s-4) var(--font-ui); color: var(--c-text-2); } /* the 11.5 type floor: t-12 (designer m_44023 #6) */
+.plg-row-what { font: var(--t-12) var(--font-ui); color: var(--c-text-2); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.plg-row-what.err { color: var(--c-err); }
+.plg-row-end { flex: none; display: flex; align-items: center; gap: var(--s-3); font: var(--t-12) var(--font-ui); }
+.plg-lead { flex: none; width: var(--s-6); text-align: center; color: var(--c-text-3); font-family: var(--font-mono); }
+.plg-empty { padding: var(--s-6) var(--s-1); font: var(--t-13) var(--font-ui); color: var(--c-text-2); }
+
+/* an icon: the plain stand-in for the plugin's object (bims' render goes in its place) */
+/* one tile for every icon (#4): 40 on --c-sunken at --r-2, the object drawn at 32 inside (PluginIcon
+   PX) or the title's capital at t-15/600; the head's 56 at --r-3, its object 48. Off: the object or
+   letter at half, the tile kept, so it stays readable in dark (#15) */
+.plg-icon { position: relative; flex: none; display: inline-flex; align-items: center; justify-content: center; border-radius: var(--r-2); background: var(--c-sunken); box-shadow: inset 0 0 0 1px var(--c-line); }
+.plg-icon.row { width: var(--s-10); height: var(--s-10); }
+.plg-icon.head { width: calc(var(--s-12) + var(--s-2)); height: calc(var(--s-12) + var(--s-2)); border-radius: var(--r-3); }
+.plg-mono-letter { font: 600 var(--t-15)/1 var(--font-ui); color: var(--c-text-2); }
+.plg-icon.head .plg-mono-letter { font-size: var(--t-22); }
+.plg-obj { width: var(--s-8); height: var(--s-8); object-fit: contain; user-select: none; }
+.plg-icon.head .plg-obj { width: var(--s-12); height: var(--s-12); }
+.plg-icon.glass > .plg-obj, .plg-icon.glass > .plg-mono-letter { opacity: 0.5; }
+.plg-badge { position: absolute; bottom: calc(-1 * var(--s-1)); right: calc(-1 * var(--s-1)); width: var(--s-4); height: var(--s-4); display: inline-flex; align-items: center; justify-content: center; border-radius: 50%; background: var(--c-accent); color: var(--c-on-ink, #fff); font: 700 var(--t-11)/1 var(--font-ui); }
+.plg-badge.err { background: var(--c-err); }
+
+/* a plugin's page: its banner (its object in the box), then its column: the actions' row, the lines
+   to try, its parts, about */
+.plg-page { gap: var(--s-6); }
+.plg-page-col { display: flex; flex-direction: column; gap: var(--gap-page); }
+.plg-page-acts { display: flex; align-items: center; gap: var(--s-3); font: var(--t-12) var(--font-ui); }
+/* the plugin's own object in the banner's box: transparent, no tile (the box is the frame rule's) */
+.b-banner .vis > .plg-icon.head { width: 100%; height: 100%; border-radius: 0; background: none; box-shadow: none; }
+/* no badge in the banner's box: what waits on him is in its facts (designer m_44023 #4) */
+.b-banner .vis .plg-badge { display: none; }
+/* its switch: a row in a box, like its parts' */
+.plg-page-switch { flex: 1 1 auto; }
+.plg-err { color: var(--c-err); }
+.b-banner .vis > .plg-icon.head .plg-obj { width: auto; height: 100%; max-width: 100%; }
+.b-banner .vis > .plg-icon.head .plg-mono-letter { font: 600 var(--f-question); }
+.b-banner .title > .plg-tag { margin-left: var(--s-2); vertical-align: middle; }
+.plg-ask { display: flex; align-items: center; justify-content: space-between; gap: var(--s-3); padding: var(--s-2) var(--s-3); border-radius: var(--r-2); background: var(--c-err-soft); font: var(--t-13) var(--font-ui); color: var(--c-text); }
+.plg-acts { display: flex; gap: var(--gap-inline); }
+.plg-try { display: flex; flex-direction: column; gap: var(--s-1); }
+.plg-try-line { display: flex; justify-content: space-between; gap: var(--s-3); padding: var(--s-2) var(--s-3); border: 0; border-radius: var(--r-2); background: var(--c-raised); box-shadow: inset 0 0 0 1px var(--c-line); font: var(--t-13) var(--font-read); color: var(--c-text); text-align: left; }
+.plg-try-line:hover { background: var(--c-hover); }
+.plg-fold { align-self: flex-start; margin: 0; padding: var(--s-1) var(--s-3) var(--s-1) calc(var(--s-6) + var(--s-6)); border: 0; background: none; font: var(--t-12) var(--font-ui); color: var(--c-text-2); }
+.plg-tools { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: var(--s-1) var(--s-4); padding: var(--s-1) var(--s-3) var(--s-3) calc(var(--s-6) + var(--s-6)); }
+.plg-tool { display: flex; align-items: center; justify-content: space-between; gap: var(--s-2); min-height: var(--h-row-tight); }
+.plg-tool.off .plg-mono { opacity: 0.55; }
+.plg-about { display: flex; flex-direction: column; gap: var(--s-1); }
+.plg-kv { display: grid; grid-template-columns: 120px 1fr; gap: var(--s-2) var(--gap-block); margin: 0; padding: var(--s-3); border-radius: var(--r-3, 10px); background: var(--c-raised); box-shadow: inset 0 0 0 1px var(--c-line); font: var(--t-13) var(--font-ui); }
+.plg-kv dt { color: var(--c-text-2); }
+.plg-kv dd { margin: 0; color: var(--c-text); overflow-wrap: anywhere; }
+
+/* the add sheets */
+.plg-form { display: flex; flex-direction: column; gap: var(--s-2); font: var(--t-13) var(--font-ui); }
+.plg-label { margin-top: var(--s-1); font: 600 11.5px/1.2 var(--font-ui); color: var(--c-text-3); }
+.plg-runs { display: flex; flex-direction: column; gap: var(--s-1); }
+.plg-run, .plg-secret { display: grid; grid-template-columns: 120px 1fr; align-items: center; gap: var(--s-2); }
+.plg-run-name { font-weight: 500; color: var(--c-text); }
+.plg-run-cmd { padding: var(--s-1) var(--s-2); border-radius: var(--r-1); background: var(--c-sunken); font: 12px/1.4 var(--font-mono); color: var(--c-text); overflow-wrap: anywhere; }
+
+/* a switch inside a tip's span: the span is a flex box, so the switch keeps its size */
+.plg-tg { display: inline-flex; align-items: center; }
+.plg-tool { min-width: 0; }
+
+/* a skill's tab (SkillTab.tsx): one scroll in the panel; its head (the name in mono, the whole
+   description, its facts, its actions and its path), its frontmatter's key rows, its SKILL.md, its
+   folder's files */
+.plg-skill { height: 100%; overflow-y: auto; box-sizing: border-box; padding: var(--s-6) var(--s-6) var(--float-room); display: flex; flex-direction: column; gap: var(--s-6); }
+.plg-skill-head { display: flex; flex-direction: column; gap: var(--s-2); }
+.plg-skill-name { margin: 0; font: 600 var(--t-15)/1.4 var(--font-mono); color: var(--c-text); overflow-wrap: anywhere; }
+.plg-skill-say { margin: 0; font: var(--f-lead); color: var(--c-text-2); }
+.plg-skill-facts { margin: 0; font: var(--t-13)/var(--lh-ui) var(--font-ui); color: var(--c-text-3); }
+.plg-skill-acts { display: flex; align-items: center; gap: var(--s-2); margin-top: var(--s-2); min-width: 0; }
+.plg-skill-path { flex: 1 1 auto; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; text-align: right; font: var(--f-mono); color: var(--c-text-3); }
+.plg-skill-front .plg-kv { grid-template-columns: max-content 1fr; }
+.plg-kv-row { display: contents; }
+.plg-kv-row dd { display: flex; align-items: flex-start; gap: var(--s-1); }
+.plg-kv-fold { display: inline-flex; flex: none; margin: 0; padding: 0; border: 0; background: none; color: var(--c-text-3); }
+.plg-kv-v { white-space: pre-wrap; }
+.plg-kv-v.cut { overflow: hidden; display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; }
+.plg-skill-broken { display: flex; align-items: center; gap: var(--s-2); margin: 0 0 var(--s-2); font: var(--t-13) var(--font-ui); color: var(--c-err); }
+.plg-skill-raw { margin: 0; padding: var(--s-3); border-radius: var(--r-2); background: var(--c-sunken); font: var(--f-mono); color: var(--c-text); white-space: pre-wrap; overflow-wrap: anywhere; }
+.plg-skill-src { margin-left: auto; }
+.plg-skill-toggle { margin: 0; padding: 0 var(--s-2); height: var(--h-control-sm); border: 0; border-radius: var(--r-1); background: none; font: var(--t-12) var(--font-ui); color: var(--c-text-2); }
+.plg-skill-toggle:hover { background: var(--c-hover); }
+.plg-skill-toggle[aria-pressed="true"] { background: var(--c-active); color: var(--c-text); }
+.plg-skill-body { font: var(--t-14)/1.6 var(--font-read); color: var(--c-text); }
+/* a code block keeps its lines: it scrolls sideways inside its padding, its last 24 px fading out at
+   the right, never a hard cut at the panel's edge (ui-review m_43947 #5, designer m_44023 #3) */
+.plg-skill-body pre { overflow-x: auto; padding: var(--s-3) var(--s-6) var(--s-3) var(--s-3); border-radius: var(--r-2); mask-image: linear-gradient(to right, #000 calc(100% - var(--s-6)), transparent); }
+.plg-skill-back { display: inline-flex; align-items: center; gap: var(--s-1); align-self: flex-start; margin: 0; padding: 0; border: 0; background: none; font: var(--t-13) var(--font-ui); color: var(--c-text-2); }
+.plg-skill-md { display: flex; flex-direction: column; gap: var(--s-2); }
+.plg-skill-files { display: flex; flex-direction: column; }
+.plg-skill-file { display: flex; align-items: center; gap: var(--s-2); height: var(--h-control); margin: 0; padding: 0 var(--s-3); border: 0; border-radius: var(--r-2); background: none; color: var(--c-text); text-align: left; }
+.plg-skill-file:hover { background: var(--c-hover); }
+.plg-skill-file:focus-visible, .plg-skill-back:focus-visible, .plg-kv-fold:focus-visible, .plg-skill-toggle:focus-visible { outline: 2px solid var(--c-focus); outline-offset: -2px; }

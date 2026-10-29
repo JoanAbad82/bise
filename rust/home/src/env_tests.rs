@@ -99,6 +99,45 @@ fn the_python_copy_matches() {
     assert_eq!(list("TEST"), of(Kind::Test), "tests/bise_env.py TEST");
 }
 
+/// The desktop app's copy (apps/desktop/src/main/env_vars.gen.ts): the
+/// internal and test names, generated from [`VARS`] so the app's
+/// `childEnv` (src/main/childenv.ts) drops what `env_for` drops. A stale
+/// or hand-edited file is red; `BISE_PROTO_BLESS=1` rewrites it (one bless
+/// for every generated TS file, like bise-proto's).
+fn desktop_ts() -> String {
+    let mut s = String::new();
+    s.push_str("// generated from bise_home::env::VARS (rust/home/src/env_tests.rs), never hand-edited:\n");
+    s.push_str("// BISE_PROTO_BLESS=1 cargo test -p bise-home --lib env::tests\n");
+    for (k, what, kind) in [
+        ("INTERNAL_VARS", "set by bise for one child: no child ever inherits one", Kind::Internal),
+        ("TEST_VARS", "a knob of the tests: a child gets one only in test mode", Kind::Test),
+    ] {
+        s.push_str(&format!("\n/** {what} */\nexport const {k} = [\n"));
+        for v in VARS.iter().filter(|v| v.kind == kind) {
+            s.push_str(&format!("  '{}',\n", v.name));
+        }
+        s.push_str("] as const;\n");
+    }
+    s.push_str("\n/** a voice-fake test knob the core also gets in an off-screen run, never the terminal shells (Var::offscreen_core) */\nexport const OFFSCREEN_CORE_VARS = [\n");
+    for v in VARS.iter().filter(|v| v.offscreen_core) {
+        s.push_str(&format!("  '{}',\n", v.name));
+    }
+    s.push_str("] as const;\n");
+    s
+}
+
+#[test]
+fn the_desktop_copy_is_generated() {
+    let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../apps/desktop/src/main/env_vars.gen.ts");
+    let want = desktop_ts();
+    if test_setting("BISE_PROTO_BLESS").is_some() {
+        std::fs::write(&path, &want).unwrap();
+        return;
+    }
+    let have = std::fs::read_to_string(&path).unwrap_or_default();
+    assert!(have == want, "{} is stale: BISE_PROTO_BLESS=1 cargo test -p bise-home --lib env::tests", path.display());
+}
+
 /// A parent full of junk internal variables and the user's settings.
 fn parent() -> Vec<(OsString, OsString)> {
     [
@@ -132,7 +171,7 @@ fn parent() -> Vec<(OsString, OsString)> {
 
 #[test]
 fn no_child_inherits_an_internal_variable() {
-    for child in [Child::Hub, Child::Core, Child::Repl, Child::Shell] {
+    for child in [Child::Hub, Child::Core, Child::Repl, Child::Shell, Child::Script] {
         let env = env_for(child, parent(), [("SB_AGENT", "t1")]);
         let get = |k: &str| env.get(k).map(|v| v.to_string_lossy().into_owned());
         for junk in ["SB_CORE_BIN", "SB_SOCKET", "SB_TASK", "BISE_ROLE", "BISE_SESSION_CHOICE", "BISE_APP_ROOT", "BEND_WORKDIR", "BEND_WIRE_LOG", "BISE_OWNERS"] {
@@ -164,4 +203,29 @@ fn a_set_value_wins_and_unset_removes() {
     assert_eq!(env.get("BEND_MODEL"), Some(OsStr::new("other")));
     env.unset("MISTRAL_API_KEY");
     assert_eq!(env.get("MISTRAL_API_KEY"), None);
+}
+
+/// hub-fifo: the test home keeps a test run's own inputs (a bench's
+/// journal, the gate's sb-core) and still unsets every other place
+/// variable; only test settings carry the flag.
+#[test]
+fn the_test_home_keeps_only_the_test_runs_inputs() {
+    for n in ["SB_BENCH_JOURNAL", "SB_CORE_BIN", "SB_SEARCH_BENCH"] {
+        assert!(kept_in_tests(n), "{n}");
+    }
+    for n in ["SB_STATE_DIR", "SB_SOCKET", "BISE_HOME", "SB_EVERY_MIN_MS", "NOT_A_BISE_VAR"] {
+        assert!(!kept_in_tests(n), "{n}");
+    }
+    assert!(VARS.iter().filter(|v| v.kept_in_tests).all(|v| v.kind == Kind::Test));
+}
+
+/// architect m_22561: an off-screen desktop app hands its core exactly the
+/// three voice-fake knobs outside test mode (childenv.ts reads the flag from
+/// env_vars.gen.ts), all three test settings; the core's voice_of stays the
+/// guard against the real mic.
+#[test]
+fn only_the_voice_fake_knobs_reach_an_off_screen_core() {
+    let flagged: Vec<&str> = VARS.iter().filter(|v| v.offscreen_core).map(|v| v.name).collect();
+    assert_eq!(flagged, ["BISE_AMBIENT_FAKE_VOICE", "BISE_VOICE_FAKE_HEARD", "BISE_VOICE_FAKE_HEARD_MS"]);
+    assert!(VARS.iter().filter(|v| v.offscreen_core).all(|v| v.kind == Kind::Test && !v.kept_in_tests));
 }

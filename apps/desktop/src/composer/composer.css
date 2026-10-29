@@ -1,0 +1,604 @@
+/* The composer's own parts inside amb-kit's ComposerFrame: the field, its placeholder, the chips,
+   the strip above the box and the @ $ / list. Tokens only (src/ds/tokens.css). */
+.b-composer .in {
+  position: relative;
+}
+/* the field's line over the box's controls row (designer's composer-strip A): one line when empty,
+   longer drafts grow above the row */
+.b-composer .box {
+  box-sizing: border-box;
+}
+.b-composer .box .in {
+  flex: 1;
+  min-width: 0;
+}
+/* a frame its place bounds (the thread's column, thread.css) shrinks down to its field, which
+   scrolls: the head and the row keep their height, the line and its words take what is left
+   (his m_45466: the words went under the window) */
+.b-composer .box > .head,
+.b-composer .box > .row {
+  flex: none;
+}
+.b-composer .box > .line {
+  flex: 0 1 auto;
+  min-height: 0;
+}
+.b-composer .box > .line > .in {
+  align-self: stretch;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+/* the attachment list keeps its whole rows (4 at most, then it scrolls): never a row cut in half */
+.b-composer .in > .b-attach {
+  flex: none;
+}
+/* '+ N more': only the floating composer's cut list shows it (float.css [data-attach-cut]) */
+.b-composer .b-attach-more {
+  display: none;
+}
+.b-composer .in .b-field {
+  flex: 0 1 auto;
+}
+/* one frame (ambient m_10689): the box is the frame, the field inside it is borderless (not the
+   design system's .b-field input frame) */
+.b-composer .in .b-field {
+  display: block;
+  height: auto;
+  min-height: 1.45em;
+  max-height: 40vh;
+  overflow-y: auto;
+  padding: 0;
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+  font: inherit;
+  outline: 0;
+}
+.b-composer .in .b-field:focus-within {
+  box-shadow: none;
+}
+.b-composer .b-field .p {
+  margin: 0;
+}
+/* on the field's own line, where his first typed word goes: the field is one 22 px line with no
+   padding, so the placeholder's top is the field's (his m_47114: a 3 px drop, (28 - 1lh) / 2, left
+   it under the line's middle in every size: docked, and the floating pill at rest, focused, open) */
+.b-composer .b-field-ph {
+  position: absolute;
+  /* one line: a tail that doesn't fit wraps under it, out of sight (designer m_41726) */
+  top: 0;
+  right: 0;
+  left: 0;
+  display: flex;
+  flex-wrap: wrap;
+  height: 1lh;
+  overflow: hidden;
+  pointer-events: none;
+  user-select: none;
+}
+.b-composer .b-field-ph .ph-head,
+.b-composer .b-field-ph .ph-tail {
+  flex: none;
+  white-space: pre;
+}
+/* the TipTap field (pm/PmField.tsx, behind Composer.tsx ENGINE): its host adds no box; ProseMirror
+   needs pre-wrap; the dictation's live words are dim after the take's chip */
+.b-composer .b-field-host {
+  display: contents;
+}
+/* ThreadComposer's focus wrapper (composer/talking.ts): no box of its own */
+.cmp-talk {
+  display: contents;
+}
+.b-composer .b-field.ProseMirror {
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+  font-variant-ligatures: none;
+}
+.b-composer .b-field .b-dictation {
+  color: var(--c-text-2);
+}
+/* the take's chip, the TUI's voice chip (pm/meter.ts, designer m_22700): the quote and image chips'
+   drawing (1 px line, r 9, no fill), 8 px padding and 8 px between its parts. Listening: '●' in
+   accent blinking 600 ms on / 600 ms off, 6 accent bars (his last levels, the newest on the
+   right), the time mono text-2. Transcribing: a steady '∿' in accent, the bars text-3 rolling a
+   wave, the time held. One width in every state: nothing moves. Reduced motion: the ● stays lit
+   (the wave holds still in schema.ts). His live words, if any, follow it in text-2. */
+.b-composer .b-field .b-dictation .chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-2);
+  height: var(--s-5);
+  padding: 0 var(--s-2);
+  margin: 0 1px;
+  vertical-align: 1px;
+  border: 1px solid var(--c-line);
+  border-radius: 9px;
+  line-height: 1;
+}
+.b-composer .b-field .b-dictation .sign {
+  display: inline-block;
+  width: 1em;
+  text-align: center;
+  font-style: normal;
+  color: var(--c-accent);
+}
+.b-composer .b-field .b-dictation .chip[data-phase="listening"] .sign::before {
+  content: "●";
+  font-size: 0.75em;
+}
+.b-composer .b-field .b-dictation .chip[data-phase="listening"] .sign {
+  animation: b-blink 1.2s steps(1) infinite;
+}
+/* the ∿ is a thin stroke: heavier, so it reads the full accent as the ● does (designer m_22785) */
+.b-composer .b-field .b-dictation .chip[data-phase="transcribing"] .sign::before {
+  content: "∿";
+  font-weight: 700;
+  font-size: 1.15em;
+}
+/* a bar per level, 8 steps from 3 to 14 px (▁ to █), 3 px wide, 2 px apart: the meter is a glyph */
+.b-composer .b-field .b-dictation .mt {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: calc(var(--s-1) / 2);
+  height: 14px;
+}
+.b-composer .b-field .b-dictation .mt i {
+  width: 3px;
+  height: calc(3px + 11px * var(--h, 0) / 7);
+  border-radius: 1px;
+  background: var(--c-accent);
+}
+.b-composer .b-field .b-dictation .mt[data-phase="transcribing"] i {
+  background: var(--c-text-3);
+}
+.b-composer .b-field .b-dictation .t::before {
+  content: attr(data-t);
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--c-text-2);
+}
+/* narrow (fitFor): less than 160 px of free text, the time drops, then 3 bars (listening: the
+   newest 3; transcribing: the first 3) */
+.b-composer .b-field .b-dictation .chip:not([data-fit="full"]) .t,
+.b-composer .b-field .b-dictation .chip[data-fit="three"][data-phase="listening"] .mt i:nth-child(-n + 3),
+.b-composer .b-field .b-dictation .chip[data-fit="three"][data-phase="transcribing"] .mt i:nth-child(n + 4) {
+  display: none;
+}
+.b-composer .b-field .b-dictation .chip:not([data-fit]) .t {
+  display: inline;
+}
+/* his live words (designer m_22720): text-3, provisional (the final lands in ink); one space after
+   the chip, a CSS content (the node's text is his words alone); they wrap like his text, a new
+   partial swaps them in place, no fade */
+.b-composer .b-field .b-dictation .w {
+  color: var(--c-text-3);
+}
+.b-composer .b-field .b-dictation .w:not(:empty)::before {
+  content: " ";
+}
+@media (prefers-reduced-motion: reduce) {
+  .b-composer .b-field .b-dictation .chip[data-phase] .sign {
+    animation: none;
+  }
+}
+/* a take that came back with no words or an error (designer m_22396): sans text-2, only the ▲ in
+   the warn tone; 'try again' in ink, underlined on hover, a click does it; its key and 'esc drops
+   it' text-3, the key mono as the key line's */
+.b-composer .b-field .b-dictation[data-failed] {
+  font-family: var(--font-ui);
+}
+.b-composer .b-field .b-dictation .warn {
+  color: var(--c-err); /* no warn token in the ds: the err tone, as a failed try's in the thread */
+}
+/* '· try again ⌥⏎ · esc drops it' never wraps; the reason cuts instead (schema.ts fitFailed) */
+.b-composer .b-field .b-dictation .tail {
+  white-space: nowrap;
+}
+.b-composer .b-field .b-dictation .retry {
+  color: var(--c-text);
+}
+.b-composer .b-field .b-dictation .retry:hover {
+  text-decoration: underline;
+}
+.b-composer .b-field .b-dictation .k {
+  font-family: var(--font-mono);
+  color: var(--c-text-3);
+}
+.b-composer .b-field .b-dictation .k-what {
+  color: var(--c-text-3);
+}
+.b-composer-strip {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  padding: 0 var(--s-1) var(--gap-tight);
+  font: var(--t-12) var(--font-mono);
+  color: var(--c-text-3);
+}
+/* the attachment list in the box, above his words (designer's composer-attachments A): 28 px rows
+   number · sign · name · facts · ✕ on hover, aligned in columns like the terminal's; 4 rows, then it
+   scrolls; a rule under it; the name cuts first, the facts stay */
+.b-composer .b-attach {
+  display: flex;
+  flex-direction: column;
+  max-height: calc(4 * var(--h-row-tight));
+  overflow-y: auto;
+  /* 2 px of room over the first row, given back by the margin (the rows stay put): the ✕'s ds focus
+     ring (4 px out, the ✕ 2 px in) is drawn whole, never cut by the list's scroll (m_46812) */
+  margin: calc(var(--s-1) / -2) 0 var(--s-2);
+  padding-top: calc(var(--s-1) / 2);
+  padding-bottom: var(--s-1);
+  border-bottom: 1px solid var(--c-line);
+}
+.b-composer .b-attach-row {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  flex: none;
+  height: var(--h-row-tight);
+  padding: 0 var(--s-1);
+  border-radius: var(--r-2);
+  font: var(--t-13) / 1 var(--font-ui);
+  color: var(--c-text);
+}
+.b-composer .b-attach-row.lit {
+  background: var(--c-hover);
+}
+.b-composer .b-attach-row .n {
+  flex: none;
+  min-width: 1ch;
+  font: var(--t-12) / 1 var(--font-mono);
+  color: var(--c-text-3);
+}
+.b-composer .b-attach-row .sg {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  color: var(--c-text-2);
+}
+/* .thumb, never .th: artifacts/thumbs/thumbs.css's .th is global (absolute, inset 0) */
+.b-composer .b-attach-row .sg.thumb {
+  border-radius: 3px;
+  object-fit: cover;
+}
+.b-composer .b-attach-row .nm {
+  flex: 0 100 auto;
+  min-width: 8ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* the facts give way only once the name is down to its first letters (a long folder path) */
+.b-composer .b-attach-row .in3 {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--c-text-3);
+  white-space: nowrap;
+}
+.b-composer .b-attach-row .x {
+  flex: none;
+  margin-left: auto;
+  opacity: 0;
+}
+/* ✕ on the pointer's hover or the keyboard's focus only, never from 'lit' alone: the caret next to
+   its chip lights the row, the ✕ stays away (designer m_46780). Hidden by its opacity, never its
+   visibility: a hidden button takes no focus, and Tab must reach it (with the ds ring, m_46812) */
+.b-composer .b-attach-row:hover .x,
+.b-composer .b-attach-row:focus-within .x {
+  opacity: 1;
+}
+.b-composer-strip .k {
+  margin-left: var(--gap-inline);
+}
+.b-composer-strip .n {
+  color: var(--c-text-2);
+}
+/* the @ $ / list floats on <body> (Picker.tsx pickPlace gives its fixed place): over the floating
+   composer (40), like the ds's floating picker (dropdown.css) */
+.b-composer-pick {
+  position: fixed;
+  z-index: 45;
+}
+/* its place in the composer (what it measures the box from): nothing drawn */
+.b-composer-pick-at {
+  display: none;
+}
+.b-composer {
+  position: relative;
+}
+/* the context strip's items (thread/ComposerTab.tsx; the strip itself is the frame's head, ds/css/composer.css):
+   each item whole or gone (kept in the flow's measure, never drawn) */
+.b-composer .cmp-ctx {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  gap: var(--s-4);
+  min-width: 0;
+}
+.b-composer .cmp-ctx .it {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-2);
+  min-width: 0;
+}
+.b-composer .cmp-ctx .it.br {
+  flex: 0 1 auto;
+}
+/* the addressee's state where 'local' was (his m_44719): main's breath or the ask mark, its words
+   text-3; the mark alone carries the accent when it waits on him */
+.b-composer .cmp-ctx .it.st {
+  color: var(--c-text-3);
+}
+/* 'to perf': whom his words go to, the strip's first item and never given way (his m_47126): whole,
+   cut with its ellipsis only when alone it can't fit; main's 'to bise' text-2. Its picker's caret
+   follows the words' color */
+.b-composer .cmp-ctx .it.to {
+  flex: none;
+  max-width: 100%;
+  color: var(--c-text-2);
+}
+.b-composer .cmp-ctx .it.to .w {
+  min-width: 0;
+}
+/* an agent that is not main: its name in the accent at 600 as main's tab had it (agent-target,
+   designer m_28208; his ask m_44704); never main's */
+.b-composer .cmp-ctx .it.to.acc {
+  color: var(--c-accent);
+  font-weight: 600;
+}
+.b-composer .cmp-ctx-sign {
+  display: inline-flex;
+}
+/* 'lands on main' after the branch: a fact, text-3 (designer m_43996); short of room it goes whole
+   right after the project (tab.ts stripFit), never squeezed to a sliver (ui-review m_47192) */
+.b-composer .cmp-ctx .it.lands {
+  flex: none;
+  color: var(--c-text-3);
+  white-space: nowrap;
+}
+.b-composer .cmp-ctx .nm {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.b-composer .cmp-ctx .mono {
+  font-family: var(--font-mono);
+}
+/* the project's picker: the strip's words, its caret; the 6% hover, never a fill at rest */
+.b-composer .cmp-ctx .cmp-ctx-pick {
+  height: var(--s-6);
+  gap: var(--s-2);
+  margin-inline: calc(-1 * var(--s-2));
+  padding: 0 var(--s-2);
+  font: inherit;
+  color: inherit;
+}
+.b-composer .cmp-ctx .cmp-ctx-pick .w {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-2);
+}
+.b-composer .cmp-ctx .gone {
+  position: absolute;
+  visibility: hidden;
+  pointer-events: none;
+}
+.b-composer .cmp-ctx .end {
+  flex: none;
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-2);
+  color: var(--c-text-3);
+}
+.b-composer .cmp-ctx .end .num {
+  font-variant-numeric: tabular-nums;
+}
+/* bare (his words answer a card, go to another agent by its @name, or about an open artifact): the
+   label alone, cut after a whole word; the accent while it answers */
+.b-composer .cmp-ctx.bare .lbl {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--c-text);
+}
+.b-composer .box.ans .cmp-ctx.bare .lbl {
+  color: var(--c-accent);
+}
+/* an open item his words close without answering it ('to perf · the approval waits for 1 or 2'):
+   the rest strip's type, 'to perf' in the accent at 600 as at rest, the rest text-3 (designer m_44890) */
+.b-composer .cmp-ctx.bare .lbl.to {
+  font: var(--f-meta);
+  color: var(--c-text-3);
+}
+.b-composer .cmp-ctx.bare .lbl.to .who {
+  color: var(--c-accent);
+  font-weight: 600;
+}
+.b-composer .box.ans .cmp-ctx.bare .who {
+  font-weight: 600;
+}
+/* an open question from main: the box plain (his words go to main, his m_47126), the label in the
+   accent as a question's, so it still reads as waiting on him (designer m_47129) */
+.b-composer .cmp-ctx.bare .lbl.ask {
+  color: var(--c-accent);
+}
+.b-composer .cmp-ctx.bare .lbl.ask .who {
+  font-weight: 600;
+}
+.b-composer .box.ans:not(.quiet) > .head {
+  background: color-mix(in srgb, var(--c-accent) 7%, transparent);
+}
+/* the one-off notice at the strip's right (Composer NoticeLine, notice.ts: a refused command, the
+   hub's word on his answer): nothing moves (designer m_29135). Sans 12 text-2; only commands and
+   paths in mono; the mark ✗ in the error color, a note's · text-2. One line, cut after a whole word
+   with a glued …, the whole words in its tip */
+.b-composer .head > .notice {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  justify-content: flex-end;
+  gap: var(--gap-inline);
+  color: var(--c-text-2);
+}
+.b-composer .notice .mark {
+  flex: none;
+}
+.b-composer .notice.err .mark {
+  color: var(--c-err);
+}
+.b-composer .notice .words {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  white-space: pre;
+}
+.b-composer .notice .code {
+  font-family: var(--font-mono);
+}
+/* a selection in the field is the ds 9% text tint: the light theme's pale pink selection didn't
+   show on the field's fill, so a refused line put back selected looked unselected (designer m_29408) */
+.b-composer .in ::selection {
+  background: color-mix(in srgb, var(--c-text) 9%, transparent);
+}
+/* the ds send has no hover of its own: the ds primary button's (prim.css .b-btn.pri:hover) */
+.b-composer .send {
+  transition: background var(--d-fast) var(--ease-out);
+}
+.b-composer .send:not(:disabled):not(.off):hover {
+  background: color-mix(in srgb, var(--c-ink) 88%, var(--c-solid));
+}
+/* TP-R6: the 3 s flash of an approvals switch at the strip's right, its mode word in ink (the TUI's keybar.rs) */
+.b-composer .flash-word {
+  color: var(--c-text);
+  font-weight: 600;
+}
+/* the tool row (mockup 1, thread/ComposerTools.tsx): '+' and the mic 28 square, the menus 28 high,
+   12/16 text-2, the 6% hover; 'yolo' in --c-err while on; their pickers (ds PickerPop) open above
+   the box. Short (the box under 440 px), the effort leaves the model's button: it stays in its
+   menu; the mode never drops */
+.b-composer .box {
+  container: cmp-box / inline-size;
+}
+.b-composer .cmp-tool {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-1);
+  height: var(--h-control-sm);
+  padding: 0 var(--s-2);
+  border: 0;
+  border-radius: var(--r-2);
+  background: none;
+  font: var(--t-13) var(--font-ui);
+  color: var(--c-text-2);
+  white-space: nowrap;
+  transition:
+    background var(--d-fast) var(--ease-out),
+    color var(--d-fast) var(--ease-out);
+}
+.b-composer .cmp-tool:hover,
+.b-composer .cmp-tool[aria-expanded='true'] {
+  background: var(--c-hover);
+  color: var(--c-text);
+}
+.b-composer .cmp-plus,
+.b-composer .cmp-mic {
+  justify-content: center;
+  width: var(--h-control-sm);
+  padding: 0;
+}
+.b-composer .cmp-mic[hidden] {
+  display: none;
+}
+/* ⌃ held (heldkeys.ts, designer m_44287): the ⌃R keycap in the mic's 28 box, in place of its icon */
+.b-composer .cmp-mic-key {
+  display: inline-flex;
+  animation: cmp-held-in 120ms var(--ease-out);
+}
+/* a held modifier's keys in the row's empty middle: one line high, what doesn't fit wraps to the
+   hidden second line, whole pairs from the end (the drop order is heldkeys.ts's); 12 between pairs */
+.b-composer .cmp-held {
+  flex: 1 1 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  column-gap: var(--s-3);
+  min-width: 0;
+  height: var(--h-control-sm);
+  padding: 0 var(--s-2);
+  overflow: hidden;
+  font: var(--f-meta);
+  color: var(--c-text-3);
+  white-space: nowrap;
+  animation: cmp-held-in 120ms var(--ease-out);
+}
+/* the list takes the row's whole middle (designer m_44571): the spacer gives way, so the room is
+   what lies between the left group and the right one, 12 from each (its 8 padding + the row's 4 gap) */
+.b-composer .box > .row:has(> .cmp-held) > .sp {
+  display: none;
+}
+.b-composer .cmp-held-pair {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-1);
+  height: var(--h-control-sm);
+}
+.b-composer .cmp-held-sep,
+.b-composer .cmp-held-word {
+  color: var(--c-text-3);
+}
+@keyframes cmp-held-in {
+  from {
+    opacity: 0;
+  }
+}
+/* reduced motion: there at once; gone at release with no fade (it unmounts) */
+@media (prefers-reduced-motion: reduce) {
+  .b-composer .cmp-held,
+  .b-composer .cmp-mic-key {
+    animation: none;
+  }
+}
+:root[data-reduce-motion] .b-composer .cmp-held,
+:root[data-reduce-motion] .b-composer .cmp-mic-key {
+  animation: none;
+}
+/* the mode and model chips are the ds PickerTrigger (ds/dropdown.tsx: the same 28 px chip, the
+   caret centered 8 px after the words): 12/16 text-2, the mode 500 */
+.b-composer .cmp-menu {
+  font: var(--f-meta);
+  color: var(--c-text-2);
+}
+/* yolo is text-2 like the model: pink and red are only for what waits on him (designer m_43892) */
+.b-composer .cmp-menu.cmp-yolo {
+  font-weight: 500;
+}
+/* very narrow (680 with a panel open, ui-review m_47192): the model's words cut with their ellipsis,
+   the send never leaves the box */
+.b-composer .cmp-model {
+  margin-left: auto;
+  flex: 0 1 auto;
+  min-width: 0;
+}
+.b-composer .box > .row > .send {
+  flex: none;
+}
+@container cmp-box (max-width: 440px) {
+  .b-composer .cmp-menu .eff {
+    display: none;
+  }
+}
+.b-composer .box {
+  position: relative;
+}

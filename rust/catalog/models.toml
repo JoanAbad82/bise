@@ -25,9 +25,12 @@
 #   max_output is the body's max_tokens.
 # Reasoning effort (BISE-135), for a model that reasons: efforts = the
 #   words it takes, comma-separated (unset: its family's: anthropic
-#   none,low,medium,high,max; the others none,low,medium,high);
+#   none,low,medium,high,xhigh,max; the others none,low,medium,high);
 #   effort = the one it gets when nobody picks (unset: high). /reasoning
 #   and config.toml's reasoning_effort / agent_reasoning_effort pick.
+#   Each default model has its own list, from its provider's docs and
+#   openrouter.ai/api/v1/models reasoning.supported_efforts (checked
+#   2026-10-13). On Claude, none is bise's own word: thinking off.
 # Prompt cache (BISE-268): cache_key = the body field and cache_header =
 #   the HTTP header that carry the session's routing key ("bise-<hash>",
 #   core/api.bend session_key) to a provider that routes by it; unset:
@@ -84,7 +87,7 @@
 # still set default_model.
 
 # the voice input's model (BISE-130) when config.toml's [voice] has none
-default_voice_model = "mistral/voxtral-transcribe-3"
+default_voice_model = "mistral/voxtral-mini-transcribe-3"
 
 # names without a provider (the old config lines keep working)
 [aliases]
@@ -116,6 +119,7 @@ betas = "interleaved-thinking-2025-05-14,fine-grained-tool-streaming-2025-05-14"
 # "start with Claude Opus 5.5 for most workloads": long-running agentic
 # coding
 [models."anthropic/claude-opus-5-5"]
+efforts = "none,low,medium,high,xhigh,max"
 input_price = 4
 output_price = 20
 cache_read_price = 0.2
@@ -123,21 +127,24 @@ cache_write_price = 5
 
 # demanding reasoning and long-horizon agentic work
 [models."anthropic/claude-fable-5-1"]
+efforts = "none,low,medium,high,xhigh,max"
 input_price = 10
 output_price = 50
 cache_read_price = 0.25
 cache_write_price = 12.5
 
 [models."anthropic/claude-sonnet-5-5"]
+efforts = "none,low,medium,high,xhigh,max"
 input_price = 2
 output_price = 10
 cache_read_price = 0.2
 cache_write_price = 2.5
 
 # extended thinking with a token budget (it rejects adaptive thinking),
-# 200k context
+# 200k context; its efforts are budget sizes (no xhigh)
 [models."anthropic/claude-haiku-4-5"]
 thinking = "budget"
+efforts = "none,low,medium,high,max"
 context = 200000
 max_output = 64000
 input_price = 1
@@ -167,12 +174,14 @@ reasoning = true
 
 # the proxy bills Anthropic's list prices
 [models."foundry/claude-opus-5-5"]
+efforts = "none,low,medium,high,xhigh,max"
 input_price = 4
 output_price = 20
 cache_read_price = 0.2
 cache_write_price = 5
 
 [models."foundry/claude-sonnet-5-5"]
+efforts = "none,low,medium,high,xhigh,max"
 input_price = 2
 output_price = 10
 cache_read_price = 0.2
@@ -182,6 +191,7 @@ cache_write_price = 2.5
 # supported on this model")
 [models."foundry/claude-haiku-4-5"]
 thinking = "budget"
+efforts = "none,low,medium,high,max"
 context = 200000
 input_price = 1
 output_price = 5
@@ -217,6 +227,9 @@ max_output = 128000
 vision = true
 reasoning = true
 efforts = "low,medium,high,xhigh,max"
+# Codex's default for OpenAI's models (issue #18: high spent a plan's
+# 5 hours on one issue; Gabriel's pick, page token-audit)
+effort = "medium"
 
 # the flagship, for complex reasoning and coding
 [models."openai/gpt-6-astra"]
@@ -259,12 +272,24 @@ key_env = ""
 auth = "chatgpt"
 # the plan route's request rules (runtime/provider-pure.bend)
 shape = "chatgpt-plan"
+# the prompt cache's routing key (BISE-268), as on openai: the same
+# Responses API. Without it every bise call starts with the same tools,
+# so every session of every user routes to the same cache machines and
+# misses (issue #18); Codex sends the session's key on every call too.
+# The plan routes by the session-id header (Codex: "ChatGPT derives cache
+# affinity from the Responses session-id header"): on his plan, one run
+# each, 3.1% of input cached with neither, 15.4% with the field alone,
+# 81.3% with both (page token-audit)
+cache_key = "prompt_cache_key"
+cache_header = "session-id"
 small_model = "gpt-6-luna"
 context = 1050000
 max_output = 128000
 vision = true
 reasoning = true
 efforts = "low,medium,high,xhigh,max"
+# as openai's: Codex's default (issue #18)
+effort = "medium"
 
 [models."chatgpt/gpt-6.1-sol"]
 
@@ -296,6 +321,7 @@ reasoning = true
 # "our most intelligent Flash model, engineered for long-horizon software
 # engineering"
 [models."google/gemini-3.8-flash"]
+efforts = "low,medium,high"
 input_price = 0.75
 output_price = 3.75
 cache_read_price = 0.075
@@ -320,14 +346,16 @@ cache_read_price = 0.03
 name = "Mistral"
 hint = "Mistral's models, a free tier to start"
 keys_url = "https://console.mistral.ai/api-keys"
-model = "mistral-medium-latest"
+# Large 4: Mistral's best model (the user, 2026-10-11); mistral-large-latest
+# still points at Large 3 (2512), so the id names the version
+model = "mistral-large-4"
 api = "openai-chat"
 base_url = "https://api.mistral.ai/v1"
 key_env = "MISTRAL_API_KEY"
 # docs.mistral.ai/studio/conversations/advanced/prompt-caching (BISE-268)
 cache_key = "prompt_cache_key"
 stt = "mistral"
-voice_model = "voxtral-transcribe-3"
+voice_model = "voxtral-mini-transcribe-3"
 small_model = "mistral-small-latest"
 context = 262144
 # the Mistral API's reasoning_effort takes these two (the vibe CLI maps
@@ -402,7 +430,9 @@ small_model = "google/gemini-3.8-flash"
 cache_header = "x-session-id"
 reasoning = true
 
+# OpenRouter's reasoning.supported_efforts (it refuses none on Claude)
 [models."openrouter/anthropic/claude-sonnet-5.5"]
+efforts = "low,medium,high,xhigh,max"
 context = 1000000
 max_output = 128000
 vision = true
@@ -412,6 +442,7 @@ cache_read_price = 0.2
 cache_write_price = 2.5
 
 [models."openrouter/anthropic/claude-opus-5.5"]
+efforts = "low,medium,high,xhigh,max"
 context = 1000000
 max_output = 128000
 vision = true
@@ -435,6 +466,7 @@ input_price = 2
 output_price = 10
 
 [models."openrouter/google/gemini-3.8-flash"]
+efforts = "low,medium,high"
 context = 1048576
 max_output = 65536
 vision = true
@@ -442,7 +474,9 @@ input_price = 0.75
 output_price = 3.75
 cache_read_price = 0.075
 
+# reasoning cannot be turned off; xhigh from grok-4.6 (docs.x.ai)
 [models."openrouter/x-ai/grok-4.7"]
+efforts = "low,medium,high,xhigh"
 context = 500000
 vision = true
 input_price = 2
@@ -537,7 +571,9 @@ context = 500000
 vision = true
 reasoning = true
 
+# reasoning cannot be turned off; xhigh from grok-4.6 (docs.x.ai)
 [models."xai/grok-4.7"]
+efforts = "low,medium,high,xhigh"
 input_price = 2
 output_price = 6
 cache_read_price = 0.5
@@ -570,7 +606,8 @@ hint = "low prices"
 keys_url = "https://platform.deepseek.com/api_keys"
 billing_url = "https://platform.deepseek.com/top_up"
 model = "deepseek-v4-pro"
-api = "openai-chat"
+# Chat Completions, with reasoning replayed as reasoning_content (PR #23)
+api = "deepseek-chat"
 base_url = "https://api.deepseek.com/v1"
 key_env = "DEEPSEEK_API_KEY"
 small_model = "deepseek-flash"
@@ -836,11 +873,14 @@ reasoning = true
 # scribe_v2_realtime) stream: not this batch call.
 
 # Voxtral Transcribe 3: the default voice model (dictation and voice
-# mode). Voxtral Mini (voxtral-mini-latest, the realtime mini) is not
-# offered: it got too many words wrong (the user, voice mode round 2);
-# a config or BISE_VOICE_MODEL naming a voxtral-mini-* id reads as
-# Transcribe 3 (bise_catalog::voice::RETIRED_STT_PREFIX).
-[models."mistral/voxtral-transcribe-3"]
+# mode). Mistral took the plain voxtral-transcribe-3 id away on
+# 2026-10-19 (404 since; its /v1/models has voxtral-mini-transcribe-3
+# and voxtral-small-transcribe-3, both audio_transcription). The older
+# Voxtral Mini (voxtral-mini-latest, -2602) is not offered: it got too
+# many words wrong (the user, voice mode round 2), but a config naming
+# it is used as written. A model the provider no longer knows falls back
+# to its voice pick, then its next one here (VoiceJob::fallback).
+[models."mistral/voxtral-mini-transcribe-3"]
 kind = "stt"
 
 [models."mistral/voxtral-small-transcribe-3"]

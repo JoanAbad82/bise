@@ -20,6 +20,14 @@ pub(crate) struct App {
     pub(crate) artifacts: Option<crate::artifacts_screen::Screen>,
     /// `/scheduled`, the full screen of the scheduled tasks, when open
     pub(crate) scheduled: Option<crate::scheduled_screen::Screen>,
+    /// `/plugins` and `/skills`, the Plugins screen, when open
+    pub(crate) plugins: Option<crate::plugins::Open>,
+    /// `/inbox`, what waits then his past answers, when open
+    pub(crate) inbox: Option<crate::inbox_screen::Screen>,
+    /// `/usage`, the full screen of what the calls cost, when open
+    pub(crate) usage: Option<crate::usage_screen::Screen>,
+    /// `/processes`, the full screen of what the agents left running, when open
+    pub(crate) running: Option<crate::running_screen::Screen>,
     /// the diff panel (ctrl+g, `/diff`, `± 3 files`), when open
     pub(crate) diff: Option<crate::diffview::Panel>,
     // the /computer-use screen, when open (computer_use.rs)
@@ -67,6 +75,9 @@ pub(crate) struct App {
     pub(crate) unseen: usize,
     pub(crate) tail_visible: bool,
     pub(crate) bottom_bar_rect: Option<ratatui::layout::Rect>,
+    /// the composer rule's `◌ 1 watching` (no panel): a click opens
+    /// /scheduled on the alarms
+    pub(crate) watching_rect: Option<ratatui::layout::Rect>,
     /// the first-run text's `show me what you can do`, where it was
     /// drawn: a click fills the composer with it (BISE-284)
     pub(crate) demo_rect: Option<ratatui::layout::Rect>,
@@ -166,11 +177,6 @@ pub(crate) struct App {
     pub(crate) sb: sb::Sb,
     /// the images attached in the composer (`[Image #N]`, attach.rs)
     pub(crate) attachments: Vec<crate::attach::Attachment>,
-    /// messages queued for after the turn (BISE-89), this feed's
-    pub(crate) queued: Vec<crate::queue::Queued>,
-    /// a queued message went and its turn has not started yet (queue.rs):
-    /// the next one waits, whatever a stale idle state says
-    pub(crate) queue_out: Option<std::time::Instant>,
 }
 
 /// The composer's text area in the last frame: its screen origin, its
@@ -296,6 +302,10 @@ impl App {
             logview: None,
             artifacts: None,
             scheduled: None,
+            plugins: None,
+            inbox: None,
+            usage: None,
+            running: None,
             diff: None,
             computer_use: None,
             debug,
@@ -317,6 +327,7 @@ impl App {
             unseen: 0,
             tail_visible: true,
             bottom_bar_rect: None,
+            watching_rect: None,
             demo_rect: None,
             demo_after_onboarding: false,
             hold: Default::default(),
@@ -362,8 +373,6 @@ impl App {
             should_quit: false,
             sb,
             attachments: Vec::new(),
-            queued: Vec::new(),
-            queue_out: None,
         }
     }
 }

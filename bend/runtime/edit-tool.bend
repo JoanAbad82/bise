@@ -94,12 +94,13 @@ def read_bytes(+path: String) -> IO(List<&2, U32>):
 
 # ---- edit ----
 
-def edit.wrote(r: U32 & String, +path: String, +msg: String, +old: String,
-    +new: String) -> Xp.ExecRes:
+# the result names the lines, never old/new (the model's call has them)
+def edit.wrote(r: U32 & String, +path: String, +msg: String,
+    +starts: List<&2, Nat>, +h: Nat) -> Xp.ExecRes:
   match r:
     case (code, +out):
       Bool.pick(Xp.ExecRes, U32.is_eq(code, 0),
-        Xp.Ex{True{}, Ed.edit_result(path, msg, old, new)},
+        Xp.Ex{True{}, Ed.edit_result(path, msg, starts, h)},
         fail(Ed.err_os(path, String.trim(out))))
 
 def edit.apply(e: Ed.Edited, +path: String, +nl: String, +old: String,
@@ -107,10 +108,10 @@ def edit.apply(e: Ed.Edited, +path: String, +nl: String, +old: String,
   match e:
     case Ed.EdFail{+msg}:
       IO.pure(Xp.ExecRes, fail(msg))
-    case Ed.EdOk{+text, +msg}:
+    case Ed.EdOk{+text, +msg, +starts}:
       do IO<Xp.ExecRes>:
         r : U32 & String <- sh(ATOMIC_SCRIPT(), path, Ed.restore(text, nl))
-        IO.pure(Xp.ExecRes, edit.wrote(r, path, msg, old, new))
+        IO.pure(Xp.ExecRes, edit.wrote(r, path, msg, starts, Ed.text_lines(new)))
 
 def edit.text(+text: String, +path: String, +old: String, +new: String,
     +all: Bool) -> IO(Xp.ExecRes):
@@ -163,7 +164,8 @@ def write.done(r: U32 & String, +path: String, +content: String) -> Xp.ExecRes:
   match r:
     case (code, +out):
       Bool.pick(Xp.ExecRes, U32.is_eq(code, 0),
-        Xp.Ex{True{}, Ed.write_result(path, Ed.utf8_len(content), content)},
+        Xp.Ex{True{}, Ed.write_result(path, Ed.utf8_len(content),
+          Ed.text_lines(content))},
         fail(Ed.werr_write(path, String.trim(out))))
 
 def write.go(+path: String, +content: String) -> IO(Xp.ExecRes):

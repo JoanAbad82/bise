@@ -736,43 +736,6 @@ impl VoiceMode {
         }
     }
 
-    fn pump_heard(&mut self, now: Instant) {
-        let Some(rx) = &self.heard_rx else { return };
-        let mut got = Vec::new();
-        loop {
-            match rx.try_recv() {
-                Ok(h) => got.push(h),
-                Err(TryRecvError::Empty) => break,
-                Err(TryRecvError::Disconnected) => {
-                    self.heard_rx = None;
-                    self.listen_tx = None;
-                    break;
-                }
-            }
-        }
-        for h in got {
-            match h {
-                Heard::Text(t) => {
-                    self.heard.push_str(&t);
-                    self.captions_you = true;
-                }
-                Heard::Flushed => {
-                    if self.flushing.is_some() {
-                        self.finish_turn(now);
-                    }
-                }
-                Heard::Failed(line) => {
-                    self.failed = Some((line, now));
-                    self.listen_tx = None;
-                    self.heard_rx = None;
-                    if self.flushing.is_some() {
-                        self.finish_turn(now);
-                    }
-                }
-            }
-        }
-    }
-
     /// The speech: the next one starts, its synth streams to the speaker
     /// sentence by sentence, the speaker's clock lights its words.
     fn pump_speech(&mut self, now: Instant) {
@@ -1226,6 +1189,9 @@ impl Drop for VoiceMode {
         self.speaker.stop();
     }
 }
+
+#[path = "turn_heard.rs"]
+mod heard;
 
 #[cfg(test)]
 #[path = "turn_tests.rs"]

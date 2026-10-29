@@ -1,0 +1,105 @@
+/* bise desktop window · primitives: button, kbd, chip, segmented, toggle, field, help, dot, pearl, bar, skeleton, empty, error */
+.b-btn{display:inline-flex;align-items:center;justify-content:center;gap:var(--gap-inline);height:var(--h-control-sm);padding:0 var(--pad-control-x);border-radius:var(--r-2);font:500 var(--t-13)/1 var(--font-ui);color:var(--c-text);background:var(--c-hover);border:0;box-shadow:inset 0 0 0 1px var(--c-line);transition:background var(--d-fast) var(--ease-out),transform var(--d-press) var(--ease-out),box-shadow var(--d-fast) var(--ease-out);white-space:nowrap}
+.b-btn:hover,.b-btn.is-hover{background:var(--c-active)}
+.b-btn:active,.b-btn.is-active{background:var(--c-press);transform:scale(.98)}
+.b-btn:focus-visible,.b-btn.is-focus{outline:0;box-shadow:inset 0 0 0 1px var(--c-line),0 0 0 2px var(--c-solid),0 0 0 4px var(--c-focus)}
+.b-btn.is-disabled,.b-btn:disabled{opacity:.4}
+.b-btn.pri{background:var(--c-ink);color:var(--c-on-ink);box-shadow:none}
+.b-btn.pri:hover,.b-btn.pri.is-hover{background:color-mix(in srgb,var(--c-ink) 88%,var(--c-solid))}
+.b-btn.ghost{background:none;box-shadow:none;color:var(--c-text-2)}
+.b-btn.ghost:hover,.b-btn.ghost.is-hover{background:var(--c-hover);color:var(--c-text)}
+.b-btn.danger{color:var(--c-err)}
+.b-btn.sm{height:var(--s-6);padding:0 var(--pad-control-x-sm);font-size:var(--t-13)}
+.b-btn.on{background:var(--c-active);box-shadow:none}
+.b-btn.is-loading{color:transparent;position:relative}
+.b-btn.is-loading::after{content:"";position:absolute;width:12px;height:12px;border-radius:50%;border:1.5px solid var(--c-text-3);border-top-color:var(--c-text);animation:b-spin .8s linear infinite}
+.b-btn.pri.is-loading::after{border-color:color-mix(in srgb,var(--c-on-ink) 40%,transparent);border-top-color:var(--c-on-ink)}
+/* a key: native-mac §6 (20 high, 11.5/16 text-2, pad 0 6, r 6, --c-sunken; a 1 px ring so it shows on a sunken field too) */
+.b-kbd{display:inline-flex;align-items:center;justify-content:center;flex:none;box-sizing:border-box;height:var(--h-kbd);min-width:var(--h-kbd);padding:0 calc(var(--s-1) * 1.5);border-radius:var(--r-1);background:var(--c-sunken);font:400 var(--f-kbd);color:var(--c-text-2);box-shadow:inset 0 0 0 1px var(--c-line)}
+.b-chip{display:inline-flex;align-items:center;gap:var(--gap-inline);height:var(--s-6);padding:0 var(--pad-control-x-sm);border-radius:var(--r-pill);font-size:var(--t-12);color:var(--c-text-2);background:var(--c-hover);white-space:nowrap}
+.b-chip.acc{color:var(--c-accent);background:var(--c-accent-soft)}
+.b-chip.new{color:var(--c-text);background:none;box-shadow:inset 0 0 0 1px var(--c-line);border-radius:9px}
+.b-chip.err{color:var(--c-err);background:var(--c-err-soft)}
+.b-chip.ok{color:var(--c-ok);background:var(--c-ok-soft)}
+/* a tab: the bar row's height, its words centered, never set by a vertical padding (designer's spacing §3) */
+.b-seg{display:inline-flex;gap:var(--s-1);border-bottom:1px solid var(--c-line)}
+.b-seg>span{display:inline-flex;align-items:center;height:var(--h-control-sm);padding:0 var(--pad-control-x-sm);margin-bottom:-1px;font-size:var(--t-13);color:var(--c-text-2);border-bottom:2px solid transparent;transition:color var(--d-fast) var(--ease-out),border-color var(--d-fast)}
+.b-seg>span:hover,.b-seg>span.is-hover{color:var(--c-text)}
+.b-seg>span.on{color:var(--c-text);border-bottom-color:var(--c-ink)}
+/* the switch (designer m_44968): a 36×20 track, a grey one off with a 1 px inset line, ink on (a
+   dimmed ink in dark, never cream, never the pink); a light 16 knob, 2 in, that travels 16. One size
+   everywhere. --sw-ring is the focus ring (live.css), kept apart so it adds to the inset line. */
+.b-toggle{--sw-line:inset 0 0 0 1px color-mix(in srgb,var(--c-text) 6%,transparent);--sw-ring:0 0 0 0 transparent;display:inline-block;margin:0;padding:0;border:0;font:inherit;appearance:none;width:var(--w-switch);height:var(--h-switch);border-radius:var(--r-pill);background:var(--c-switch-off);box-shadow:var(--sw-line),var(--sw-ring);position:relative;flex:none;align-self:center;transition:background var(--d-switch) var(--ease-switch)}
+.b-toggle>i{position:absolute;top:calc(var(--s-1) / 2);left:calc(var(--s-1) / 2);width:var(--s-4);height:var(--s-4);border-radius:var(--r-pill);background:var(--c-knob);box-shadow:var(--sh-knob);transition:transform var(--d-switch) var(--ease-switch),width var(--d-switch-press) var(--ease-switch)}
+.b-toggle.on{--sw-line:0 0 0 0 transparent;background:var(--c-switch-on)}
+.b-toggle.on>i{transform:translateX(var(--s-4))}
+/* pressed: the knob stretches to 20 toward its travel (on, it stays at the track's end) */
+.b-toggle:not(.is-disabled):active>i,.b-toggle.is-active>i{width:var(--s-5)}
+.b-toggle.on:not(.is-disabled):active>i,.b-toggle.on.is-active>i{transform:translateX(var(--s-3))}
+.b-toggle.is-focus{--sw-ring:0 0 0 2px var(--c-solid),0 0 0 4px var(--c-focus)}
+.b-toggle.is-disabled{opacity:.4}
+.b-toggle.is-disabled>i{box-shadow:none}
+.b-field{display:flex;align-items:center;gap:var(--gap-inline);height:var(--h-control);padding:0 var(--pad-control-x);border-radius:var(--r-2);background:var(--c-sunken);box-shadow:inset 0 0 0 1px var(--c-line);color:var(--c-text);font-size:var(--t-13)}
+.b-field .ph{color:var(--c-text-3)}
+.b-field.is-focus{box-shadow:inset 0 0 0 1px var(--c-focus),0 0 0 3px color-mix(in srgb,var(--c-focus) 25%,transparent)}
+.b-field.is-error{box-shadow:inset 0 0 0 1px var(--c-err),0 0 0 3px var(--c-err-soft)}
+.b-help{font-size:var(--t-12);color:var(--c-text-3)}
+.b-help.err{color:var(--c-err)}
+.b-dot{display:inline-block;flex:none;width:10px;height:10px;border-radius:50%;background:radial-gradient(circle at 35% 30%,var(--c-solid) 0,color-mix(in srgb,var(--c-text-3) 70%,transparent) 55%,transparent 72%)}
+/* working: the TUI's 1-cell breath in the dot's slot (designer's desktop-working page): its cells and
+   their tones are working/Signs.tsx's, on the window's one clock (still: one ∿ in ink) */
+.b-dot.wk{display:inline-flex;align-items:center;justify-content:center;width:14px;height:14px;background:none;font:500 var(--t-14)/1 var(--font-ui)}
+.b-dot.nd{background:radial-gradient(circle at 35% 30%,var(--c-solid) 0,var(--c-accent) 48%,transparent 72%);box-shadow:0 0 8px var(--c-accent-line)}
+.b-dot.ok{background:radial-gradient(circle at 35% 30%,var(--c-solid) 0,var(--c-ok) 50%,transparent 72%)}
+.b-dot.er{background:radial-gradient(circle at 35% 30%,var(--c-solid) 0,var(--c-err) 50%,transparent 72%)}
+.b-dot.off{opacity:.35}
+.b-dot.lg{width:16px;height:16px}
+.b-pearl{display:inline-flex;align-items:center;justify-content:center;flex:none;color:var(--c-accent);font-family:var(--font-display);font-style:italic}
+/* the pearl's sizes are Pearl's size prop (a drawing, not a control or a row): --pearl */
+.b-pearl.s14{--pearl:14px}.b-pearl.s22{--pearl:22px}.b-pearl.s40{--pearl:40px;font-size:1.1em}.b-pearl.s56{--pearl:56px;font-size:1.5em}.b-pearl.s120{--pearl:120px;font-size:3em}
+.b-pearl.s14,.b-pearl.s22,.b-pearl.s40,.b-pearl.s56,.b-pearl.s120{width:var(--pearl);height:var(--pearl)}
+.b-bar{height:4px;border-radius:2px;background:var(--c-active);overflow:hidden}
+.b-bar>i{display:block;height:100%;border-radius:2px;background:repeating-linear-gradient(90deg,var(--c-text) 0 10px,var(--c-text-2) 10px 14px);background-size:28px 100%;animation:b-run 1.2s linear infinite}
+.b-bar.err>i{background:var(--c-err);animation:none}
+.b-bar.done>i{background:var(--c-ok);animation:none}
+.b-bar.ind>i{width:30%;animation:b-slide 1.4s var(--ease-io) infinite}
+.b-skel{display:block;height:10px;border-radius:5px;background:linear-gradient(90deg,var(--c-hover),var(--c-active),var(--c-hover));background-size:200% 100%;animation:b-shimmer 1.4s linear infinite}
+.b-empty{display:flex;flex-direction:column;align-items:flex-start;gap:var(--s-1);padding:var(--s-2) var(--pad-row-x);color:var(--c-text-2)}
+.b-empty .say{margin:0;font:var(--t-15)/1.5 var(--font-ui);color:var(--c-text-2)}
+.b-empty .more{margin:0;font:var(--t-13)/var(--lh-ui) var(--font-ui);color:var(--c-text-3)}
+.b-empty .act{margin-top:var(--s-2)}
+.b-err{display:flex;gap:var(--gap-inline);align-items:flex-start;padding:var(--s-2) var(--pad-control-x);border-radius:var(--r-2);background:var(--c-err-soft);color:var(--c-text);font-size:var(--t-13)}
+.b-err .m{color:var(--c-err);font-weight:700}
+/* a chip with onClick is a real button (designer m_18626): the chip's look, the ds ring */
+button.b-chip{margin:0;border:0;font:inherit;font-size:var(--t-12)}
+button.b-chip:hover,button.b-chip.is-hover{background:var(--c-active)}
+button.b-chip:focus-visible{outline:2px solid var(--c-focus);outline-offset:2px}
+/* an artifact's name (desktop-agents-bar §5): pink for him, on a 10 % accent tint, 16 % on hover, a
+   hand; the chip 24 px, r 6, 8 px sides, kind and version the same pink at 70 %; inline 4 px sides */
+.b-artchip{display:inline-flex;align-items:center;gap:var(--s-2);min-width:0;max-width:100%;height:var(--s-6);margin:0;padding:0 var(--s-2);border:0;border-radius:var(--r-1);background:color-mix(in srgb,var(--c-accent) 10%,transparent);color:var(--c-accent);font:var(--t-13) var(--font-ui);white-space:nowrap}
+.b-artchip:hover,.b-artchip.is-hover,.b-artchip.open,.b-artname:hover,.b-artname.is-hover{background:color-mix(in srgb,var(--c-accent) 16%,transparent)}
+.b-artchip-title{min-width:0;overflow:hidden;text-overflow:ellipsis}
+.b-artchip-meta{flex:none;color:color-mix(in srgb,var(--c-accent) 70%,transparent);font-size:var(--t-12)}
+.b-artchip-open{flex:none;color:var(--c-text-3);font-size:var(--t-11)}
+/* keep (designer m_47680, m_47728): narrow, the meta wraps to a hidden second line before the title
+   is cut (it drops whole); then the title, one text, cuts with '…', never narrower than its first
+   letters and '…' (b-artchip-min, measured); the chip keeps that width, the row gives way */
+.b-artchip.fit{flex-wrap:wrap;align-content:flex-start;min-width:min-content;overflow:hidden}
+.b-artchip.fit>*{display:flex;align-items:center;height:var(--s-6)}
+.b-artchip.fit .b-artchip-title{display:grid;align-items:center;min-width:auto;overflow:visible}
+.b-artchip-cut,.b-artchip-min,.b-artchip-max{grid-area:1/1;white-space:nowrap}
+.b-artchip-cut{contain:inline-size;min-width:0;overflow:hidden;text-overflow:ellipsis}
+/* no overflow: hidden here, it would make its grid minimum 0 (the floor gone) */
+/* 1 px of slack: the ellipsis's own fitting rounds, without it the cut ends a letter short */
+.b-artchip-min{height:0;padding-right:1px;visibility:hidden}
+/* as wide as the title, narrow as a letter: the title's max size without raising its min */
+.b-artchip-max{height:0;overflow:hidden;visibility:hidden;white-space:normal;word-break:break-all}
+.b-artname{padding:0 var(--s-1);border-radius:var(--r-1);background:color-mix(in srgb,var(--c-accent) 10%,transparent);color:var(--c-accent);-webkit-box-decoration-break:clone;box-decoration-break:clone}
+.b-artchip:focus-visible,.b-artname:focus-visible{outline:2px solid var(--c-focus);outline-offset:2px}
+/* kind 'part': a part of his message under its words (designer m_17969): the artifact chip's look,
+   1 px line, r 9, text-2, never the accent; an image's words in ink beside its 16 px thumb */
+.b-chip.part{gap:var(--s-1);min-width:0;max-width:100%;height:var(--s-6);padding:0 var(--pad-control-x-sm);border:1px solid var(--c-line);border-radius:9px;background:none;color:var(--c-text-2);font:var(--t-12) var(--font-ui);overflow:hidden;text-overflow:ellipsis}
+button.b-chip.part:hover,button.b-chip.part.is-hover{background:var(--c-hover)}
+.b-chip.part .thumb{width:16px;height:16px;border-radius:3px;object-fit:cover;flex:none}
+.b-chip.part .thumb.none{display:inline-flex;flex:0 0 16px;color:var(--c-text-3);opacity:.7}
+.b-chip.part .ink{color:var(--c-text);overflow:hidden;text-overflow:ellipsis}

@@ -1,11 +1,11 @@
 //! `bise --version` (BISE-165, packaging.md C5): the `VERSION` file of the
 //! app root (a version dir, an install), else the crate version of a dev
-//! build; the name is the one the command was called by (`bise`, or the
-//! `bend-harness` link kept for one release).
+//! build; the name is the one the command was called by (`bise`; a
+//! version dir built before BISE-165 has `bend-harness`).
 
 use std::path::Path;
 
-/// The name this process was called by: `bise`, `bend-harness`.
+/// The name this process was called by: `bise`.
 pub(crate) fn cmd_name() -> String {
     std::env::args_os()
         .next()

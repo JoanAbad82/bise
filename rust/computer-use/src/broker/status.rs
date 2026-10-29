@@ -78,6 +78,9 @@ pub(super) fn full_status(sh: &Arc<Shared>) -> Value {
     v["agents"] = state::render(&inner.agents, json!([]), json!({}))["agents"].clone();
     v["sessions"] = json!(inner.sessions.iter().filter(|(_, n)| **n > 0).map(|(k, _)| k.clone()).collect::<Vec<_>>());
     v["pid"] = json!(std::process::id());
+    drop(inner);
+    // where it starts the helper from (a pruned version dir shows here)
+    v["helper_app"] = json!(super::helper::helper_app_cached(sh));
     v
 }
 
@@ -91,7 +94,11 @@ pub(super) fn write_state(sh: &Arc<Shared>) {
         let inner = lock(&sh.inner);
         state::render(&inner.agents, b, a)
     };
-    if let Err(e) = state::write(&sh.opts.paths, &v) {
+    // the broker's state is the whole file: it replaces it, under the lock
+    if let Err(e) = state::update(&sh.opts.paths, |f| -> std::io::Result<()> {
+        *f = v;
+        Ok(())
+    }) {
         log(&format!("state.json: {}", e));
     }
 }

@@ -3,10 +3,13 @@
 //! thread fold and the TUI read the hub's `scheduled : <json>` lines and
 //! the runs (bise's wakes) with one parser and one set of words. The
 //! words are designer's: "scheduled task" for one, "scheduled" for the
-//! lines, "run" for a wake. The caller passes `now` (the fold: the line's
-//! own time) and the UTC offset at a moment (`off`).
+//! lines, "run" for a wake; they live in the catalog
+//! ([`crate::words::scheduled`]), the choices (which word for which
+//! state) stay here. The caller passes `now` (the fold: the line's own
+//! time) and the UTC offset at a moment (`off`).
 
 use super::Scheduled;
+use crate::words::scheduled;
 use serde_json::Value;
 
 /// The UTC offset (seconds east) at a moment: the caller's clock.
@@ -38,6 +41,9 @@ pub struct Task {
     pub end: String,
     /// who stopped it: `user`, an agent, or empty
     pub stopped_by: String,
+    /// its name (sched-names): "" from an older hub or before the hub
+    /// named it; [`Task::title`] is what the lists show
+    pub name: String,
 }
 
 impl Task {
@@ -59,7 +65,19 @@ impl Task {
             ended_ms: v["ended_ms"].as_u64(),
             end: s("end"),
             stopped_by: s("stopped_by"),
+            name: s("name"),
         })
+    }
+
+    /// What the lists show (designer m_14531, m_15602): its name, else the
+    /// plain label of its instruction (`words::timer_fallback`, the hub's
+    /// too), never with its agent's name in front (the row shows it).
+    pub fn title(&self) -> String {
+        if self.name.is_empty() {
+            super::words::timer_fallback(&self.text, &self.agent)
+        } else {
+            super::words::name_fit(&super::words::name_without_agent(&self.name, &self.agent))
+        }
     }
 
     pub fn active(&self) -> bool {
@@ -74,10 +92,10 @@ impl Task {
     /// How often, short (the 80-column list): `2m`, `daily 07:30`, `once`.
     pub fn when_short(&self) -> String {
         if self.times == Some(1) {
-            return "once".into();
+            return scheduled::once.into();
         }
         match self.label.strip_prefix("every day ") {
-            Some(hm) => format!("daily {hm}"),
+            Some(hm) => scheduled::daily(hm),
             None => self.label.trim_start_matches("every ").to_string(),
         }
     }
@@ -85,8 +103,8 @@ impl Task {
     /// How many so far, or until when: `2 of 6`, `until 18:00`, or "".
     pub fn so_far(&self, now: u64, off: Offset) -> String {
         match (self.times, self.until_ms) {
-            (Some(n), _) => format!("{} of {}", self.fired, n),
-            (None, Some(u)) => format!("until {}", ahead(u, now, off)),
+            (Some(n), _) => scheduled::n_of(self.fired, n),
+            (None, Some(u)) => scheduled::until(ahead(u, now, off)),
             _ => String::new(),
         }
     }
@@ -96,16 +114,16 @@ impl Task {
     pub fn ended_words(&self) -> String {
         match self.end.as_str() {
             "times" => match self.times {
-                Some(1) => "ran once".into(),
-                Some(n) => format!("ran its {n} times"),
-                None => "ran its times".into(),
+                Some(1) => scheduled::ran_once.into(),
+                Some(n) => scheduled::ran_n_times(n),
+                None => scheduled::ran_its_times.into(),
             },
-            "until" => "its end time passed".into(),
-            "gone" => format!("{} is gone", self.agent),
+            "until" => scheduled::end_time_passed.into(),
+            "gone" => scheduled::agent_gone(&self.agent),
             _ => match self.stopped_by.as_str() {
-                "user" => "stopped by you".into(),
-                "" => "stopped".into(),
-                by => format!("stopped by {by}"),
+                "user" => scheduled::stopped_by_you.into(),
+                "" => scheduled::stopped.into(),
+                by => scheduled::stopped_by(by),
             },
         }
     }
@@ -116,7 +134,7 @@ impl Task {
 /// 07:30` (its schedule's label), `once` (one run).
 pub fn every_words(label: &str, times: Option<u64>) -> String {
     if times == Some(1) {
-        "once".into()
+        scheduled::once.into()
     } else {
         label.to_string()
     }
@@ -145,23 +163,23 @@ pub fn hub_line(raw: &str, now: u64, off: Offset) -> Option<Scheduled> {
     match v["ev"].as_str()? {
         "set" => {
             let who = if t.by == t.agent || t.by.is_empty() {
-                format!("{} scheduled #{}", t.agent, t.id)
+                scheduled::set_own(&t.agent, t.title())
             } else {
-                format!("{} scheduled #{} for {}", t.by, t.id, t.agent)
+                scheduled::set_for(&t.by, t.title(), &t.agent)
             };
             let mut h = format!("{who} · {}", t.when());
             match (t.times, t.until_ms) {
-                (Some(n), _) if n > 1 => h.push_str(&format!(" · {n} times")),
-                (None, Some(u)) => h.push_str(&format!(" · until {}", ahead(u, now, off))),
+                (Some(n), _) if n > 1 => h.push_str(&format!(" · {}", scheduled::n_times(n))),
+                (None, Some(u)) => h.push_str(&format!(" · {}", scheduled::until(ahead(u, now, off)))),
                 _ => {}
             }
-            h.push_str(&format!(" · next {}", ahead(t.next_ms, now, off)));
+            h.push_str(&format!(" · {}", scheduled::next_at(ahead(t.next_ms, now, off))));
             Some(Scheduled { id: t.id, head: h, words: t.text })
         }
         "end" => {
-            let mut h = format!("scheduled #{} ended · {}", t.id, t.ended_words());
-            if v["in"].as_str() == Some("main") && t.agent != "main" {
-                h.push_str(&format!(" ({} · {})", t.agent, clip(&t.text, 32)));
+            let mut h = scheduled::ended(t.title(), t.ended_words());
+            if v["in"].as_str() == Some("main") && t.agent != "main" && t.end != "gone" {
+                h.push_str(&format!(" · {}", t.agent));
             }
             Some(Scheduled { id: t.id, head: h, words: String::new() })
         }
@@ -170,20 +188,21 @@ pub fn hub_line(raw: &str, now: u64, off: Offset) -> Option<Scheduled> {
 }
 
 /// A run: the wake an agent reads from bise (switchboard every.rs
-/// `wake_text`, `timer #48 (every 2m, 2/6, set by answer-line): <words>`
-/// then the stop hint) as its ◷ line: `scheduled #48 · 2 of 6 · <first
-/// words>`, `scheduled #48 · 1 of 6 · waited 4m for answer-line to
-/// finish`, `scheduled #48 · ran now, by you · <first words>`. None: not
-/// a wake.
+/// `wake_text`, `timer #48 "check the build" (every 2m, 2/6, set by
+/// answer-line): <words>` then the stop hint) as its ◷ line, its name
+/// first and never its id (designer m_14531): `check the build · 2 of 6`,
+/// `check the build · 1 of 6 · waited 4m for answer-line to finish`,
+/// `check the build · ran now, by you`. An older hub's wake has no name:
+/// its words' plain fallback (`words::timer_fallback`). None: not a wake.
 pub fn run_line(text: &str) -> Option<Scheduled> {
     // the one parser of a wake (lines.rs)
-    let (id, how, words) = super::lines::timer_wake(text)?;
-    let mut head = format!("scheduled #{id}");
+    let (id, name, how, words) = super::lines::timer_wake(text)?;
+    let mut head = if name.is_empty() { super::words::timer_fallback(words, "") } else { name.to_string() };
     let mut waited = None;
     let mut now = false;
     for part in how.split(", ") {
         if let Some((a, b)) = part.split_once('/').filter(|(a, b)| a.parse::<u64>().is_ok() && b.parse::<u64>().is_ok()) {
-            head.push_str(&format!(" · {a} of {b}"));
+            head.push_str(&format!(" · {}", scheduled::n_of(a, b)));
         } else if part.starts_with("waited ") {
             waited = Some(part.to_string());
         } else if part == "run now by the user" {
@@ -191,11 +210,10 @@ pub fn run_line(text: &str) -> Option<Scheduled> {
         }
     }
     if now {
-        head.push_str(" · ran now, by you");
+        head.push_str(&format!(" · {}", scheduled::ran_now_by_you));
     }
-    match waited {
-        Some(w) => head.push_str(&format!(" · {w}")),
-        None => head.push_str(&format!(" · {}", clip(words, 48))),
+    if let Some(w) = waited {
+        head.push_str(&format!(" · {w}"));
     }
     Some(Scheduled { id, head, words: words.trim().to_string() })
 }
@@ -204,6 +222,7 @@ pub fn run_line(text: &str) -> Option<Scheduled> {
 mod tests {
     use super::*;
     use serde_json::json;
+    use crate::words::scheduled::*;
 
     const NOW: u64 = 1_790_000_000_000;
     const UTC: Offset = &|_| 0;
@@ -216,13 +235,17 @@ mod tests {
     /// run now; the agent's stop hint never shows; not a wake: None.
     #[test]
     fn a_run_reads_as_its_scheduled_line() {
-        let l = run_line("timer #48 (every 2m, 2/6, set by answer-line): check the build and tell me what failed\n(stop it: sb every --stop 48)").unwrap();
-        assert_eq!((l.id, l.head.as_str()), (48, "scheduled #48 · 2 of 6 · check the build and tell me what failed"));
+        // designer m_14531: its name, never its id
+        let l = run_line("timer #48 \"build check\" (every 2m, 2/6, set by answer-line): check the build and tell me what failed\n(stop it: sb every --stop 48)").unwrap();
+        assert_eq!((l.id, l.head.clone()), (48, format!("build check · {}", n_of(2, 6))));
         assert_eq!(l.words, "check the build and tell me what failed");
-        let l = run_line("timer #48 (every 2m, 1/6, waited 4m for answer-line to finish, set by answer-line): x\n(stop it: sb every --stop 48)").unwrap();
-        assert_eq!(l.head, "scheduled #48 · 1 of 6 · waited 4m for answer-line to finish");
-        let l = run_line("timer #51 (every day 07:30, run now by the user, set by main): ship\n(stop it: sb every --stop 51)").unwrap();
-        assert_eq!(l.head, "scheduled #51 · ran now, by you · ship");
+        let l = run_line("timer #48 \"build check\" (every 2m, 1/6, waited 4m for answer-line to finish, set by answer-line): x\n(stop it: sb every --stop 48)").unwrap();
+        assert_eq!(l.head, format!("build check · {} · waited 4m for answer-line to finish", n_of(1, 6)));
+        let l = run_line("timer #51 \"ship\" (every day 07:30, run now by the user, set by main): ship it\n(stop it: sb every --stop 51)").unwrap();
+        assert_eq!(l.head, format!("ship · {ran_now_by_you}"));
+        // an older hub's wake (no name): its words' plain fallback
+        let l = run_line("timer #48 (every 2m, 2/6, set by answer-line): check the build and tell me what failed\n(stop it: sb every --stop 48)").unwrap();
+        assert_eq!((l.id, l.head.clone()), (48, format!("check the build and tell · {}", n_of(2, 6))));
         assert!(run_line("timer set: #1 @main every 10m").is_none());
         assert!(run_line("hello").is_none());
     }
@@ -232,37 +255,41 @@ mod tests {
     #[test]
     fn set_and_ended_lines() {
         let t = json!({"id": 48, "agent": "answer-line", "by": "answer-line", "label": "every 2m", "text": "check the build",
-                       "next_ms": NOW + 120_000, "fired": 0, "times": 6});
+                       "next_ms": NOW + 120_000, "fired": 0, "times": 6, "name": "build check"});
         let mut set = t.clone();
         set["ev"] = json!("set");
         let (h, w) = hl(&set.to_string()).unwrap();
-        assert!(h.starts_with("answer-line scheduled #48 · every 2m · 6 times · next "), "{h}");
+        assert!(h.starts_with(&format!("{} · every 2m · {} · {}", set_own("answer-line", "build check"), n_times(6), next_at(""))), "{h}");
         assert_eq!(w, "check the build");
         assert_eq!(hub_line(&set.to_string(), NOW, UTC).unwrap().id, 48);
         let mut by_main = set.clone();
         by_main["by"] = json!("main");
         by_main["times"] = json!(null);
         let (h, _) = hl(&by_main.to_string()).unwrap();
-        assert!(h.starts_with("main scheduled #48 for answer-line · every 2m · next "), "{h}");
-        for (end, by, words) in [
-            ("times", "", "ran its 6 times"),
-            ("stopped", "user", "stopped by you"),
-            ("stopped", "answer-line", "stopped by answer-line"),
-            ("until", "", "its end time passed"),
-            ("gone", "", "answer-line is gone"),
+        assert!(h.starts_with(&format!("{} · every 2m · {}", set_for("main", "build check", "answer-line"), next_at(""))), "{h}");
+        // an older hub's line (no name): the plain fallback of its words
+        let mut old = set.clone();
+        old["name"] = json!(null);
+        assert!(hl(&old.to_string()).unwrap().0.starts_with(&format!("{} · every 2m", set_own("answer-line", "check the build"))));
+        for (end, by, why) in [
+            ("times", "", ran_n_times(6)),
+            ("stopped", "user", stopped_by_you.into()),
+            ("stopped", "answer-line", stopped_by("answer-line")),
+            ("until", "", end_time_passed.into()),
+            ("gone", "", agent_gone("answer-line")),
         ] {
             let mut e = t.clone();
             e["ev"] = json!("end");
             e["ended_ms"] = json!(NOW);
             e["end"] = json!(end);
             e["stopped_by"] = json!(by);
-            assert_eq!(hl(&e.to_string()), Some((format!("scheduled #48 ended · {words}"), String::new())));
+            assert_eq!(hl(&e.to_string()), Some((ended("build check", why), String::new())));
         }
         let mut e = t.clone();
         e["ev"] = json!("end");
         e["end"] = json!("times");
         e["in"] = json!("main");
-        assert_eq!(hl(&e.to_string()).unwrap().0, "scheduled #48 ended · ran its 6 times (answer-line · check the build)");
+        assert_eq!(hl(&e.to_string()).unwrap().0, format!("{} · answer-line", ended("build check", ran_n_times(6))));
         assert!(hl("{}").is_none());
     }
 
@@ -280,10 +307,10 @@ mod tests {
     #[test]
     fn counts_and_short_forms() {
         let mut t = Task { label: "every day 07:30".into(), ..Default::default() };
-        assert_eq!((t.when(), t.when_short()), ("every day 07:30".into(), "daily 07:30".into()));
+        assert_eq!((t.when(), t.when_short()), ("every day 07:30".into(), daily("07:30")));
         t.label = "every 15m".into();
         assert_eq!(t.when_short(), "15m");
         t.times = Some(1);
-        assert_eq!((t.when(), t.when_short(), t.so_far(NOW, UTC)), ("once".into(), "once".into(), "0 of 1".into()));
+        assert_eq!((t.when(), t.when_short(), t.so_far(NOW, UTC)), (once.into(), once.into(), n_of(0, 1)));
     }
 }

@@ -10,8 +10,7 @@
 //! (`setup.rs`).
 //!
 //! It runs once per user: the flag is the `onboarded` preference
-//! (`bise_home`: a key of `~/.bise/prefs.json`, or the old
-//! `~/.local/state/switchboard/onboarded` file). `esc` / `ctrl+c` skip it and mark
+//! (`bise_home`: a key of `~/.bise/prefs.json`). `esc` / `ctrl+c` skip it and mark
 //! it seen too. `SB_ONBOARDING=off` never shows it, `on` always does (the
 //! tmux tests set `off`). `/welcome` (BISE-41) calls [`run`] to replay it.
 //!
@@ -29,6 +28,7 @@
 use crate::keycheck::Why;
 use crate::theme::{self, Mode, Palette};
 use crate::App;
+use bise_proto::words::settings;
 use crossterm::event::{poll, read, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 use ratatui::layout::{Alignment, Rect};
 use ratatui::style::{Color, Modifier, Style};
@@ -40,6 +40,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration, Instant};
 use unicode_width::UnicodeWidthStr;
 
+mod models;
 mod provider;
 #[cfg(test)]
 mod provider_tests;
@@ -55,6 +56,7 @@ pub(crate) use signin::{Flow, Kind, Logins, Poll, DENIED, UNFINISHED};
 use signin::{Account, PlanState};
 pub(crate) use provider::{request as provider_request, take_line as provider_line, Ask};
 pub(crate) use roles::{take_voice_out, Open, VoiceOut};
+pub(crate) use models::setup_of;
 
 /// The env var: `off` never shows the onboarding, `on` always does.
 pub(crate) const ENV: &str = "SB_ONBOARDING";
@@ -68,14 +70,12 @@ fn real_env(k: &str) -> Option<String> {
 
 // ---- the flag ----
 
-/// bise's state for an environment (`bise_home`: `~/.bise`, `$BISE_HOME`,
-/// or the old places).
+/// bise's state for an environment (`bise_home`: `~/.bise`, `$BISE_HOME`).
 pub(crate) fn home_of(env: Env) -> bise_home::Home {
     bise_home::Home::from_lookup(env)
 }
 
-/// Where the flag is kept: `onboarded` in `prefs.json`, or the old
-/// `~/.local/state/switchboard/onboarded` file.
+/// Where the flag is kept: `onboarded` in `prefs.json`.
 pub(crate) fn flag(env: Env) -> bise_home::Slot {
     home_of(env).pref(bise_home::Pref::Onboarded)
 }
@@ -123,7 +123,7 @@ pub(crate) fn chatgpt_hint(env: Env) -> bool {
     *HINT.get_or_init(|| {
         let home = home_of(env);
         let l = Logins::real();
-        (l.detect)(home.user_home(), env).codex_chatgpt && (l.state)(&auth_paths(&home)) == PlanState::NotSetUp
+        (l.detect)(home.user_home(), env).codex_chatgpt && (l.state)(&bise_catalog::auth_cli::Paths::of(&home)) == PlanState::NotSetUp
     })
 }
 
@@ -187,29 +187,6 @@ impl Provider {
 /// own coding base URLs), the key step's `a coding plan key` row.
 pub(crate) const CODING_PLANS: [&str; 3] = ["zai-coding", "kimi-code", "minimax"];
 
-/// The catalog and the model choice (`Setup`: `BISE_MODEL` >
-/// `BEND_MODEL` > `model` in config.toml > the default).
-/// The base URLs' variables (foundry's ANTHROPIC_FOUNDRY_BASE_URL) are
-/// also read from the .env files, like its key (~/.vibe/.env).
-pub(crate) fn setup_of(env: Env, home: &bise_home::Home) -> bise_catalog::Setup {
-    let text = std::fs::read_to_string(home.config_file()).ok();
-    let files = bise_catalog::auth::EnvFile::read_all(&home.env_files());
-    let store = bise_catalog::auth::Store::read(&home.auth_file()).unwrap_or_default();
-    // one key, every role: the checker and voice follow the keys found
-    bise_catalog::Setup::from_parts(text.as_deref(), env, &|k| bise_catalog::with_files(env, &files, k))
-        .with_keys(&bise_catalog::auth::Keys { env, store: &store, files: &files })
-}
-
-/// Where `login` keeps the keys (auth.json) and where the old ones are.
-pub(crate) fn auth_paths(home: &bise_home::Home) -> bise_catalog::auth_cli::Paths {
-    bise_catalog::auth_cli::Paths {
-        auth_file: home.auth_file(),
-        config: home.config_file(),
-        env_files: home.env_files(),
-        home: Some(home.user_home().to_path_buf()),
-    }
-}
-
 /// Every provider a key can be pasted for, in catalog order.
 pub(crate) fn key_providers(setup: &bise_catalog::Setup) -> Vec<Provider> {
     setup
@@ -228,7 +205,7 @@ pub(crate) fn key_providers(setup: &bise_catalog::Setup) -> Vec<Provider> {
 /// `.env` files.
 pub(crate) fn find_keys(env: Env, home: &bise_home::Home, setup: &bise_catalog::Setup) -> Vec<Provider> {
     use bise_catalog::auth::{EnvFile, Keys, Store};
-    let paths = auth_paths(home);
+    let paths = bise_catalog::auth_cli::Paths::of(home);
     let store = Store::read(&paths.auth_file).unwrap_or_default();
     let files = EnvFile::read_all(&paths.env_files);
     let keys = Keys { env, store: &store, files: &files };
@@ -253,37 +230,11 @@ pub(crate) fn model_blocked(setup: &bise_catalog::Setup, found: &[Provider]) -> 
         || (r.caps.key_command.is_empty() && !r.key_env.is_empty() && !found.iter().any(|p| p.id == r.provider))
 }
 
-/// `provider/model`: the provider's pick (its catalog `model`), else the
-/// model in use when it is of that provider; None when neither.
-pub(crate) fn pick_of(p: &Provider, current: &str) -> Option<String> {
-    if !p.model.is_empty() {
-        return Some(format!("{}/{}", p.id, p.model));
-    }
-    bise_catalog::split_name(current).filter(|(pid, _)| *pid == p.id).map(|_| current.to_string())
-}
-
-/// Write `model` as main's model in config.toml (`[roles] main`, BISE-298;
-/// the rest of the file kept, the old `model` key dropped).
-pub(crate) fn save_model(home: &bise_home::Home, model: &str) -> io::Result<()> {
-    let file = home.config_file();
-    let text = std::fs::read_to_string(&file).unwrap_or_default();
-    if let Some(dir) = file.parent() {
-        std::fs::create_dir_all(dir)?;
-    }
-    // BISE-298: main's role, the old `model` key dropped
-    std::fs::write(&file, bise_catalog::roles::with_role(&text, bise_catalog::roles::MAIN, model))
-}
+pub(crate) use crate::firstkey::save_model;
 
 /// auth.json has a key for this provider already.
 pub(crate) fn stored(home: &bise_home::Home, id: &str) -> bool {
     bise_catalog::auth::Store::read(&home.auth_file()).is_ok_and(|s| s.key(id).is_some())
-}
-
-/// A pasted key, cleaned: trimmed, quotes off; None when it can't be one
-/// (empty, spaces or control characters inside).
-pub(crate) fn clean_key(s: &str) -> Option<String> {
-    let k = s.trim().trim_matches('"').trim_matches('\'');
-    (!k.is_empty() && !k.chars().any(|c| c.is_whitespace() || c.is_control())).then(|| k.to_string())
 }
 
 // ---- the steps ----
@@ -563,7 +514,7 @@ impl Onb {
         found.sort_by_key(|p| p.id != self.mine);
         self.found = found;
         self.keys = provider::key_states(env, &self.home, &self.setup);
-        self.plan = (self.logins.state)(&auth_paths(&self.home));
+        self.plan = (self.logins.state)(&bise_catalog::auth_cli::Paths::of(&self.home));
     }
 
     /// Put other sign-ins (the tests' fakes): the plan's state and what
@@ -816,7 +767,7 @@ impl Onb {
                 b.push(c);
                 Sub::Paste(p, m, b)
             }
-            (Sub::Paste(p, m, b), KeyCode::Enter) => match clean_key(&b) {
+            (Sub::Paste(p, m, b), KeyCode::Enter) => match crate::firstkey::clean_key(&b) {
                 None if b.trim().is_empty() => Sub::Paste(p, m, b),
                 None => {
                     self.note = Some(Note::NotAKey);
@@ -859,35 +810,6 @@ impl Onb {
         Out::Stay
     }
 
-    /// The models offered for `p`: its pick first, then the catalog's chat
-    /// models of that provider.
-    pub(crate) fn models_of(&self, p: &Provider) -> Vec<String> {
-        // the voice picker (BISE-298): its voice models, its pick first
-        if self.voice_pick() {
-            return self.voice_models(p);
-        }
-        // a role's steps (BISE-301): the one recommended for the role first
-        let first = self.picking().and_then(|id| self.recommended(id, p)).or_else(|| pick_of(p, &self.model));
-        let mut v: Vec<String> = first.into_iter().collect();
-        // the plan: the account's own list (cached at sign-in and when
-        // /models opens), then the catalog's
-        if p.plan {
-            for m in (self.logins.models)(&auth_paths(&self.home)) {
-                let full = format!("{}/{}", p.id, m.slug);
-                if !v.contains(&full) {
-                    v.push(full);
-                }
-            }
-        }
-        for m in self.setup.catalog.models.iter().filter(|m| m.provider == p.id && !m.stt) {
-            let full = format!("{}/{}", m.provider, m.id);
-            if !v.contains(&full) {
-                v.push(full);
-            }
-        }
-        v
-    }
-
     /// The rows of `which model?` (BISE-289): the models of `p` whose id
     /// holds `filter` (any case), then the typed id when it is not one of
     /// them.
@@ -912,7 +834,7 @@ impl Onb {
                     PlanState::SignedIn(a) => a.clone(),
                     _ => Account { email: String::new(), plan: None },
                 };
-                match (self.logins.token)(&auth_paths(&self.home)) {
+                match (self.logins.token)(&bise_catalog::auth_cli::Paths::of(&self.home)) {
                     Ok(t) => (t, Tried::Plan(who)),
                     Err(e) => return Sub::Failed(p, model, Tried::Plan(who), crate::keycheck::Fail { why: Why::WrongKey, said: e }),
                 }
@@ -976,7 +898,7 @@ impl Onb {
     /// The key of `p` where the harness finds it (env, auth.json, .env).
     fn found_key(&self, p: &Provider, env: Env) -> Option<bise_catalog::auth::Found> {
         use bise_catalog::auth::{EnvFile, Keys, Store};
-        let paths = auth_paths(&self.home);
+        let paths = bise_catalog::auth_cli::Paths::of(&self.home);
         let store = Store::read(&paths.auth_file).unwrap_or_default();
         let files = EnvFile::read_all(&paths.env_files);
         let keys = Keys { env, store: &store, files: &files };
@@ -992,7 +914,7 @@ impl Onb {
         let answer = match rx.try_recv() {
             Ok(a) => a,
             Err(std::sync::mpsc::TryRecvError::Empty) => return,
-            Err(_) => Err(crate::keycheck::Fail::of(Why::Unreachable("the check stopped".into()))),
+            Err(_) => Err(crate::keycheck::Fail::of(Why::Unreachable(settings::first_check_stopped.into()))),
         };
         self.pending = None;
         let Sub::Checking(p, model, tried) = std::mem::replace(&mut self.sub, Sub::List) else { return };
@@ -1029,7 +951,7 @@ impl Onb {
         }
         // /provider: a new key keeps main's model; its `default model` saves it
         if self.panel.as_ref().is_none_or(|pn| pn.save_model) {
-            save_model(&self.home, model).map_err(|e| format!("couldn't write config.toml: {}", e))?;
+            save_model(&self.home, model).map_err(settings::first_write_config)?;
         }
         self.setup = setup_of(env, &self.home);
         self.model = self.setup.model.clone();
@@ -1041,8 +963,8 @@ impl Onb {
     /// Save a pasted key (`login`'s own code: auth.json, 0600); note the
     /// environment's key it replaces.
     fn save_key(&mut self, p: &Provider, key: &str, env: Env) -> Result<(), String> {
-        let paths = auth_paths(&self.home);
-        let cp = self.setup.catalog.provider(&p.id).ok_or_else(|| format!("unknown provider {}", p.id))?;
+        let paths = bise_catalog::auth_cli::Paths::of(&self.home);
+        let cp = self.setup.catalog.provider(&p.id).ok_or_else(|| settings::first_unknown_provider(&p.id))?;
         bise_catalog::auth_cli::login(&paths, cp, key, env).map(|_| ())?;
         let store = bise_catalog::auth::Store::read(&paths.auth_file).unwrap_or_default();
         self.shadows = bise_catalog::auth::Keys { env, store: &store, files: &[] }.shadowed(&p.id, &p.key_env);
@@ -1073,9 +995,14 @@ pub(crate) fn typed(text: &str, start: u64, per: u64, t: u64) -> &str {
 }
 
 // the welcome timeline (the mockup's): typing, the kiss, the tagline, the hint
-const HI: &str = "hi, i'm bise ";
-const TAGLINE: &str = "ideas in. little kisses out. also pull requests.";
-const PRESS: &str = "any key ↵";
+const HI: &str = settings::first_hi;
+const TAGLINE: &str = settings::first_tagline;
+/// `any key ↵`: the key's words, then the arrow (press_text: the hint whole)
+const PRESS_KEY: &str = settings::first_any_key;
+const PRESS_TAIL: &str = " ↵";
+fn press_text() -> String {
+    format!("{PRESS_KEY}{PRESS_TAIL}")
+}
 const HI_AT: u64 = 300;
 const KISS_AT: u64 = HI_AT + 12 * 70 + 250;
 /// the name's definition, a blank row under the first line, just after the
@@ -1084,8 +1011,11 @@ const GLOSS_AT: u64 = KISS_AT + 900;
 const GLOSS_STEP: u64 = 300;
 const TAG_AT: u64 = GLOSS_AT + 3 * GLOSS_STEP + 1000;
 const PRESS_AT: u64 = TAG_AT + (TAGLINE.len() as u64 - 1) * 35 + 500;
-/// when the welcome is fully written
-pub(crate) const WELCOME_END: u64 = PRESS_AT + 9 * 30;
+/// when the welcome is fully written: the hint's last character drawn
+/// (`typed` shows n+1 characters after n steps), so a key read once the
+/// whole hint is on screen goes on (it was 30 ms later: a key in those
+/// 30 ms only showed it all, red under load in tui_subscriptions_tmux)
+pub(crate) const WELCOME_END: u64 = PRESS_AT + 8 * 30;
 /// the three lines of step 5 and the last hint appear one by one
 #[cfg(test)]
 pub(crate) const LINES_END: u64 = 400 + 3 * 900;
@@ -1167,8 +1097,7 @@ fn kiss(t: u64) -> Span<'static> {
 }
 
 /// The meanings of the definition, the third (what bise is) in text color.
-const MEANINGS: [&str; 3] =
-    ["a quick kiss on the cheek :*", "a brisk north wind", "a terminal where multi-agent coding is painless"];
+const MEANINGS: [&str; 3] = [settings::first_meaning_kiss, settings::first_meaning_wind, settings::first_meaning_bise];
 
 /// The name's definition, as on the landing and the README: `bise` bold,
 /// `/beez/ · french, n.` dim (the `·` follows BISE_ASCII), then the three
@@ -1181,7 +1110,7 @@ fn gloss(t: u64, w: u16) -> Vec<Line<'static>> {
         0,
         vec![
             bold("bise", theme::text()),
-            s(format!(" /beez/ {} french, n.", theme::glyph("·")), theme::dim()),
+            s(settings::first_gloss(theme::glyph("·")), theme::dim()),
         ],
     )];
     for (i, m) in MEANINGS.iter().enumerate() {
@@ -1213,10 +1142,10 @@ fn gloss(t: u64, w: u16) -> Vec<Line<'static>> {
 
 /// `any key ↵` typed, dim, `any key` in text color.
 fn press(t: u64) -> Line<'static> {
-    let shown = typed(PRESS, PRESS_AT, 30, t).chars().count();
+    let shown = typed(&press_text(), PRESS_AT, 30, t).chars().count();
     let mut spans = Vec::new();
     let mut at = 0;
-    for (part, key) in [("any key", true), (" ↵", false)] {
+    for (part, key) in [(PRESS_KEY, true), (PRESS_TAIL, false)] {
         let n = part.chars().count().min(shown.saturating_sub(at));
         if n > 0 {
             let p: String = part.chars().take(n).collect();
@@ -1242,8 +1171,8 @@ fn welcome(t: u64, gap: usize, w: u16) -> Vec<Line<'static>> {
 
 fn name_of(m: Mode) -> &'static str {
     match m {
-        Mode::Dark => "dark",
-        Mode::Light => "light",
+        Mode::Dark => settings::first_dark,
+        Mode::Light => settings::first_light,
     }
 }
 
@@ -1252,14 +1181,12 @@ fn name_of(m: Mode) -> &'static str {
 fn theme_text(o: &Onb) -> Vec<Line<'static>> {
     let first = match (o.theme_from, o.detected) {
         // forced: say so, no detection involved
-        (ThemeFrom::Env, _) => format!("{} is set to {}, so i picked it.", crate::theme_detect::ENV, name_of(o.pick)),
-        (ThemeFrom::Saved, _) => format!("you picked {} last time, so i kept it.", name_of(o.pick)),
-        (ThemeFrom::Terminal, Some(m)) => format!("your terminal looks {}, so i picked {}.", name_of(m), name_of(m)),
-        (ThemeFrom::Terminal, None) => {
-            format!("i couldn't read your terminal's background, so i picked {}.", name_of(o.pick))
-        }
+        (ThemeFrom::Env, _) => settings::first_theme_env(crate::theme_detect::ENV, name_of(o.pick)),
+        (ThemeFrom::Saved, _) => settings::first_theme_saved(name_of(o.pick)),
+        (ThemeFrom::Terminal, Some(m)) => settings::first_theme_terminal(name_of(m)),
+        (ThemeFrom::Terminal, None) => settings::first_theme_unread(name_of(o.pick)),
     };
-    vec![title(first), Line::from(s("you can change it any time with /theme.", theme::dim()))]
+    vec![title(first), Line::from(s(settings::first_theme_note, theme::dim()))]
 }
 
 // a preview shows its palette on that palette's ground (theme `bg`)
@@ -1274,16 +1201,16 @@ fn preview_lines(p: &Palette, m: Mode) -> Vec<Line<'static>> {
     vec![
         Line::from(ps(name_of(m), p.dim)),
         Line::raw(""),
-        Line::from(vec![ps(&who(theme::glyph(theme::G_YOU)), p.dim), ps("fix the flaky login test", p.text)]),
+        Line::from(vec![ps(&who(theme::glyph(theme::G_YOU)), p.dim), ps(settings::first_preview_you, p.text)]),
         Line::raw(""),
-        Line::from(vec![ps(&who(theme::glyph(theme::G_MAIN)), p.accent), ps("on it: auth-fix takes it.", p.text)]),
+        Line::from(vec![ps(&who(theme::glyph(theme::G_MAIN)), p.accent), ps(settings::first_preview_main, p.text)]),
         Line::raw(""),
         Line::from(vec![
             ps(" │ ", p.faint),
-            ps(&format!("{} auth-fix → main  found it", theme::glyph(theme::G_MSG)), p.dim),
+            ps(&settings::first_preview_msg(theme::glyph(theme::G_MSG)), p.dim),
         ]),
         Line::raw(""),
-        Line::from(vec![ps(&who(theme::done_glyph()), p.accent), ps("auth-fix is done.", p.text)]),
+        Line::from(vec![ps(&who(theme::done_glyph()), p.accent), ps(settings::first_preview_done, p.text)]),
     ]
 }
 
@@ -1353,36 +1280,36 @@ fn model_lines(o: &Onb, w: u16, gap: usize) -> Vec<Line<'static>> {
     match &o.sub {
         Sub::List | Sub::Menu(..) | Sub::Remove(_) | Sub::Effort(..) => model_list(o, w, gap),
         Sub::SignIn(k, copied) => {
-            let mut v = vec![title(format!("waiting for you to sign in to {} in your browser…", k.name()))];
+            let mut v = vec![title(bise_proto::words::common::signing_wait(k.name()))];
             blanks(&mut v, gap);
             // designer: after c, the key's word says it for 2 s
             let just = copied.is_some_and(|at| at.elapsed() < COPIED_FOR);
-            v.push(keybar(if just { "c copied   esc cancel" } else { "c copy the link   esc cancel" }));
+            v.push(keybar(if just { settings::bar_copied } else { settings::bar_copy_link }));
             v
         }
         Sub::OpenRouter(i) => {
-            let mut v = vec![title("OpenRouter"), dim("sign in with your browser, or paste its key.".into())];
+            let mut v = vec![title("OpenRouter"), dim(settings::first_openrouter_sub.into())];
             blanks(&mut v, gap);
-            option(&mut v, *i == 0, vec![s("sign in with OpenRouter", theme::text())], "", w);
-            option(&mut v, *i == 1, vec![s("paste a key", theme::text())], "", w);
+            option(&mut v, *i == 0, vec![s(settings::first_openrouter_sign_in, theme::text())], "", w);
+            option(&mut v, *i == 1, vec![s(settings::first_paste_a_key, theme::text())], "", w);
             blanks(&mut v, gap);
-            v.push(keybar("↑↓ choose   ⏎ go   esc back"));
+            v.push(keybar(settings::bar_choose_go));
             v
         }
         Sub::Which(i) => {
             let list = o.which_list();
-            let mut v = vec![title(if o.coding { "which coding plan?" } else { "which provider?" })];
+            let mut v = vec![title(if o.coding { settings::first_which_plan } else { settings::first_which_provider })];
             blanks(&mut v, gap);
             // a window of WHICH_ROWS rows around the cursor
             let n = list.len();
             let from = i.saturating_sub(WHICH_ROWS / 2).min(n.saturating_sub(WHICH_ROWS));
             if from > 0 {
-                v.push(Line::from(s(format!("  ↑ {} more", from), theme::dim())));
+                v.push(Line::from(s(settings::first_more_up(from), theme::dim())));
             }
             // the hints in one column (designer, BISE-298)
             let nw = list.iter().map(|p| format!("{} · {}", n, p.name).width()).max().unwrap_or(0) + 2;
             if list.is_empty() {
-                v.push(dim("  this bise has no coding plan provider yet.".into()));
+                v.push(dim(settings::first_no_plan.into()));
             }
             for (k, p) in list.iter().enumerate().skip(from).take(WHICH_ROWS) {
                 let head = format!("{} · {}", k + 1, p.name);
@@ -1390,28 +1317,28 @@ fn model_lines(o: &Onb, w: u16, gap: usize) -> Vec<Line<'static>> {
                 option(&mut v, k == *i, vec![s(format!("{}{}", head, pad), theme::text()), s(p.hint.clone(), theme::dim())], "", w);
             }
             if from + WHICH_ROWS < n {
-                v.push(Line::from(s(format!("  ↓ {} more", n - from - WHICH_ROWS), theme::dim())));
+                v.push(Line::from(s(settings::first_more_down(n - from - WHICH_ROWS), theme::dim())));
             }
             blanks(&mut v, gap);
-            v.push(keybar("↑↓ choose   ⏎ ok   esc back"));
+            v.push(keybar(settings::bar_choose_ok));
             v
         }
         Sub::Model(p, i, f) => {
             let pick = o.models_of(p).into_iter().next().filter(|_| !p.model.is_empty());
             let rows = o.model_rows(p, f);
-            let mut v = vec![title("which model?"), dim("you can change it any time with /model.".into())];
+            let mut v = vec![title(settings::first_which_model), dim(settings::first_model_note.into())];
             blanks(&mut v, gap);
             // the filter line (designer: like the ctrl+s palette)
             let mut line = vec![s("› ", theme::accent())];
             if f.is_empty() {
-                line.push(s("type to filter, or any model id", theme::faint()));
+                line.push(s(settings::first_model_filter, theme::faint()));
             } else {
                 line.push(s(format!("{}▏", f), theme::text()));
             }
             v.push(Line::from(line));
             blanks(&mut v, 1);
             if !f.is_empty() && !rows.iter().any(|r| matches!(r, ModelRow::Listed(_))) {
-                v.push(dim("  no listed model matches.".into()));
+                v.push(dim(settings::first_model_none.into()));
             }
             let from = i.saturating_sub(WHICH_ROWS / 2).min(rows.len().saturating_sub(WHICH_ROWS));
             for (k, r) in rows.iter().enumerate().skip(from).take(WHICH_ROWS) {
@@ -1419,76 +1346,81 @@ fn model_lines(o: &Onb, w: u16, gap: usize) -> Vec<Line<'static>> {
                     ModelRow::Listed(m) => {
                         let mut n = vec![s(format!("{} · {}", k + 1, m), theme::text())];
                         if pick.as_ref() == Some(m) {
-                            n.push(s("  recommended", theme::accent()));
+                            n.push(s(settings::first_recommended, theme::accent()));
                         }
                         if p.plan {
-                            n.push(s("   your ChatGPT plan", theme::dim()));
+                            n.push(s(settings::first_your_plan, theme::dim()));
                         }
                         n
                     }
                     // designer: no number (not in the list), '+' accent
                     ModelRow::Typed(m) => vec![
                         s("+ ", theme::accent()),
-                        s(format!("use {}", m), theme::text()),
-                        s("   not in my list: i'll try it with one tiny call", theme::dim()),
+                        s(settings::first_use(m), theme::text()),
+                        s(settings::first_not_listed, theme::dim()),
                     ],
                 };
                 option(&mut v, k == *i, name, "", w);
             }
             if rows.is_empty() {
-                v.push(dim(format!("{} has no model listed: type its id.", p.name)));
+                v.push(dim(settings::first_no_model(&p.name)));
             }
             blanks(&mut v, gap);
-            v.push(keybar("↑↓ choose   ⏎ ok   esc back"));
+            v.push(keybar(settings::bar_choose_ok));
             v
         }
         Sub::Paste(p, _, b) => {
             let dots: String = "•".repeat(b.chars().count().min(48));
-            let mut v = vec![title(format!("paste your {} key", p.name))];
+            let mut v = vec![title(settings::first_paste_key(&p.name))];
             // BISE-301: a role's steps: for which role, what comes next
             let steps = o.picking().filter(|_| o.panel.as_ref().is_some_and(|pn| pn.key_first));
             if let Some(id) = steps {
-                v.push(dim(format!("for {}. then you pick the model.", roles::who(id))));
+                v.push(dim(settings::first_for_role(roles::who(id))));
             }
             blanks(&mut v, 1);
             if !p.keys_url.is_empty() {
-                v.extend(link_lines("get one: ", &p.keys_url, w));
+                v.extend(link_lines(settings::first_get_one, &p.keys_url, w));
             }
             if !p.signup_url.is_empty() {
-                v.extend(link_lines("no account yet? ", &p.signup_url, w));
+                v.extend(link_lines(settings::first_no_account, &p.signup_url, w));
+            }
+            // a Claude plan seen: its monthly API credits can pay for this key
+            if p.id == "anthropic" && o.seen.claude_plan {
+                v.push(Line::raw(""));
+                v.extend(words_in(settings::first_claude_credits_key, w as usize).into_iter().map(dim));
             }
             blanks(&mut v, gap);
             v.push(Line::from(vec![s(format!("{} ", theme::glyph(theme::G_YOU)), theme::accent()), s(dots, theme::text()), s("█", theme::text())]));
             if o.note == Some(Note::NotAKey) {
                 v.push(Line::raw(""));
-                v.push(Line::from(s(format!("{} that doesn't look like a key: no spaces inside.", theme::glyph(theme::G_FAILED)), theme::error())));
+                v.push(Line::from(s(settings::first_not_a_key(theme::glyph(theme::G_FAILED)), theme::error())));
             }
             blanks(&mut v, 1);
             // one line, the path under ~ (designer, BISE-301)
             let at = auth_shown(o);
-            let line = format!("it goes in {}, only you can read it.", at);
-            v.push(dim(if at.starts_with('~') && line.width() <= w as usize { line } else { "it goes in bise's auth.json, only you can read it.".into() }));
+            let line = settings::first_goes_in(&at);
+            v.push(dim(if at.starts_with('~') && line.width() <= w as usize { line } else { settings::first_goes_in_auth.into() }));
             blanks(&mut v, gap);
-            v.push(keybar(if o.picking().is_some() { "⏎ check it   esc back to the providers" } else { "⏎ check   esc back" }));
+            v.push(keybar(if o.picking().is_some() { settings::bar_check_it } else { settings::bar_check }));
             v
         }
         Sub::Confirm(p, _, _) => {
-            let mut v = vec![title(format!("{} has a key in {} already.", p.name, auth_shown(o)))];
+            let mut v = vec![title(settings::first_has_key(&p.name, auth_shown(o)))];
             blanks(&mut v, gap);
-            v.push(keybar("⏎ replaces it   esc keeps the old one"));
+            v.push(keybar(settings::bar_replace));
             v
         }
         Sub::Checking(_, _, Tried::Plan(a)) => {
             let mut v = signed_in(a);
-            v.push(dim("checking your plan…".into()));
+            v.push(dim(settings::first_checking_plan.into()));
             blanks(&mut v, gap);
-            v.push(keybar("esc back"));
+            v.push(keybar(settings::bar_back));
             v
         }
         Sub::Checking(p, m, _) => {
-            let mut v = vec![title("checking your key with one tiny call…"), dim(format!("{} on {}", short_model(m), p.name))];
+            let mut v = vec![title(settings::first_checking_key), dim(settings::first_model_on(short_model(m), &p.name))];
             blanks(&mut v, gap);
-            v.push(keybar("esc back"));
+            v.push(keybar(settings::bar_back));
             v
         }
         Sub::Failed(p, m, Tried::Plan(a), f) => {
@@ -1507,21 +1439,21 @@ fn model_lines(o: &Onb, w: u16, gap: usize) -> Vec<Line<'static>> {
                 }
                 Why::NoAccess => err(signin::PLAN_OFF),
                 Why::Unreachable(e) if e == crate::keycheck::USAGE_UNCHECKED => err(signin::UNCHECKED),
-                Why::Model => err(&format!("▲ your plan doesn't run {}. pick another model.", short_model(m))),
-                Why::Unreachable(e) => err(&format!("▲ i couldn't reach {}: {}.", p.name, e.trim_end_matches('.'))),
-                Why::NoUrl(_) => err(&format!("▲ {} has no URL yet: i didn't call it.", p.name)),
-                Why::Configuration(e) => err(&format!("▲ {}", e.trim_end_matches('.'))),
+                Why::Model => err(&settings::first_plan_model(short_model(m))),
+                Why::Unreachable(e) => err(&settings::first_plan_unreachable(&p.name, e.trim_end_matches('.'))),
+                Why::NoUrl(_) => err(&settings::first_plan_no_url(&p.name)),
+                Why::Configuration(e) => err(&settings::first_plan_config(e.trim_end_matches('.'))),
             });
             if !f.said.is_empty() {
-                for l in words_in(&format!("{} said: \"{}\"", p.name, f.said), w as usize) {
+                for l in words_in(&settings::first_said(&p.name, &f.said), w as usize) {
                     v.push(dim(l));
                 }
             }
             blanks(&mut v, gap);
             v.push(keybar(match f.why {
-                Why::WrongKey => "⏎ sign in again   tab another way   esc back",
-                Why::Model => "⏎ pick another model   tab another way   esc back",
-                _ => "⏎ try again   tab another way   esc back",
+                Why::WrongKey => settings::bar_plan_sign_in,
+                Why::Model => settings::bar_plan_model,
+                _ => settings::bar_plan_again,
             }));
             v
         }
@@ -1529,55 +1461,55 @@ fn model_lines(o: &Onb, w: u16, gap: usize) -> Vec<Line<'static>> {
             let err = |t: String| Line::from(s(format!("{} {}", theme::glyph(theme::G_FAILED), t), theme::error()));
             // "the key" (pasted) or "the key in ANTHROPIC_API_KEY" (found)
             let the_key = match t {
-                Tried::Pasted(_) | Tried::Plan(_) => "the key".to_string(),
-                Tried::Found(w) => format!("the key in {}", w),
+                Tried::Pasted(_) | Tried::Plan(_) => settings::first_the_key.to_string(),
+                Tried::Found(w) => settings::first_the_key_in(w),
             };
             let mut v = Vec::new();
             match &f.why {
                 Why::WrongKey => v.push(err(match t {
-                    Tried::Found(_) => format!("{} doesn't work. {} says it's wrong.", the_key, p.name),
-                    _ => format!("{} says this key is wrong.", p.name),
+                    Tried::Found(_) => settings::first_found_wrong(&the_key, &p.name),
+                    _ => settings::first_key_wrong(&p.name),
                 })),
                 // BISE-282: not a failure of the key: it needs the user
                 Why::NoCredit => v.push(Line::from(vec![
                     s(format!("{} ", theme::glyph(theme::G_NEEDS_YOU)), theme::accent()),
-                    s(format!("{} works, but your {} account has no credit yet.", the_key, p.name), theme::text()),
+                    s(settings::first_no_credit(&the_key, &p.name), theme::text()),
                 ])),
-                Why::Model => v.push(err(format!("{} doesn't know {}. pick another model.", p.name, short_model(m)))),
-                Why::NoAccess => v.push(err(format!("this key can't use {}.", short_model(m)))),
-                Why::Unreachable(e) => v.push(err(format!("i couldn't reach {}: {}.", p.name, e.trim_end_matches('.')))),
+                Why::Model => v.push(err(settings::first_key_model(&p.name, short_model(m)))),
+                Why::NoAccess => v.push(err(settings::first_no_access(short_model(m)))),
+                Why::Unreachable(e) => v.push(err(settings::first_unreachable(&p.name, e.trim_end_matches('.')))),
                 Why::Configuration(e) => v.push(err(e.clone())),
-                Why::NoUrl(_) => v.push(err(format!("{} has no URL yet: i didn't call it.", p.name))),
+                Why::NoUrl(_) => v.push(err(settings::first_no_url(&p.name))),
             }
             // BISE-282: the provider's own words, cut to the width; a url
             // in them stays plain: the one link is the line under them
             // (BISE-287, the designer's call)
             if !f.said.is_empty() {
-                for l in words_in(&format!("{} said: \"{}\"", p.name, f.said), w as usize) {
+                for l in words_in(&settings::first_said(&p.name, &f.said), w as usize) {
                     v.push(dim(l));
                 }
             }
             let keys = !p.keys_url.is_empty();
             match (&f.why, t) {
-                (Why::WrongKey, Tried::Pasted(_)) if keys => v.extend(link_lines("copy it again from ", &p.keys_url, w)),
-                (Why::WrongKey, Tried::Found(_)) if keys => v.extend(link_lines("paste another one, or get a new key: ", &p.keys_url, w)),
-                (Why::WrongKey, Tried::Found(_)) => v.push(dim("paste another one.".into())),
+                (Why::WrongKey, Tried::Pasted(_)) if keys => v.extend(link_lines(settings::first_copy_again, &p.keys_url, w)),
+                (Why::WrongKey, Tried::Found(_)) if keys => v.extend(link_lines(settings::first_paste_another_get, &p.keys_url, w)),
+                (Why::WrongKey, Tried::Found(_)) => v.push(dim(settings::first_paste_another.into())),
                 (Why::NoCredit, _) => {
                     if p.billing_url.is_empty() {
-                        v.push(dim(format!("add some on your {} account.", p.name)));
+                        v.push(dim(settings::first_add_on(&p.name)));
                     } else {
-                        v.extend(link_lines("add some here: ", &p.billing_url, w));
+                        v.extend(link_lines(settings::first_add_here, &p.billing_url, w));
                     }
                     v.push(dim(match t {
-                        Tried::Pasted(_) => "i saved the key. add credit, then enter checks again.".into(),
-                        _ => "add credit, then enter checks again.".into(),
+                        Tried::Pasted(_) => settings::first_saved_add_credit.into(),
+                        _ => settings::first_add_credit.into(),
                     }));
                 }
-                (Why::NoAccess, _) => v.push(dim("your account may not have access to this model yet. pick another one.".into())),
-                (Why::Unreachable(_), _) => v.push(dim("check your network, then enter.".into())),
+                (Why::NoAccess, _) => v.push(dim(settings::first_no_access_note.into())),
+                (Why::Unreachable(_), _) => v.push(dim(settings::first_check_network.into())),
                 (Why::NoUrl(fix), _) => {
                     let fix = fix.split_once(": ").map(|(_, f)| f).unwrap_or(fix);
-                    for l in words_in(&format!("{}, then enter.", fix), w as usize) {
+                    for l in words_in(&settings::first_then_enter(fix), w as usize) {
                         v.push(dim(l));
                     }
                 }
@@ -1585,35 +1517,35 @@ fn model_lines(o: &Onb, w: u16, gap: usize) -> Vec<Line<'static>> {
             }
             blanks(&mut v, gap);
             v.push(keybar(match (&f.why, t) {
-                (Why::Model | Why::NoAccess, _) => "⏎ pick another model   tab another provider   esc back",
-                (Why::WrongKey, Tried::Found(_)) => "⏎ paste another key   tab another provider   esc back",
-                (Why::NoCredit, _) => "⏎ check again   tab another provider   esc back",
-                _ => "⏎ try again   tab another provider   esc back",
+                (Why::Model | Why::NoAccess, _) => settings::bar_key_model,
+                (Why::WrongKey, Tried::Found(_)) => settings::bar_key_paste,
+                (Why::NoCredit, _) => settings::bar_key_check,
+                _ => settings::bar_key_again,
             }));
             v
         }
         Sub::Works(p, m) if p.plan => {
             let mut v = match &o.plan {
                 PlanState::SignedIn(a) => signed_in(a),
-                _ => vec![title(format!("it works: {} answered.", short_model(m)))],
+                _ => vec![title(settings::first_works(short_model(m)))],
             };
-            v.push(dim(format!("main and your agents use {} now, on your plan.", short_model(m))));
+            v.push(dim(settings::first_works_plan(short_model(m))));
             blanks(&mut v, gap);
-            v.push(keybar("⏎ go on"));
+            v.push(keybar(settings::bar_go_on));
             v
         }
         Sub::Works(_, m) => {
-            let mut v = vec![title(format!("it works: {} answered.", short_model(m))), dim(format!("main uses {}.", m))];
+            let mut v = vec![title(settings::first_works(short_model(m))), dim(settings::first_main_uses(m))];
             if let Some(l) = helpers_line(o) {
                 v.push(dim(l));
             }
             if let Some(n) = &o.shadows {
-                v.push(dim(format!("{} in your environment holds another key: i use this one.", n)));
+                v.push(dim(settings::first_shadows(n)));
             }
             let extras = extras(o);
             if !extras.is_empty() {
                 blanks(&mut v, gap);
-                v.push(dim("optional. add these any time:".into()));
+                v.push(dim(settings::first_optional.into()));
                 for e in extras {
                     v.push(Line::from(s(format!("  {}", e), theme::text())));
                 }
@@ -1621,10 +1553,10 @@ fn model_lines(o: &Onb, w: u16, gap: usize) -> Vec<Line<'static>> {
             // BISE-298: the first run picks main's model only
             if o.panel.is_none() {
                 blanks(&mut v, 1);
-                v.push(dim("agents, voice and the rest: /models".into()));
+                v.push(dim(settings::first_the_rest.into()));
             }
             blanks(&mut v, gap);
-            v.push(keybar("⏎ go on"));
+            v.push(keybar(settings::bar_go_on));
             v
         }
     }
@@ -1632,29 +1564,13 @@ fn model_lines(o: &Onb, w: u16, gap: usize) -> Vec<Line<'static>> {
 
 /// A model's id without its provider.
 fn short_model(m: &str) -> String {
-    bise_catalog::split_name(m).map_or(m.to_string(), |(_, id)| id.to_string())
+    crate::firstkey::short_model(m)
 }
 
-/// The first run's word on the roles one key runs (one key, every role):
-/// `small jobs and auto's checker use claude-haiku-4-5.`; Jev:
-/// `small jobs use gemini-3.8-flash. auto's checker: Jev, by OpenRouter.`
-/// None: no small jobs model.
+/// The first run's word on the roles one key runs (firstkey.rs, shared
+/// with the desktop's first run).
 fn helpers_line(o: &Onb) -> Option<String> {
-    let small = o.setup.small_model.clone();
-    if small.is_empty() {
-        return None;
-    }
-    let (checker, _) = o.role_model(bise_catalog::roles::CLASSIFY);
-    let short = short_model(&small);
-    Some(match bise_catalog::roles::jev_of(&checker) {
-        Some((via, _)) => {
-            let by = o.setup.catalog.provider(via).map_or(via.to_string(), |p| p.name.clone());
-            format!("small jobs use {}. auto's checker: Jev, by {}.", short, by)
-        }
-        None if checker == small => format!("small jobs and auto's checker use {}.", short),
-        None if checker == bise_catalog::roles::CHECKER_OFF || checker.is_empty() => format!("small jobs use {}.", short),
-        None => format!("small jobs use {}. auto's checker: {}.", short, short_model(&checker)),
-    })
+    crate::firstkey::helpers_line(&o.setup, &o.role_model(bise_catalog::roles::CLASSIFY).0)
 }
 
 /// What the optional keys unlock, for those not set (BISE-266): the
@@ -1664,12 +1580,12 @@ fn extras(o: &Onb) -> Vec<String> {
     let has = |id: &str| o.found.iter().any(|p| p.id == id);
     let mut v = Vec::new();
     if !has("mistral") {
-        v.push("web search and other tools: a Mistral key · /setup".to_string());
+        v.push(settings::first_extra_tools.to_string());
     }
     // BISE-298: the voice screen's providers
     let voice = ["mistral", "openai", "elevenlabs"].iter().any(|id| has(id));
     if !voice {
-        v.push("voice (ctrl+r): a Mistral, OpenAI or ElevenLabs key · /voice".to_string());
+        v.push(settings::first_extra_voice.to_string());
     }
     v
 }
@@ -1691,8 +1607,8 @@ fn padded(label: &str, n: usize) -> String {
 /// then its description, dim, on the same line when it fits, else under.
 fn model_list(o: &Onb, w: u16, gap: usize) -> Vec<Line<'static>> {
     let mut v = vec![
-        title("how do you want to pay for the models?"),
-        Line::from(s("a plan you already have, or a key. you can add more later in /provider.", theme::dim())),
+        title(settings::first_pay),
+        Line::from(s(settings::first_pay_sub, theme::dim())),
     ];
     blanks(&mut v, gap);
     let opts = o.opts();
@@ -1711,32 +1627,28 @@ fn model_list(o: &Onb, w: u16, gap: usize) -> Vec<Line<'static>> {
                 p.key_env.clone(),
                 true,
                 if p.id == o.mine {
-                    format!("{}, already set up", p.name)
+                    settings::first_set_up(&p.name)
                 } else {
                     // BISE-266: enter moves the model to this provider
-                    match pick_of(&p, &o.model) {
-                        Some(m) => format!("{}. i'll use {}", p.name, short_model(&m)),
-                        None => format!("{}. set model in {}", p.name, bise_catalog::auth::tilde(&o.home.config_file(), Some(o.home.user_home()))),
+                    match bise_catalog::roles::pick_for(&o.setup.catalog, &p.id, &o.model) {
+                        Some(m) => settings::first_will_use(&p.name, short_model(&m)),
+                        None => settings::first_set_model(&p.name, bise_catalog::auth::tilde(&o.home.config_file(), Some(o.home.user_home()))),
                     }
                 },
             ),
             Opt::ChatGpt => (
-                "Continue with ChatGPT".to_string(),
+                settings::first_chatgpt.to_string(),
                 false,
-                if o.seen.codex_chatgpt {
-                    "use your Plus or Pro plan · you use it in Codex already".to_string()
-                } else {
-                    "use your Plus or Pro plan".to_string()
-                },
+                if o.seen.codex_chatgpt { settings::first_chatgpt_codex.to_string() } else { settings::first_chatgpt_sub.to_string() },
             ),
-            Opt::OpenRouter => ("OpenRouter".to_string(), false, "sign in, or paste its key".to_string()),
-            Opt::Paste => ("an API key".to_string(), false, "Anthropic, OpenAI, Google, Mistral…".to_string()),
-            Opt::Coding => ("a coding plan key".to_string(), false, "GLM, Kimi or MiniMax".to_string()),
+            Opt::OpenRouter => ("OpenRouter".to_string(), false, settings::first_openrouter_way.to_string()),
+            Opt::Paste => (settings::api_key.to_string(), false, settings::first_api_key_sub.to_string()),
+            Opt::Coding => (settings::first_coding.to_string(), false, settings::first_coding_sub.to_string()),
         };
         let mut name = if found {
             // `ANTHROPIC_API_KEY found`, padded to the column
-            let used = label.width() + 1 + "found".width();
-            vec![s(format!("{} ", label), theme::text()), s("found", theme::accent()), Span::raw(" ".repeat(lw.saturating_sub(used).max(1)))]
+            let used = label.width() + 1 + settings::first_found.width();
+            vec![s(format!("{} ", label), theme::text()), s(settings::first_found, theme::accent()), Span::raw(" ".repeat(lw.saturating_sub(used).max(1)))]
         } else {
             vec![s(padded(&label, lw), theme::text())]
         };
@@ -1759,18 +1671,19 @@ fn model_list(o: &Onb, w: u16, gap: usize) -> Vec<Line<'static>> {
             }
         }
     }
-    // Claude Code's plan, no Anthropic key: why it isn't one of the ways
+    // Claude Code's plan, no Anthropic key: its monthly API credits, and
+    // how a key uses them (the API key way)
     let anthropic = o.found.iter().any(|p| p.id == "anthropic");
     if o.seen.claude_plan && !anthropic {
         v.push(Line::raw(""));
-        for l in words_in("your Claude plan works only in Claude Code (Anthropic's terms). for Claude here, use an API key.", w as usize) {
+        for l in [settings::first_claude_plan, settings::first_claude_credits_how].iter().flat_map(|t| words_in(t, w as usize)) {
             v.push(Line::from(s(l, theme::dim())));
         }
     }
     match &o.note {
         Some(Note::Failed(e)) => {
             v.push(Line::raw(""));
-            v.push(Line::from(s(format!("{} couldn't save the key: {}", theme::glyph(theme::G_FAILED), e), theme::error())));
+            v.push(Line::from(s(settings::first_save_failed(theme::glyph(theme::G_FAILED), e), theme::error())));
         }
         Some(Note::SignIn(t)) => {
             v.push(Line::raw(""));
@@ -1781,7 +1694,7 @@ fn model_list(o: &Onb, w: u16, gap: usize) -> Vec<Line<'static>> {
         _ => {}
     }
     blanks(&mut v, gap);
-    v.push(keybar("↑↓ choose   ⏎ go   esc back"));
+    v.push(keybar(settings::bar_choose_go));
     v
 }
 
@@ -1808,7 +1721,7 @@ fn keybar(text: &str) -> Line<'static> {
 fn signed_in(a: &Account) -> Vec<Line<'static>> {
     vec![Line::from(vec![
         s("✓ ", theme::accent()),
-        bold(format!("signed in as {} · {}", a.email, signin::plan_words(a)), theme::text()),
+        bold(settings::first_signed_in(&a.email, signin::plan_words(a)), theme::text()),
     ])]
 }
 
@@ -1816,14 +1729,14 @@ fn signed_in(a: &Account) -> Vec<Line<'static>> {
 /// lead): the three numbered lines, `me` and `i` (bise) in accent, the
 /// numbers dim, no final periods. Each fits the 64-column column.
 const HOW: [[&str; 3]; 3] = [
-    ["you talk to ", "me", ": main, your team lead. any time, keep typing"],
-    ["", "i", " start an agent when a job needs one. they sync on their own"],
-    ["only the real decisions reach you, in your inbox · ctrl+1", "", ""],
+    [settings::first_how_1a, settings::first_how_me, settings::first_how_1b],
+    ["", settings::first_how_i, settings::first_how_2],
+    [settings::first_how_3, "", ""],
 ];
 /// Line 3 where the terminal sends no ctrl+1-9 (BISE-302, reach.rs).
-const HOW_3_CLICK: [&str; 3] = ["only the real decisions reach you, in your inbox · click it", "", ""];
+const HOW_3_CLICK: [&str; 3] = [settings::first_how_3_click, "", ""];
 /// The faint footer under the three lines.
-const HOW_FOOT: &str = "ctrl+o opens everything folded · ⌥0-9 talk to an agent";
+const HOW_FOOT: &str = settings::first_how_foot;
 
 /// One HOW line in a column `w` wide: the number dim, `me`/`i` bold in
 /// accent, the rest in text color; wider than `w`, it wraps at the words
@@ -1852,7 +1765,7 @@ fn how_rows(i: usize, [a, me, b]: [&str; 3], w: u16) -> Vec<Line<'static>> {
 
 fn how_lines(t: u64, gap: usize, w: u16, digits: bool) -> Vec<Line<'static>> {
     let shown = |i: u64| t >= 400 + i * 900;
-    let mut v = vec![title("how it works")];
+    let mut v = vec![title(settings::first_how)];
     blanks(&mut v, gap);
     for (i, line) in HOW.iter().enumerate() {
         if i > 0 {
@@ -1866,7 +1779,7 @@ fn how_lines(t: u64, gap: usize, w: u16, digits: bool) -> Vec<Line<'static>> {
     blanks(&mut v, 1);
     v.push(if shown(3) { Line::from(s(HOW_FOOT, theme::faint())) } else { Line::raw("") });
     blanks(&mut v, gap);
-    v.push(if shown(3) { keyline("{any key} ↵") } else { Line::raw("") });
+    v.push(if shown(3) { keyline(&settings::first_how_key("{any key}")) } else { Line::raw("") });
     v
 }
 
@@ -1993,7 +1906,7 @@ fn draw_page(f: &mut Frame, o: &Onb, now: u64) {
         let hy = py + PREVIEW_H + gap as u16;
         if hy < body.bottom() {
             f.render_widget(
-                Paragraph::new(keyline("{←→} switch · {enter} keep")).alignment(Alignment::Center),
+                Paragraph::new(keyline(&settings::first_theme_keys("{←→}", "{enter}"))).alignment(Alignment::Center),
                 Rect { y: hy, height: 1, ..col },
             );
         }
@@ -2049,8 +1962,8 @@ impl Mouse {
     /// Does `act` (opens the url, copies the text) and keeps its note.
     fn act(&mut self, act: Act, now: u64) {
         let note = match act {
-            Act::Open(url) if crate::links::open(&url) => format!("opening {}", url),
-            Act::Open(url) => format!("could not open {}", url),
+            Act::Open(url) if crate::links::open(&url) => settings::first_opening(&url),
+            Act::Open(url) => settings::first_open_failed(&url),
             Act::Copy(t) => crate::textlayer::copy_note(&t),
         };
         self.note = Some((note, now + NOTE_MS));
@@ -2212,13 +2125,13 @@ mod tests {
     fn the_flag_follows_the_state_root_and_the_env_var() {
         let d = tmp("flag");
         let ds = d.to_string_lossy().to_string();
-        // the old layout: the flag file an older version reads
+        // the `onboarded` key of ~/.bise/prefs.json
         let e = env_of(HashMap::from([("HOME", ds.clone())]));
-        assert_eq!(flag(&e).file, d.join(".local/state/switchboard/onboarded"));
+        assert_eq!(flag(&e).file, d.join(".bise/prefs.json"));
         assert!(due(&e));
         mark_seen(&e).unwrap();
         assert!(!due(&e));
-        assert!(d.join(".local/state/switchboard/onboarded").exists());
+        assert!(d.join(".bise/prefs.json").exists());
         let on = env_of(HashMap::from([("HOME", ds.clone()), (ENV, "on".into())]));
         assert!(due(&on));
         let home = env_of(HashMap::from([("HOME", "/h".into()), (ENV, "off".into())]));
@@ -2270,16 +2183,16 @@ mod tests {
         let o = Onb::new(&none);
         // BISE-266: no built-in model
         assert_eq!((o.model.as_str(), o.mine.as_str()), ("", ""));
-        std::fs::create_dir_all(h.join(".bend-harness")).unwrap();
-        std::fs::write(h.join(".bend-harness/config.toml"), "# c\nmodel = \"zai-glm-5-3\" # glm\n").unwrap();
+        std::fs::create_dir_all(h.join(".bise")).unwrap();
+        std::fs::write(h.join(".bise/config.toml"), "# c\nmodel = \"zai-glm-5-3\" # glm\n").unwrap();
         let o = Onb::new(&none);
         assert_eq!((o.model.as_str(), o.mine.as_str()), ("mistral/zai-glm-5-3", "mistral"));
         let e = env_of(HashMap::from([("HOME", home.clone()), ("BEND_MODEL", "anthropic/claude-haiku-4-5".to_string())]));
         let o = Onb::new(&e);
         assert_eq!(o.mine, "anthropic");
-        assert_eq!(clean_key("  'sk-1'\n"), Some("sk-1".into()));
-        assert_eq!(clean_key("a b"), None);
-        assert_eq!(clean_key(" "), None);
+        assert_eq!(crate::firstkey::clean_key("  'sk-1'\n"), Some("sk-1".into()));
+        assert_eq!(crate::firstkey::clean_key("a b"), None);
+        assert_eq!(crate::firstkey::clean_key(" "), None);
     }
 
     #[test]
@@ -2354,6 +2267,9 @@ mod tests {
             assert_eq!(r.on_key(key(KeyCode::Char('y')), 20, &none), Out::Stay);
             assert_eq!(r.step, Step::Theme);
         }
+        // the hint whole is the welcome done: no key swallowed while it shows
+        let press = press_text();
+        assert!(typed(&press, PRESS_AT, 30, WELCOME_END) == press && typed(&press, PRESS_AT, 30, WELCOME_END - 1) != press);
         let mut r = onb(&h, "/w");
         assert_eq!(r.on_key(key(KeyCode::Char(' ')), WELCOME_END, &none), Out::Stay);
         assert_eq!(r.step, Step::Theme, "written: any key goes on, no enter needed");
@@ -2539,11 +2455,11 @@ mod tests {
         o.on_key(key(KeyCode::Enter), 1, &e);
         // its models, the pick first and recommended
         let sc = screen(&o, 10, 110, 30);
-        assert!(sc.contains("which model?") && sc.contains("1 · mistral/mistral-medium-latest  recommended"), "{}", sc);
+        assert!(sc.contains("which model?") && sc.contains("1 · mistral/mistral-large-4  recommended"), "{}", sc);
         o.on_key(key(KeyCode::Enter), 1, &e);
         // the keys page, the field, where it goes
         let sc = screen(&o, 10, 110, 30);
-        for s in ["paste your Mistral key", "get one: https://console.mistral.ai/api-keys", "it goes in ~/.bend-harness/auth.json, only you can read it.", "⏎ check   esc back"] {
+        for s in ["paste your Mistral key", "get one: https://console.mistral.ai/api-keys", "it goes in ~/.bise/auth.json, only you can read it.", "⏎ check   esc back"] {
             assert!(sc.contains(s), "{}\n{}", s, sc);
         }
         // the link is a hit for the OSC 8 backend
@@ -2558,7 +2474,7 @@ mod tests {
         assert!(sc.contains("⏎ try again   tab another provider   esc back"), "{}", sc);
         assert!(!hm(&h).auth_file().exists() && !hm(&h).config_file().exists());
         o.on_key(key(KeyCode::Enter), 1, &e);
-        assert!(matches!(&o.sub, Sub::Paste(p, m, b) if p.id == "mistral" && m == "mistral/mistral-medium-latest" && b.is_empty()));
+        assert!(matches!(&o.sub, Sub::Paste(p, m, b) if p.id == "mistral" && m == "mistral/mistral-large-4" && b.is_empty()));
         // no credit: its own words; the key saved all the same (not the
         // model), enter checks it again
         type_key(&mut o, &e, "broke-key");
@@ -2579,11 +2495,11 @@ mod tests {
         o.on_key(key(KeyCode::Enter), 1, &e);
         settle(&mut o, &e);
         let sc = screen(&o, 10, 110, 30);
-        assert!(sc.contains("? the key in ~/.bend-harness/auth.json works, but your Mistral") && sc.contains("account has no credit yet."), "{}", sc);
+        assert!(sc.contains("? the key in ~/.bise/auth.json works, but your Mistral account") && sc.contains("has no credit yet."), "{}", sc);
         assert!(sc.contains("add credit, then enter checks again.") && !sc.contains("i saved the key"), "{}", sc);
         // a key that can't use this model: pick another
         let paste = |o: &mut Onb, k: &str| {
-            o.sub = Sub::Paste(o.providers[mistral].clone(), "mistral/mistral-medium-latest".into(), String::new());
+            o.sub = Sub::Paste(o.providers[mistral].clone(), "mistral/mistral-large-4".into(), String::new());
             type_key(o, &e, k);
             // mistral has a key in auth.json: yes, replace it
             o.on_key(key(KeyCode::Enter), 1, &e);
@@ -2591,15 +2507,15 @@ mod tests {
         };
         paste(&mut o, "locked-key");
         let sc = screen(&o, 10, 110, 30);
-        assert!(sc.contains("✗ this key can't use mistral-medium-latest.") && sc.contains("Mistral said: \"not for you\""), "{}", sc);
+        assert!(sc.contains("✗ this key can't use mistral-large-4.") && sc.contains("Mistral said: \"not for you\""), "{}", sc);
         assert!(sc.contains("your account may not have access to this model yet.") && sc.contains("⏎ pick another model"), "{}", sc);
         o.on_key(key(KeyCode::Enter), 1, &e);
         assert!(matches!(&o.sub, Sub::Model(p, 0, _) if p.id == "mistral"));
         paste(&mut o, "good-key");
         // it works: the key in auth.json (0600), the model in config.toml
-        assert!(matches!(&o.sub, Sub::Works(_, m) if m == "mistral/mistral-medium-latest"));
+        assert!(matches!(&o.sub, Sub::Works(_, m) if m == "mistral/mistral-large-4"));
         let sc = screen(&o, 10, 110, 30);
-        assert!(sc.contains("it works: mistral-medium-latest answered.") && sc.contains("main uses mistral/mistral-medium-latest."), "{}", sc);
+        assert!(sc.contains("it works: mistral-large-4 answered.") && sc.contains("main uses mistral/mistral-large-4."), "{}", sc);
         // one key, every role: what runs the small jobs and auto's checker
         assert!(sc.contains("small jobs and auto's checker use mistral-small-latest."), "{}", sc);
         // a Mistral key runs the connectors and the voice input: no extras
@@ -2608,7 +2524,7 @@ mod tests {
         let f = hm(&h).auth_file();
         assert_eq!(bise_catalog::auth::Store::read(&f).unwrap().key("mistral"), Some("good-key"));
         assert_eq!(std::fs::metadata(&f).unwrap().permissions().mode() & 0o777, 0o600);
-        assert_eq!(o.model, "mistral/mistral-medium-latest");
+        assert_eq!(o.model, "mistral/mistral-large-4");
         assert!(!model_blocked(&o.setup, &o.found));
         assert!(!sc.contains("good-key"));
         o.on_key(key(KeyCode::Enter), 1, &e);
@@ -2636,7 +2552,7 @@ mod tests {
         assert!(cfg.starts_with("[roles]\nmain = \"openai/gpt-6-astra\""), "{}", cfg);
         // a key already in auth.json: enter replaces it only after a yes
         std::fs::create_dir_all(hm(&h).auth_file().parent().unwrap()).unwrap();
-        let paths = auth_paths(&o.home);
+        let paths = bise_catalog::auth_cli::Paths::of(&o.home);
         bise_catalog::auth_cli::login(&paths, o.setup.catalog.provider("groq").unwrap(), "old", &e).unwrap();
         o.sub = Sub::Paste(Provider::of(o.setup.catalog.provider("groq").unwrap()), "groq/openai/gpt-oss-120b".into(), String::new());
         o.on_paste("new");
@@ -2715,7 +2631,7 @@ mod tests {
         ]));
         let mut o = Onb::new(&e);
         o.go(Step::Model, 0);
-        let sc = screen(&o, 10, 44, 30);
+        let sc = screen(&o, 10, 36, 30);
         let rows: Vec<&str> = sc.lines().collect();
         let i = rows.iter().position(|r| r.contains("Mistral. i'll use")).expect("the detail");
         // the wrapped row starts where the detail starts (same column)
@@ -2723,7 +2639,7 @@ mod tests {
         let start = col(rows[i], "Mistral").unwrap();
         let next: Vec<char> = rows[i + 1].chars().collect();
         assert!(next[start] != ' ' && next[start - 4..start].iter().all(|c| *c == ' '), "{}", sc);
-        assert!(sc.contains("mistral-medium-latest"), "{}", sc);
+        assert!(sc.contains("mistral-large-4"), "{}", sc);
     }
 
     #[test]
@@ -2809,7 +2725,7 @@ mod tests {
         let e = env_of(HashMap::from([
             ("HOME", h.to_string_lossy().to_string()),
             ("MISTRAL_API_KEY", "k".to_string()),
-            ("BISE_MODEL", "mistral/mistral-medium-latest".to_string()),
+            ("BISE_MODEL", "mistral/mistral-large-4".to_string()),
         ]));
         let mut o = Onb::new(&e);
         assert_eq!(o.steps(), vec![Step::Welcome, Step::Theme, Step::Lines]);

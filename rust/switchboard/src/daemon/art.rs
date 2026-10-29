@@ -1,7 +1,9 @@
 //! Artifacts and diffs on the hub's side (docs/artifacts.md): the
-//! `artifacts` event and ops, `sb artifact`, the thread lines, the
-//! `diff` and `branches` ops (computed off the hub's loop), each agent's
-//! `changes` in the state, and the `landed` line after a land.
+//! `artifacts` event (artifacts/seen, artifacts/add's words), `sb
+//! artifact` (add, list, archive, unarchive), the thread lines, `diff/read` and `branches/list`'s answers
+//! (computed off the hub's loop), each agent's
+//! `changes` in the state, the `landed` line after a land, and his edits
+//! saved from the viewer's grid ([`Shell::art_save`], pages/artifact/save.rs).
 
 use super::*;
 use crate::artifacts::{self, Add, Added, Store};
@@ -27,14 +29,42 @@ pub(super) struct Art {
     /// the same sends nothing.
     last: String,
     /// Each agent's `changes` ({files, add, del} or null), by name.
-    pub(super) changes: BTreeMap<String, Value>,
+    pub(super) changes: BTreeMap<String, Option<bise_proto::rows::Changes>>,
     /// When each agent's changes were last asked, and those being
     /// computed now.
     asked: BTreeMap<String, std::time::Instant>,
     busy: BTreeSet<String>,
     /// An edit came while busy or too soon: ask again at the next idle.
     stale: BTreeSet<String>,
+    /// The artifacts whose newest version's turn still ran at their last
+    /// live frame: id -> (maker, its turn's start). When sb-core says that
+    /// turn is over, their `live` frame and the list go again.
+    live: BTreeMap<String, (String, u64)>,
+    /// The live words' cache was filled at the first state push after the
+    /// hub started (events::seed).
+    seeded: bool,
+    /// The store's rows, its metas (for `live`), new and seen_ms, built
+    /// again only when a store write, the agents' names or the 10 s
+    /// backstop move them (crate::store_gen, send-fast): the state push
+    /// and the view ask for them up to 10 times a second.
+    memo: std::cell::RefCell<crate::store_gen::Memo<(u64, u64, u64, u64), ArtView>>,
+    /// The library's folders, read by its mtime (daemon/art_folders.rs).
+    pub(super) lib: super::art_folders::LibCache,
 }
+
+/// What the artifacts event is built from (the memo's value).
+#[derive(Clone, Debug, Default)]
+struct ArtView {
+    rows: Vec<Value>,
+    stored: BTreeMap<String, artifacts::Meta>,
+    new: usize,
+    seen_ms: u64,
+}
+
+/// The backstop of the artifacts memo: a row reads what changes outside
+/// the hub (its target's file there or `gone`), so the rows are built
+/// again at least this often.
+const ART_BACKSTOP_MS: u64 = 10_000;
 
 /// Where an agent works and what its changes are measured against.
 #[derive(Clone, Debug)]
@@ -46,7 +76,7 @@ enum Where {
 }
 
 impl Shell {
-    fn art_store(&self) -> Store {
+    pub(super) fn art_store(&self) -> Store {
         Store::new(&self.opts.paths.state)
     }
 
@@ -63,17 +93,125 @@ impl Shell {
         }
     }
 
+    /// The turn `agent` is in now, from sb-core's view (its `turn_ms`):
+    /// the stamp of a save, never read from the request (artifacts_turns).
+    fn art_turn(&self, agent: &str) -> Option<crate::artifacts_turns::Turn> {
+        let a = self.hub.st.agents.get(agent)?;
+        a.turn_ms.map(|started_ms| crate::artifacts_turns::Turn { agent: a.name.clone(), started_ms })
+    }
+
+    /// When the turn of the agent that made `v` started, if it runs now.
+    fn art_maker_turn(&self, v: &artifacts::Version) -> Option<u64> {
+        let t = v.turn.as_ref()?;
+        self.hub.st.agents.get(&t.agent)?.turn_ms
+    }
+
+    /// Each stored artifact's live words, by id (the rows' `live`).
+    fn art_live_rows(&self, metas: &BTreeMap<String, artifacts::Meta>, rows: &mut [Value]) {
+        for r in rows.iter_mut() {
+            let Some(v) = r.get("id").and_then(Value::as_str).and_then(|id| metas.get(id)).and_then(|m| m.current()) else { continue };
+            if let Some(live) = crate::artifacts_turns::live(v, self.art_maker_turn(v)) {
+                r["live"] = json!(live);
+            }
+        }
+    }
+
+    /// A new save of `m`: its `version` frame on the viewer's
+    /// `/a/<id>/events` (pages/artifact/events.rs), and its turn watched
+    /// for the frame that follows the turn's end.
+    fn art_live_push(&mut self, m: &artifacts::Meta) {
+        let Some(v) = m.current() else { return };
+        let maker = self.art_maker_turn(v);
+        match (&v.turn, maker) {
+            (Some(t), Some(at)) if t.started_ms == at => {
+                self.art.live.insert(m.id.clone(), (t.agent.clone(), at));
+            }
+            _ => {
+                self.art.live.remove(&m.id);
+            }
+        }
+        if let Some(pages) = self.pg.pages.clone() {
+            crate::pages::artifact::events::push_version(&pages, &m.id, v, crate::artifacts_turns::live(v, maker));
+        }
+    }
+
+    /// The state changed (push_state): an artifact whose maker's turn
+    /// ended since its last frame gets its `live` frame (the line now)
+    /// and the list goes again. Read from sb-core's view, never a line.
+    /// The first time with a page server: the words' cache seeded for
+    /// every artifact (a stream opened after a restart starts right).
+    pub(super) fn art_live_watch(&mut self) {
+        if !self.art.seeded {
+            if let Some(pages) = self.pg.pages.clone() {
+                self.art.seeded = true;
+                let running = crate::pages::artifact::events::seed(&pages, &self.art_store(), |v| self.art_maker_turn(v));
+                for (id, agent, at) in running {
+                    self.art.live.insert(id, (agent, at));
+                }
+            }
+        }
+        let ended: Vec<String> = self
+            .art
+            .live
+            .iter()
+            .filter(|(_, (agent, at))| self.hub.st.agents.get(agent).and_then(|a| a.turn_ms) != Some(*at))
+            .map(|(id, _)| id.clone())
+            .collect();
+        if ended.is_empty() {
+            return;
+        }
+        let store = self.art_store();
+        for id in &ended {
+            self.art.live.remove(id);
+            let Some(m) = store.get(id) else { continue };
+            let Some(v) = m.current() else { continue };
+            if let Some(pages) = self.pg.pages.clone() {
+                crate::pages::artifact::events::push_live(&pages, id, crate::artifacts_turns::live(v, self.art_maker_turn(v)));
+            }
+        }
+        self.artifacts_refresh(false);
+    }
+
     /// `{"ev":"artifacts","rows":[…],"new":N,"seen_ms":T}`.
     pub(super) fn artifacts_ev(&self) -> Value {
-        let store = self.art_store();
-        let who = self.art_who();
         let now = now_ms();
+        // the folders' stamps: a page or an artifact written by another process
+        let st = &self.opts.paths.state;
+        let disk = crate::store_gen::dir_stamp(&st.join("pages")) ^ crate::store_gen::dir_stamp(&st.join("artifacts")).rotate_left(1);
+        let key = (crate::store_gen::now(), self.art_who_key(), now / ART_BACKSTOP_MS, disk);
+        let mut view = self.art.memo.borrow_mut().get(key, || {
+            let store = self.art_store();
+            let who = self.art_who();
+            ArtView {
+                rows: store.rows(&who, &self.hub.workspace),
+                stored: store.stored().into_iter().map(|m| (m.id.clone(), m)).collect(),
+                new: store.new_count(now),
+                seen_ms: store.seen_ms(now),
+            }
+        });
+        self.art_live_rows(&view.stored, &mut view.rows);
+        // the library joined at send time (his rename in the desktop core
+        // moves no store stamp): each row's folder resolved, the folders
+        let lib = self.art_library();
+        artifacts::resolve_folders(&mut view.rows, &lib);
         json!({
             "ev": "artifacts",
-            "rows": store.rows(&who, &self.hub.workspace),
-            "new": store.new_count(now),
-            "seen_ms": store.seen_ms(now),
+            "rows": view.rows,
+            "new": view.new,
+            "seen_ms": view.seen_ms,
+            "folders": super::art_folders::folder_rows(&lib),
         })
+    }
+
+    /// One number for what `art_who` answers: each agent's names and
+    /// whether it is archived (a rename or an /archive moves the rows).
+    fn art_who_key(&self) -> u64 {
+        use std::hash::{Hash, Hasher};
+        let mut h = std::collections::hash_map::DefaultHasher::new();
+        for a in self.hub.st.agents.values() {
+            (&a.name, &a.dir, &a.aliases, a.status() == crate::model::Status::Archived).hash(&mut h);
+        }
+        h.finish()
     }
 
     /// Send the list when it changed since the last one sent (`force`:
@@ -87,44 +225,28 @@ impl Shell {
         }
     }
 
-    /// The TUI's `artifacts` op: the list again, `seen`, `add`.
-    pub(super) fn artifacts_op(&mut self, id: ClientId, v: &Value) {
-        let s = |k: &str| v.get(k).and_then(|x| x.as_str()).unwrap_or("").to_string();
-        match s("do").as_str() {
-            "seen" => {
-                // `at_ms`: when the user looked (an older client: now)
-                let now = now_ms();
-                let at = v.get("at_ms").and_then(|x| x.as_u64()).unwrap_or(now);
-                let _ = self.art_store().saw(at, now);
-                self.artifacts_refresh(true);
-            }
-            "add" => {
-                let title = Some(s("title")).filter(|t| !t.trim().is_empty());
-                let ev = match self.art_add(&s("agent"), &s("target"), title) {
-                    Ok(text) => json!({"ev": "notice", "text": text}),
-                    Err(e) => json!({"ev": "warn", "text": format!("▲ {}", e)}),
-                };
-                if let Some(c) = self.clients.get_mut(&id) {
-                    write_json(c, &ev);
-                }
-                self.artifacts_refresh(true);
-            }
-            _ => {
-                let ev = self.artifacts_ev();
-                self.art.last = ev.to_string();
-                if let Some(c) = self.clients.get_mut(&id) {
-                    write_json(c, &ev);
-                }
-            }
-        }
+    /// artifacts/seen (the TUI's `/artifacts` screen opened): `new` = 0,
+    /// the list to every client.
+    /// `at_ms`: when he looked (none: now); seen moves to it, never past
+    /// now, never back (art-seen 1cfbc07d)
+    pub(super) fn artifacts_seen(&mut self, at_ms: Option<u64>) {
+        let now = now_ms();
+        let _ = self.art_store().saw(at_ms.unwrap_or(now), now);
+        self.artifacts_refresh(true);
     }
 
-    /// `/artifacts add <path or link>` by the user in `agent`'s view (the
-    /// TUI's `artifacts` op and the window's `slash`): the store's add,
+    /// `/artifacts add <path or link>` by the user in `agent`'s view
+    /// (artifacts/add and command/run): the store's add,
     /// its thread lines, and the words for the one who asked (`↗ added:
     /// <title>`) or the store's refusal. The caller sends them and then
-    /// `artifacts_refresh(true)`.
-    pub(super) fn art_add(&mut self, agent: &str, target: &str, title: Option<String>) -> Result<String, String> {
+    /// `artifacts_refresh(true)`. `folder`: a library folder (id or name)
+    /// he picked: it goes there.
+    pub(super) fn art_add(&mut self, agent: &str, target: &str, title: Option<String>, folder: Option<String>) -> Result<String, String> {
+        let lib = self.art_library();
+        let folder = match folder.filter(|f| !f.trim().is_empty()) {
+            Some(f) => Some(artifacts::Filed::Asked(bise_home::library::find(&lib, &f).ok_or_else(|| format!("no folder {f}"))?.id.clone())),
+            None => None,
+        };
         let agent = match agent {
             "" => MAIN.to_string(),
             a => a.to_string(),
@@ -139,51 +261,142 @@ impl Shell {
                 Where::Checkout { dir, .. } | Where::Shared { dir, .. } => dir.to_string_lossy().to_string(),
             })
             .unwrap_or_else(|| self.hub.workspace.clone());
-        let add = Add { target: target.to_string(), title, kind: None, agent, by: "you".into(), cwd };
+        let add = Add { target: target.to_string(), title, kind: None, agent, by: "you".into(), cwd, known_only: false, folder, ..Default::default() };
         let a = self.art_store().add(&add, now_ms())?;
         if a.new_version {
             self.art_lines(&a);
         }
+        self.serve_ask(&a);
         Ok(format!("↗ added: {}", a.meta.title))
     }
 
-    /// `sb artifact add|list` (an agent's request).
-    pub(super) fn artifact_cmd(&mut self, from: &str, v: &Value) -> Value {
-        let s = |k: &str| v.get(k).and_then(|x| x.as_str()).unwrap_or("").to_string();
+    /// His edits in the viewer's grid (pages/artifact/save.rs): decided
+    /// here, the store's only writer; the file written, the version added
+    /// (one per sitting), its frame on the viewer's stream, the list, and
+    /// on the save that makes the version, its maker told once (an `edit`
+    /// note, the notes' Sent path). (status, body) for the page thread.
+    pub(super) fn art_save(&mut self, pages: &crate::pages::Pages, id: &str, req: crate::pages::artifact::save::SaveReq) -> (u16, Value) {
+        use crate::pages::artifact::save::{decide, Decision};
         let store = self.art_store();
-        match s("do").as_str() {
-            "add" => {
+        let Some(m) = store.stored().into_iter().find(|m| m.id == id) else { return (404, json!({"error": "no such artifact"})) };
+        if !m.source.to_lowercase().ends_with(".xlsx") {
+            return (400, json!({"error": "only an xlsx is edited in the viewer"}));
+        }
+        let latest = m.current().cloned();
+        let disk_same = || match &latest {
+            Some(l) => std::fs::read(&m.source).ok().is_some_and(|b| Some(b) == store.copy_bytes(&m, l)),
+            None => true,
+        };
+        match decide(latest.as_ref(), &req, disk_same) {
+            Decision::Already { v, rev } => return (200, json!({"v": v, "rev": rev})),
+            Decision::Stale { v, rev } => return (409, json!({"v": v, "rev": rev, "error": format!("v{v} came in while you edited")})),
+            Decision::Disk { v, rev } => return (409, json!({"v": v, "rev": rev, "disk": true, "error": "the file changed on disk while you edited"})),
+            Decision::Write => {}
+        }
+        if let Err(e) = store.write_source(&m, &req.bytes) {
+            return (410, json!({"error": format!("the file is gone ({e}): save a copy instead")}));
+        }
+        let cwd = std::path::Path::new(&m.source).parent().map(|p| p.to_string_lossy().to_string()).unwrap_or_default();
+        let sitting = crate::artifacts_turns::Sitting { by: "you".into(), session: req.session.clone(), seq: req.seq };
+        let add = Add { target: m.source.clone(), agent: m.agent.clone(), by: "you".into(), cwd, known_only: true, sitting: Some(sitting), ..Default::default() };
+        let a = match store.add(&add, now_ms()) {
+            Ok(a) => a,
+            Err(e) => return (500, json!({"error": e})),
+        };
+        let Some(v) = a.meta.current().cloned() else { return (500, json!({"error": "no version after the save"})) };
+        if a.new_version {
+            self.art_live_push(&a.meta);
+            if !a.replaced {
+                self.art_lines(&a);
+                if let Some((text, parts, _)) = crate::pages::artifact::notes::record_edit(pages, id, &a.meta.title, v.v, now_ms()) {
+                    let to = if self.page_agent_gone(&a.meta.agent) { MAIN.to_string() } else { a.meta.agent.clone() };
+                    self.step(Input::ClientInput { client: 0, focus: to, text, queued: true, parts, from: String::new() });
+                }
+            }
+            self.artifacts_refresh(false);
+        }
+        (200, json!({"v": v.v, "rev": v.rev()}))
+    }
+
+    /// `sb artifact add|list` (an agent's request).
+    pub(super) fn artifact_cmd(&mut self, from: &str, r: bise_proto::sb::Artifact) -> Value {
+        use bise_proto::sb::Artifact;
+        let store = self.art_store();
+        match r {
+            Artifact::Add { target, cwd, title, kind, known_only, changed, folder } => {
+                let folder = match self.art_folder(from, folder.as_deref()) {
+                    Ok(f) => f,
+                    Err(e) => return json!({"ok": false, "error": e}),
+                };
                 let add = Add {
-                    target: s("target"),
-                    title: v.get("title").and_then(|x| x.as_str()).map(String::from),
-                    kind: v.get("kind").and_then(|x| x.as_str()).map(String::from),
+                    target,
+                    title,
+                    kind,
                     agent: from.to_string(),
                     by: from.to_string(),
-                    cwd: s("cwd"),
+                    cwd,
+                    known_only,
+                    // the turn from sb-core's fact, never from the request
+                    turn: self.art_turn(from),
+                    sitting: None,
+                    changed: changed.as_ref().and_then(bise_proto::office::Changed::of_value).map(|c| c.0),
+                    folder,
                 };
                 match store.add(&add, now_ms()) {
                     Ok(a) => {
                         if a.new_version {
-                            self.art_lines(&a);
+                            // a save in the same turn is the same version: no new line
+                            if !a.replaced {
+                                self.art_lines(&a);
+                            }
+                            self.art_live_push(&a.meta);
                         }
+                        self.serve_ask(&a);
                         self.artifacts_refresh(false);
                         json!({"ok": true, "text": artifacts::added_text(&a), "id": a.meta.id})
                     }
                     Err(e) => json!({"ok": false, "error": e}),
                 }
             }
-            "list" => {
-                let agent = Some(s("agent")).filter(|a| !a.is_empty());
-                json!({"ok": true, "text": store.list_text(&s("words"), agent.as_deref(), now_ms())})
+            Artifact::List { words, agent, archived } => {
+                let agent = agent.filter(|a| !a.is_empty());
+                json!({"ok": true, "text": store.list_text(&words, agent.as_deref(), archived, now_ms())})
             }
-            _ => json!({"ok": false, "error": "usage: sb artifact add <path or link> | sb artifact list"}),
+            Artifact::Archive(p) => self.artifact_pick(true, p),
+            Artifact::Unarchive(p) => self.artifact_pick(false, p),
+            Artifact::Move { ids, folder } => self.artifact_move_cmd(from, &ids, folder.as_deref()),
+            Artifact::Folders => {
+                let lib = self.art_library();
+                json!({"ok": true, "text": super::art_folders::folders_text(&lib, &store.all())})
+            }
+        }
+    }
+
+    /// `sb artifact archive|unarchive`: those picked out of the list, or
+    /// back in it.
+    fn artifact_pick(&mut self, archive: bool, p: bise_proto::sb::ArtifactPick) -> Value {
+        let store = self.art_store();
+        let bise_proto::sb::ArtifactPick { ids, agent, kind, before_ms } = p;
+        let some = |x: Option<String>| x.filter(|x| !x.is_empty());
+        let pick = artifacts::Pick { ids, agent: some(agent), before_ms, kind: some(kind) };
+        let text = if archive {
+            store.archive(&pick, now_ms()).map(|a| artifacts::archived_text(&a))
+        } else {
+            store.unarchive(&pick).map(|(back, not)| artifacts::unarchived_text(&back, &not))
+        };
+        match text {
+            Ok(text) => {
+                self.artifacts_refresh(false);
+                json!({"ok": true, "text": text})
+            }
+            Err(e) => json!({"ok": false, "error": e}),
         }
     }
 
     /// The ↗ line of a new artifact or version: in the maker's thread and
     /// in main's.
     fn art_lines(&mut self, a: &Added) {
-        let line = format!("sb artifact : {}", wire_escape(&artifacts::thread_line(&a.meta)));
+        let line = artifacts::thread_rec(&a.meta).line();
         let maker = self.art_who()(&a.meta.agent).map(|(n, _)| n);
         if let Some(m) = &maker {
             if m != MAIN {
@@ -215,7 +428,7 @@ impl Shell {
             },
             _ => Where::Shared {
                 dir: PathBuf::from(&a.ws.path),
-                files: a.files.iter().cloned().collect(),
+                files: a.files.to_vec(),
             },
         }
     }
@@ -243,48 +456,64 @@ impl Shell {
         });
     }
 
+    /// After the add of a local link (a dev server, artifacts_serve): who
+    /// listens on its port, found off the loop (lsof, its argv, `GET /`);
+    /// the answer comes back as `Msg::Serve`. Nothing listens: nothing
+    /// comes, the link stays a link.
+    fn serve_ask(&self, a: &Added) {
+        let Some(v) = a.meta.current().filter(|_| a.new_version && !a.page) else { return };
+        if crate::artifacts_serve::local_port(&v.target).is_none() {
+            return;
+        }
+        let (tx, id, n, link) = (self.tx.clone(), a.meta.id.clone(), v.v, v.target.clone());
+        std::thread::spawn(move || {
+            if let Some((serve, root)) = crate::artifacts_probe::recipe(&link) {
+                let _ = tx.send(Msg::Serve { id, v: n, serve, root });
+            }
+        });
+    }
+
+    /// A local site's recipe was found: on its version (and a static
+    /// site's copy), then the list again (its row's `url` is its door).
+    pub(super) fn on_serve(&mut self, id: &str, v: u64, serve: crate::artifacts_serve::Serve, root: Option<PathBuf>) {
+        match self.art_store().set_serve(id, v, serve, root.as_deref()) {
+            Ok(true) => self.artifacts_refresh(false),
+            Ok(false) => {}
+            Err(e) => log_line(&self.opts.paths, &format!("artifact {id}: its recipe not kept: {e}")),
+        }
+    }
+
     /// An agent's changes are computed: the state again when they moved.
-    pub(super) fn on_changes(&mut self, name: String, v: Value) {
+    pub(super) fn on_changes(&mut self, name: String, v: Option<bise_proto::rows::Changes>) {
         self.art.busy.remove(&name);
         let moved = self.art.changes.get(&name) != Some(&v);
         self.art.changes.insert(name.clone(), v);
         if moved {
-            let snap = self.snapshot();
-            self.broadcast(&snap);
+            self.state_now();
         }
         if self.art.stale.contains(&name) {
             self.changes_ask(&name, false);
         }
     }
 
-    /// The `diff` op: an agent's changes, a branch, a range or a PR,
-    /// answered with a `diff` event to that client.
-    pub(super) fn diff_op(&mut self, id: ClientId, v: &Value) {
-        let req = v.get("req").cloned().unwrap_or(Value::Null);
-        let shared = PathBuf::from(&self.hub.workspace);
-        let ask = self.diff_ask(v);
-        let tx = self.tx.clone();
-        std::thread::spawn(move || {
-            let ev = diff_answer(ask, &shared, req);
-            let _ = tx.send(Msg::ToClient { id, v: ev });
-        });
-    }
-
-    /// The typed `diff {project, agent}` (desktop S7): the same answer as
-    /// the op, in bise-proto's shape (`proto_view::diff`), to that client.
-    pub(super) fn diff_typed(&mut self, id: ClientId, project: String, agent: String, commit: Option<String>) {
+    /// The typed `diff` (desktop S7; a branch, a PR or a range since
+    /// client-protocol step 3): the same answer as the op, in bise-proto's
+    /// shape (`proto_view::diff`), to that client. `d` is checked
+    /// (`DiffAsk::check`).
+    pub(super) fn diff_typed(&mut self, id: ClientId, project: String, d: crate::proto_view::DiffAsk) {
         let shared = PathBuf::from(&self.hub.workspace);
         // one commit: the range ask the TUI's door under a land uses
-        let ask = match &commit {
-            Some(c) => self.diff_ask(&json!({"agent": agent, "range": format!("{c}^..{c}")})),
-            None => self.diff_ask(&json!({"agent": agent})),
-        };
+        let ask = self.diff_ask(&d.op());
+        let agent = d.agent.clone().unwrap_or_default();
+        let commit = d.commit.clone();
         // emitter 5: what its change measured (`sb report --result`), from
-        // its latest report
-        let result = self.hub.st.agents.get(&agent).and_then(|a| a.last_report.as_ref()).and_then(|r| r.result.clone());
+        // its latest report (an agent's own change only)
+        let mine = d.range.is_none() && d.commit.is_none();
+        let result = self.hub.st.agents.get(&agent).filter(|_| mine).and_then(|a| a.last_report.as_ref()).and_then(|r| r.result.clone());
+        let req = d.req.map_or(Value::Null, |r| json!(r));
         let tx = self.tx.clone();
         std::thread::spawn(move || {
-            let mut ev = diff_answer(ask, &shared, Value::Null);
+            let mut ev = diff_answer(ask, &shared, req);
             // a binary file's size, read here (the mapper stays pure):
             // its file in the agent's checkout, when it is still there
             for f in ev.get_mut("files").and_then(Value::as_array_mut).into_iter().flatten() {
@@ -301,7 +530,7 @@ impl Shell {
                 *c = commit;
                 *r = result.and_then(|v| serde_json::from_value(v).ok()).map(Box::new);
             }
-            let _ = tx.send(Msg::ToClient { id, v: typed.to_value() });
+            let _ = tx.send(Msg::Typed { to: super::rpc::Typed::Answer(id), v: typed.to_value() });
         });
     }
 
@@ -342,8 +571,9 @@ impl Shell {
         }
     }
 
-    /// The `branches` op: the /diff picker's rows.
-    pub(super) fn branches_op(&mut self, id: ClientId) {
+    /// The /diff picker's rows to client `id`: `branches/list`'s answer.
+    pub(super) fn branches_scan(&mut self, id: ClientId) {
+        let project = self.project();
         let shared = PathBuf::from(&self.hub.workspace);
         // who works on which branch, and the PRs the poller knows
         let mut on: BTreeMap<String, Vec<String>> = BTreeMap::new();
@@ -365,7 +595,8 @@ impl Shell {
                            "uncommitted": false, "pr": null, "landed_ms": null, "add": add, "del": del})
                 })
                 .collect();
-            let _ = tx.send(Msg::ToClient { id, v: json!({"ev": "branches", "base": base, "rows": rows}) });
+            let v = json!({"ev": "branches", "project": project, "base": base, "rows": rows});
+            let _ = tx.send(Msg::Typed { to: super::rpc::Typed::Answer(id), v });
         });
     }
 }
@@ -375,7 +606,7 @@ impl Shell {
 /// files included) or of its own files in the shared folder; null when
 /// there are none or git cannot say (a folder that is gone: diff.rs
 /// never runs git in it).
-fn changes_of(place: &Where) -> Value {
+fn changes_of(place: &Where) -> Option<bise_proto::rows::Changes> {
     let files = match place {
         Where::Checkout { dir, base } => {
             let base = base.clone().unwrap_or_else(|| diff::trunk(dir));
@@ -386,13 +617,13 @@ fn changes_of(place: &Where) -> Value {
     match files {
         Ok(f) if !f.is_empty() => {
             let (files, add, del) = diff::stat(&f);
-            json!({"files": files, "add": add, "del": del})
+            Some(bise_proto::rows::Changes { files: files as u64, add, del })
         }
-        _ => Value::Null,
+        _ => None,
     }
 }
 
-/// What the `diff` op asks for.
+/// What a `diff/read` asks for.
 #[derive(Clone, Debug)]
 enum Ask {
     /// name, where, branch, archived
@@ -509,14 +740,14 @@ fn diff_answer(ask: Ask, shared: &Path, req: Value) -> Value {
     ev
 }
 
-/// The `landed` line of a land, after its `info` line in main's feed:
-/// `agent : target : from : sha : files : add : del` (from = the
-/// target's tip before, short). None when git cannot say.
-pub(super) fn landed_fields(shared: &Path, agent: &str, target: &str, sha: &str, commits: usize) -> Option<String> {
+/// The `landed` record of a land, after its `info` line in main's feed
+/// (from = the target's tip before, short). None when git cannot say.
+pub(super) fn landed_rec(shared: &Path, agent: &str, target: &str, sha: &str, commits: usize) -> Option<Feed> {
     if commits == 0 {
         return None;
     }
-    let out = std::process::Command::new("git")
+    let out = crate::tools_env::git_command()
+        .ok()?
         .arg("-C")
         .arg(shared)
         .args(["rev-parse", "--short", &format!("{}~{}", sha, commits)])
@@ -527,15 +758,16 @@ pub(super) fn landed_fields(shared: &Path, agent: &str, target: &str, sha: &str,
     }
     let from = String::from_utf8_lossy(&out.stdout).trim().to_string();
     let (files, add, del) = diff::range_stat(shared, &from, sha);
-    Some(crate::core::join_fields(&[
-        agent.to_string(),
-        target.to_string(),
+    Some(Feed::Landed(bise_proto::core::feed::Landed {
+        v: 1,
+        agent: agent.to_string(),
+        target: target.to_string(),
         from,
-        sha.to_string(),
-        files.to_string(),
-        add.to_string(),
-        del.to_string(),
-    ]))
+        sha: sha.to_string(),
+        files: files as u64,
+        add,
+        del,
+    }))
 }
 
 #[cfg(test)]
@@ -627,17 +859,17 @@ mod tests {
         sh(&shared, &["commit", "-q", "-m", "init"]);
         sh(&shared, &["worktree", "add", "-q", "-b", "sb/t1", wt.to_str().unwrap()]);
         let place = Where::Checkout { dir: wt.clone(), base: None };
-        assert_eq!(changes_of(&place), Value::Null, "nothing yet");
+        assert_eq!(changes_of(&place), None, "nothing yet");
         std::fs::create_dir_all(wt.join("out")).unwrap();
         std::fs::write(wt.join("out/plans.csv"), "plan,price\nfree,0\npro,20\n").unwrap();
         sh(&wt, &["add", "out"]);
         sh(&wt, &["commit", "-q", "-m", "plans"]);
         std::fs::write(wt.join("README"), "hello\nmore\n").unwrap();
         std::fs::write(wt.join("new.txt"), "x\n").unwrap();
-        assert_eq!(changes_of(&place), json!({"files": 3, "add": 5, "del": 0}));
+        assert_eq!(changes_of(&place), Some(bise_proto::rows::Changes { files: 3, add: 5, del: 0 }));
         // its folder gone: null, and no git in it
         sh(&shared, &["worktree", "remove", "--force", wt.to_str().unwrap()]);
-        assert_eq!(changes_of(&place), Value::Null);
+        assert_eq!(changes_of(&place), None);
         let _ = std::fs::remove_dir_all(&root);
     }
 

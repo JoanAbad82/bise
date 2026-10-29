@@ -69,5 +69,8 @@ fi
 # keyed by the content of its sources, and compiles it on a miss (sb-core
 # ~15 s, a REPL 1-2 min). A failed compile keeps the existing binary.
 scripts/bins.sh repl-live repl-scripted sb-core
+# the viewer's xlsx grid (Univer, office/dist/office-sheet.js, not in git): the
+# same cache; without it an xlsx says it can't be drawn, the rest runs
+scripts/bins.sh office-sheet || echo "building the xlsx grid failed (pnpm -C office/sdk install?)" >&2
 
 exec "$BIN" "$@"

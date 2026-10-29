@@ -8,6 +8,7 @@ Dense reference for agents building bise's terminal UI. The exact specs are in `
 3. **one key for the common case**: digits pick options. ctrl+N opens inbox item N, and N is the same number everywhere.
 4. **show what happened**: a 2–3 s trace where your eyes already are (divider, the touched row), then it folds.
 5. **never lie**: never show a key the terminal can't send, never show an unbuilt feature, and a default always says what it resolves to.
+6. **every mark explains itself**: a glyph, chip, count, short age, id or state mark says what it is on hover or focus, in one line. the screen stays compact; the explanation is one step away, the full thing one more (progressive disclosure).
 
 ## tokens (dark / light)
 | role | dark | light | for | never |
@@ -63,6 +64,7 @@ Rules: the position separates look-alikes (✓ at the start of a row = done, at 
 ## patterns
 - **rest vs held**: at rest show only what changes or needs you. holding ctrl shows ctrl keys where they act, state words, long forms and the full header/key bar. ⌥ shows `⌥N`. cmd shows only after a cmd key has really arrived. the held form replaces the rest form in the same cells, so nothing moves.
 - **disclosure**: one row by default; `▸` means there's more, and folded stuff is still searchable. errors show their first line, and questions show in full.
+- **explain every mark** (law 6): mark → tip → the full thing. what gets a tip: every glyph (ψ ↑ ✓ ? … ◌ ∿ ▲), chip, count, short age, `%`, mono id, icon button, pearl or badge; not text that already says it in words. the tip's words: `<what it is>: <what it says now>`, lowercase, no period, e.g. `ψ worktree: its own copy of the repo, on sb/perf`, `17% of perf's context used`; one string per mark and state, in one signed table shared by the terminal and the desktop (bise-proto words). terminal: while the mouse is over a mark, or the keyboard selection is on it, the key bar line shows its words, dim. desktop: one tip component (pointer-events none, sans 12, max 280 px, 2 lines at most, 400 ms hover delay, instant on focus, warm for 1 s after one closes, never repeats visible text). a new mark without its words doesn't ship.
 - **keys**: digits pick. esc = back one step, ⏎ = do it, ctrl+o = open folds. every key has a click twin and vice versa. leave OS keys alone (ctrl+arrows on macOS). detect the terminal (kitty protocol) before showing ctrl+digits.
 - **feedback**: mode switch = accent word on the divider + an explanation on the key bar (3 s). answer = fold line (2 s), also in main's thread. setting = row flash ✓. message = `· → ✓ → ✓✓`.
 - **short on room**: every line has a written drop order: explanation words → short forms → whole details → names cut with `…` last. the gust while working and `?` are never dropped. test at 80 and 150 cols.
@@ -72,15 +74,28 @@ Rules: the position separates look-alikes (✓ at the start of a row = done, at 
 - **defaults**: the first run asks one thing (the main model). every other role is `same as main`/`auto · resolved`. picks are remembered. name what leaves the machine the first time.
 - **never block**: items wait in the inbox, never auto-open while the draft has text, and open in place with the thread visible. no modal eats keys.
 
+## dialogs and page heroes (desktop)
+Mocks: page `page-hero` (bise pages). Gabriel's ask: calmer popups, and every page and dialog says what it is, for good.
+- **scrim**: the window ground at 62 % (`--c-scrim: color-mix(in srgb, var(--c-ground) 62%, transparent)`, dark and light): the page fades toward its own paper and stays sharp. never a blur behind a dialog.
+- **dialog shadow**: `--e-sheet: 0 0 0 1px var(--c-line), 0 1px 2px <shadow 8%>, 0 12px 32px -12px <shadow 22%, light 12%>`. `--e-3` (the wide halo) only for what floats over other apps: spotlight, capsule, palette.
+- **dialog place**: 12 % from the window top, centred across, 520 px (480 under 800), grows down. solid surface, radius 12, padding 24. in: fade + 8 px rise, 160 ms ease-out; scrim 120 ms; out 120 ms fade; reduced motion: fades only.
+- **page hero**: the first block of every full page (inbox, artifacts, scheduled, processes, agents, archived, each settings section) and of every dialog or sheet; never in the thread, side panels, menus, popovers, the capsule. page: a card on `--c-raised`, radius 12, padding 20 24, 24 above the content; text left, a bims-world vignette right (220 × 132, bleeding to the card's right and bottom edges). dialog: no card, a 64 px vignette left of the title, 16 px gap, 20 px to the first field.
+- **its words**: the place's name (t-22 600; dialog t-17); one sentence, t-15/1.5 text-2, ≤ 56 ch, 4 px under it, saying what this place is in his words; a facts line, t-13 text-3, 8 px under: live numbers, the accent only on what waits on him. never "welcome", "here you can…", click steps, a button.
+- **permanent**: no ×, no "got it", no setting hides it; it scrolls away with the page (the title-bar crumb keeps the name). under 800 px the vignette goes, the words stay.
+- **the vignette**: stills from the bims renderer at his hour's light, one per state (a letter more in the mailbox, the bim's `?` only when something waits). still at rest; a 1–2 s move only when its state changes; none under reduced motion.
+
 ## words
-- bise says "i", the user is "you". four nouns: you, main (team lead), agents, the inbox. never task, hub, sub-agent, orchestrator, cards.
+- bise says "i", the user is "you". four nouns: you, main (team lead), agents, the inbox; what waits in the inbox is a notification (#12 in a tight row, never "notif"), and the macOS one is a banner. never task, hub, sub-agent, orchestrator, cards.
 - state words, the same everywhere: working, idle, done, waiting, asks you, failed, starting, stopped.
 - picker titles are questions, flashes are `✓ state`, keys are verbs. no period on titles or labels. numbers before units: `58k · 22%`, `3m`.
 - templates: error `✗ X. /cmd fixes it.` · tip `fact. key does what.` · mode `auto · safe calls run, risky ones ask you` · answered `✓ you allowed t3: …` · hard rule `it rewrites main. this one always asks.`
 - no LLM tells: seamless, "X, not Y", "never deleted", let's, exclamation marks.
 
+## the bims (desktop)
+The animated office of agents (one bim = one agent, `?` accent / `✗` error the only UI colors on it, light from his hour, never a grey void): book §6b for the tone, `docs/brand/bims.md` for the spec, the laws and where the code lives.
+
 ## ship checklist
-blocks typing? · the one key? · which level? · rest vs held? · color only for needs-you/failure? · glyph unique + 1 cell + ASCII? · every shown key works here + fallback? · the trace after acting? · drop order at 80? · dark/light/NO_COLOR/ASCII? · words (lowercase, 4 nouns)? · failure = one line + fix + nothing lost?
+blocks typing? · the one key? · which level? · every new mark has its tip words? · rest vs held? · color only for needs-you/failure? · glyph unique + 1 cell + ASCII? · every shown key works here + fallback? · the trace after acting? · drop order at 80? · dark/light/NO_COLOR/ASCII? · words (lowercase, 4 nouns)? · failure = one line + fix + nothing lost?
 
 ## process
 user's words → mock on real geometry (`site/content/*.html`, local) → variants only where unsure, pick marked → user picks → build → tmux captures 150/80, ctrl up/held → designer signs off → book updated.

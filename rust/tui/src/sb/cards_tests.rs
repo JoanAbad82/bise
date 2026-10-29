@@ -17,7 +17,8 @@ fn app_with_hub() -> (App, UnixStream) {
     (sb_app(sb, rx, false, 100, crate::voice::Voice::live(false)), b)
 }
 
-/// What the TUI typed to the hub since the last call (`input` ops).
+/// What the TUI sent the hub since the last call: card/answer and
+/// card/close as the lines they replaced, command/run's line.
 fn sent(b: &mut UnixStream) -> Vec<String> {
     let mut s = String::new();
     let mut buf = [0u8; 4096];
@@ -29,8 +30,12 @@ fn sent(b: &mut UnixStream) -> Vec<String> {
     }
     s.lines()
         .filter_map(|l| serde_json::from_str::<Value>(l).ok())
-        .filter(|v| v["op"] == "input")
-        .map(|v| v["text"].as_str().unwrap_or("").to_string())
+        .filter_map(|v| match v["method"].as_str()? {
+            "card/answer" => Some(format!("/answer {} {}", v["params"]["card"], v["params"]["reply"].as_str()?)),
+            "card/close" => Some(format!("/close {}", v["params"]["card"])),
+            "command/run" => v["params"]["line"].as_str().map(str::to_string),
+            _ => None,
+        })
         .collect()
 }
 
@@ -269,8 +274,8 @@ fn the_card_view_takes_the_history_place() {
     assert!(rows[rel + 1].contains("│ ┃ "), "a blank bar row on top: {}", rows[rel + 1]);
     let t = row_of(&rows, "┃ ? perf asks");
     assert_eq!(t, rel + 2);
-    // its age one tinted column from the tint's edge, then the box's gap
-    assert!(rows[t].contains("2 of 3 · 6m  │"), "{}", rows[t]);
+    // its age, then its number (notif-id), one tinted column from the tint's edge, then the box's gap
+    assert!(rows[t].contains("2 of 3 · 6m · #12  │"), "{}", rows[t]);
     assert!(rows[t + 1].contains("┃ the hero image is 4.2 MB. compress it, or lazy-load it?"), "{}", rows[t + 1]);
     let o = row_of(&rows, "┃ 1 compress it (webp, ~300 kB)   2 both: compress, and lazy-load below the fold");
     assert!(rows[o + 1].contains("┃ or type your answer, ⏎ sends it"), "{}", rows[o + 1]);
@@ -280,11 +285,12 @@ fn the_card_view_takes_the_history_place() {
     term.draw(|f| draw_sb(&mut app, f)).unwrap();
     let x = col_of(&rows[t], "? perf");
     assert_eq!(term.backend().buffer()[(x, t as u16)].bg, theme::item_tint());
-    let pad = col_of(&rows[t], "6m  │") + 2;
-    assert_eq!(term.backend().buffer()[(pad, t as u16)].bg, theme::item_tint(), "the padding after the age is tinted");
+    let pad = col_of(&rows[t], "#12  │") + 3;
+    assert_eq!(term.backend().buffer()[(pad, t as u16)].bg, theme::item_tint(), "the padding after the number is tinted");
     assert!(!rows.iter().any(|r| r.contains('▸')), "nothing highlighted on open");
-    assert!(rows.iter().any(|r| r.contains("you → ? perf · your answer")), "{}", rows.join("\n"));
-    assert_eq!(bar(&app), "1-2 answer   ←→ choose   ↑↓ other items   ctrl+o full screen   esc back to your message");
+    assert!(rows.iter().any(|r| r.contains("↳ answering perf · ")), "{}", rows.join("\n"));
+    // a question his words answer (composer-target A): ⏎ sends them, esc names whom they go to instead
+    assert_eq!(bar(&app), "1-2 answer   ⏎ send the answer   ←→ choose   ↑↓ other items   ctrl+o full screen   esc to main");
     // ctrl+o: full screen, the items as numbered tabs; again: in place
     ctrl(&mut app, 'o');
     let rows = draw(&mut app, 140, 40);
@@ -292,7 +298,7 @@ fn the_card_view_takes_the_history_place() {
     assert!(rows[tabs].contains("2 ? perf") && rows[tabs].contains("3 ? dark-mode") && rows[tabs].contains("↑↓"), "{}", rows[tabs]);
     assert!(!rows.iter().any(|r| r.contains("waiting for you")), "no box: {}", rows.join("\n"));
     assert!(rows[row_of(&rows, "? perf asks")].contains("┃ ? perf asks"));
-    assert_eq!(bar(&app), "1-2 answer   ↑↓ other items   pgup pgdn scroll   ctrl+o back in place   esc back to your message");
+    assert_eq!(bar(&app), "1-2 answer   ⏎ send the answer   ↑↓ other items   pgup pgdn scroll   ctrl+o back in place   esc to main");
     ctrl(&mut app, 'o');
     let rows = draw(&mut app, 140, 40);
     row_of(&rows, "waiting for you");
@@ -392,7 +398,7 @@ fn a_long_card_scrolls() {
     assert!(rows[more].contains("more lines · ctrl+o full screen"), "{}", rows.join("\n"));
     assert!(rows[more + 2].contains("┃ 1 yes   2 no"), "{}", rows.join("\n"));
     let top = row_of(&rows, "╭─ inbox");
-    let div = row_of(&rows, "you → ? t1");
+    let div = row_of(&rows, "↳ answering t1");
     assert!(more + 6 - top <= 2 + (div - 1) / 2 + 2, "about half the feed: {}", rows.join("\n"));
     // pgdn is the thread's in place
     assert!(!key(&mut app, KeyCode::PageDown, KeyModifiers::NONE));
@@ -447,7 +453,7 @@ fn the_arrows_choose_an_option() {
     press(&mut app, KeyCode::Char('m'));
     press(&mut app, KeyCode::Left);
     assert_eq!((app.ed.cursor, app.sb.current_card().map(|c| c.id)), (0, Some(12)), "← moved the caret");
-    assert_eq!(bar(&app), "⏎ sends your answer   ctrl+o full screen   esc back to your message");
+    assert_eq!(bar(&app), "⏎ send the answer   ctrl+o full screen   esc to main");
     // emptied: the arrows and the highlight are back
     press(&mut app, KeyCode::Delete);
     assert_eq!(app.ed.text, "");
@@ -546,23 +552,77 @@ fn the_card_view_divider_shows_a_fresh_note() {
     assert!(rows[d].contains("your answer  ✓ copied 9 chars "), "{}", rows[d]);
 }
 
-/// The card in view answered elsewhere: the view moves on, its draft
-/// goes to the history; no card left: back to the thread.
+/// The hub's next snapshot: `cards` replace the last one's.
+fn snapshot(app: &mut App, cards: Vec<Card>) {
+    let before = std::mem::replace(&mut app.sb.cards, cards);
+    sync(app, &before);
+}
+
+/// The card in view closed elsewhere with nothing typed: the view moves
+/// on; no card left: back to the thread.
 #[test]
 fn a_card_closed_elsewhere_moves_the_view_on() {
     let (mut app, _hub) = app_with_hub();
     app.sb.cards = vec![card(1, "question", "a", "one?"), card(2, "question", "b", "two?")];
     app.ed.insert("mine");
     open(&mut app);
-    app.ed.insert("half an answer");
-    app.sb.cards.remove(0);
-    sync(&mut app);
+    snapshot(&mut app, vec![card(2, "question", "b", "two?")]);
     assert_eq!(app.sb.current_card().map(|c| c.id), Some(2));
-    assert_eq!(app.history.first().map(String::as_str), Some("half an answer"));
-    app.sb.cards.clear();
-    sync(&mut app);
+    snapshot(&mut app, Vec::new());
     assert!(!app.sb.card.open);
     assert_eq!(app.ed.text, "mine");
+}
+
+/// Benjamin's lost answer: main withdrew the card he was answering and
+/// asked a new one. With his words typed the closed card stays in view,
+/// `· closed`, his words stay; the new card waits in the box. esc: the
+/// card goes, his words to the history with one line; ⏎ instead sends
+/// them to the asker as a message, and the view moves on.
+#[test]
+fn a_card_closed_mid_answer_keeps_the_card_and_the_words() {
+    let (mut app, mut hub) = app_with_hub();
+    app.sb.cards = vec![card(1, "question", "perf", "which bench?\n1. cold\n2. warm")];
+    app.ed.insert("to main");
+    open(&mut app);
+    app.ed.insert("warm, after the reindex");
+    snapshot(&mut app, vec![card(2, "question", "perf", "and the p99?")]);
+    assert!(app.sb.card.open);
+    assert_eq!(app.sb.current_card().map(|c| c.id), Some(1));
+    assert_eq!(app.ed.text, "warm, after the reindex");
+    let rows = draw(&mut app, 120, 30).join("\n");
+    assert!(rows.contains("· closed"), "{rows}");
+    assert!(rows.contains("you → perf · the question is closed: ⏎ sends your words as a message"), "{rows}");
+    assert!(bar(&app).contains("⏎ sends your words as a message"), "{}", bar(&app));
+    // another snapshot: it stays
+    snapshot(&mut app, vec![card(2, "question", "perf", "and the p99?"), card(3, "question", "x", "three?")]);
+    assert_eq!(app.sb.current_card().map(|c| c.id), Some(1));
+    // esc: the closed card goes, the words to the history, one line
+    key(&mut app, KeyCode::Esc, KeyModifiers::NONE);
+    assert!(!app.sb.card.open);
+    assert_eq!(app.ed.text, "to main");
+    assert_eq!(app.history.first().map(String::as_str), Some("warm, after the reindex"));
+    assert!(matches!(app.events.last(), Some(Ev::Info(t)) if t == "your words to perf's closed question: ↑ brings them back"));
+    // again, and ⏎: a plain message to perf, the view on the next card
+    open(&mut app);
+    ctrl(&mut app, '1');
+    let _ = sent(&mut hub);
+    app.ed.insert("both, really");
+    let id = app.sb.current_card().map(|c| c.id).unwrap();
+    let rest: Vec<Card> = app.sb.cards.iter().filter(|c| c.id != id).cloned().collect();
+    snapshot(&mut app, rest);
+    assert_eq!(app.sb.current_card().map(|c| c.id), Some(id));
+    let mut b = String::new();
+    key(&mut app, KeyCode::Enter, KeyModifiers::NONE);
+    let mut buf = [0u8; 4096];
+    while let Ok(n) = hub.read(&mut buf) {
+        if n == 0 {
+            break;
+        }
+        b.push_str(&String::from_utf8_lossy(&buf[..n]));
+    }
+    assert!(b.contains("\"turn/send\"") && b.contains("both, really"), "{b}");
+    assert!(app.sb.card.open && app.sb.current_card().is_some_and(|c| c.id != id));
+    assert_eq!(app.ed.text, "");
 }
 
 /// ⌥N in the view: to that agent; the view goes, the drafts stay.
@@ -664,14 +724,17 @@ fn the_last_answer_clears_the_inbox() {
 #[test]
 fn an_answer_says_one_line_in_the_thread() {
     let (mut app, mut hub) = app_with_hub();
+    // the thread in view, subscribed before he answers (its first page
+    // replaces the feed), then its entries as the hub sends them
+    let mut thread = super::entries_for_tests::Hub::new();
+    let focus = app.sb.focus.clone();
+    thread.subscribe(&mut app, &focus, false);
     app.sb.cards = cast();
     open(&mut app);
     ctrl(&mut app, 'n');
     assert!(key(&mut app, KeyCode::Char('2'), KeyModifiers::NONE));
     assert_eq!(sent(&mut hub), vec!["/answer 12 both: compress, and lazy-load below the fold"]);
-    let line = |agent: &str, l: &str| {
-        serde_json::json!({"ev": "line", "agent": agent, "line": format!("sb route : {l}")}).to_string()
-    };
+
     let folds = |evs: &[Ev]| -> Vec<String> {
         evs.iter()
             .filter_map(|e| match e {
@@ -682,42 +745,74 @@ fn an_answer_says_one_line_in_the_thread() {
             .collect()
     };
     // the hub's line for it comes back to main's feed: nothing more
-    let focus = app.sb.focus.clone();
-    super::super::dispatch(&mut app, &line(&focus, "you → @perf (answer to card #12) : both: compress, and lazy-load below the fold"));
+    thread.line(&mut app, &focus, "sb route : you → @perf (answer to card #12) : both: compress, and lazy-load below the fold");
     assert_eq!(folds(&app.events), vec!["you answered perf: both"]);
     // an answer given elsewhere: the hub's line, as a fold
-    super::super::dispatch(&mut app, &line(&focus, "you → @docs (answer to card #40) : v2"));
+    thread.line(&mut app, &focus, "sb route : you → @docs (answer to card #40) : v2");
     assert_eq!(folds(&app.events), vec!["you answered perf: both", "you answered docs: v2"]);
     // a message routed by hand stays as it was
-    super::super::dispatch(&mut app, &line(&focus, "you → @docs : thanks"));
+    thread.line(&mut app, &focus, "sb route : you → @docs : thanks");
     assert!(matches!(app.events.last(), Some(Ev::Info(t)) if t == "→ you → @docs : thanks"));
 }
 
-/// update-card: the new-release item (designer): the head alone as the
-/// title, `bise · v… is out` in the strip, the notes text, the running
-/// version dim; `3` opens the release page here and the item stays.
+/// update-dot (designer m_46058): the new-release card, bise's own: the
+/// head as the title, `bise · v… is ready` in the strip; opened, the
+/// safe line, the changelog's first 12 lines then `▸ N more lines`, then
+/// `you're on v… · full notes on GitHub ↗` (the link); `1` and `2` go
+/// to the hub.
 #[test]
-fn the_new_release_item() {
-    let (mut app, _hub) = app_with_hub();
-    let text = "bise v2026.10.2-5 is out\nthe inbox keeps your place\n/update from any thread\nyou're on v2026.10.2-4\n\n1. update now · your agents keep running\n2. later\n3. release notes ↗";
+fn the_new_release_card_shows_its_changelog() {
+    let (mut app, mut hub) = app_with_hub();
+    let text = "bise v2026.10.2-5 is ready\n\n1. update now · your agents keep running\n2. later";
     let url = "https://github.com/gvergnaud/bise/releases/tag/v2026.10.2-5";
-    app.sb.cards = vec![Card { place: Some("release:bbb".into()), link: Some(url.into()), ..card(21, "update", "main", text) }];
+    let notes: Vec<String> = std::iter::once("## Fixes".to_string()).chain((1..=14).map(|i| format!("- fix {i}"))).collect();
+    let release = bise_proto::rows::ReleaseNotes { version: "v2026.10.2-5".into(), running: "v2026.10.2-4".into(), notes: notes.join("\n\n") };
+    app.sb.cards = vec![Card { place: Some("release:bbb".into()), link: Some(url.into()), release: Some(release.clone()), ..card(21, "update", "main", text) }];
     let s = shape(&app.sb.cards[0]);
-    assert_eq!((s.title.as_str(), s.who.as_str(), s.summary.as_str()), ("bise v2026.10.2-5 is out", "bise", "v2026.10.2-5 is out"));
-    assert_eq!(s.options, ["update now · your agents keep running", "later", "release notes ↗"]);
-    assert!(matches!(s.parts.first(), Some(Part::Text(t)) if t == "the inbox keeps your place\n/update from any thread"));
-    assert!(matches!(s.parts.get(1), Some(Part::Evidence(t)) if t == "you're on v2026.10.2-4"));
-    // no notes: no body
-    let bare = card(22, "update", "main", "bise v2026.10.2-5 is out\nyou're on v2026.10.2-4\n\n1. update now · your agents keep running\n2. later\n3. release notes ↗");
-    let s = shape(&bare);
-    assert_eq!(s.parts.len(), 1);
-    assert!(matches!(s.parts.first(), Some(Part::Evidence(t)) if t == "you're on v2026.10.2-4"));
-    // 3: the page opens here, nothing sent, the item stays
+    assert_eq!((s.title.as_str(), s.who.as_str(), s.summary.as_str()), ("bise v2026.10.2-5 is ready", "bise", "v2026.10.2-5 is ready"));
+    assert_eq!(s.options, ["update now · your agents keep running", "later"]);
+    let texts: Vec<String> = s
+        .parts
+        .iter()
+        .map(|p| match p {
+            Part::Text(t) => format!("T:{t}"),
+            Part::Evidence(t) => format!("E:{t}"),
+            _ => "?".into(),
+        })
+        .collect();
+    assert_eq!(texts[0], format!("T:{}", bise_proto::words::settings::bise_update_tip));
+    let shown: Vec<&str> = notes.iter().take(CHANGELOG_ROWS).map(|l| l.trim_start_matches("## ")).collect();
+    assert_eq!(texts[1], format!("T:{}", shown.join("\n")), "12 lines, the blank ones out");
+    assert_eq!(texts[2], "E:▸ 3 more lines");
+    assert_eq!(texts[3], format!("E:you're on v2026.10.2-4 · [full notes on GitHub ↗]({url})"));
+    // no notes: says so
+    let bare = Card { release: Some(bise_proto::rows::ReleaseNotes { notes: String::new(), ..release }), ..card(22, "update", "main", text) };
+    assert!(matches!(shape(&bare).parts.get(1), Some(Part::Evidence(t)) if t == "no notes for this release."));
+    // 1 goes to the hub (it installs, the card closes there)
     open(&mut app);
-    crate::links::OPENED.with(|o| o.borrow_mut().clear());
-    assert!(pick_digit(&mut app, 21, 3));
-    crate::links::OPENED.with(|o| assert_eq!(*o.borrow(), [url.to_string()]));
-    assert!(app.sb.card_by_id(21).is_some());
+    assert!(key(&mut app, KeyCode::Char('1'), KeyModifiers::NONE));
+    assert_eq!(sent(&mut hub), vec!["/answer 21 1"]);
+}
+
+/// update-dot (designer m_46118): a short window clamps the update card,
+/// the changelog gives way first; the head, the safe line, the foot and
+/// the choices always show.
+#[test]
+fn a_clamped_update_card_keeps_its_foot() {
+    let (mut app, _hub) = app_with_hub();
+    let text = "bise v2026.10.2-5 is ready\n\n1. update now · your agents keep running\n2. later";
+    let notes = (1..=15).map(|i| format!("- fix {i}")).collect::<Vec<_>>().join("\n");
+    let release = bise_proto::rows::ReleaseNotes { version: "v2026.10.2-5".into(), running: "v2026.10.2-4".into(), notes };
+    app.sb.cards = vec![Card { place: Some("release:bbb".into()), link: Some("https://x.dev/n".into()), release: Some(release), ..card(21, "update", "main", text) }];
+    open(&mut app);
+    let rows = draw(&mut app, 120, 30);
+    let all = rows.join("\n");
+    let more = row_of(&rows, "┃ … ");
+    assert!(rows[more].contains("more lines · ctrl+o full screen"), "{all}");
+    assert!(all.contains("safe to update at any time"), "{all}");
+    let foot = row_of(&rows, "you're on v2026.10.2-4 · full notes on GitHub");
+    assert!(foot > more, "the foot under the clamp: {all}");
+    assert!(all.contains("1 update now"), "{all}");
 }
 
 /// pr-design §6.3: the ready-to-merge item, as the hub writes it. Its
@@ -839,4 +934,74 @@ fn a_typed_card_number_never_picks_a_setup_card() {
     assert_eq!(values("setup"), vec![local.to_string()]);
     assert_eq!(values("docs"), vec!["994".to_string()]);
     assert_eq!(values("").len(), 3);
+}
+
+/// Never a card's kind id in its title (designer m_15412): a merge, a try,
+/// an update or a sign-in asks like a question; its text says what it asks.
+#[test]
+fn a_card_title_never_shows_its_kind_id() {
+    for kind in ["merge", "feature_try", "feature_merge", "update", "signin", "confirm", "approval", "setup", "anything_new"] {
+        let t = kind_title(kind, "perf");
+        assert_eq!(t, "perf asks", "{kind}");
+        assert!(!t.contains(kind), "{kind}: {t}");
+    }
+    assert_eq!(kind_title("question", "perf"), "perf asks");
+    assert_eq!(kind_title("done", "perf"), "perf is done");
+}
+
+/// Benjamin: a new card while he answers one never takes his text or
+/// the card he answers (through the hub's real hub/cards line).
+#[test]
+fn a_new_card_mid_answer_keeps_the_text_and_the_card() {
+    use super::super::hub_reads::rows_for_tests as rows;
+    let (mut app, _hub) = app_with_hub();
+    let a = || rows::agent("main", "idle", "");
+    rows::apply(&mut app, vec![a()], vec![rows::card(5, "question", "perf", "which bench?\n1. cold\n2. warm")]);
+    open(&mut app);
+    for c in "warm, but only after".chars() {
+        press(&mut app, KeyCode::Char(c));
+    }
+    rows::apply(
+        &mut app,
+        vec![a()],
+        vec![rows::card(5, "question", "perf", "which bench?\n1. cold\n2. warm"), rows::card(6, "approval", "release", "npm publish\n\nwhy")],
+    );
+    assert!(app.sb.card.open);
+    assert_eq!(app.sb.current_card().map(|c| c.id), Some(5));
+    assert_eq!(app.ed.text, "warm, but only after");
+}
+
+/// Answer-in-thread A (designer m_24425 (7)): an answer made in main's
+/// view goes to the asker's view (esc back to main); from an agent's own
+/// view, to main's own card, to a gone agent, a drop card, or while the
+/// card view moves on to the next card, the view stays.
+#[test]
+fn an_answer_from_mains_view_opens_the_askers_thread() {
+    let ag = |name: &str| Agent { name: name.into(), main: name == "main", status: "idle".into(), ..Agent::default() };
+    let agents = vec![ag("main"), ag("perf")];
+    assert_eq!(asker_view("question", "main", "perf", &agents, false).as_deref(), Some("perf"));
+    assert_eq!(asker_view("question", "docs", "perf", &agents, false), None);
+    assert_eq!(asker_view("question", "main", "main", &agents, false), None);
+    assert_eq!(asker_view("question", "main", "gone", &agents, false), None);
+    assert_eq!(asker_view("question", "main", "perf", &agents, true), None);
+    // drop-card: a drop card's agent is the one archived, never a thread to open
+    assert_eq!(asker_view("drop", "main", "perf", &agents, false), None);
+}
+
+/// tui_answer_target_tmux (min-tests): an open question takes his words
+/// (`↳ answering <who>`, the heavy bar), an approval never does: its
+/// divider keeps `you → main` and the plain bar.
+#[test]
+fn an_open_question_takes_his_words_an_approval_never() {
+    let (mut app, _hub) = app_with_hub();
+    app.sb.cards = vec![card(15, "question", "search", "which size system should the filter use: EU, or US too?")];
+    open(&mut app);
+    let a = answer_target::answering(&app).expect("a question takes his words");
+    assert_eq!((a.who.as_str(), a.esc_to.as_str()), ("search", "main"));
+    assert!(answer_target::bar(&app, 2).is_some());
+    let (mut app, _hub) = app_with_hub();
+    app.sb.cards = vec![card(14, "approval", "release", "npm publish --tag next")];
+    open(&mut app);
+    assert_eq!(answer_target::answering(&app), None);
+    assert!(answer_target::bar(&app, 2).is_none());
 }

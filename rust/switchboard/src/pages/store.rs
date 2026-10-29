@@ -3,6 +3,11 @@
 //! `meta.json` and `notes.json`. Plain functions over a directory; the
 //! caller holds the lock ([`super::Pages`]) so the hub and the page
 //! server never write a page at the same time.
+//!
+//! The notes rules (drafts, send) are the same for every target
+//! ([`Target`], architect m_23701 §9.5): a page's notes in
+//! `pages/<id>/notes.json`, an artifact's in `artifacts/<id>/notes.json`
+//! (its routes and its message: `artifact::notes`).
 
 use super::lint::Block;
 use serde::{Deserialize, Serialize};
@@ -93,6 +98,11 @@ fn ready() -> String {
 }
 
 impl Meta {
+    /// The blocks its `--went` names: their text left (posted, sent).
+    pub fn went_blocks(&self) -> Vec<String> {
+        self.went.iter().filter_map(|w| w.block.clone()).collect()
+    }
+
     pub fn version(&self) -> u64 {
         self.versions.last().map_or(0, |v| v.n)
     }
@@ -132,6 +142,10 @@ pub struct Note {
     pub answer: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub sent_ms: Option<u64>,
+    /// his answer's typed parts (card-image-parts, architect m_35268): a
+    /// card answered with images; `text` is then his words alone
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub parts: Vec<bise_proto::parts::Part>,
     /// anything else the note layer keeps on a note
     #[serde(flatten)]
     pub extra: serde_json::Map<String, Value>,
@@ -196,6 +210,22 @@ pub struct Store {
     pub dir: PathBuf,
 }
 
+/// Whose notes (architect m_23701 §9.5: one notes system for every
+/// target): a page's, or an artifact's (office-artifacts plan §5).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Target {
+    Page(String),
+    Artifact(String),
+}
+
+impl Target {
+    pub fn id(&self) -> &str {
+        match self {
+            Target::Page(id) | Target::Artifact(id) => id,
+        }
+    }
+}
+
 fn read_json<T: serde::de::DeserializeOwned + Default>(p: &Path) -> T {
     std::fs::read_to_string(p).ok().and_then(|t| serde_json::from_str(&t).ok()).unwrap_or_default()
 }
@@ -214,6 +244,8 @@ fn write_atomic(p: &Path, bytes: &[u8]) -> Result<(), String> {
         let _ = std::fs::remove_file(&tmp);
         return Err(format!("{}: {e}", tmp.display()));
     }
+    // the rows built from the store are built again (crate::store_gen)
+    crate::store_gen::bump();
     std::fs::rename(&tmp, p).map_err(|e| {
         let _ = std::fs::remove_file(&tmp);
         format!("{}: {e}", p.display())
@@ -246,15 +278,47 @@ impl Store {
         write_json(&self.page_dir(&m.id).join("meta.json"), m)
     }
 
-    pub fn notes(&self, id: &str) -> Vec<Note> {
-        if !valid_id(id) {
-            return Vec::new();
+    /// name-free (sb-core's `retarget` fx): another agent takes the old
+    /// name `from`, so the pages that still say `from` say `to`, the agent
+    /// that had it (its notes and questions go to it, not to the new one).
+    pub fn retarget(&self, from: &str, to: &str) -> usize {
+        self.list()
+            .into_iter()
+            .filter(|m| m.agent == from)
+            .filter(|m| self.save_meta(&Meta { agent: to.to_string(), ..m.clone() }).is_ok())
+            .count()
+    }
+
+    /// Where a target's notes live: `pages/<id>/notes.json`,
+    /// `artifacts/<id>/notes.json` (None: not an id).
+    fn notes_file(&self, t: &Target) -> Option<PathBuf> {
+        match t {
+            Target::Page(id) if valid_id(id) => Some(self.page_dir(id).join("notes.json")),
+            Target::Artifact(id) if valid_id(id) => Some(self.dir.parent().unwrap_or(&self.dir).join("artifacts").join(id).join("notes.json")),
+            _ => None,
         }
-        read_json(&self.page_dir(id).join("notes.json"))
+    }
+
+    /// A page's notes ([`Store::notes_of`] its [`Target::Page`]).
+    pub fn notes(&self, id: &str) -> Vec<Note> {
+        self.notes_of(&Target::Page(id.to_string()))
+    }
+
+    /// The notes of a page or an artifact, as kept.
+    pub fn notes_of(&self, t: &Target) -> Vec<Note> {
+        self.notes_file(t).map(|p| read_json(&p)).unwrap_or_default()
     }
 
     pub fn save_notes(&self, id: &str, notes: &[Note]) -> Result<(), String> {
-        write_json(&self.page_dir(id).join("notes.json"), &notes)
+        self.save_notes_of(&Target::Page(id.to_string()), notes)
+    }
+
+    pub fn save_notes_of(&self, t: &Target, notes: &[Note]) -> Result<(), String> {
+        let p = self.notes_file(t).ok_or_else(|| format!("{} is not an id", t.id()))?;
+        if let Some(d) = p.parent() {
+            std::fs::create_dir_all(d).map_err(|e| format!("{}: {e}", d.display()))?;
+        }
+        write_json(&p, &notes)
     }
 
     /// The page's question blocks and their cards (§4.2).
@@ -375,8 +439,8 @@ impl Store {
     /// given replaces every draft (a draft left out is deleted); sent,
     /// done and answered notes never change here. A note without a
     /// usable id gets the next `n<k>`. The notes after.
-    pub fn set_drafts(&self, id: &str, given: &[Value], version: u64, now: u64) -> Result<Vec<Note>, String> {
-        let mut notes: Vec<Note> = self.notes(id).into_iter().filter(|x| x.status != "draft").collect();
+    pub fn set_drafts(&self, t: &Target, given: &[Value], version: u64, now: u64) -> Result<Vec<Note>, String> {
+        let mut notes: Vec<Note> = self.notes_of(t).into_iter().filter(|x| x.status != "draft").collect();
         for g in given {
             let mut n: Note = serde_json::from_value(g.clone()).map_err(|e| format!("a note: {e}"))?;
             if n.id.is_empty() || !n.id.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'_') || n.id.len() > 40 {
@@ -396,14 +460,14 @@ impl Store {
             }
             notes.push(n);
         }
-        self.save_notes(id, &notes)?;
+        self.save_notes_of(t, &notes)?;
         Ok(notes)
     }
 
     /// `send`: the drafts become sent. The sent ones (empty: nothing to
     /// send) and every note after.
-    pub fn send(&self, id: &str, now: u64) -> Result<Vec<Note>, String> {
-        let mut notes = self.notes(id);
+    pub fn send(&self, t: &Target, now: u64) -> Result<Vec<Note>, String> {
+        let mut notes = self.notes_of(t);
         let mut sent = Vec::new();
         for x in notes.iter_mut().filter(|x| x.status == "draft") {
             x.status = "sent".into();
@@ -411,7 +475,7 @@ impl Store {
             sent.push(x.clone());
         }
         if !sent.is_empty() {
-            self.save_notes(id, &notes)?;
+            self.save_notes_of(t, &notes)?;
         }
         Ok(sent)
     }
@@ -447,15 +511,16 @@ impl Store {
 
     /// A pick on question `block` with no open card (ambient-lead
     /// m_5343): a note of kind `pick`, sent at once. The note.
-    pub fn add_pick(&self, id: &str, block: &str, reply: &str, version: u64, now: u64) -> Result<Note, String> {
-        self.add_sent(id, block, None, "pick", reply, version, now)
+    /// `parts`: his answer's typed parts (none: a plain one).
+    pub fn add_pick(&self, id: &str, block: &str, reply: &str, parts: &[bise_proto::parts::Part], version: u64, now: u64) -> Result<Note, String> {
+        self.add_sent(id, block, None, "pick", reply, parts, version, now)
     }
 
     /// A note the hub makes for the user (a pick with no card, a step
     /// ticked from its card or by voice), sent at once: `item` is the
     /// list item it is on (a checklist row). The note.
     #[allow(clippy::too_many_arguments)]
-    pub fn add_sent(&self, id: &str, block: &str, item: Option<&str>, kind: &str, text: &str, version: u64, now: u64) -> Result<Note, String> {
+    pub fn add_sent(&self, id: &str, block: &str, item: Option<&str>, kind: &str, text: &str, parts: &[bise_proto::parts::Part], version: u64, now: u64) -> Result<Note, String> {
         let mut notes = self.notes(id);
         let mut n = Note {
             id: next_id(&notes),
@@ -466,6 +531,7 @@ impl Store {
             at_ms: now,
             status: "sent".into(),
             sent_ms: Some(now),
+            parts: parts.to_vec(),
             ..Note::default()
         };
         if let Some(i) = item {
@@ -558,13 +624,14 @@ impl Store {
         Ok(out)
     }
 
-    /// The start notes just sent (kind `start`, sent, not routed yet):
-    /// marked routed to main (`to: main`); the ones marked.
-    pub fn route_starts(&self, id: &str) -> Result<Vec<Note>, String> {
+    /// The start notes just sent (kind `start`, sent, not routed yet)
+    /// that `which` takes: marked routed to `to`; the ones marked. A
+    /// plan's go to its agent (daemon/page_plan.rs), the others to main.
+    pub fn route_starts(&self, id: &str, which: &dyn Fn(&Note) -> bool, to: &str) -> Result<Vec<Note>, String> {
         let mut notes = self.notes(id);
         let mut out = Vec::new();
-        for n in notes.iter_mut().filter(|n| n.kind == "start" && n.status == "sent" && !n.extra.contains_key("to")) {
-            n.extra.insert("to".into(), Value::String("main".into()));
+        for n in notes.iter_mut().filter(|n| n.kind == "start" && n.status == "sent" && !n.extra.contains_key("to") && which(n)) {
+            n.extra.insert("to".into(), Value::String(to.into()));
             out.push(n.clone());
         }
         if !out.is_empty() {
@@ -647,6 +714,16 @@ fn short(s: &str) -> String {
 }
 
 /// One note as a line of the message (§2.6).
+/// His words in a note for the model: his typed parts rendered as his
+/// messages are (one renderer: an image stays its marker, so the model
+/// gets the image), else the note's text.
+fn said(n: &Note) -> String {
+    match n.parts.is_empty() {
+        true => n.text.clone().unwrap_or_default(),
+        false => bise_proto::parts::render(&n.parts),
+    }
+}
+
 fn note_line(n: &Note) -> String {
     let what = match n.kind.as_str() {
         "edit" => {
@@ -659,9 +736,9 @@ fn note_line(n: &Note) -> String {
         "approve" => "approve".to_string(),
         "skip" => "skip".to_string(),
         "tick" => "✓ tick".to_string(),
-        "pick" => format!("pick: {}", n.text.as_deref().unwrap_or("")),
-        "voice" => format!("(said) {}", n.text.as_deref().unwrap_or("")),
-        _ => n.text.clone().unwrap_or_default(),
+        "pick" => format!("pick: {}", said(n)),
+        "voice" => format!("(said) {}", said(n)),
+        _ => said(n),
     };
     // on a ui block's rows (a k-diff, a k-term): the lines, numbers and text, under the note
     if let Some(l) = super::notelines::of(n) {
@@ -699,199 +776,55 @@ pub fn notes_message(m: &Meta, url: &str, sent: &[Note]) -> String {
     out
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use serde_json::json;
-
-    fn temp() -> PathBuf {
-        static N: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
-        let d = std::env::temp_dir().join(format!("sb-pages-{}-{}", std::process::id(), N.fetch_add(1, std::sync::atomic::Ordering::SeqCst)));
-        std::fs::create_dir_all(&d).unwrap();
-        d
-    }
-
-    fn publish(agent: &str, id: Option<&str>, title: Option<&str>) -> Publish {
-        Publish { agent: agent.into(), id: id.map(String::from), title: title.map(String::from), html: "<section data-kit=\"prose\" data-id=\"p1\"><p>hi</p></section>".into(), ..Publish::default() }
-    }
-
-    #[test]
-    fn ids_and_slugs() {
-        assert!(valid_id("weekly-update") && valid_id("a") && !valid_id("") && !valid_id("A") && !valid_id("../x"));
-        assert!(!valid_id(&"a".repeat(41)));
-        assert_eq!(slug("Weekly update: Slack & Linear!"), "weekly-update-slack-linear");
-        assert_eq!(title_of("weekly-update"), "weekly update");
-    }
-
-    #[test]
-    fn publish_versions_owner_and_takeover() {
-        let d = temp();
-        let s = Store::new(&d);
-        let none = |_: &str| false;
-        let (m, _) = s.publish(&publish("t1", None, Some("Weekly update")), vec![], 10, &none).unwrap();
-        assert_eq!((m.id.as_str(), m.title.as_str(), m.agent.as_str(), m.version()), ("weekly-update", "Weekly update", "t1", 1));
-        let (m, _) = s.publish(&publish("t1", Some("weekly-update"), None), vec![], 20, &none).unwrap();
-        assert_eq!((m.version(), m.title.as_str()), (2, "Weekly update"));
-        assert!(s.html("weekly-update", 1).is_some() && s.html("weekly-update", 2).is_some());
-        // another agent's page
-        let e = s.publish(&publish("t2", Some("weekly-update"), None), vec![], 30, &none).unwrap_err();
-        assert!(e.contains("t1's page"), "{e}");
-        // main takes over a gone agent's page
-        let (m, _) = s.publish(&publish("main", Some("weekly-update"), None), vec![], 40, &|a| a == "t1").unwrap();
-        assert_eq!((m.agent.as_str(), m.version()), ("main", 3));
-        assert!(s.publish(&publish("t1", None, None), vec![], 50, &none).is_err());
-        assert_eq!(s.list().len(), 1);
-        let _ = std::fs::remove_dir_all(d);
-    }
-
-    #[test]
-    fn notes_draft_send_and_outcomes() {
-        let d = temp();
-        let s = Store::new(&d);
-        s.publish(&publish("t1", Some("w"), None), vec![], 10, &|_| false).unwrap();
-        let notes = s
-            .set_drafts("w", &[json!({"block": "t1", "quote": "Revenue", "kind": "note", "text": "use the March numbers"}), json!({"block": "p2", "kind": "drop", "x": 1})], 1, 11)
-            .unwrap();
-        assert_eq!(notes.iter().map(|n| n.id.as_str()).collect::<Vec<_>>(), vec!["n1", "n2"]);
-        assert_eq!(notes[1].extra.get("x"), Some(&json!(1)), "the layer's own fields are kept");
-        // the whole draft list again: n1 edited, n2 left out (deleted), an edit added
-        s.set_drafts("w", &[json!({"id": "n1", "block": "t1", "quote": "Revenue", "kind": "note", "text": "use March"}), json!({"block": "p4", "kind": "edit", "before": "Q2", "after": "Q3"})], 1, 12)
-            .unwrap();
-        let sent = s.send("w", 13).unwrap();
-        assert_eq!(sent.iter().map(|n| (n.id.as_str(), n.status.as_str())).collect::<Vec<_>>(), vec![("n1", "sent"), ("n2", "sent")]);
-        assert!(s.send("w", 14).unwrap().is_empty(), "nothing left to send");
-        // a sent note can't be edited as a draft
-        assert!(s.set_drafts("w", &[json!({"id": "n1", "text": "x"})], 1, 15).is_err());
-        // an empty list clears the drafts, never the sent ones
-        assert_eq!(s.set_drafts("w", &[], 1, 16).unwrap().len(), 2);
-        let m = s.meta("w").unwrap();
-        let msg = notes_message(&m, "http://127.0.0.1:47100/p/w", &sent);
-        assert!(msg.starts_with("you sent 2 notes on your page \"w\" (w v1, http://127.0.0.1:47100/p/w):\n1. on \"Revenue\" (t1): use March\n2. on p4, you changed \"Q2\" → \"Q3\"\nanswer with: sb page publish <file> --id w --notes-done n1,n2 (or --note-answer n1=\"…\")\n<page-notes page=\"w\" version=\"1\">[{"), "{msg}");
-        // the next version's outcomes
-        let (_, unknown) = s
-            .publish(&Publish { done: vec!["n1".into(), "n9".into()], answers: vec![("n2".into(), "kept: Marc asked".into())], ..publish("t1", Some("w"), None) }, vec![], 20, &|_| false)
-            .unwrap();
-        assert_eq!(unknown, vec!["n9"]);
-        let notes = s.notes("w");
-        assert_eq!(notes.iter().map(|n| n.status.as_str()).collect::<Vec<_>>(), vec!["done", "answered"]);
-        assert_eq!(notes[1].answer.as_deref(), Some("kept: Marc asked"));
-        let _ = std::fs::remove_dir_all(d);
-    }
-
-    /// page-notes: a note on 3 rows of a k-diff reaches the agent with
-    /// the block, the tab, the lines' numbers and text, and the note.
-    #[test]
-    fn a_note_on_a_diffs_lines_quotes_the_block_the_numbers_and_the_text() {
-        let d = temp();
-        let s = Store::new(&d);
-        s.publish(&publish("t1", Some("w"), None), vec![], 10, &|_| false).unwrap();
-        let lines = json!([{"old": 34, "text": "Skills contain"}, {"old": 35, "text": ""}, {"new": 34, "text": "Skills below"}]);
-        s.set_drafts("w", &[json!({"block": "diff", "quote": "Skills contain Skills below", "kind": "note", "text": "keep the old line", "lines": lines, "part": "main"})], 1, 11).unwrap();
-        let sent = s.send("w", 12).unwrap();
-        let msg = notes_message(&s.meta("w").unwrap(), "http://127.0.0.1:47100/p/w", &sent);
-        assert!(
-            msg.contains("1. on diff main, old 34–35 → new 34: keep the old line\n     −34       │ Skills contain\n     −35       │ \n           +34 │ Skills below\nanswer with:"),
-            "{msg}"
-        );
-        assert!(msg.contains("\"lines\":[{"), "the JSON keeps the lines: {msg}");
-        let _ = std::fs::remove_dir_all(d);
-    }
-
-    #[test]
-    fn went_parses_and_keeps_one_entry_per_kind_and_ref() {
-        let w = Went::parse("gmail-draft:r-123@mail=https://mail.google.com/mail/#drafts?compose=r-123").unwrap();
-        assert_eq!((w.kind.as_str(), w.reference.as_str(), w.block.as_deref()), ("gmail-draft", "r-123", Some("mail")));
-        assert_eq!(w.url, "https://mail.google.com/mail/#drafts?compose=r-123");
-        assert!(Went::parse("kit-draft:42=https://app.kit.com/b/42").unwrap().block.is_none());
-        for bad in ["gmail-draft", "gmail-draft:r1", ":r1=https://x", "Gmail:r1=https://x", "gmail-draft:r1=file:///etc", "gmail-draft:r 1=https://x"] {
-            assert!(Went::parse(bad).is_err(), "{bad}");
-        }
-        let d = temp();
-        let s = Store::new(&d);
-        let pw = |went: Vec<Went>| Publish { went, ..publish("t1", Some("mail"), None) };
-        let (m, _) = s.publish(&pw(vec![w.clone()]), vec![], 10, &|_| false).unwrap();
-        assert_eq!((m.went.len(), m.went[0].at), (1, 10));
-        // no --went: kept; the same kind and ref: replaced; another: added
-        let (m, _) = s.publish(&pw(vec![]), vec![], 20, &|_| false).unwrap();
-        assert_eq!(m.went.len(), 1);
-        let w2 = Went { url: "https://mail.google.com/x".into(), ..w.clone() };
-        let k = Went::parse("kit-draft:42=https://app.kit.com/b/42").unwrap();
-        let (m, _) = s.publish(&pw(vec![w2, k]), vec![], 30, &|_| false).unwrap();
-        assert_eq!(m.went.iter().map(|x| (x.kind.as_str(), x.url.as_str(), x.at)).collect::<Vec<_>>(), vec![("gmail-draft", "https://mail.google.com/x", 30), ("kit-draft", "https://app.kit.com/b/42", 30)]);
-        let v = serde_json::to_value(s.meta("mail").unwrap()).unwrap();
-        assert_eq!(v["went"][0]["ref"], "r-123", "the meta says ref");
-        let _ = std::fs::remove_dir_all(d);
-    }
-
-    #[test]
-    fn start_notes_go_to_main_not_in_the_agents_message() {
-        let d = temp();
-        let s = Store::new(&d);
-        s.publish(&publish("t1", Some("bugs"), None), vec![], 10, &|_| false).unwrap();
-        s.set_drafts("bugs", &[json!({"block": "b2", "quote": "login fails on Safari", "kind": "start"}), json!({"block": "b3", "kind": "start", "text": "this one first"})], 1, 11).unwrap();
-        let sent = s.send("bugs", 12).unwrap();
-        let m = s.meta("bugs").unwrap();
-        assert_eq!(notes_message(&m, "u", &sent), "", "only start notes: nothing for the page's agent");
-        let starts = s.route_starts("bugs").unwrap();
-        assert_eq!(starts.len(), 2);
-        assert!(s.route_starts("bugs").unwrap().is_empty(), "routed once");
-        let msg = start_message(&m, "http://127.0.0.1:47100/p/bugs", &starts);
-        assert!(msg.starts_with("you asked for an agent on these items of the page \"bugs\" (bugs v1, http://127.0.0.1:47100/p/bugs):\n1. item b2 \"login fails on Safari\"\n2. item b3: this one first\n"), "{msg}");
-        assert!(msg.contains("ask t1 (the page's agent) to publish it again with data-agent=") && msg.contains("<page-start page=\"bugs\" version=\"1\">[{"), "{msg}");
-        // a start note among others: the agent's message has the others only
-        s.set_drafts("bugs", &[json!({"block": "b4", "kind": "start"}), json!({"block": "p1", "kind": "note", "text": "shorter"})], 1, 13).unwrap();
-        let sent = s.send("bugs", 14).unwrap();
-        let text = notes_message(&m, "u", &sent);
-        assert!(text.starts_with("you sent 1 note on your page") && text.contains("shorter") && !text.contains("b4"), "{text}");
-        let _ = std::fs::remove_dir_all(d);
-    }
-
-    #[test]
-    fn data_agents_are_read_from_the_fragment() {
-        let h = r#"<section data-kit="review" data-id="r"><ul><li data-id="a" data-agent="fix-login">x</li><li data-agent='docs'>y</li><li data-agent="fix-login">z</li><li data-agent="">w</li></ul></section>"#;
-        assert_eq!(data_agents_of(h), vec!["fix-login", "docs"]);
-        assert!(data_agents_of("<p>no agent</p>").is_empty());
-    }
-
-    #[test]
-    fn a_page_waits_for_review_until_the_users_go() {
-        let d = temp();
-        let s = Store::new(&d);
-        let block = |id: &str, kit: &str| Block { id: id.into(), kit: kit.into(), hash: "h".into() };
-        // a plain page never holds drafts back
-        s.publish(&publish("t1", Some("plain"), None), vec![block("p1", "prose")], 10, &|_| false).unwrap();
-        assert_eq!(s.pending_review("t1"), None);
-        // a review: held until an approve, a send, or words asking for drafts
-        s.publish(&Publish { title: Some("replies".into()), ..publish("t1", Some("replies"), None) }, vec![block("r", "review"), block("m", "email")], 20, &|_| false).unwrap();
-        assert_eq!(s.pending_review("t1").as_deref(), Some("\"replies\""));
-        assert_eq!(s.pending_review("t2"), None, "another agent's page");
-        s.set_drafts("replies", &[json!({"block": "m", "kind": "note", "text": "shorter"})], 1, 21).unwrap();
-        s.send("replies", 22).unwrap();
-        assert!(s.pending_review("t1").is_some(), "a note is not his go");
-        s.set_drafts("replies", &[json!({"block": "m", "kind": "voice", "text": "ok put it in my drafts"})], 1, 23).unwrap();
-        assert!(s.pending_review("t1").is_some(), "a draft note is not said yet");
-        s.send("replies", 24).unwrap();
-        assert_eq!(s.pending_review("t1"), None, "his word: drafts run free");
-        // an open question holds too, until answered
-        s.publish(&publish("t3", Some("plan"), None), vec![block("q1", "question")], 30, &|_| false).unwrap();
-        s.save_questions("plan", &[super::super::questions::Question { block: "q1".into(), text: "which venue?".into(), options: vec![], card: 4, ..Default::default() }]).unwrap();
-        assert!(s.pending_review("t3").is_some());
-        s.save_questions("plan", &[super::super::questions::Question { block: "q1".into(), text: "which venue?".into(), options: vec![], card: 4, reply: Some("Les Pins".into()), ..Default::default() }]).unwrap();
-        assert_eq!(s.pending_review("t3"), None);
-        let _ = std::fs::remove_dir_all(d);
-    }
-
-    #[test]
-    fn taste_is_counted_and_only_on_the_publish_that_said_it() {
-        assert_eq!(taste_rules("# my taste\n- short\n* no emoji\n  - lowercase\ntext - not one\n-nope\n"), 3);
-        assert_eq!(taste_rules(""), 0);
-        let d = temp();
-        let s = Store::new(&d);
-        let (m, _) = s.publish(&Publish { taste: Some(4), ..publish("t1", Some("w"), None) }, vec![], 10, &|_| false).unwrap();
-        assert_eq!(m.taste, Some(json!({"rules": 4})));
-        assert_eq!(serde_json::to_value(s.meta("w").unwrap()).unwrap()["taste"], json!({"rules": 4}));
-        let (m, _) = s.publish(&publish("t1", Some("w"), None), vec![], 20, &|_| false).unwrap();
-        assert_eq!(m.taste, None, "a publish without --taste: gone");
-        let _ = std::fs::remove_dir_all(d);
-    }
+/// The typed part of a page's message to `to` (page-answer-row,
+/// architect m_20833): `text` is the message the model gets whole (from
+/// [`notes_message`] or [`start_message`], its hint included), `sent` the
+/// notes in it. A note on a question block carries its question and its
+/// card, so the clients draw `you answered main · <question>` and his
+/// words, never `text`.
+pub fn page_part(m: &Meta, questions: &[super::questions::Question], sent: &[Note], to: &str, text: &str) -> bise_proto::parts::Part {
+    let notes = sent
+        .iter()
+        .map(|n| {
+            let q = questions.iter().find(|q| q.block == n.block && matches!(n.kind.as_str(), "pick" | "note" | "voice"));
+            let (text, quote) = match n.kind.as_str() {
+                "edit" => (n.after.clone().unwrap_or_default(), n.before.clone().unwrap_or_default()),
+                _ => (n.text.clone().unwrap_or_default(), n.quote.clone().unwrap_or_default()),
+            };
+            bise_proto::parts::PageNote {
+                block: n.block.clone(),
+                kind: n.kind.clone(),
+                text,
+                quote,
+                card: q.map(|q| q.card).unwrap_or(0),
+                asked: q.map(|q| q.text.trim().to_string()).unwrap_or_default(),
+                parts: n.parts.clone(),
+            }
+        })
+        .collect();
+    bise_proto::parts::Part::Page { text: text.to_string(), to: to.to_string(), page: m.id.clone(), title: m.title.clone(), version: m.version(), notes }
 }
+
+/// His words on a page's drafts card that are no option (ambient-lead
+/// m_21516: 'Ou sont les drafts?' was lost): the message `to` gets (the
+/// page's agent, main when gone) and its typed part, one note on the
+/// batch (block "") quoting the card's line, so the clients draw
+/// `you answered · <asked>` and his words, never the text.
+pub fn batch_words(m: &Meta, url: &str, card: u64, line: &str, asked: &str, to: &str, words: &str) -> (String, bise_proto::parts::Part) {
+    let text = format!("on the drafts notification \"{line}\" of your page \"{}\" ({url}), the user says: {words}", m.title);
+    let note = bise_proto::parts::PageNote {
+        block: super::checklist::BATCH.to_string(),
+        kind: "note".into(),
+        text: words.to_string(),
+        quote: line.to_string(),
+        card,
+        asked: asked.trim().to_string(),
+        parts: Vec::new(),
+    };
+    let part = bise_proto::parts::Part::Page { text: text.clone(), to: to.to_string(), page: m.id.clone(), title: m.title.clone(), version: m.version(), notes: vec![note] };
+    (text, part)
+}
+
+#[cfg(test)]
+#[path = "store_tests.rs"]
+mod tests;

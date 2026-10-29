@@ -129,16 +129,16 @@ fn price_rank(c: &crate::Catalog, pid: &str, twin: &str, id: &str) -> (u64, u64)
 /// None when nothing is listed. The agents follow main, the checker the
 /// small model ([`checker_default`]).
 pub fn one_login_defaults(c: &crate::Catalog, pid: &str, twin: &str, listed: &[String]) -> Option<(String, String)> {
-    let p = c.provider(pid)?;
+    c.provider(pid)?;
     let ids: Vec<String> = if listed.is_empty() {
         c.models.iter().filter(|m| m.provider == pid && !m.stt).map(|m| m.id.clone()).collect()
     } else {
         listed.to_vec()
     };
-    let first = ids.first()?;
-    let main = if ids.contains(&p.model) { p.model.clone() } else { first.clone() };
-    let small = ids.iter().min_by_key(|id| price_rank(c, pid, twin, id)).cloned().unwrap_or_else(|| main.clone());
-    Some((format!("{}/{}", pid, main), format!("{}/{}", pid, small)))
+    ids.first()?;
+    let main = crate::plan_list::pick_among(c, pid, "", listed)?;
+    let small = ids.iter().min_by_key(|id| price_rank(c, pid, twin, id)).map(|id| format!("{}/{}", pid, id)).unwrap_or_else(|| main.clone());
+    Some((main, small))
 }
 
 /// Every role, in the order the screens list them.
@@ -446,6 +446,26 @@ pub fn save_role(file: &std::path::Path, id: &str, model: Option<&str>, effort: 
         let _ = std::fs::remove_file(&tmp);
         format!("couldn't write config.toml: {e}")
     })
+}
+
+/// The model a provider's key is checked with, and main runs when it is
+/// picked (the TUI's key step, the desktop's first run and settings):
+/// [`crate::plan_list::pick_among`] with the provider's plan list (the
+/// catalog's, cached at sign-in): main's model when it is of that
+/// provider (and listed), else the provider's pick (when listed), else
+/// the first listed, else its first chat model. None: the catalog has no
+/// chat model for it (the TUI then asks for a name).
+pub fn pick_for(c: &crate::Catalog, provider: &str, main: &str) -> Option<String> {
+    crate::plan_list::pick_among(c, provider, main, c.listed_of(provider))
+}
+
+/// What a key that just passed its check writes as main's model
+/// (architect m_28532): the checked model when main has none, or when
+/// main's model can't run (its provider has no working key or sign-in);
+/// never over a model that runs. None: main's model stays.
+pub fn model_to_write(main: &str, main_runs: bool, checked: &str) -> Option<String> {
+    let none = main.trim().is_empty() || main == "none";
+    ((none || !main_runs) && !checked.is_empty() && checked != main).then(|| checked.to_string())
 }
 
 /// Each write's own tmp name in this process (with the pid: across them).

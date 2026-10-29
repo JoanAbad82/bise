@@ -434,3 +434,72 @@ function connect(host, port, ms, k) {
   };
   return go();
 }
+
+// Lookup
+// ======
+// Twin of lookup in wire.c: getaddrinfo through bun:ffi (blocking: the JS lane
+// waits, as Process.run does). struct addrinfo keeps ai_canonname before
+// ai_addr on macOS and after it on Linux. A host without bun:ffi fails with 3.
+function wire_gai() {
+  if (globalThis.BEND_GAI === undefined) {
+    globalThis.BEND_GAI = null;
+    try {
+      const ffi = require("bun:ffi");
+      const mac = process.platform === "darwin";
+      const s = ffi.dlopen(mac ? "libSystem.dylib" : "libc.so.6", {
+        getaddrinfo: { args: ["ptr", "ptr", "ptr", "ptr"], returns: "i32" },
+        freeaddrinfo: { args: ["ptr"], returns: "void" },
+        gai_strerror: { args: ["i32"], returns: "cstring" },
+        inet_ntop: { args: ["i32", "ptr", "ptr", "u32"], returns: "ptr" },
+      }).symbols;
+      globalThis.BEND_GAI = { s, ffi, mac };
+    } catch (_) {
+      globalThis.BEND_GAI = null;
+    }
+  }
+  return globalThis.BEND_GAI;
+}
+
+function lookup(host) {
+  const g = wire_gai();
+  if (g === null || host.length === 0 || host.includes("\0")) {
+    return { $: "Fail", error: io_tup(3, "no system resolver here") };
+  }
+  const { s, ffi, mac } = g;
+  const name = Buffer.from(host + "\0", "utf8");
+  const hint = new Int32Array(12);
+  hint[2] = 1; // ai_socktype SOCK_STREAM; ai_family 0 is AF_UNSPEC
+  const out = new BigUint64Array(1);
+  const r = s.getaddrinfo(ffi.ptr(name), null, ffi.ptr(hint), ffi.ptr(out));
+  const codes = mac ? { 8: 1, 7: 1, 1: 1, 2: 2, 4: 2 } : { [-2]: 1, [-5]: 1, [-9]: 1, [-3]: 2, [-4]: 2 };
+  if (r !== 0) {
+    return { $: "Fail", error: io_tup(codes[r] || 3, String(s.gai_strerror(r))) };
+  }
+  const v6 = mac ? 30 : 10;
+  const buf = Buffer.alloc(46);
+  const addrs = [];
+  for (let a = Number(out[0]); a && addrs.length < 16; a = ffi.read.ptr(a, 40)) {
+    const fam = ffi.read.i32(a, 4);
+    const sa = ffi.read.ptr(a, mac ? 32 : 24);
+    if ((fam !== 2 && fam !== v6) || !sa) {
+      continue;
+    }
+    if (s.inet_ntop(fam, sa + (fam === 2 ? 4 : 8), ffi.ptr(buf), 46)) {
+      const text = buf.toString("latin1", 0, buf.indexOf(0));
+      if (!addrs.includes(text)) {
+        addrs.push(text);
+      }
+    }
+  }
+  s.freeaddrinfo(Number(out[0]));
+  if (addrs.length === 0) {
+    return { $: "Fail", error: io_tup(1, String(s.gai_strerror(mac ? 8 : -2))) };
+  }
+  let xs = { $: "Nil" };
+  for (let i = addrs.length - 1; i >= 0; i -= 1) {
+    xs = { $: "Con", head: addrs[i], tail: xs };
+  }
+  return io_done(xs);
+}
+
+io_eff(CID(lookup), lookup);

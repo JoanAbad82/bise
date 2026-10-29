@@ -5,6 +5,7 @@
 //! their own (the theme ground stays, BISE-92).
 
 use crate::gust;
+use bise_proto::words::composer;
 use crate::layout::Cols;
 use crate::theme::{self, accent, dim, faint};
 use ratatui::buffer::Buffer;
@@ -359,7 +360,7 @@ fn label(name: &str, tail: &[Span<'static>], working: Option<(&Working, Step)>) 
     };
     let mut out = vec![
         Span::raw(" "),
-        Span::styled(format!("you {} ", arrow), Style::default().fg(dim())),
+        Span::styled(format!("{} ", composer::divider_you(arrow)), Style::default().fg(dim())),
         Span::styled(name, Style::default().fg(accent())),
     ];
     out.extend(tail.iter().cloned());
@@ -368,8 +369,8 @@ fn label(name: &str, tail: &[Span<'static>], working: Option<(&Working, Step)>) 
         out.extend(gust::mark(w.motion, step.size));
         if step.words && w.words {
             let words = match &w.age {
-                Some(age) => format!(" working · {}", age),
-                None => " working".to_string(),
+                Some(age) => format!(" {}", composer::divider_working_for(age)),
+                None => format!(" {}", composer::divider_working),
             };
             out.push(Span::styled(words, Style::default().fg(dim())));
         }
@@ -418,16 +419,42 @@ fn divider_rule(buf: &mut Buffer, area: Rect, cols: Cols, y: u16) -> bool {
 }
 
 /// The divider with a label of its own and no state (the card view:
-/// `you → ? perf · your answer`); returns (no state, the label).
-pub(crate) fn draw_divider_label(buf: &mut Buffer, area: Rect, cols: Cols, y: u16, label: Vec<Span<'static>>) -> (Rect, Rect) {
+/// `you → ? perf · your answer`); returns (no state, the label). While
+/// his words answer the open item, `answering` gives, for the label's
+/// room, its two sides instead (sb/answer_target.rs: ` ↳ answering
+/// search · … ` and ` esc to main instead `): the rule in the accent,
+/// the end on the right where the state goes.
+pub(crate) fn draw_divider_label(
+    buf: &mut Buffer,
+    area: Rect,
+    cols: Cols,
+    y: u16,
+    label: Vec<Span<'static>>,
+    answering: impl Fn(usize) -> Option<(Vec<Span<'static>>, Vec<Span<'static>>)>,
+) -> (Rect, Rect) {
     let area = area.intersection(buf.area);
+    crate::sb::places::psi_tip::mark(None); // no ψ in this label
     if !divider_rule(buf, area, cols, y) {
         return (Rect::default(), Rect::default());
     }
     let (l, r) = (area.x, area.right() - 1);
     let lx = l + cols.margin - 1;
     let end = r + 1 - cols.margin;
-    let label = fit(label, (end + 1).saturating_sub(lx) as usize);
+    let room = (end + 1).saturating_sub(lx);
+    let (label, right) = match answering(room as usize) {
+        Some((left, right)) => {
+            for x in l..=r {
+                buf[(x, y)].set_style(Style::default().fg(crate::theme::accent()));
+            }
+            (left, right)
+        }
+        None => (label, Vec::new()),
+    };
+    let w = width_of(&right);
+    if w > 0 && w < room {
+        put(buf, end + 1 - w, y, &right, end + 1);
+    }
+    let label = fit(label, room as usize);
     put(buf, lx, y, &label, end + 1);
     let label_rect = Rect { x: lx, y, width: width_of(&label).min((end + 1).saturating_sub(lx)), height: 1 };
     (Rect::default(), label_rect)
@@ -500,6 +527,9 @@ pub(crate) fn draw_divider(
     };
     put(buf, lx, y, &label, end + 1);
     let label_rect = Rect { x: lx, y, width: width_of(&label).min((end + 1).saturating_sub(lx)), height: 1 };
+    // wt-sign: the ψ (and its place's name) says what it is on hover
+    let psi = psi_span(&label).map(|(x, w)| (Rect { x: lx + x, y, width: w, height: 1 }.intersection(label_rect), name));
+    crate::sb::places::psi_tip::mark(psi);
     let w = width_of(&state);
     if w == 0 {
         return (Rect::default(), label_rect);
@@ -511,6 +541,22 @@ pub(crate) fn draw_divider(
         put(buf, end, y, &[Span::raw(" ")], end + 1);
     }
     (Rect { x, y, width: w, height: 1 }, label_rect)
+}
+
+/// Where the label's `ψ` (or `ψ fix-login`) is: its column from the
+/// label's start and its width; None when the tail has none. After the
+/// name (the first 3 spans), so a name cannot be taken for it.
+fn psi_span(label: &[Span]) -> Option<(u16, u16)> {
+    let psi = theme::glyph(theme::G_WORKTREE);
+    let mut x = 0u16;
+    for (i, s) in label.iter().enumerate() {
+        let w = s.content.width() as u16;
+        if i >= 3 && (s.content == psi || s.content.starts_with(&format!("{psi} "))) {
+            return Some((x, w));
+        }
+        x += w;
+    }
+    None
 }
 
 /// The divider's forms, richest first (BISE-303): (the state, the tail,

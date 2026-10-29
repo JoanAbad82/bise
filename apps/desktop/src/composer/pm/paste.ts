@@ -1,0 +1,274 @@
+// The field's paste, drop and clipboard, out of PmField.tsx: images as chips (pasted, dropped on
+// the field or anywhere in the window), any other file on disk as a file chip by its path
+// (file-chips), a long text as a chip after it lands inline (⌘Z puts it
+// back inline), a URL over selected words as a link with those words (linkpaste.ts), any other
+// text as plain text; a copy reads chips as their labels for other apps, and keeps the chips
+// themselves in a private type (chipclip.ts) that a paste in a field turns back into chips.
+import { useEffect, useEffectEvent } from "react";
+import { closeHistory } from "@tiptap/pm/history";
+import {
+  TextSelection,
+  type EditorState,
+  type Transaction,
+} from "@tiptap/pm/state";
+import type { EditorView } from "@tiptap/pm/view";
+import type { Slice } from "@tiptap/pm/model";
+import { chipLabel, isLongPaste, nextChipNumber, type Chip } from "../message";
+import { isImagePath, type ComposerSources } from "../sources";
+import { fileIconOf, filePathOf, imageDims, isImageFile, thumbnail } from "../attach";
+import { linkPaste } from "../linkpaste";
+import { chipsOf, inlineOf, insertChip, insertText, nodeType, segmentsOf } from "./pmtext";
+import { CLIP_MIME, placeChips, readClip, segmentsOfSlice, writeClip } from "./chipclip";
+
+/** What paste and drop need of the field: read at each use (the editor and props live in refs). */
+export interface PasteCtx {
+  readonly sources: () => ComposerSources;
+  readonly state: () => EditorState | null;
+  readonly dispatch: (tr: Transaction | null) => boolean;
+  readonly view: () => EditorView | null;
+}
+
+/** What the clipboard reads of a selection: chips as their labels, a newline '\n', no dictation. */
+export function clipboardText(slice: Slice): string {
+  return slice.content.textBetween(0, slice.content.size, "\n", (n) =>
+    n.type.name === "hardBreak"
+      ? "\n"
+      : n.type.name === "chip"
+        ? chipLabel(n.attrs.chip as Chip)
+        : "",
+  );
+}
+
+const addChip = (c: PasteCtx, make: (n: number) => Chip): void => {
+  const st = c.state();
+  if (st !== null)
+    c.dispatch(insertChip(st, make(nextChipNumber(segmentsOf(st.doc)))));
+};
+
+/** An image's chip: the image in the store, its thumbnail; null when the store refuses it. */
+const imageChip = async (
+  c: PasteCtx,
+  f: File,
+): Promise<((n: number) => Chip) | null> => {
+  const [img, thumb, dims] = await Promise.all([
+    c.sources().saveImage(f),
+    thumbnail(f),
+    imageDims(f),
+  ]);
+  if (img === null) return null;
+  return (n) => ({
+    kind: "image",
+    n,
+    path: img.path,
+    name: img.name,
+    ...(thumb === null ? {} : { thumb }),
+    ...(dims === null ? {} : dims),
+    bytes: f.size,
+  });
+};
+
+/** A file that isn't an image, as a file chip by its absolute path (file-chips): its system icon
+ *  when main gives one, else ▯. One with no path (made in the page) is left out. */
+const fileChip = async (f: File): Promise<((n: number) => Chip) | null> => {
+  const path = filePathOf(f);
+  if (path === "") return null;
+  const icon = await fileIconOf(path);
+  return (n) => ({
+    kind: "file",
+    n,
+    path,
+    bytes: f.size,
+    ...(icon === null ? {} : { icon }),
+  });
+};
+
+/** Files as the composer takes them, in their order (each chip where the one before it ended,
+ *  numbered in that order, one space between two: chips are words in his text, designer
+ *  m_21957): images to the store, any other file a file chip. */
+const addAll = (c: PasteCtx, list: readonly File[]): void => {
+  void (async () => {
+    let added = false;
+    for (const f of list) {
+      const make = isImageFile(f) ? await imageChip(c, f) : await fileChip(f);
+      if (make === null) continue;
+      const st = c.state();
+      if (added && st !== null) c.dispatch(insertText(st, " "));
+      addChip(c, make);
+      added = true;
+    }
+  })();
+};
+
+/** A file picked by its path (the box's '+'), as its chip: an image by its extension (the model
+ *  reads it where it is), any other a file chip with its system icon. */
+const pathChip = async (path: string): Promise<(n: number) => Chip> => {
+  const name = path.split("/").at(-1) ?? path;
+  if (isImagePath(path)) return (n) => ({ kind: "image", n, path, name });
+  const icon = await fileIconOf(path);
+  return (n) => ({ kind: "file", n, path, ...(icon === null ? {} : { icon }) });
+};
+
+/** Picked files, in their order, each where the one before it ended (as addAll). */
+export function addPaths(c: PasteCtx, paths: readonly string[]): void {
+  void (async () => {
+    let added = false;
+    for (const p of paths) {
+      const make = await pathChip(p);
+      const st = c.state();
+      if (added && st !== null) c.dispatch(insertText(st, " "));
+      addChip(c, make);
+      added = true;
+    }
+  })();
+}
+
+const droppedFiles = (e: DragEvent): File[] =>
+  Array.from(e.dataTransfer?.files ?? []);
+
+/** A long paste: inline first, then its chip in a second undo step (⌘Z puts it back inline). */
+const longPaste = (c: PasteCtx, raw: string): void => {
+  const text = raw.replace(/\r\n?/gu, "\n");
+  const st = c.state();
+  if (st === null) return;
+  const start = st.selection.from;
+  c.dispatch(closeHistory(insertText(st, text).setMeta("paste", true)));
+  const now = c.state();
+  if (now === null) return;
+  const chip: Chip = {
+    kind: "paste",
+    n: nextChipNumber(segmentsOf(now.doc)),
+    text,
+  };
+  const tr = now.tr.replaceWith(
+    start,
+    start + text.length,
+    nodeType(now.schema, "chip").create({ chip }),
+  );
+  tr.setSelection(TextSelection.create(tr.doc, start + 1));
+  c.dispatch(closeHistory(tr));
+};
+
+/** A URL pasted over selected words: `[words](url)`, the caret after it, one undo step that
+ *  gives the selection back (linkpaste.ts). False: a chip, a newline or the dictation in the
+ *  selection, or not one URL; the paste goes on as before. */
+const linkOverSelection = (c: PasteCtx, text: string): boolean => {
+  const st = c.state();
+  if (st === null || st.selection.empty) return false;
+  const { from, to } = st.selection;
+  const selected = st.doc.textBetween(from, to, "\n", "\uFFFC");
+  if (selected.includes("\uFFFC")) return false;
+  const link = linkPaste(selected, text);
+  if (link === null) return false;
+  const tr = insertText(st, link.text);
+  tr.setSelection(TextSelection.create(tr.doc, from + link.caret));
+  c.dispatch(closeHistory(tr.setMeta("paste", true)));
+  return true;
+};
+
+/** A copy or a cut of the field's selection (ProseMirror's own then stays out): its words with
+ *  the chips' labels as text/plain, and its chips in CLIP_MIME when it holds one. A cut removes
+ *  the selection. False: nothing selected, or no clipboard (ProseMirror's own). */
+export function copyFrom(view: EditorView, e: ClipboardEvent): boolean {
+  const data = e.clipboardData;
+  const st = view.state;
+  if (data === null || st.selection.empty) return false;
+  const slice = st.selection.content();
+  const text = clipboardText(slice);
+  e.preventDefault();
+  data.clearData();
+  data.setData("text/plain", text);
+  const chips = writeClip(segmentsOfSlice(slice), text);
+  if (chips !== null) data.setData(CLIP_MIME, chips);
+  if (e.type === "cut")
+    view.dispatch(st.tr.deleteSelection().scrollIntoView().setMeta("uiEvent", "cut"));
+  return true;
+}
+
+/** A paste of the field's own copy: its words and chips in place of the selection, the chips
+ *  numbered for this field (chipclip.ts placeChips), the caret after them; one undo step. */
+const chipsPaste = (c: PasteCtx, raw: string, plain: string): boolean => {
+  const segs = readClip(raw, plain);
+  const st = c.state();
+  if (segs === null || st === null) return false;
+  // inside the one paragraph (⌘A's selection covers the whole document)
+  const inside = (p: number): number => Math.min(Math.max(p, 1), st.doc.content.size - 1);
+  const at = inside(st.selection.from);
+  const tr = st.tr.delete(at, inside(st.selection.to));
+  const kids = placeChips(segs, chipsOf(tr.doc)).flatMap((s) =>
+    s.kind === "chip"
+      ? [nodeType(st.schema, "chip").create({ chip: s.chip })]
+      : inlineOf(st.schema, s.text),
+  );
+  tr.insert(at, kids);
+  const size = kids.reduce((n, k) => n + k.nodeSize, 0);
+  tr.setSelection(TextSelection.create(tr.doc, at + size));
+  c.dispatch(closeHistory(tr.setMeta("paste", true)));
+  return true;
+};
+
+/** A paste in the field (or anywhere, through grab.ts): true, it was handled. */
+export function pasteInto(c: PasteCtx, e: ClipboardEvent): boolean {
+  const data = e.clipboardData;
+  if (data === null) return false;
+  // the field's own copy, chips and all (checked before the files: it carries none)
+  if (chipsPaste(c, data.getData(CLIP_MIME), data.getData("text/plain"))) {
+    e.preventDefault();
+    return true;
+  }
+  // a pasted image, or files copied in Finder (each by its path: a file chip, an image chip)
+  const files = Array.from(data.files).filter(
+    (f) => f.type.startsWith("image/") || filePathOf(f) !== "",
+  );
+  if (files.length > 0) {
+    e.preventDefault();
+    addAll(c, files);
+    return true;
+  }
+  const text = data.getData("text/plain");
+  e.preventDefault();
+  if (linkOverSelection(c, text)) return true;
+  if (isLongPaste(text)) {
+    longPaste(c, text);
+    return true;
+  }
+  const st = c.state();
+  if (st !== null && text !== "")
+    c.dispatch(
+      insertText(st, text.replace(/\r\n?/gu, "\n")).setMeta("paste", true),
+    );
+  return true;
+}
+
+/** A drop on the field: its images and files as chips; false (no file): ProseMirror's own. */
+export function dropInto(c: PasteCtx, e: DragEvent): boolean {
+  const files = droppedFiles(e);
+  if (files.length === 0) return false;
+  e.preventDefault();
+  addAll(c, files);
+  return true;
+}
+
+/** A file dropped anywhere in the window is the composer's, never a navigation. */
+export function useDropAnywhere(c: PasteCtx): void {
+  // registered once; the drop sees this render's context
+  const drop = useEffectEvent((e: DragEvent): void => {
+    e.preventDefault();
+    if (c.view()?.dom.contains(e.target as Node) === true) return; // handleDrop has it
+    const files = droppedFiles(e);
+    if (files.length > 0) addAll(c, files);
+  });
+  useEffect(() => {
+    const over = (e: DragEvent): void => {
+      e.preventDefault();
+    };
+    const onDrop = (e: DragEvent): void => {
+      drop(e);
+    };
+    window.addEventListener("dragover", over);
+    window.addEventListener("drop", onDrop);
+    return () => {
+      window.removeEventListener("dragover", over);
+      window.removeEventListener("drop", onDrop);
+    };
+  }, []);
+}

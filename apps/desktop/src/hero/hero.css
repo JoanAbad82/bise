@@ -1,0 +1,378 @@
+/* bise.dev/desktop's hero town (hero.ts): the canvas over the page's poster, faded in at its first
+   frame; the bims' words as the app draws them (office.css .bims-label, .bims-pill, .bims-zzz), on
+   the site's paper; The page lays out the box,
+   draws the controls and the first-visit line (designer m_30837). */
+.bims-hero {
+  position: relative;
+  overflow: hidden;
+  /* one finger scrolls the page; two are the town's (gestures.ts) */
+  touch-action: pan-x pan-y;
+  user-select: none;
+  -webkit-user-select: none;
+  --bh-text: #2b2723;
+  --bh-dim: #6f675c;
+  --bh-paper: #fbf8f1;
+  --bh-accent: #e0607a;
+  --bh-err: #d24b3e;
+  --bh-on: #fff;
+  /* the site's paper (download.html :root): the feed's panel and bubbles (designer m_31887) */
+  --bh-bg: #f7f2e9;
+  --bh-soft: #ebe4d6;
+  --bh-win: #fdfbf7;
+  --bh-line: #1d1a1714;
+  /* bise's words: ink, a step softer than his, never faint (designer m_31992) */
+  --bh-text2: #4a443c;
+  /* the paper plane's ink edge (bims render/plane.ts: WORLD.ink at 0.55, light only) */
+  --bh-plane-ink: #1d1a178c;
+  --bh-plane-ink-dart: #1d1a178c;
+  /* a question bubble's edge (ask.ts): ink, a comic's line */
+  --bh-ask-ink: #2b2723;
+  /* the app's spacing tokens (src/ds/tokens.css) the page has none of: the tip look's */
+  --s-1: 4px;
+  --pad-pill: 3px;
+}
+html.pd .bims-hero {
+  --bh-text: #ece6da;
+  --bh-dim: #b8b0a3;
+  --bh-paper: #1f1c19;
+  --bh-bg: #24201c;
+  --bh-soft: #1e1b18;
+  --bh-win: #1f1c19;
+  --bh-line: #ece6da1f;
+  --bh-text2: #cfc8bc;
+  /* no ink on the dark page: the paper's own shade for its crease */
+  --bh-plane-ink: #c9c1b2;
+  --bh-plane-ink-dart: #c9c1b2;
+  --bh-ask-ink: #c9c1b2;
+}
+.bims-hero .bh-canvas {
+  position: absolute;
+  inset: 0;
+  /* the renderer sizes its pixels (DPR, at most STYLE.maxPixelRatio), never its css box */
+  width: 100%;
+  height: 100%;
+  display: block;
+  opacity: 0;
+  transition: opacity 0.6s ease-out;
+}
+.bims-hero[data-ready='true'] .bh-canvas {
+  opacity: 1;
+}
+.bims-hero .bh-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  font: 12px / 1.5 ui-sans-serif, -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', sans-serif;
+}
+.bims-hero .bh-tag {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--s-1);
+  padding-bottom: var(--s-1);
+  white-space: nowrap;
+  will-change: transform;
+  z-index: 1;
+}
+.bims-hero .bh-tag[data-mode='pill'] {
+  z-index: 2;
+}
+.bims-hero .bh-label {
+  padding: 0 var(--s-1);
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--bh-paper) 85%, transparent);
+  color: var(--bh-text);
+  animation: bh-in 0.12s ease-out;
+}
+.bims-hero .bh-tag[data-mode='name'] .bh-label {
+  color: var(--bh-dim);
+}
+.bims-hero .bh-pill {
+  display: inline-grid;
+  place-items: center;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 var(--pad-pill);
+  border-radius: 999px;
+  font: 600 11px / 1 ui-monospace, 'SF Mono', Menlo, monospace;
+  color: var(--bh-on);
+}
+.bims-hero .bh-pill.asks {
+  background: var(--bh-accent);
+}
+.bims-hero .bh-pill.failed {
+  background: var(--bh-err);
+}
+/* a bim's question, a comic bubble over its '?' pill (ask.ts): paper, an ink edge, its tail to the
+   bim at --tail (film.ts pops it by its scale, from the tail's tip) */
+.bims-hero .bh-ask {
+  position: absolute;
+  top: 0;
+  left: 0;
+  padding: 3px 9px 4px;
+  border: 1.5px solid var(--bh-ask-ink);
+  border-radius: 12px;
+  background: var(--bh-win);
+  color: var(--bh-text);
+  /* 13 px at least, as the feed's bubbles (designer m_39582) */
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.35;
+  white-space: nowrap;
+  z-index: 3;
+  will-change: transform;
+}
+.bims-hero .bh-ask::before,
+.bims-hero .bh-ask::after {
+  content: '';
+  position: absolute;
+  top: 100%;
+  border-style: solid;
+  border-color: transparent;
+  border-bottom-width: 0;
+  transform-origin: top center;
+}
+.bims-hero .bh-ask::before {
+  left: calc(var(--tail) - 1.5px - 6px);
+  border-width: 8px 6px 0;
+  border-top-color: var(--bh-ask-ink);
+}
+.bims-hero .bh-ask::after {
+  left: calc(var(--tail) - 1.5px - 4px);
+  margin-top: -2px;
+  border-width: 6.5px 4px 0;
+  border-top-color: var(--bh-win);
+}
+/* beside its pill (no room over it): the tail leans to the bim */
+.bims-hero .bh-ask[data-side='right']::before,
+.bims-hero .bh-ask[data-side='right']::after {
+  transform: skewX(40deg);
+}
+.bims-hero .bh-ask[data-side='left']::before,
+.bims-hero .bh-ask[data-side='left']::after {
+  transform: skewX(-40deg);
+}
+.bims-hero .bims-zzzs {
+  position: absolute;
+  inset: 0;
+}
+.bims-hero .bims-zzz {
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+.bims-hero .bims-zzz > span {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  color: var(--bh-dim);
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 1;
+  opacity: 0;
+  animation: bh-z 3.6s steps(27) infinite;
+  will-change: transform, opacity;
+}
+.bims-hero .bims-zzz > span:nth-child(2) {
+  font-size: 11px;
+  animation-delay: 1.2s;
+}
+.bims-hero .bims-zzz > span:nth-child(3) {
+  font-size: 13px;
+  animation-delay: 2.4s;
+}
+@keyframes bh-z {
+  0% { opacity: 0; transform: translate(0, 0); }
+  20% { opacity: 0.85; }
+  70% { opacity: 0.6; }
+  100% { opacity: 0; transform: translate(12px, -26px); }
+}
+@keyframes bh-in {
+  from { opacity: 0; }
+}
+/* the feed (feed.ts, designer hero-fix-2 §1 + m_31887): one soft panel bottom-right (out of the page's fade, designer m_32742), every line a
+   bubble with its background (his right, bise's left), so the grass never shows behind a word */
+.bims-hero .bh-feed {
+  position: absolute;
+  right: 24px;
+  bottom: 24px;
+  width: 300px;
+  box-sizing: border-box;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--bh-bg) 72%, transparent);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  pointer-events: none;
+  font: 13px / 1.4 ui-sans-serif, -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', sans-serif;
+  color: var(--bh-text);
+}
+@media (max-width: 1199px) {
+  .bims-hero .bh-feed { width: 260px; }
+}
+/* a phone: the compact feed (bims m_35441), his last line and the field with its send button, bottom
+   right, ~40% of the width: his planes leave from it there too */
+@media (max-width: 859px) {
+  .bims-hero .bh-feed { right: 10px; bottom: 10px; width: 44%; padding: 8px; gap: 4px; border-radius: 12px; font-size: 12px; }
+  .bims-hero .bh-feed-row:not(:last-child) { display: none; }
+  .bims-hero .bh-feed-row { max-width: 100%; }
+  .bims-hero .bh-feed-choices { display: none; }
+}
+.bims-hero .bh-feed-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.bims-hero .bh-feed-row {
+  align-self: flex-start;
+  max-width: 88%;
+  padding: 6px 10px;
+  border-radius: 12px 12px 12px 4px;
+  color: var(--bh-text2);
+  background: var(--bh-win);
+  box-shadow: 0 0 0 1px var(--bh-line);
+  animation: bh-in 0.15s ease-out;
+}
+.bims-hero .bh-feed-row.you {
+  align-self: flex-end;
+  border-radius: 12px 12px 4px 12px;
+  color: var(--bh-text);
+  background: var(--bh-soft);
+  box-shadow: none;
+}
+/* his sent line lands as its bubble in the frame the field clears: no fade in (designer m_36640) */
+.bims-hero .bh-feed-row.you { animation: none; }
+/* the field and its send button (feed.ts, Gabriel via main m_36299): the button presses, folds into
+   his paper plane (fold.ts) and leaves as the 3D one; a new one comes back */
+.bims-hero .bh-feed-input {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.bims-hero .bh-feed-input .bh-feed-field { flex: 1; min-width: 0; }
+.bims-hero .bh-feed-send {
+  position: relative;
+  flex: none;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  /* ink like the app's composer (designer m_36640): pink stays for what waits on him */
+  background: var(--bh-text);
+}
+.bims-hero .bh-send-svg {
+  position: absolute;
+  inset: 0;
+  width: 28px;
+  height: 28px;
+  overflow: visible;
+  pointer-events: none;
+}
+/* the arrow: gone while it folds and flies (it is the dart, then the plane), back in after */
+.bims-hero .bh-send-arrow {
+  fill: var(--bh-bg);
+  transform: translate(4px, 4px);
+  opacity: var(--back);
+}
+.bims-hero .bh-feed-send.folding .bh-send-arrow { opacity: 0; }
+.bims-hero .bh-send-svg polygon,
+.bims-hero .bh-send-svg line { display: none; }
+/* the dart: white paper, its ink edge, from the first frame (bims m_36638) */
+.bims-hero .bh-feed-send.folding .bh-send-svg polygon {
+  display: inline;
+  fill: #fffaf0;
+  stroke: var(--bh-plane-ink-dart);
+  stroke-width: 1;
+  stroke-linejoin: round;
+}
+.bims-hero .bh-feed-send.folding .bh-send-svg line {
+  display: inline;
+  stroke: var(--bh-plane-ink-dart);
+  stroke-width: 1;
+}
+/* his planes over the page (TownOpts.planesOver): over the feed, never in the way of his hands */
+.bims-hero .bh-planes {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+.bims-hero .bh-feed-row.waiting {
+  color: var(--bh-text);
+}
+.bims-hero .bh-feed-ask {
+  display: inline-block;
+  margin-right: 6px;
+  padding: 0 var(--pad-pill);
+  border-radius: 3px;
+  font: 600 11px / 1.3 ui-monospace, 'SF Mono', Menlo, monospace;
+  color: var(--bh-on);
+  background: var(--bh-accent);
+}
+.bims-hero .bh-feed-choices {
+  display: flex;
+  gap: 10px;
+  margin-top: 2px;
+  color: var(--bh-text2);
+}
+.bims-hero .bh-feed-choice.picked {
+  color: var(--bh-text);
+  font-weight: 600;
+}
+.bims-hero .bh-feed-tick {
+  margin-left: 6px;
+  color: #3f8f5a;
+  font-weight: 700;
+}
+.bims-hero .bh-feed-field {
+  padding: 6px 10px;
+  border-radius: 10px;
+  background: var(--bh-win);
+  box-shadow: 0 0 0 1px var(--bh-line);
+  color: var(--bh-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.bims-hero .bh-feed-field.empty {
+  color: var(--bh-dim);
+}
+/* the reviewer's ✓ on checkout's crate (bims-film v13): green ok, from the stamp to the fold */
+.bims-hero .bh-stamp {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 18px;
+  height: 18px;
+  margin: -9px 0 0 -9px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font: 700 12px / 1 ui-sans-serif, -apple-system, sans-serif;
+  color: #fff;
+  background: #3f8f5a;
+  animation: bh-stamp 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+@keyframes bh-stamp {
+  from { transform: scale(1.8); opacity: 0; }
+}
+/* the shop's page (kiln-app) rising from main's crate: a flat window, r 10 (designer m_31640) */
+.bims-hero .bh-page {
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform-origin: 0 0;
+  pointer-events: auto;
+}
+.bims-hero .bh-page-cube {
+  position: absolute;
+  overflow: hidden;
+}
+@media (prefers-reduced-motion: reduce) {
+  .bims-hero .bh-canvas { transition: none; }
+}

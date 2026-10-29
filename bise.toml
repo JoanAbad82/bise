@@ -1,0 +1,14 @@
+# bise.toml: this repo's config every checkout shares (tracked; the per-user
+# flow is .switchboard/config.toml, ignored). Read from main's tip, never from
+# the branch being landed (rust/switchboard/src/flow.rs, land_check.rs).
+
+# No [land] check (Gabriel 2026-10-22: « On supprime seulement le contrôle 3
+# et sa file »): the agent's own `gate.sh quick` runs before `sb land`, the
+# tip gate on main after; a land is commit, rebase, move main, push.
+
+# A new task worktree's rust/target starts as an APFS clone of the warm cargo
+# seed (~3 s, 0 bytes), so a first bare `cargo test` there is warm, not a cold
+# 6 GB build (side-resize, 21 min at load 93: main m_48101, architect
+# m_48124). gate.sh seed never fails: no seed or a target there is one line.
+[worktree]
+setup = "tests/gate.sh seed"
