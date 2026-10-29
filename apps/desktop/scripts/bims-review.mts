@@ -36,6 +36,9 @@ const per = Number(arg('--sheet', '48'));
 const given = arg('--rows', '');
 /** California's skatepark instead of the rows: the park at stages 0 and 13, day and night, and a strip of each trick named (comma list) */
 const skate = arg('--skate', '');
+/** a trick strip's frame size (css px) and its frames */
+const skateSize = Number(arg('--skate-size', '260'));
+const skateFrames = Number(arg('--skate-frames', '6'));
 const COLS = 8;
 const SIZE = 180;
 const png = (url: string): Buffer => Buffer.from(url.slice(url.indexOf(',') + 1), 'base64');
@@ -70,7 +73,7 @@ try {
       }
     }
     for (const t of skate.split(',')) {
-      const url = await page.evaluate(([k]) => (globalThis as unknown as { review: Review }).review.trick(k, 13, false, 260, 6), [t] as const);
+      const url = await page.evaluate(([k, sz, n]) => (globalThis as unknown as { review: Review }).review.trick(k, 13, false, sz, n), [t, skateSize, skateFrames] as const);
       if (url === null) console.log(`${t}: no line holds it`);
       else writeFileSync(resolve(out, 'skate', `trick-${t}.png`), png(url));
     }

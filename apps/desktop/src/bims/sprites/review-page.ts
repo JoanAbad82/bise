@@ -563,7 +563,9 @@ window.review = {
   trick(trick, stage, night, size, frames) {
     const v = sharedView();
     camReset();
-    const st = trickStrip(v, trick as TrickKey, stage, night, size, frames);
+    // `trick@piece`: that trick on that piece only (nose_stall@vert, coping_grind@bowl)
+    const [k, on] = trick.split('@');
+    const st = trickStrip(v, k as TrickKey, stage, night, size, frames, on as Feature | undefined);
     if (!st) return null;
     const c = document.createElement('canvas');
     c.width = size * st.shots.length;

@@ -16,6 +16,7 @@ import { layoutOf } from '../maps/index';
 import { NO_GROW } from '../growth';
 import { SESSION_S, type TrickKey, lineOf } from '../skate';
 import type { Office, Park, Pose, SkatePastime } from '../model';
+import type { Feature } from '../parkpath';
 import { agent } from '../fixtures';
 
 /** a California office with a few desks: its park is the map's, whatever the agents */
@@ -56,6 +57,8 @@ function shoot(v: View, size: number, fit: Fit): HTMLCanvasElement {
 export function parkShot(v: View, stage: number, night: boolean, size: number): HTMLCanvasElement {
   const o = office();
   const w = buildWorld(o, 'main', STYLE, lookOf('california'), night, { ...NO_GROW, stage });
+  // the sky's lamps (the app's sky-light does it): the floodlights' and the room's pools at night
+  w.lit(night ? 1 : 0);
   castShadows(w.root);
   v.scene.add(w.root);
   lightOffice(v.hemi, v.sun, night ? NIGHT : DAY, o, STYLE);
@@ -65,12 +68,12 @@ export function parkShot(v: View, stage: number, night: boolean, size: number): 
   return out;
 }
 
-/** a line holding `trick` for some skater: its name, session and the move's start and length (s) */
-export function findTrick(trick: TrickKey, park: Park, p: SkatePastime): { name: string; n: number; t0: number; dur: number } | null {
+/** a line holding `trick` (on that piece, when `on` is given) for some skater: its name, session and the move's start and length (s) */
+export function findTrick(trick: TrickKey, park: Park, p: SkatePastime, on?: Feature): { name: string; n: number; t0: number; dur: number } | null {
   for (let i = 0; i < 400; i++) {
     const name = `sk8-${String(i)}`;
     for (let n = 0; n < 6; n++) {
-      const m = lineOf(name, n, p, park).moves.find((x) => x.trick === trick && !x.bail);
+      const m = lineOf(name, n, p, park).moves.find((x) => x.trick === trick && !x.bail && (on === undefined || x.on === on));
       if (m) return { name, n, t0: m.t0, dur: m.dur };
     }
   }
@@ -85,13 +88,14 @@ function skatePose(p: SkatePastime, u: number): Pose {
 }
 
 /** `frames` shots of one trick on its piece (the park at `stage`), from its start to its end, framed on the skater's whole way */
-export function trickStrip(v: View, trick: TrickKey, stage: number, night: boolean, size: number, frames: number): { name: string; shots: HTMLCanvasElement[] } | null {
+export function trickStrip(v: View, trick: TrickKey, stage: number, night: boolean, size: number, frames: number, on?: Feature): { name: string; shots: HTMLCanvasElement[] } | null {
   const o = office();
   const park = parkOf(o);
   const p: SkatePastime = { kind: 'skate', slot: 0, pool: false, nine: false, stage };
-  const found = findTrick(trick, park, p);
+  const found = findTrick(trick, park, p, on);
   if (!found) return null;
   const w = buildWorld(o, 'main', STYLE, lookOf('california'), night, { ...NO_GROW, stage });
+  w.lit(night ? 1 : 0);
   castShadows(w.root);
   v.scene.add(w.root);
   lightOffice(v.hemi, v.sun, night ? NIGHT : DAY, o, STYLE);
@@ -108,7 +112,8 @@ export function trickStrip(v: View, trick: TrickKey, stage: number, night: boole
     if (r) way.expandByPoint(new Vector3(r.x, r.y, r.z));
   }
   way.min.y = 0;
-  way.max.y += 1.4;
+  // a bim's height and an air's reach over its rig's point (a bs_air at the vert's lip went out of the frame)
+  way.max.y += 2.4;
   way.expandByScalar(0.9);
   const fit = fitOn(way, size);
   const shots: HTMLCanvasElement[] = [];
