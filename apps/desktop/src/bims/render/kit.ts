@@ -3,7 +3,7 @@
 // room with it, stages.ts what the project's growth adds. Split out of world.ts (bims-grow). Its night
 // glows (glow, light: a lantern, a pendant's light) are registered, so the sky can fade them in and
 // out in either theme (bims-sky, bims m_33351: lit(level)).
-import { type BufferGeometry, type Material, Mesh, type MeshStandardMaterial, type Object3D, type PointLight } from 'three';
+import { type BufferGeometry, type Light, type Material, Mesh, type MeshStandardMaterial, type Object3D } from 'three';
 import type { Box } from '../model';
 import type { Foot } from './decor';
 import type { Palette } from './palette';
@@ -22,7 +22,7 @@ export interface Kit {
    */
   glow(color: string, o: { readonly night: number; readonly day?: number; readonly emissive?: string }): Material;
   /** a light that shines at night only (a pendant, a street lamp): its strength lit; built at the theme's level */
-  light(l: PointLight): PointLight;
+  light<L extends Light>(l: L): L;
   /** every glow and night light at this level, 0 day .. 1 night (they fade, never pop) */
   lit(level: number): void;
 }
@@ -30,7 +30,7 @@ export interface Kit {
 export function kitOf(style: Style, pal: Palette): Kit {
   const cache = new Map<string, Material>();
   const glows: { m: MeshStandardMaterial; day: number; night: number }[] = [];
-  const lights: { l: PointLight; i: number }[] = [];
+  const lights: { l: Light; i: number }[] = [];
   const level0 = pal.pendants ? 1 : 0;
   return {
     style,

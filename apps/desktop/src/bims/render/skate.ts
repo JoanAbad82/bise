@@ -407,8 +407,13 @@ function stanceOf(m: Move, f: number, u: number): Stance {
     case 'bs_air':
       // back to the wall: the turn the other way (a full one in the bowl)
       return air(m.on === 'bowl' ? -Math.PI * 2 : -Math.PI);
-    case 'coping_grind':
-      return { ...RIDE, knees: 0.8, arms: 1.4, lean: 0.06 };
+    case 'coping_grind': {
+      // on the coping, the board and the bim turned GRIND_YAW across it, toward the bowl (its middle is
+      // -π/2 off the carve's way), knees bent, leaning in: held ~0.4 s so it reads as a grind, not as
+      // standing on the edge (designer m_49921)
+      const h = clamp01(Math.min(u, 1 - u) / 0.15);
+      return { ...RIDE, knees: mix(0.8, 1.05, h), arms: 1.4, lean: 0.06 + 0.1 * h, board: [0, -GRIND_YAW * h, 0], spin: -GRIND_YAW * h };
+    }
     case 'roll':
       return RIDE;
   }
@@ -522,6 +527,8 @@ export function skateRig(name: string, pose: Pose, park: Park, phase: number): R
 
 /** the tailslide's board turned this much from the start of its pop (never end-on) */
 const TAIL_YAW = 0.45;
+/** the bowl grind's board and body, turned across the coping (~35°) */
+const GRIND_YAW = 0.61;
 /** on a steep wall the bim stands this much back towards upright from the wall's normal (~30°), its board still on the wall */
 export const WALL_BACK = 0.52;
 /** a wall counts from this slope (rad), fully from WALL_FROM + WALL_SPAN */

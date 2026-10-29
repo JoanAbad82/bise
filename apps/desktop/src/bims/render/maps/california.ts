@@ -10,7 +10,7 @@
 // palms, a beach shower, a tide pool); the frames are skateboard decks on the wall, golden at 500.
 // Never the app's pink or red. Owner: maps-d.
 import {
-  BufferGeometry, CatmullRomCurve3, ExtrudeGeometry, Float32BufferAttribute, Group, type Material, type Object3D, Path, PointLight, Shape, ShapeGeometry,
+  BufferGeometry, CatmullRomCurve3, ExtrudeGeometry, Float32BufferAttribute, Group, type Material, type Object3D, Path, PointLight, Shape, ShapeGeometry, SpotLight,
   TubeGeometry, Vector2, Vector3,
 } from 'three';
 import type { Box, Office, Park, Pt } from '../../model';
@@ -44,6 +44,11 @@ const COPING = '#8e9399';
 const POLE = '#5c677d';
 /** a floodlight's pool hangs this far in from its pole, towards the slab's middle */
 const FLOOD_IN = 1.2;
+/** the spot under the floodlight's head; its pool's half width on the slab (a disc ~1.2 tiles across) */
+const FLOOD_Y = 2.85;
+const FLOOD_R = 0.6;
+/** its strength: about +40% over the lit slab in the pool's middle (the room's pools give ~+30% at 6 from 2.2) */
+const FLOOD_PEAK = 11;
 const GRASS = { day: '#9fd68a', night: '#4f7a45' } as const;
 const SAND = { day: '#e8d3a8', night: '#8a7552' } as const;
 const HEDGE = { day: '#5fa84a', night: '#3f7a35' } as const;
@@ -176,16 +181,21 @@ function parkSlab(k: Kit, root: Object3D, p: Park, n: boolean, carved: boolean):
   // the floodlights (the plan's poles: never on the camera's side, bims m_28843)
   for (const { x: px, z: pz } of p.poles) {
     k.add(style.cylinder(0.045, 3.0), k.mat(POLE), root, px, 1.5, pz);
-    k.add(style.box(0.4, 0.2, 0.22), k.glow('#fff3c4', { night: 1.5, day: 0.1 }), root, px, 3.0, pz);
-    // lit at night, in either theme as the sky says (kit.ts light): a warm pool on the slab like the
-    // room's (sky.ts POOL; designer m_49888: the park went dark at night), hung a little in from its
-    // pole so the pool lands on the concrete, not past the slab's edge
+    // the head lit in the room's lamp colour at night, so each pool's source is seen (designer m_49915)
+    k.add(style.box(0.4, 0.2, 0.22), k.glow(POOL.color, { night: 1.5, day: 0.1 }), root, px, 3.0, pz);
+    // lit at night, in either theme as the sky says (kit.ts light): a spot from the head, aimed
+    // FLOOD_IN in from its pole so its pool lands on the concrete, not past the slab's edge. A disc
+    // FLOOD_R across with a short soft edge, not a wash (designer m_49915: a pool you can point to)
     const cx = (a.x0 + a.x1) / 2;
     const cz = (a.z0 + a.z1) / 2;
     const d = Math.hypot(cx - px, cz - pz) || 1;
-    const l = k.light(new PointLight(POOL.color, POOL.peak - 1, POOL.distance, POOL.decay));
-    l.position.set(px + ((cx - px) / d) * FLOOD_IN, POOL.y, pz + ((cz - pz) / d) * FLOOD_IN);
-    root.add(l);
+    const tx = px + ((cx - px) / d) * FLOOD_IN;
+    const tz = pz + ((cz - pz) / d) * FLOOD_IN;
+    const reach = Math.hypot(FLOOD_IN, FLOOD_Y);
+    const l = k.light(new SpotLight(POOL.color, FLOOD_PEAK, 0, Math.atan(FLOOD_R / reach), 0.25, POOL.decay));
+    l.position.set(px, FLOOD_Y, pz);
+    l.target.position.set(tx, 0, tz);
+    root.add(l, l.target);
   }
   // the benches (the plan's: one by the rest spots, one past the quarter pipe)
   for (const bn of p.benches) k.add(style.box(bn.x1 - bn.x0, 0.35, bn.z1 - bn.z0, 0.05), k.mat('#c49a6c'), root, (bn.x0 + bn.x1) / 2, 0.18, (bn.z0 + bn.z1) / 2);
