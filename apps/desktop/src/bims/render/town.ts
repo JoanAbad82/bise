@@ -58,6 +58,8 @@ interface Probe {
   merged: { from: number; to: number };
   /** the offices drawn live at the last frame */
   live: string[];
+  /** the far offices popping a newcomer in at the last frame (live meanwhile, baked again after) */
+  popping: string[];
   /** the last frames' render calls, ms (the zoomed check reads their median: one frame on a busy machine says little) */
   recent: number[];
   /** the plan's road and river points inside an office: 0 and 0 */
@@ -116,6 +118,8 @@ interface Spot {
  * the pop and its poof (office-scene APPEAR_S, poof.ts POOF_S) and a beat, then baked again
  */
 const POP_LIVE_S = APPEAR_S + POOF_S + 0.3;
+/** while its newcomer walks to its spot, the office stays live this much longer each frame */
+const POP_TAIL_S = 0.4;
 const reducedNow = (): boolean => typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 const testMode = (): boolean => (window as Partial<Window> & { bise?: { test?: boolean } }).bise?.test === true;
@@ -175,7 +179,7 @@ export const makeTownRenderer: MakeTownRenderer = (canvas, opts = {}) => {
   /** the lawn's holes the townscape was built with last (the entry leaves no cube there) */
   let lastPits: readonly { x0: number; x1: number; z0: number; z1: number }[] = [];
   const v = new Vector3();
-  const probe: Probe | null = testMode() ? { frames: 0, calls: 0, ms: 0, offices: 0, merged: { from: 0, to: 0 }, live: [], recent: [], check: { road: 0, river: 0 }, heads: [] } : null;
+  const probe: Probe | null = testMode() ? { frames: 0, calls: 0, ms: 0, offices: 0, merged: { from: 0, to: 0 }, live: [], popping: [], recent: [], check: { road: 0, river: 0 }, heads: [] } : null;
   if (probe) (window as unknown as { __biseTown?: Probe }).__biseTown = probe;
 
   const placedOf = (id: string): Placed | undefined => plan?.offices.find((p) => p.id === id);
@@ -612,10 +616,19 @@ export const makeTownRenderer: MakeTownRenderer = (canvas, opts = {}) => {
     live(id, step, t) {
       const s = spots.get(id);
       if (!s) return 'still';
+      // a popping office stays live while its newcomer still walks: baked again only with it at its spot (no visible switch)
+      const now = Date.now() / 1000;
+      if (s.popUntil > now && step.moving) s.popUntil = Math.max(s.popUntil, now + POP_TAIL_S);
       const m = posed(s, step, t);
       walls(s, step);
       shadowsDirty = true;
       return m ?? 'still';
+    },
+    popWake() {
+      const now = Date.now() / 1000;
+      let left: number | null = null;
+      for (const s of spots.values()) if (s.popUntil > now) left = Math.max(left ?? 0, s.popUntil - now);
+      return left;
     },
     idleWake() {
       let soon: number | null = null;
@@ -738,6 +751,7 @@ export const makeTownRenderer: MakeTownRenderer = (canvas, opts = {}) => {
         probe.recent = [...probe.recent.slice(-29), probe.ms];
         probe.calls = renderer.info.render.calls;
         probe.live = [...spots].filter(([, s]) => s.live).map(([id]) => id);
+        probe.popping = [...spots].filter(([, s]) => s.popUntil > Date.now() / 1000).map(([id]) => id);
         probe.heads = probe.live.flatMap((id) =>
           (spots.get(id)?.scene.names() ?? []).flatMap((name) => {
             const h = api.headOf(id, name);

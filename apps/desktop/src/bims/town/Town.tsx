@@ -373,6 +373,8 @@ export function Town({
     let tick: ReturnType<typeof setTimeout> | undefined;
     let r: TownRenderer | null = null;
     let lastLabels = '';
+    /** a far office popped at the last frame: one more frame once it ends (its bake with the newcomer) */
+    let popped = false;
     const draw = () => {
       raf = 0;
       tick = undefined;
@@ -435,6 +437,15 @@ export function Town({
       // a live office's resting bim: its next idle move (render/idle.ts), never while away
       const idle = awayNow() ? null : r.idleWake();
       if (idle !== null) next = next === null ? Math.ceil(idle * 1000) : Math.min(next, Math.ceil(idle * 1000));
+      // a far office popping a newcomer in (render/town.ts popWake, designer m_49905): every frame while
+      // it pops, and the frame after it ends bakes it again with the newcomer in it
+      const pop = r.popWake();
+      if (pop !== null) next = 0;
+      else if (popped) {
+        popped = false;
+        next = next === null ? FRAME_MS.walk ?? 0 : next;
+      }
+      if (pop !== null) popped = true;
       // the sky's blend: its few seconds at 30 fps, then rest (sky.ts)
       const sky = townSky(c);
       if (r.frame(nightNow(), sky === null ? undefined : { sky: sky.sky, t, reduced: c.reduced })) {

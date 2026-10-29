@@ -32,6 +32,8 @@ export interface TownRenderer {
   liveIds(): readonly string[];
   /** s from the live offices' last frames until a resting bim's next idle move (render/idle.ts), the soonest; null: none */
   idleWake(): number | null;
+  /** s left of the longest newcomer's pop in a far office (it is live meanwhile, then baked again); null: none */
+  popWake(): number | null;
   /** the fit an office's own Office opens with at this width, where the town put it (town/camera.ts diveFit); null: no such office */
   diveFit(id: string, widthPx: number): Fit | null;
   /** css px; the town fitted to the width, returns its height */

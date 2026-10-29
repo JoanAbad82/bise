@@ -2,7 +2,7 @@
 // after; the puffs grow to stay seen when the camera is far (designer m_39015), never past BOOST.
 import { describe, expect, it } from 'vitest';
 import { APPEAR_S } from './office-scene';
-import { POOF_S, PUFF, PUFF_MIN_PX, SPARK, SPARK_MIN_PX, poofAt, puffBoost, sparkBoost } from './poof';
+import { POOF_S, PUFF, PUFF_MIN_PX, PUFF_TOP, SPARK, SPARK_MIN_PX, poofAt, puffBoost, sparkBoost } from './poof';
 
 const steps = (n: number): number[] => Array.from({ length: n + 1 }, (_, i) => (i / n) * POOF_S);
 const seen = (s: number, boost = 1): number => poofAt(7, s, boost).filter((b) => b.r > 1e-3).length;
@@ -33,15 +33,19 @@ describe('a newcomer\'s poof', () => {
     }
   });
 
-  it('keeps its puffs at their size close up and grows them far out to stay PUFF_MIN_PX wide', () => {
+  it('keeps its puffs at their size close up, grows them only a little far out, and always at its feet (designer m_49905)', () => {
     // close up (0.01 office units per css px): today's size
     expect(puffBoost(0.01)).toBe(1);
-    // far (the hero's wide: ~0.1 units per px): a ball's least width on screen is PUFF_MIN_PX
-    const scale = 0.1;
-    const least = (2 * PUFF.size * 0.75 * puffBoost(scale)) / scale;
-    expect(least).toBeGreaterThanOrEqual(PUFF_MIN_PX - 1e-9);
-    // and never past its cap
-    expect(puffBoost(10)).toBeLessThanOrEqual(2.5);
+    // far out: a little bigger, never past 1.3x (they read as dust over the bim at 2.5x)
+    expect(puffBoost(0.1)).toBeGreaterThan(1);
+    expect(puffBoost(10)).toBeLessThanOrEqual(1.3);
+    expect(PUFF_MIN_PX).toBeGreaterThan(0);
+    // under its waist at any camera, all through the poof: the newcomer is seen arriving
+    for (const boost of [1, puffBoost(1 / 6), puffBoost(10)]) {
+      for (let s = 0; s < POOF_S; s += 0.02) {
+        for (const b of poofAt(11, s, boost)) if (b.kind === 'puff' && b.r > 1e-3) expect(b.y + b.r).toBeLessThanOrEqual(PUFF_TOP + 1e-9);
+      }
+    }
   });
 
   it("grows its sparkles far out so the glitter reads at the tile's fit, as the hero's close shots show it (his m_49844)", () => {

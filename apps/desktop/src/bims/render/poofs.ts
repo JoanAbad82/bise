@@ -39,9 +39,11 @@ function star(): BufferGeometry {
 
 export function makePoofs(root: Group, style: Style): Poofs {
   const puffGeo = style.ball(1);
-  const puffMat = style.material(PUFF_COLOR);
+  // designer m_49905: under the sky's light the paper read grey and the gold an ochre nobody saw:
+  // the puffs glow half their own paper white, the sparkles their whole gold (a glitter catches the light)
+  const puffMat = style.material(PUFF_COLOR, { emissive: PUFF_COLOR, ei: 0.55 });
   const sparkGeo = star();
-  const sparkMat = style.material(SPARK_COLOR, { flat: true });
+  const sparkMat = style.material(SPARK_COLOR, { flat: true, emissive: SPARK_COLOR, ei: 1 });
   const mesh = (g: BufferGeometry, m: Material, count: number): InstancedMesh => {
     const im = new InstancedMesh(g, m, count * MAX);
     im.count = 0;
@@ -52,6 +54,8 @@ export function makePoofs(root: Group, style: Style): Poofs {
   };
   const puffs = mesh(puffGeo, puffMat, PUFF.n);
   const sparks = mesh(sparkGeo, sparkMat, SPARK.n);
+  // the sparkles drawn after the puffs (over them where they meet, never hidden by one)
+  sparks.renderOrder = puffs.renderOrder + 1;
   const m4 = new Matrix4();
   const p3 = new Vector3();
   const s3 = new Vector3();

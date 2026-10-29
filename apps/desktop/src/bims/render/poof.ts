@@ -25,8 +25,13 @@ export const PUFF = { n: 8, r0: 0.16, r1: 0.6, size: 0.17, grow: 0.12, life: [0.
 export const SPARK = { n: 4, size: 0.15, life: 0.5, gap: 0.07, from: 0.08, y: 0.75 } as const;
 /** designer m_39015: a puff's ball at least this wide on screen (css px), its ring at least ~1.5 bims wide */
 export const PUFF_MIN_PX = 6;
-/** how far the far camera may grow the puffs (past it they would hide the office) */
-const BOOST_MAX = 2.5;
+/**
+ * how far the far camera may grow the puffs: a little (designer m_49905: at the tile's fit they read
+ * as grey dust over the bim's body; the glitter is the sparkles' now, the puffs stay at its feet)
+ */
+const BOOST_MAX = 1.3;
+/** the puffs stay under the bim's waist (its feet's cloud): a ball's top at most this high */
+export const PUFF_TOP = 0.45;
 /**
  * his m_49844 (« la même animation d'apparition que dans la hero section, le glitter, comme par
  * magie »): the hero's close shots show the sparkles; at the tile's fit (~6 px a unit) they were a
@@ -35,7 +40,8 @@ const BOOST_MAX = 2.5;
  */
 export const SPARK_MIN_PX = 4;
 const SPARK_MAX = 4.5;
-const SPREAD_MAX = 2;
+/** designer m_49905: spread ×1 (the glitter round its head, as close up) */
+const SPREAD_MAX = 1;
 
 /** How much the sparkles grow at this camera (`scale`: office units per css px): 1 close up, more far out. Pure. */
 export function sparkBoost(scale: number): number {
@@ -77,22 +83,24 @@ const GONE = (kind: PoofBit['kind']): PoofBit => ({ kind, x: 0, y: 0, z: 0, r: 0
 function puffs(rnd: () => number, s: number, boost: number): PoofBit[] {
   const out: PoofBit[] = [];
   const turn = rnd() * Math.PI * 2;
-  // the ring widens half as much as the balls grow: still round the bim, never over the next desk
-  const wide = 1 + (boost - 1) * 0.5;
+  // the ring as wide at any camera (designer m_49905: spread ×1)
+  const wide = 1;
   for (let i = 0; i < PUFF.n; i++) {
     const a = turn + (i / PUFF.n) * Math.PI * 2 + (rnd() - 0.5) * 0.5;
     const life = PUFF.life[0] + rnd() * (PUFF.life[1] - PUFF.life[0]);
     const big = 0.75 + rnd() * 0.5;
-    // every third one higher: the cloud reaches the bim's middle as it pops out of it
-    const lift = (i % 3 === 0 ? 0.32 : 0.06) + rnd() * 0.1;
+    // every third one a little higher, all of them at its feet: the newcomer is seen arriving over them
+    const lift = (i % 3 === 0 ? 0.12 : 0.04) + rnd() * 0.06;
     const u = s / life;
     if (u < 0 || u >= 1) { out.push(GONE('puff')); continue; }
     const go = expoOut(u * 1.6);
     const rad = (PUFF.r0 + (PUFF.r1 - PUFF.r0) * go) * wide;
     const grow = backOut(s / PUFF.grow);
     const fade = 1 - clamp01((u - 0.35) / 0.65) ** 2;
-    const r = Math.max(0, PUFF.size * boost * big * grow * fade);
-    out.push({ kind: 'puff', x: Math.cos(a) * rad, y: Math.max(lift * wide, r * 0.8) + 0.14 * go, z: Math.sin(a) * rad, r, spin: 0 });
+    const r = Math.max(0, Math.min(PUFF_TOP / 2, PUFF.size * boost * big * grow * fade));
+    // its top under PUFF_TOP: never over the bim's body
+    const y = Math.min(Math.max(lift, r * 0.8) + 0.06 * go, PUFF_TOP - r);
+    out.push({ kind: 'puff', x: Math.cos(a) * rad, y, z: Math.sin(a) * rad, r, spin: 0 });
   }
   return out;
 }
@@ -112,7 +120,8 @@ function sparks(rnd: () => number, s: number, boost = 1): PoofBit[] {
     const go = expoOut(u);
     // a twinkle: quick in, a short hold, out
     const tw = Math.sin(Math.PI * clamp01(u) ** 0.7);
-    out.push({ kind: 'spark', x: Math.cos(a) * far * spread * go, y: SPARK.y + up * spread * go, z: Math.sin(a) * far * spread * go, r: Math.max(0, SPARK.size * boost * big * tw), spin: a + u * 2.2 });
+    // at its head's height (designer m_49905), a little over it as it twinkles out
+    out.push({ kind: 'spark', x: Math.cos(a) * far * spread * go, y: SPARK.y + up * 0.35 * go, z: Math.sin(a) * far * spread * go, r: Math.max(0, SPARK.size * boost * big * tw), spin: a + u * 2.2 });
   }
   return out;
 }
