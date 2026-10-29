@@ -137,6 +137,17 @@ export function placeOf(v: unknown): { key: string; off: number } | undefined {
   return typeof key === 'string' ? { key, off: typeof off === 'number' && Number.isFinite(off) ? off : 0 } : undefined;
 }
 
+/**
+ * Scrolled up, the row he reads stays where his own scroll put it (scroll-steady, his « ce que je
+ * vois ne glitch pas »): `at` is that row's y in the list's box and the list's scrollTop when it
+ * was read, `now` the same now. His scroll since then moves it by the scrollTop's change; anything
+ * else that moved it (a row above measured at last, a page in front) is the px to scroll by to put
+ * it back. Pure.
+ */
+export function steadyBy(at: { y: number; st: number }, now: { y: number; st: number }): number {
+  return now.y - (at.y - (now.st - at.st));
+}
+
 /** How long after a prepend the anchor row is held (Virtuoso measures the new rows over a few frames). */
 const HOLD_MS = 1500;
 /** How many frames a reveal nudges its row toward the view's centre at most (~1.5 s at 60 fps). */
@@ -191,18 +202,42 @@ export function ThreadList({ keys, row, more, onOlder, head, tail, cue, testId, 
   const holdRef = useRef<() => void>(() => undefined);
   // his place written to keep.ts (keepPlace below, once `stick` exists)
   const placeRef = useRef<() => void>(() => undefined);
+  // scrolled up, the row he reads and where his own scroll put it (steadyBy): put back at that y
+  // whenever something else moved it. Virtuoso's own fixes came a frame late or never (a row above
+  // measured at last while a new entry came at the end: 4 to 56 px jumps). None: read again at the
+  // next scroll (after a hold, a jump of his, at the end)
+  const still = useRef<{ index: number; y: number; st: number } | undefined>(undefined);
+  // a jump of his (⌘F, a reveal, his place put back): no steady until it lands or he moves the list
+  const jumpUntil = useRef(0);
+  const steady = useCallback(() => {
+    const s = still.current;
+    const el = scroller.current;
+    if (s === undefined || el === null || stick.current || held.current !== undefined || Date.now() < jumpUntil.current) return;
+    const row = el.querySelector<HTMLElement>(`[data-item-index="${String(s.index)}"]`);
+    if (row === null) return;
+    const d = steadyBy(s, { y: partOf(row, holdPart).getBoundingClientRect().top - el.getBoundingClientRect().top, st: el.scrollTop });
+    if (Math.abs(d) < 0.5) return;
+    el.scrollTop += d;
+    // read again where it is now: this scroll is ours, never one of his to follow
+    still.current = { index: s.index, y: partOf(row, holdPart).getBoundingClientRect().top - el.getBoundingClientRect().top, st: el.scrollTop };
+  }, [holdPart]);
   const measure = useCallback(() => {
     const el = scroller.current;
     if (el === null) return;
     if (held.current !== undefined) {
+      still.current = undefined;
       holdRef.current();
       return;
     }
+    // what moved the row he reads since the last scroll, other than his scroll, is undone first
+    steady();
     const rows = [...el.querySelectorAll<HTMLElement>('[data-item-index]')].map((r) => {
       const b = partOf(r, holdPart).getBoundingClientRect();
       return { index: Number(r.dataset.itemIndex), top: b.top, bottom: b.bottom };
     });
-    const a = anchorRow(rows, el.getBoundingClientRect().top);
+    const edge = el.getBoundingClientRect().top;
+    const a = anchorRow(rows, edge);
+    still.current = a === undefined ? undefined : { index: a.index, y: a.top - edge, st: el.scrollTop };
     const key = a === undefined ? undefined : keysNow.current[a.index - firstIndex.current];
     reading.current = a === undefined ? undefined : { ...a, ...(key === undefined ? {} : { key }) };
     // the store keeps the rows near it (trim.ts); told when it changes, while he reads up there
@@ -211,11 +246,22 @@ export function ThreadList({ keys, row, more, onOlder, head, tail, cue, testId, 
       tellRead.current?.(key);
     }
     placeRef.current();
-  }, [holdPart]);
+  }, [holdPart, steady]);
   const scrollerRef = useCallback(
     (el: HTMLElement | Window | null) => {
       scroller.current?.removeEventListener('scroll', measure);
       scroller.current = el instanceof HTMLElement ? el : null;
+      // scrolled up, steady alone keeps what he reads still: Virtuoso's own upward fix (its
+      // scrollBy, a frame after the row moved, or not at all when an entry came in the same
+      // update) would move it a second time. At the end, Virtuoso's is kept
+      if (el instanceof HTMLElement) {
+        const own = el.scrollBy.bind(el);
+        el.scrollBy = (a?: ScrollToOptions | number, b?: number) => {
+          if (!stick.current && still.current !== undefined) return;
+          if (typeof a === 'number') own(a, b ?? 0);
+          else own(a);
+        };
+      }
       scroller.current?.addEventListener('scroll', measure, { passive: true });
     },
     [measure],
@@ -298,6 +344,8 @@ export function ThreadList({ keys, row, more, onOlder, head, tail, cue, testId, 
     if (h === undefined || el === null) return;
     if ((stick.current && h.click !== true) || Date.now() > h.until) {
       held.current = undefined;
+      // steady takes over from here: the row he reads, where the hold left it
+      measure();
       return;
     }
     const row = el.querySelector<HTMLElement>(`[data-item-index="${String(h.index)}"]`);
@@ -322,7 +370,7 @@ export function ThreadList({ keys, row, more, onOlder, head, tail, cue, testId, 
       stick.current = false;
       setStuck(false);
     }
-  }, [holdPart]);
+  }, [holdPart, measure]);
   useLayoutEffect(() => {
     holdRef.current = hold;
   }, [hold]);
@@ -382,6 +430,7 @@ export function ThreadList({ keys, row, more, onOlder, head, tail, cue, testId, 
         null;
       if (r === null) return;
       held.current = { index: Number(r.dataset.itemIndex), top: partOf(r, holdPart).getBoundingClientRect().top, until: Date.now() + HOLD_MS, click: true, end: stick.current };
+      still.current = undefined;
       keepHeld();
     },
     [holdPart, keepHeld],
@@ -400,6 +449,7 @@ export function ThreadList({ keys, row, more, onOlder, head, tail, cue, testId, 
     if (index === r.index && next.index === before) return;
     reading.current = { ...r, index };
     held.current = { index, top: r.top, until: Date.now() + HOLD_MS };
+    still.current = undefined;
     return keepHeld();
   }, [keys, next.index, keepHeld]);
   const onGrow = useCallback(() => {
@@ -442,6 +492,30 @@ export function ThreadList({ keys, row, more, onOlder, head, tail, cue, testId, 
       ro.disconnect();
     };
   }, [toEndNow, drawn]);
+  // scrolled up, every change in the list puts the row he reads back where his scroll left it
+  // (steady), before the frame is drawn: a DOM change (a commit of the list, a row's new words)
+  // as a mutation, a row measured at its size as a resize of the list's content
+  useEffect(() => {
+    const el = scroller.current;
+    if (!drawn || el === null) return;
+    const ro = new ResizeObserver(steady);
+    const watch = () => {
+      for (const c of el.children) {
+        ro.observe(c);
+        for (const g of c.children) ro.observe(g);
+      }
+    };
+    const mo = new MutationObserver(() => {
+      watch();
+      steady();
+    });
+    watch();
+    mo.observe(el, { subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: ['style'] });
+    return () => {
+      mo.disconnect();
+      ro.disconnect();
+    };
+  }, [steady, drawn]);
 
   useLayoutEffect(() => {
     if (opened.current || keys.length === 0) return;
@@ -460,6 +534,7 @@ export function ThreadList({ keys, row, more, onOlder, head, tail, cue, testId, 
       // DOM, is nudged back to its px over the next frames, until he moves the list
       const index = firstIndex.current + i;
       const until = Date.now() + HOLD_MS;
+      jumpUntil.current = until;
       restoring.current = true;
       const settle = () => {
         if (moved.current || Date.now() >= until) {
@@ -526,6 +601,7 @@ export function ThreadList({ keys, row, more, onOlder, head, tail, cue, testId, 
         // a jump of his (⌘F, a quote's source) wins over the row held still
         held.current = undefined;
         stopHold.current();
+        jumpUntil.current = Date.now() + HOLD_MS;
         virtuoso.current?.scrollToIndex({ index: i, align: 'center' });
       },
       reveal(key, shown) {
@@ -561,6 +637,7 @@ export function ThreadList({ keys, row, more, onOlder, head, tail, cue, testId, 
         let lastTop: number | undefined;
         moved.current = false;
         revealUntil.current = Date.now() + HOLD_MS;
+        jumpUntil.current = revealUntil.current;
         settling.current = true;
         let told = false;
         const tell = (): void => {
@@ -627,6 +704,7 @@ export function ThreadList({ keys, row, more, onOlder, head, tail, cue, testId, 
       onPointerDown={(e) => {
         moved.current = true;
         held.current = undefined;
+        jumpUntil.current = 0;
         // a press on a row's toggle (a fold, a thinking row, a tool line): that row keeps its y
         // while it opens or closes
         const t = e.target as HTMLElement;
@@ -637,11 +715,15 @@ export function ThreadList({ keys, row, more, onOlder, head, tail, cue, testId, 
       onWheel={(e) => {
         moved.current = true;
         held.current = undefined;
+        jumpUntil.current = 0;
         if (e.deltaY < 0 && stick.current) setStick(false);
       }}
       onKeyDown={(e) => {
         moved.current = true;
-        if (['PageUp', 'PageDown', 'Home', 'End', 'ArrowUp', 'ArrowDown'].includes(e.key)) held.current = undefined;
+        if (['PageUp', 'PageDown', 'Home', 'End', 'ArrowUp', 'ArrowDown'].includes(e.key)) {
+          held.current = undefined;
+          jumpUntil.current = 0;
+        }
         if (['PageUp', 'Home', 'ArrowUp'].includes(e.key) && stick.current) setStick(false);
       }}
     >
@@ -654,9 +736,13 @@ export function ThreadList({ keys, row, more, onOlder, head, tail, cue, testId, 
         firstItemIndex={next.index}
         computeItemKey={(_, key) => (reactKey === undefined ? key : reactKey(key))}
         itemContent={(_, key) => row(key)}
-        // never back to the end while a row he opened is held
-        // nor while a reveal lands (revealUntil)
-        followOutput={(b) => (held.current?.click === true || (!moved.current && (settling.current || Date.now() < revealUntil.current)) ? false : b || stick.current ? 'auto' : false)}
+        // Virtuoso never follows the output itself: the list follows its end only while it sticks,
+        // through onGrow and the box observer (toEndNow). Virtuoso's following decided on its own
+        // at-the-bottom, a frame behind his wheel up, and with a followOutput set at all it also
+        // scrolled to the end on a size increase or a smaller viewport up to 100 ms after a new
+        // entry, whatever the function said: his first notches up were taken back to the end
+        // (scroll-steady: 20 to 186 px pulled down)
+        followOutput={false}
         totalListHeightChanged={onGrow}
         rangeChanged={onRange}
         alignToBottom
