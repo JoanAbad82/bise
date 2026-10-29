@@ -21,7 +21,9 @@ const ENTRY_BUDGET = 6 * 1024;
 // 290 since main grew 279 -> 284.5 KB with the workshop pods, town light and town paths (main m_35420)
 // 292 since main grew to 290.2 KB over 36 bims commits since the last hero build (a54eed3f2: the
 // standing bims' life, idle moves, the closed jacket, the hands on the keys; bim-3d, the bise.dev deploy of his m_49096)
-const FILM_BUDGET = 292 * 1024;
+// 294 since main grew to 292.9 KB with 12 bims commits since b358fedb7 (the glitter's screen sparkles
+// for his m_49844, the rain, the town's pop; bim-3d, designer m_49932)
+const FILM_BUDGET = 294 * 1024;
 /** the home islands' own chunk on top of film.js (designer's brief, bims-home v11: 40 KB gzip at most) */
 const ISLANDS_BUDGET = 40 * 1024;
 

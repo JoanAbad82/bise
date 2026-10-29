@@ -30,6 +30,8 @@ export interface TownRenderer {
   live(id: string, step: Step, t: number): Motion;
   /** the offices to pose live at this view: the ones in view once it is close enough, at most LIVE_MAX */
   liveIds(): readonly string[];
+  /** the live ones that are live only for a newcomer's pop (far off): they keep their sign, no bims' labels (designer m_49932) */
+  popOnlyIds(): readonly string[];
   /** s from the live offices' last frames until a resting bim's next idle move (render/idle.ts), the soonest; null: none */
   idleWake(): number | null;
   /** s left of the longest newcomer's pop in a far office (it is live meanwhile, then baked again); null: none */

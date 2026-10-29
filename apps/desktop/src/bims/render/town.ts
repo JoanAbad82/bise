@@ -475,6 +475,34 @@ export const makeTownRenderer: MakeTownRenderer = (canvas, opts = {}) => {
   /** what is drawn: the dive's way, else the town's fit through his camera */
   const shownFit = (): Fit | null => view ?? (base && !sameCam(cam, FIT) ? viewFit(base, cam) : base);
 
+  /**
+   * The offices posed live at this view: `near`, the ones in view once it is close enough (at most
+   * LIVE_MAX, the nearest the middle first), and `popping`, the ones whose newcomer pops in (still()),
+   * live a moment wherever the camera is
+   */
+  function liveSets(): { near: readonly string[]; popping: readonly string[] } {
+    const f = shownFit();
+    if (!f || !base || !plan) return { near: [], popping: [] };
+    // the hero's few offices: all of them, always (an office back in view would bake its walls again: ~100 ms)
+    if (opts.allLive === true) return { near: plan.offices.map((p) => p.id), popping: [] };
+    const now = Date.now() / 1000;
+    const popping = plan.offices.filter((p) => (spots.get(p.id)?.popUntil ?? 0) > now).map((p) => p.id);
+    // close enough: the fit's width shows LIVE_ZOOM times less of the town
+    if ((base.right - base.left) / (f.right - f.left) < LIVE_ZOOM) return { near: [], popping };
+    const cx = f.widthPx / 2;
+    const cy = f.heightPx / 2;
+    const near = plan.offices
+      .filter((p) => inView(f, p))
+      .map((p) => {
+        const c = toScreen(f, { x: (p.fp.x0 + p.fp.x1) / 2, y: 0, z: (p.fp.z0 + p.fp.z1) / 2 });
+        return { id: p.id, d: Math.hypot(c.x - cx, c.y - cy) };
+      })
+      .sort((a, b) => a.d - b.d)
+      .slice(0, LIVE_MAX)
+      .map((x) => x.id);
+    return { near, popping };
+  }
+
   function applyView(): void {
     const f = shownFit();
     if (!f) return;
@@ -639,27 +667,12 @@ export const makeTownRenderer: MakeTownRenderer = (canvas, opts = {}) => {
       return soon;
     },
     liveIds() {
-      const f = shownFit();
-      if (!f || !base || !plan) return [];
-      // the hero's few offices: all of them, always (an office back in view would bake its walls again: ~100 ms)
-      if (opts.allLive === true) return plan.offices.map((p) => p.id);
-      // an office whose newcomer pops in (still()): live a moment wherever the camera is
-      const now = Date.now() / 1000;
-      const popping = plan.offices.filter((p) => (spots.get(p.id)?.popUntil ?? 0) > now).map((p) => p.id);
-      // close enough: the fit's width shows LIVE_ZOOM times less of the town
-      if ((base.right - base.left) / (f.right - f.left) < LIVE_ZOOM) return popping;
-      const cx = f.widthPx / 2;
-      const cy = f.heightPx / 2;
-      const near = plan.offices
-        .filter((p) => inView(f, p))
-        .map((p) => {
-          const c = toScreen(f, { x: (p.fp.x0 + p.fp.x1) / 2, y: 0, z: (p.fp.z0 + p.fp.z1) / 2 });
-          return { id: p.id, d: Math.hypot(c.x - cx, c.y - cy) };
-        })
-        .sort((a, b) => a.d - b.d)
-        .slice(0, LIVE_MAX)
-        .map((x) => x.id);
+      const { near, popping } = liveSets();
       return [...near, ...popping.filter((id) => !near.includes(id))];
+    },
+    popOnlyIds() {
+      const { near, popping } = liveSets();
+      return popping.filter((id) => !near.includes(id));
     },
     setSize(widthPx, maxHeightPx) {
       size = { w: Math.round(widthPx), maxH: Math.round(maxHeightPx) };

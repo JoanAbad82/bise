@@ -1,15 +1,57 @@
 // The newcomers' poofs drawn (poof.ts says where each piece is): one instanced mesh of clay puffs and
-// one of gold sparkles under the office's root, a few instances each, so every poof in the office is
-// two draw calls at most. A sparkle is three thin diamonds across each other: a star from any side.
+// one point cloud of gold sparkles under the office's root, so every poof in the office is two draw
+// calls at most. A sparkle is a flat 4-point star drawn on the screen (designer m_49932: at the tile's
+// fit the 3D stars were under a pixel and toned to white): unlit, never tone mapped, over everything,
+// sized in css px from the camera at draw time, with a 1 px warm-ink rim so it shows on the cream floor.
 // Owner: bim-pop.
-import { type BufferGeometry, Euler, type Group, InstancedMesh, type Material, Matrix4, OctahedronGeometry, Quaternion, Vector3 } from 'three';
-import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
+import {
+  BufferAttribute, BufferGeometry, Color, type Group, InstancedMesh, type Material, Matrix4, Points, Quaternion, ShaderMaterial, Vector3,
+} from 'three';
 import { POOF_S, PUFF, SPARK, poofAt, puffBoost, sparkBoost } from './poof';
 import type { Style } from './style';
 
-/** the puffs' clay: warm paper, no glow, in both themes (designer m_39015); the sparkles' gold: the neon's (palette.ts), never the accent */
+/** the puffs' clay: warm paper, no glow, in both themes (designer m_39015); the sparkles' gold: the DAY gold (palette.ts), never the accent */
 const PUFF_COLOR = '#f2ede2';
 const SPARK_COLOR = '#ffd166';
+/** the sparkles' rim: the palette's warm ink (DAY.ink), one css px */
+const SPARK_RIM = '#1d1a17';
+/** the rim's width, css px, on each side of the star */
+export const RIM_PX = 1;
+
+/** a sparkle's sprite on screen, css px across (its gold star plus its rim each side): `r` its half length, office units; `scale` units per css px. Pure. */
+export const sparkPx = (r: number, scale: number): number => (2 * r) / scale + 2 * RIM_PX;
+
+const SPARK_VERT = /* glsl */ `
+attribute float aSize;
+attribute float aSpin;
+uniform float uDpr;
+varying float vSpin;
+varying float vFill;
+void main() {
+  vSpin = aSpin;
+  vFill = (aSize - ${(2 * RIM_PX).toFixed(1)}) / aSize;
+  gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+  gl_PointSize = aSize * uDpr;
+}`;
+
+// a 4-point star: |x|^k + |y|^k under 1 (k < 1 pulls its sides in), its tips at the fill's edge; the
+// band one pixel past it is the rim
+const SPARK_FRAG = /* glsl */ `
+uniform vec3 uGold;
+uniform vec3 uRim;
+varying float vSpin;
+varying float vFill;
+void main() {
+  vec2 p = gl_PointCoord * 2.0 - 1.0;
+  float c = cos(vSpin);
+  float s = sin(vSpin);
+  vec2 q = vec2(c * p.x - s * p.y, s * p.x + c * p.y) / max(vFill, 0.05);
+  float f = pow(abs(q.x), 0.7) + pow(abs(q.y), 0.7);
+  float w = fwidth(f);
+  if (f > 1.0 + 1.5 * w) discard;
+  gl_FragColor = vec4(f < 1.0 ? uGold : uRim, 1.0);
+  #include <colorspace_fragment>
+}`;
 /** at most this many poofs at once (a burst of newcomers: the oldest ones' last frames are dropped) */
 const MAX = 6;
 
@@ -28,22 +70,42 @@ export interface Poofs {
   dispose(): void;
 }
 
-function star(): BufferGeometry {
-  const arm = (sx: number, sy: number, sz: number): BufferGeometry => new OctahedronGeometry(1, 0).scale(sx, sy, sz);
-  const thin = 0.2;
-  const parts = [arm(1, thin, thin), arm(thin, 1, thin), arm(thin, thin, 1)];
-  const g = mergeGeometries(parts, false);
-  for (const p of parts) p.dispose();
-  return g;
+/** the sparkles' point cloud: SPARK.n × MAX points, their size (css px) and spin per point, drawn over everything */
+function sparkCloud(): { pts: Points; geo: BufferGeometry; mat: ShaderMaterial; pos: BufferAttribute; size: BufferAttribute; spin: BufferAttribute } {
+  const n = SPARK.n * MAX;
+  const geo = new BufferGeometry();
+  const pos = new BufferAttribute(new Float32Array(n * 3), 3);
+  const size = new BufferAttribute(new Float32Array(n), 1);
+  const spin = new BufferAttribute(new Float32Array(n), 1);
+  geo.setAttribute('position', pos);
+  geo.setAttribute('aSize', size);
+  geo.setAttribute('aSpin', spin);
+  geo.setDrawRange(0, 0);
+  const mat = new ShaderMaterial({
+    uniforms: { uDpr: { value: 1 }, uGold: { value: new Color(SPARK_COLOR) }, uRim: { value: new Color(SPARK_RIM) } },
+    vertexShader: SPARK_VERT,
+    fragmentShader: SPARK_FRAG,
+    // over everything, never tone mapped (designer m_49932)
+    depthTest: false,
+    depthWrite: false,
+    transparent: true,
+    toneMapped: false,
+  });
+  const pts = new Points(geo, mat);
+  pts.frustumCulled = false;
+  pts.visible = false;
+  // its size in device px: the renderer's own pixel ratio, read as it draws (the tile, the town's bake, the hero)
+  pts.onBeforeRender = (r) => {
+    const u = mat.uniforms.uDpr;
+    if (u) u.value = r.getPixelRatio();
+  };
+  return { pts, geo, mat, pos, size, spin };
 }
 
 export function makePoofs(root: Group, style: Style): Poofs {
   const puffGeo = style.ball(1);
-  // designer m_49905: under the sky's light the paper read grey and the gold an ochre nobody saw:
-  // the puffs glow half their own paper white, the sparkles their whole gold (a glitter catches the light)
+  // designer m_49905: under the sky's light the paper read grey: the puffs glow half their own paper white
   const puffMat = style.material(PUFF_COLOR, { emissive: PUFF_COLOR, ei: 0.55 });
-  const sparkGeo = star();
-  const sparkMat = style.material(SPARK_COLOR, { flat: true, emissive: SPARK_COLOR, ei: 1 });
   const mesh = (g: BufferGeometry, m: Material, count: number): InstancedMesh => {
     const im = new InstancedMesh(g, m, count * MAX);
     im.count = 0;
@@ -53,14 +115,13 @@ export function makePoofs(root: Group, style: Style): Poofs {
     return im;
   };
   const puffs = mesh(puffGeo, puffMat, PUFF.n);
-  const sparks = mesh(sparkGeo, sparkMat, SPARK.n);
-  // the sparkles drawn after the puffs (over them where they meet, never hidden by one)
-  sparks.renderOrder = puffs.renderOrder + 1;
+  const sparks = sparkCloud();
+  // the sparkles drawn last (over the puffs, the bims and the room)
+  sparks.pts.renderOrder = 1000;
+  root.add(sparks.pts);
   const m4 = new Matrix4();
   const p3 = new Vector3();
   const s3 = new Vector3();
-  const q = new Quaternion();
-  const e = new Euler();
   const q0 = new Quaternion();
 
   return {
@@ -77,24 +138,29 @@ export function makePoofs(root: Group, style: Style): Poofs {
           s3.setScalar(b.r);
           if (b.kind === 'puff') puffs.setMatrixAt(ip++, m4.compose(p3, q0, s3));
           else {
-            q.setFromEuler(e.set(0.5, b.spin, 0.3));
-            sparks.setMatrixAt(is++, m4.compose(p3, q, s3));
+            sparks.pos.setXYZ(is, p3.x, p3.y, p3.z);
+            sparks.size.setX(is, sparkPx(b.r, scale));
+            sparks.spin.setX(is, b.spin);
+            is++;
           }
         }
       }
-      for (const [im, c] of [[puffs, ip], [sparks, is]] as const) {
-        im.count = c;
-        im.visible = c > 0;
-        im.instanceMatrix.needsUpdate = true;
-      }
+      puffs.count = ip;
+      puffs.visible = ip > 0;
+      puffs.instanceMatrix.needsUpdate = true;
+      sparks.geo.setDrawRange(0, is);
+      sparks.pts.visible = is > 0;
+      sparks.pos.needsUpdate = true;
+      sparks.size.needsUpdate = true;
+      sparks.spin.needsUpdate = true;
       return live.length > 0;
     },
     dispose() {
-      root.remove(puffs, sparks);
+      root.remove(puffs, sparks.pts);
       puffGeo.dispose();
-      sparkGeo.dispose();
       puffMat.dispose();
-      sparkMat.dispose();
+      sparks.geo.dispose();
+      sparks.mat.dispose();
     },
   };
 }

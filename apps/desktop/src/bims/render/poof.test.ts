@@ -3,6 +3,7 @@
 import { describe, expect, it } from 'vitest';
 import { APPEAR_S } from './office-scene';
 import { POOF_S, PUFF, PUFF_MIN_PX, PUFF_TOP, SPARK, SPARK_MIN_PX, poofAt, puffBoost, sparkBoost } from './poof';
+import { RIM_PX, sparkPx } from './poofs';
 
 const steps = (n: number): number[] => Array.from({ length: n + 1 }, (_, i) => (i / n) * POOF_S);
 const seen = (s: number, boost = 1): number => poofAt(7, s, boost).filter((b) => b.r > 1e-3).length;
@@ -64,6 +65,25 @@ describe('a newcomer\'s poof', () => {
       expect((far[i]?.r ?? 0)).toBeGreaterThan(near[i]?.r ?? 0);
       expect(Math.hypot(far[i]?.x ?? 0, far[i]?.z ?? 0)).toBeLessThanOrEqual(2 * Math.hypot(near[i]?.x ?? 0, near[i]?.z ?? 0) + 1e-9);
     }
+  });
+
+  it("draws every sparkle at least 4 css px of gold plus its rim at the tile's fit, from the camera's scale (designer m_49932)", () => {
+    for (const scale of [1 / 6, 1 / 4, 1 / 12]) {
+      const spark = sparkBoost(scale);
+      const peak = new Map<number, number>();
+      for (let s = 0; s < POOF_S; s += 0.005) {
+        poofAt(21, s, puffBoost(scale), spark).forEach((b, i) => {
+          if (b.kind === 'spark') peak.set(i, Math.max(peak.get(i) ?? 0, b.r));
+        });
+      }
+      expect(peak.size).toBe(SPARK.n);
+      for (const r of peak.values()) {
+        expect(sparkPx(r, scale) - 2 * RIM_PX).toBeGreaterThanOrEqual(4);
+        expect(sparkPx(r, scale)).toBeLessThan(40);
+      }
+    }
+    // the same star in office units is twice as many px with the camera twice as close
+    expect(sparkPx(0.3, 1 / 20) - 2 * RIM_PX).toBeCloseTo(2 * (sparkPx(0.3, 1 / 10) - 2 * RIM_PX));
   });
 
   it('is the same poof for the same bim, and another for another', () => {

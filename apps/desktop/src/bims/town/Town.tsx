@@ -294,7 +294,9 @@ export function Town({
     const ins: SignIn[] = [];
     const ph = phaseRef.current;
     const only = ph === 'office' || ph === 'swapIn' || ph === 'swapOut';
-    const liveNow = new Set(only ? [] : r.liveIds());
+    // a far office live only for a newcomer's pop keeps its sign (designer m_49932: no switch to bims' labels)
+    const popOnly = new Set(r.popOnlyIds());
+    const liveNow = new Set(only ? [] : r.liveIds().filter((id) => !popOnly.has(id)));
     // all written first (whole: no data-compact), then all measured: one layout, not one per sign
     const shown: [string, HTMLDivElement, { readonly x: number; readonly y: number }][] = [];
     for (const [id, el] of signs.current) {
@@ -422,11 +424,13 @@ export function Town({
       const own = phaseRef.current === 'town';
       const shownLabels: TownLabel[] = [];
       const hb = bimRef.current;
+      // a far office live only for a newcomer's pop: no bims' labels, its sign stays (designer m_49932)
+      const popOnly = new Set(r.popOnlyIds());
       for (const id of r.liveIds()) {
         const step = drivers.current.get(id)?.step(c, hb !== null && hb.id === id ? { ...NO_ATTENTION, hover: hb.name } : NO_ATTENTION);
         if (step == null) continue;
         const motion = r.live(id, step, t);
-        if (own) {
+        if (own && !popOnly.has(id)) {
           for (const l of step.labels.values()) shownLabels.push({ key: labelKey(id, l.name), id, label: l });
           for (const f of step.frames) ranks.current.set(labelKey(id, f.name), tagRank(f.pose.seg.act.k));
         }
