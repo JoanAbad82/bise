@@ -1046,3 +1046,50 @@ fn an_app_request_is_answered_with_its_hubs_own_response() {
     ask(&mut t, json!({"cmd": "quiet", "on": true}), 46);
     assert_eq!(t.core.take_replies(), vec![Response::ok(Id::Num(46), json!({}))]);
 }
+
+/// hub-older-race (ambient_projects_e2e red on ab4be8a4b): the window
+/// lets shop go (`shown []`) while its hub's notifications are still on
+/// their way to the core, then a send opens a new connection to it.
+/// Those lines of the closed connection, read on the new one before its
+/// `initialize` answered, made it ask `hub/read`: written first on the
+/// socket, the hub answered `does not serve the op ""` and the core said
+/// shop's hub is older than this bise. Now nothing but `initialize` goes
+/// first, and the send reaches shop at its welcome.
+#[test]
+fn a_new_connection_never_reads_the_lines_of_the_one_before() {
+    let mut t = T::new();
+    t.ready();
+    let mut w = world(&mut t);
+    typed(&mut t, json!({"cmd": "shown", "projects": ["shop"]}));
+    w.opened(&mut t, &["home", "shop"]);
+    w.welcome(&mut t, "shop");
+    // a hub-wide notification of the first connection, read by its
+    // reader thread but not by the core yet
+    w.end("shop").say(json!({"ev": "agents", "project": "shop", "agents": [
+        {"name": "main", "main": true, "status": "idle", "archived": false, "title": "", "purpose": "", "since_ms": 1, "waits": 0}]}));
+    let stale = loop {
+        let (id, h) = w.rx.recv_timeout(Duration::from_secs(3)).expect("the reader read it");
+        if id == "shop" && matches!(h, HubIn::Line(_)) {
+            break h;
+        }
+        t.core.project_hub(&id, h);
+    };
+    // the window lets it go, then sends to it: a new connection
+    typed(&mut t, json!({"cmd": "shown", "projects": []}));
+    let hi = json!({"cmd": "send", "project": "shop", "agent": "main", "text": "while not shown", "mode": "now"});
+    typed(&mut t, hi.clone());
+    let (id, end) = w.ends.recv_timeout(Duration::from_secs(3)).expect("a new connection to shop");
+    assert_eq!(id, "shop");
+    w.open.insert(id, end);
+    // the closed connection's line comes in before the new one's Up
+    t.core.project_hub("shop", stale);
+    w.until(&mut t, |_| true);
+    let first = w.end("shop").raw(Duration::from_secs(3)).expect("the core's first line");
+    assert_eq!(first["method"], "initialize", "initialize first on a new connection, nothing before it: {first}");
+    w.end("shop").take(first);
+    let before = t.take();
+    w.welcome(&mut t, "shop");
+    assert_eq!(w.end("shop").next(), hi, "the send reached shop at its welcome");
+    let out: Vec<Value> = before.into_iter().chain(t.take()).collect();
+    assert!(!out.iter().any(|v| v["kind"] == "hub_older" || v["ev"] == "hub_refused"), "never 'older' for a hub that is not: {out:#?}");
+}

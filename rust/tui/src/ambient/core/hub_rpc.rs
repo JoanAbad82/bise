@@ -214,12 +214,16 @@ impl RpcConn {
         if !self.ready {
             // initialize's answer, or a hub that doesn't serve it
             // (bise_proto::rpc::init_answer, the one reading)
-            match rpc::init_answer(&v, &Id::Num(INIT)) {
-                Init::Ready(res) => return self.welcome(*res),
-                Init::Refused(e) => return Read::Refused(e),
-                Init::NotRpc => return Read::NotRpc,
-                Init::Other => {}
-            }
+            // anything else is a line of the connection before it (the
+            // core let it go, its lines were on their way; hub-older-race):
+            // never read here, it would ask `hub/read` before `initialize`
+            // and the hub would answer 'does not serve the op' (NotRpc)
+            return match rpc::init_answer(&v, &Id::Num(INIT)) {
+                Init::Ready(res) => self.welcome(*res),
+                Init::Refused(e) => Read::Refused(e),
+                Init::NotRpc => Read::NotRpc,
+                Init::Other => Read::Nothing,
+            };
         }
         if !rpc::is_rpc(&v) {
             return Read::Nothing;
