@@ -25,6 +25,8 @@ import { kitOf } from '../render/kit';
 import { loft } from '../render/maps/loft';
 import { COIN_HEAD, cutPng, headPng } from '@/app/side3d/render';
 import { aliveRig, aliveSeed, stanceAt, stands } from '../render/alive';
+import { parkShot, trickStrip } from './review-skate';
+import type { TrickKey } from '../skate';
 import { DUR, type IdleMove, idleRig } from '../render/idle';
 import type { Row } from './pairwise';
 import { type Cam, type Dressed, IDLE_KIND, REVIEW_NAME, dimsOf, dress, rowId, validRow } from './review-space';
@@ -523,6 +525,10 @@ declare global {
       /** one row, big: a finding's shot */
       cell(r: Row, size: number): Promise<string>;
       check(r: Row): Issue[];
+      /** California's park at a growth stage, pinched in on its slab (review-skate.ts) */
+      park(stage: number, night: boolean, size: number): string;
+      /** one trick on its piece: `frames` shots from its start to its end in one strip, labelled */
+      trick(trick: string, stage: number, night: boolean, size: number, frames: number): string | null;
     };
   }
 }
@@ -549,5 +555,30 @@ window.review = {
     return c.toDataURL('image/png');
   },
   check: (r) => checkRow(r),
+  park(stage, night, size) {
+    const v = sharedView();
+    camReset();
+    return parkShot(v, stage, night, size).toDataURL('image/png');
+  },
+  trick(trick, stage, night, size, frames) {
+    const v = sharedView();
+    camReset();
+    const st = trickStrip(v, trick as TrickKey, stage, night, size, frames);
+    if (!st) return null;
+    const c = document.createElement('canvas');
+    c.width = size * st.shots.length;
+    c.height = size + 26;
+    const ctx = c.getContext('2d');
+    if (!ctx) return null;
+    ctx.fillStyle = night ? '#2a2d3a' : '#efe9df';
+    ctx.fillRect(0, 0, c.width, c.height);
+    st.shots.forEach((sh, i) => {
+      ctx.drawImage(sh, i * size, 26);
+    });
+    ctx.fillStyle = night ? '#efe9df' : '#1d1a17';
+    ctx.font = '600 15px -apple-system, Helvetica, sans-serif';
+    ctx.fillText(`${trick} · ${st.name} · stage ${String(stage)} · ${night ? 'night' : 'day'} · ${String(st.shots.length)} frames over the trick`, 8, 18);
+    return c.toDataURL('image/png');
+  },
 };
 

@@ -17,6 +17,8 @@ interface Review {
   rows(seed: number): { rows: Row[]; unreachable: string[] };
   sheet(rows: Row[], title: string, size: number, cols: number): { png: string; cells: Cell[] };
   cell(r: Row, size: number): string;
+  park(stage: number, night: boolean, size: number): string;
+  trick(trick: string, stage: number, night: boolean, size: number, frames: number): string | null;
 }
 
 const arg = (name: string, d: string): string => {
@@ -32,6 +34,8 @@ const only = arg('--only', '');
 const per = Number(arg('--sheet', '48'));
 /** a JSON file of rows to draw instead of the pairwise set (a finding's before and after shots): every one gets its shot */
 const given = arg('--rows', '');
+/** California's skatepark instead of the rows: the park at stages 0 and 13, day and night, and a strip of each trick named (comma list) */
+const skate = arg('--skate', '');
 const COLS = 8;
 const SIZE = 180;
 const png = (url: string): Buffer => Buffer.from(url.slice(url.indexOf(',') + 1), 'base64');
@@ -57,6 +61,23 @@ try {
     throw new Error(`the review page did not load: ${errors.join('; ')}`);
   });
   const all = await page.evaluate((s) => (globalThis as unknown as { review: Review }).review.rows(s), seed);
+  if (skate) {
+    mkdirSync(resolve(out, 'skate'), { recursive: true });
+    for (const stage of [0, 13]) {
+      for (const night of [false, true]) {
+        const url = await page.evaluate(([st, n]) => (globalThis as unknown as { review: Review }).review.park(st, n, 900), [stage, night] as const);
+        writeFileSync(resolve(out, 'skate', `park-${String(stage)}-${night ? 'night' : 'day'}.png`), png(url));
+      }
+    }
+    for (const t of skate.split(',')) {
+      const url = await page.evaluate(([k]) => (globalThis as unknown as { review: Review }).review.trick(k, 13, false, 260, 6), [t] as const);
+      if (url === null) console.log(`${t}: no line holds it`);
+      else writeFileSync(resolve(out, 'skate', `trick-${t}.png`), png(url));
+    }
+    console.log(`skate: ${resolve(out, 'skate')}`);
+    if (errors.length > 0) throw new Error(`the review page failed: ${errors.join('; ')}`);
+    process.exit(0);
+  }
   let rows = given ? (JSON.parse(readFileSync(given, 'utf8')) as Row[]) : all.rows;
   if (only) rows = rows.filter((r) => Object.values(r).join('|').includes(only));
   if (limit > 0) rows = rows.slice(0, limit);
