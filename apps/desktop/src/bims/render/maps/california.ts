@@ -20,6 +20,7 @@ import { FEATURE_STAGE, GOLDEN_STAGE } from '../../skate';
 import { type Kit, boxOf, glyph, onFloor } from '../kit';
 import { terraceSlab } from '../decor';
 import { DAY, NIGHT, WORLD, hash, type Palette } from '../palette';
+import { POOL } from '../../sky';
 import { cones, deckChairs, garden, islandLen, loftLounge } from '../stages';
 import type { Build, DeskHandles, MapLook } from './look';
 import { loft } from './loft';
@@ -41,6 +42,8 @@ const CONCRETE = { day: '#d8d4cc', night: '#8d8a84' } as const;
 const CONCRETE_D = { day: '#c9c4ba', night: '#7c7973' } as const;
 const COPING = '#8e9399';
 const POLE = '#5c677d';
+/** a floodlight's pool hangs this far in from its pole, towards the slab's middle */
+const FLOOD_IN = 1.2;
 const GRASS = { day: '#9fd68a', night: '#4f7a45' } as const;
 const SAND = { day: '#e8d3a8', night: '#8a7552' } as const;
 const HEDGE = { day: '#5fa84a', night: '#3f7a35' } as const;
@@ -174,9 +177,14 @@ function parkSlab(k: Kit, root: Object3D, p: Park, n: boolean, carved: boolean):
   for (const { x: px, z: pz } of p.poles) {
     k.add(style.cylinder(0.045, 3.0), k.mat(POLE), root, px, 1.5, pz);
     k.add(style.box(0.4, 0.2, 0.22), k.glow('#fff3c4', { night: 1.5, day: 0.1 }), root, px, 3.0, pz);
-    // lit at night, in either theme as the sky says (kit.ts light)
-    const l = k.light(new PointLight('#fff3c4', 6, 9, 1.4));
-    l.position.set(px, 2.8, pz);
+    // lit at night, in either theme as the sky says (kit.ts light): a warm pool on the slab like the
+    // room's (sky.ts POOL; designer m_49888: the park went dark at night), hung a little in from its
+    // pole so the pool lands on the concrete, not past the slab's edge
+    const cx = (a.x0 + a.x1) / 2;
+    const cz = (a.z0 + a.z1) / 2;
+    const d = Math.hypot(cx - px, cz - pz) || 1;
+    const l = k.light(new PointLight(POOL.color, POOL.peak - 1, POOL.distance, POOL.decay));
+    l.position.set(px + ((cx - px) / d) * FLOOD_IN, POOL.y, pz + ((cz - pz) / d) * FLOOD_IN);
     root.add(l);
   }
   // the benches (the plan's: one by the rest spots, one past the quarter pipe)

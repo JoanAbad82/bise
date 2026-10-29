@@ -30,7 +30,7 @@ interface At {
 }
 
 /** the body on the board, before it is placed */
-interface Stance {
+export interface Stance {
   readonly knees: number;
   readonly arms: number;
   /** the body's lift over the board */
@@ -396,8 +396,11 @@ function stanceOf(m: Move, f: number, u: number): Stance {
       return held([-0.18, 0.3, 0.26], { knees: 0.8, lean: -0.08 });
     case 'crooked':
       return held([0.22, 0.38, 0], { knees: 0.8, lean: 0.14 });
-    case 'tailslide':
-      return held([-0.12, -Math.PI / 2, 0], { knees: 0.75, lean: -0.1, spin: -Math.PI / 2 });
+    case 'tailslide': {
+      // turned TAIL_YAW from the start of its pop, so the board never shows end-on (designer m_49888: a glitch at office size)
+      const s = held([-0.12, -Math.PI / 2 + TAIL_YAW, 0], { knees: 0.75, lean: -0.1, spin: -Math.PI / 2 });
+      return { ...s, board: [s.board[0], s.board[1] - TAIL_YAW, s.board[2]] };
+    }
     case 'nose_stall':
       // the nose on the coping, the back foot up, then turned back in
       return { ...RIDE, knees: 0.8, arms: 1.3, lean: 0.18, board: [0.45 * hop(clamp01(u / 0.6), 1), 0, 0], spin: kick(Math.PI, 0.45, 0.95) };
@@ -513,7 +516,39 @@ export function skateRig(name: string, pose: Pose, park: Park, phase: number): R
   const dy = -Math.sin(pitch) * HALF;
   let lift = seat.base + at.air;
   for (const k of [1, -1]) lift = Math.max(lift, surfaceAt(park, p.stage, at.x + k * hx, at.z + k * hz) - k * dy);
-  return rigFrom(at.x, at.z, head, lift, tilt, body, 'skate');
+  const wall = wallRide(tilt, at.air, body);
+  return { ...rigFrom(at.x, at.z, head, lift, wall.tilt, wall.body, 'skate'), boardTilt: tilt };
+}
+
+/** the tailslide's board turned this much from the start of its pop (never end-on) */
+const TAIL_YAW = 0.45;
+/** on a steep wall the bim stands this much back towards upright from the wall's normal (~30°), its board still on the wall */
+export const WALL_BACK = 0.52;
+/** a wall counts from this slope (rad), fully from WALL_FROM + WALL_SPAN */
+const WALL_FROM = 0.35;
+const WALL_SPAN = 0.5;
+/** the knees on a wall: crouched hard */
+const WALL_KNEES = 1.35;
+
+/**
+ * Designer m_49888 (the vert's and the bowl's walls read as 'lying on the ramp'): on a steep wall
+ * the bim crouches hard and stands WALL_BACK back towards upright, its board kept on the wall (the
+ * tilt it gives back goes to the board alone). It looks the way it rides: up to the coping going up,
+ * down to the ramp's floor coming down. The film cheats physics; never a straight body flat on the
+ * surface. In the air (upright already) and sitting after a bail: as is. Pure.
+ */
+export function wallRide(tilt: readonly [number, number], air: number, s: Stance): { tilt: [number, number]; body: Stance } {
+  const steep = (a: number): number => (air > 0.05 || s.sit ? 0 : clamp01((Math.abs(a) - WALL_FROM) / WALL_SPAN));
+  const wp = steep(tilt[0]);
+  const wr = steep(tilt[1]);
+  if (wp === 0 && wr === 0) return { tilt: [tilt[0], tilt[1]], body: s };
+  const cp = Math.sign(tilt[0]) * WALL_BACK * wp;
+  const cr = Math.sign(tilt[1]) * WALL_BACK * wr;
+  const w = Math.max(wp, wr);
+  return {
+    tilt: [tilt[0] - cp, tilt[1] - cr],
+    body: { ...s, knees: mix(s.knees, Math.max(s.knees, WALL_KNEES), w), board: [s.board[0] + cp, s.board[1], s.board[2] + cr] },
+  };
 }
 
 /** a roll's body: riding, a push now and then (the back foot down, then up) */

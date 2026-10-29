@@ -42,7 +42,8 @@ function ride(o: (typeof offices)[number], name: string, n: number, p: Pastime):
     const lift = rig.lift ?? 0;
     const need = clearAt(park, p.stage, rig.x, rig.z, MARGIN);
     // the board's ends, along its way and tilt, never in a slope (a board on a transition: its sag)
-    const pitch = rig.tilt?.[0] ?? 0;
+    // the board's own tilt (a wall ride stands the bim back from it, render/skate.ts wallRide)
+    const pitch = rig.boardTilt?.[0] ?? rig.tilt?.[0] ?? 0;
     const ends = [-0.4, 0.4].map((d) => {
       const x = rig.x + Math.sin(rig.dir) * Math.cos(pitch) * d;
       const z = rig.z + Math.cos(rig.dir) * Math.cos(pitch) * d;

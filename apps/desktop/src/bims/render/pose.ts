@@ -86,6 +86,11 @@ export interface Rig {
   readonly lift?: number;
   /** the whole bim tilted along its way: pitch (nose up < 0) and roll (a ramp's wall, a carve) */
   readonly tilt?: readonly [number, number];
+  /**
+   * a skater's board's own tilt on the surface under it (pitch, roll): its tilt, but on a steep wall
+   * the bim stands back from it (render/skate.ts wallRide) and its board keeps the wall's; absent: its tilt
+   */
+  readonly boardTilt?: readonly [number, number];
   /** its board's place and turn in the bim's frame (a flip, kicked up into the hand); absent: under its feet */
   readonly board?: { readonly x: number; readonly y: number; readonly z: number; readonly rot: Rot };
   /** his pokes (render/poke.ts): the boop's squash (k 1 flat .. -0.25 stretched) about a height
