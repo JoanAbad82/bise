@@ -20,6 +20,7 @@ import { STYLE } from '../render/style';
 import { makeView, type View } from '../render/view';
 import { castShadows, lightOffice } from '../render/world';
 import type { Pose } from '../model';
+import type { Feature } from '../parkpath';
 import { FOLLOW_ZOOM } from '../focus';
 import { kitOf } from '../render/kit';
 import { loft } from '../render/maps/loft';
