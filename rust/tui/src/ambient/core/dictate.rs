@@ -20,12 +20,17 @@
 //! (two with the language guard); a slower one ended the take with no
 //! words and the listener threw them away, one take in two (m_22120).
 //!
-//! A final that failed, timed out or came back empty says `kept`: the
-//! core keeps that take's sound, in memory only (the last
-//! [`KEPT_TAKES`], [`KEPT_MAX`] each, the oldest sound goes), and
-//! `dictate_retry {id}` transcribes it again with a fresh listener: one
-//! final, no partials. The sound goes on a retry that gives words, on
-//! `dictate_cancel`, and with the core (architect m_22168).
+//! Each take's sound ([`KEPT_MAX`] at most, the oldest goes) is kept on
+//! disk once it stops (core/takes.rs: at the stop, and at a final that
+//! came while the mic was on), until the window says it has the take:
+//! `dictate_cancel {id}` (his esc, or its words landed in a draft), or the
+//! prune (7 days, 200 MB). So a take survives a chat switch, a window
+//! reload and a quit (dictation-keep, architect m_49881). A final that
+//! failed, timed out or came back empty says `kept`; `dictate_retry {id}`
+//! transcribes the file again with a fresh listener: one final, no
+//! partials. A retry for a take still transcribed is a no-op (main moved
+//! its route to the window that asked: the final goes there); one with no
+//! file says 'nothing to try again.'.
 //!
 //! core.log gets one line per step of a take (start, refused and why,
 //! stop, final with its length, its time after the stop and its error,
@@ -39,19 +44,11 @@ use std::collections::VecDeque;
 /// itself after this long, its final out.
 pub const DICTATE_MAX: Duration = Duration::from_secs(120);
 
-/// How many takes' sound the core keeps for `dictate_retry`.
-pub const KEPT_TAKES: usize = 3;
 /// The most sound kept per take: past it, the oldest goes.
 pub const KEPT_MAX: Duration = Duration::from_secs(600);
 const KEPT_SAMPLES: usize = KEPT_MAX.as_secs() as usize * SAMPLE_RATE as usize;
 /// A retry feeds the listener the sound as the mic would: 100 ms blocks.
 const RETRY_BLOCK: usize = SAMPLE_RATE as usize / 10;
-
-/// A take's sound, kept after a final with no words, for a retry.
-pub(super) struct Kept {
-    id: String,
-    pcm: VecDeque<i16>,
-}
 
 /// The take's sound, its oldest gone past [`KEPT_MAX`].
 fn record(pcm: &mut VecDeque<i16>, block: &[i16]) {
@@ -216,6 +213,10 @@ impl Core {
         let _ = d.audio.send(ListenMsg::Flush);
         d.ending = Some(now);
         eprintln!("ambient-core: dictate {id}: stop after {} ms, transcribing", now.duration_since(d.started).as_millis());
+        // on disk now: a quit while it is transcribed loses nothing
+        let pcm = std::mem::take(&mut d.pcm);
+        self.dictate_keep(id, &pcm);
+        d.pcm = pcm;
         self.dictations_ending.push(d);
         self.emit(json!({"ev": "level", "who": "you", "v": 0.0}));
     }
@@ -224,9 +225,8 @@ impl Core {
         let held = self.dictation.take_if(|d| d.id == id).is_some();
         let before = self.dictations_ending.len();
         self.dictations_ending.retain(|d| d.id != id);
-        // his cancel drops the kept sound too
-        if let Some(i) = self.dictations_kept.iter().position(|k| k.id == id) {
-            self.dictations_kept.remove(i);
+        // his cancel, or the window has the take: its sound goes
+        if takes::remove(&self.ports.dictation_dir, id) {
             eprintln!("ambient-core: dictate {id}: its kept sound dropped");
         }
         if !held && self.dictations_ending.len() == before {
@@ -273,7 +273,9 @@ impl Core {
     /// [`Self::dictation_final_ev`] with the listener's `note`: the one
     /// line the window shows with the words (their model fell back).
     fn dictation_final_note(&mut self, id: &str, text: &str, error: Option<&str>, pcm: VecDeque<i16>, note: Option<&str>) {
-        let kept = (error.is_some() || text.trim().is_empty()) && self.dictate_keep(id, pcm);
+        // on disk until the window has the take (its words may reach no window: a reload)
+        let on_disk = self.dictate_keep(id, &pcm);
+        let kept = (error.is_some() || text.trim().is_empty()) && on_disk;
         let mut v = json!({"ev": "dictation", "id": id, "text": text.trim(), "final": true});
         if let Some(e) = error {
             v["error"] = json!(e);
@@ -287,31 +289,39 @@ impl Core {
         self.emit(v);
     }
 
-    /// Keeps a take's sound (memory only): the newest [`KEPT_TAKES`].
-    /// False: no sound to keep.
-    fn dictate_keep(&mut self, id: &str, pcm: VecDeque<i16>) -> bool {
-        if pcm.is_empty() {
-            return false;
+    /// Keeps a take's sound on disk (core/takes.rs) until the window has
+    /// it. False: no sound to keep, or the disk refused (core.log says).
+    fn dictate_keep(&mut self, id: &str, pcm: &VecDeque<i16>) -> bool {
+        let dir = &self.ports.dictation_dir;
+        if takes::has(dir, id) {
+            return true;
         }
-        self.dictations_kept.retain(|k| k.id != id);
-        eprintln!("ambient-core: dictate {id}: its sound kept ({:.1} s) for a retry", seconds(&pcm));
-        self.dictations_kept.push(Kept { id: id.to_string(), pcm });
-        while self.dictations_kept.len() > KEPT_TAKES {
-            let old = self.dictations_kept.remove(0);
-            eprintln!("ambient-core: dictate {}: its kept sound dropped ({KEPT_TAKES} newer kept)", old.id);
+        match takes::save(dir, id, pcm) {
+            Ok(true) => {
+                eprintln!("ambient-core: dictate {id}: its sound kept ({:.1} s) until the window has it", seconds(pcm));
+                true
+            }
+            Ok(false) => false,
+            Err(e) => {
+                eprintln!("ambient-core: dictate {id}: its sound could not be kept: {e}");
+                false
+            }
         }
-        true
     }
 
     /// `dictate_retry`: the kept sound to a fresh listener, as a stopped
     /// take (no mic, no partials): its one final comes at the flush, kept
-    /// again if it has no words, the sound freed if it has.
+    /// again if it has no words. A take still transcribed: nothing (its
+    /// final goes to the window that asked, main moved its route).
     pub(super) fn dictate_retry(&mut self, id: String, now: Instant) {
-        let Some(i) = self.dictations_kept.iter().position(|k| k.id == id) else {
+        if self.dictation.as_ref().is_some_and(|d| d.id == id) || self.dictations_ending.iter().any(|d| d.id == id) {
+            eprintln!("ambient-core: dictate {id}: retry while it is transcribed: its final comes");
+            return;
+        }
+        let Some(pcm) = takes::load(&self.ports.dictation_dir, &id) else {
             eprintln!("ambient-core: dictate {id}: retry with nothing kept");
             return self.dictate_error(&id, "", "nothing to try again.");
         };
-        let pcm = self.dictations_kept.remove(i).pcm;
         let job = match (self.ports.listen_job)() {
             Ok(j) => j,
             Err(e) => {
@@ -337,6 +347,14 @@ impl Core {
     /// The clock: the mic to the listener, its words to the window, the
     /// time limit, the final.
     pub(super) fn tick_dictation(&mut self, now: Instant) {
+        // the takes no window came back for: at the start, then once a day
+        if self.dictations_pruned.is_none_or(|t| now.duration_since(t) >= takes::PRUNE_EVERY) {
+            self.dictations_pruned = Some(now);
+            let gone = takes::prune(&self.ports.dictation_dir, std::time::SystemTime::now(), takes::MAX_AGE, takes::MAX_TOTAL);
+            if gone > 0 {
+                eprintln!("ambient-core: dictate: {gone} old take(s) pruned");
+            }
+        }
         if self.dictation.as_ref().is_some_and(|d| now.duration_since(d.started) >= DICTATE_MAX) {
             let id = self.dictation.as_ref().map(|d| d.id.clone()).unwrap_or_default();
             eprintln!("ambient-core: dictate {id}: the time limit");

@@ -45,14 +45,17 @@ describe('dictation routes (bar I, architect m_10537)', () => {
     expect(r.route(partial)).toEqual({ to: 'none' });
   });
 
-  it("a window gone cancels its dictations (the mic goes off), not another window's", () => {
+  it("a window gone stops its dictations (the mic goes off, the take kept), not another window's", () => {
     const r = new DictationRoutes();
     r.sent(1, { cmd: 'dictate_start', id: 'd1' });
     r.sent(2, { cmd: 'dictate_start', id: 'd2' });
-    expect(r.gone(1)).toEqual([{ cmd: 'dictate_cancel', id: 'd1' }]);
+    expect(r.gone(1)).toEqual([{ cmd: 'dictate_stop', id: 'd1' }]);
     expect(r.gone(1)).toEqual([]);
-    // the core's cancelled final for d1 reaches nobody now
-    expect(r.route({ ev: 'dictation', id: 'd1', text: '', final: true, cancelled: true })).toEqual({ to: 'none' });
+    // d1's final reaches nobody now (the core keeps its sound on disk)
+    expect(r.route({ ev: 'dictation', id: 'd1', text: 'fix', final: true })).toEqual({ to: 'none' });
+    // the window back (a reload) asks for it again: its final goes there
+    r.sent(3, { cmd: 'dictate_retry', id: 'd1' });
+    expect(r.route({ ev: 'dictation', id: 'd1', text: 'fix', final: true })).toEqual({ to: 'window', window: 3, ev: { ev: 'dictation', id: 'd1', text: 'fix', final: true } });
     expect(r.route({ ev: 'dictation', id: 'd2', text: 'hi', final: false })).toMatchObject({ to: 'window', window: 2 });
   });
 

@@ -76,6 +76,7 @@ fn a_send_while_the_hub_is_away_is_an_error() {
         user_kind,
         fake_words: None,
         voice_mode: Box::new(|| Err("no voice mode".into())),
+        dictation_dir: std::env::temp_dir().join(format!("amb-conn-dictation-{}", std::process::id())),
     };
     let mut core = Core::new(WS.into(), hub, ports);
     core.cmd(Cmd::Send { text: "hello".into() }, Instant::now());
@@ -117,6 +118,7 @@ fn the_run_loop_writes_lines_and_ends_with_stdin() {
         user_kind,
         fake_words: None,
         voice_mode: Box::new(|| Err("no voice mode".into())),
+        dictation_dir: std::env::temp_dir().join(format!("amb-conn-dictation-{}", std::process::id())),
     };
     let mut core = Core::new(WS.into(), hub, ports);
     // an event before initialize is held; a line before it is refused

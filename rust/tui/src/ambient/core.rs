@@ -10,6 +10,7 @@ mod away;
 mod cmd;
 mod computer;
 mod dictate;
+mod takes;
 mod hub_rpc;
 mod home;
 mod home_switch;
@@ -93,6 +94,9 @@ pub struct Ports {
     pub fake_words: Option<super::fake::Words>,
     /// voice mode's controller ports (core/voice_mode.rs)
     pub voice_mode: OpenVoiceMode,
+    /// where dictation keeps each take's sound until the window has it
+    /// (`bise_home::Home::dictation_dir`, core/takes.rs)
+    pub dictation_dir: PathBuf,
 }
 
 /// One phase of main's turn, for the orb (§4 `phase`).
@@ -258,9 +262,9 @@ pub struct Core {
     /// stopped takes, mic off, waiting for their words (each its own
     /// listener; the mic is free for the next take)
     dictations_ending: Vec<dictate::Dictation>,
-    /// the sound of takes whose final failed or came back empty, for
-    /// `dictate_retry` (memory only, the last [`dictate::KEPT_TAKES`])
-    dictations_kept: Vec<dictate::Kept>,
+    /// the last prune of the takes kept on disk (core/takes.rs): None
+    /// until the first tick
+    dictations_pruned: Option<Instant>,
     /// voice mode with the agent in view (core/voice_mode.rs)
     voice_on: Option<voice_mode::VoiceOn>,
     /// the composer's `@` answers on their way (core/picks.rs)
@@ -352,7 +356,7 @@ impl Core {
             talk: None,
             dictation: None,
             dictations_ending: Vec::new(),
-            dictations_kept: Vec::new(),
+            dictations_pruned: None,
             voice_on: None,
             picks: picks::Picks::default(),
             index: index::Index::default(),

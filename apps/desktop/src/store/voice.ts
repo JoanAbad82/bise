@@ -64,9 +64,12 @@ export class StoreVoice extends StoreReads {
     this.dictateWait(id);
   }
   /** A take the core kept (its final with no words or an error, `kept`): transcribed once more,
-   *  one more final for that id (amb-core 276074b2); the same wait as a stop. */
+   *  one more final for that id (amb-core 276074b2); the same wait as a stop. A take this window
+   *  never saw (a draft's, after a relaunch or a reload: dictation-keep) is asked for too: the core
+   *  transcribes its sound again, or sends its final when it still transcribes it. */
   dictateRetry(id: string): void {
-    if (this.dictating.has(id) || this.dictation(id)?.kept !== true) return;
+    const d = this.dictation(id);
+    if (this.dictating.has(id) || (d !== null && d.kept !== true)) return;
     this.dictating.add(id);
     this.put(`dictation:${id}`, {
       text: "",
@@ -87,6 +90,12 @@ export class StoreVoice extends StoreReads {
       cancelled: true,
       error: null,
     } satisfies Dictation);
+  }
+  /** The take's words are in his draft: the core lets its sound go (it keeps it on disk until
+   *  then: dictation-keep). Nothing changes here. */
+  dictateDone(id: string): void {
+    if (this.dictating.has(id)) return;
+    this.command({ cmd: "dictate_cancel", id });
   }
   private dictateWait(id: string): void {
     setTimeout(() => {

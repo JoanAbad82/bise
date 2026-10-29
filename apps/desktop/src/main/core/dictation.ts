@@ -5,9 +5,12 @@
 // `dictation` events there (a refusal or a failure is one too, final with
 // its `error`), never to another
 // window, never to main's own listeners or the kept snapshot, never to a
-// log. A window gone (closed, crashed, reloaded) cancels its dictations (the
-// mic goes off); a core gone ends them for their windows (its mic is off
-// with it). Voice mode (core/voice_mode.rs) is routed the same way: its
+// log. A window gone (closed, crashed, reloaded, the app quitting) stops its
+// dictations (the mic goes off), never cancels them: the core keeps each
+// take's sound on disk and the window's draft keeps its place, so a reload
+// or a relaunch asks for it again (`dictate_retry`, which moves its route
+// here: dictation-keep). A core gone ends them for their windows (its mic is
+// off with it). Voice mode (core/voice_mode.rs) is routed the same way: its
 // `voice_mode` events (his heard words, the said sentence) go only to the
 // window that turned it on; that window gone turns it off; the core gone
 // gives that window its last state. Pure: ipc.ts gives it the window ids
@@ -67,13 +70,14 @@ export class DictationRoutes {
     return this.owners.size > 0 || this.voice !== null;
   }
 
-  /** A window is gone: the `dictate_cancel` commands for its dictations. */
+  /** A window is gone: the `dictate_stop` commands for its dictations (the mic off, each take
+   *  kept: its draft asks for it again). */
   gone(window: number): Ev[] {
     const cmds: Ev[] = [];
     for (const [id, w] of this.owners) {
       if (w !== window) continue;
       this.owners.delete(id);
-      cmds.push({ cmd: 'dictate_cancel', id });
+      cmds.push({ cmd: 'dictate_stop', id });
     }
     if (this.voice?.window === window) {
       // never left listening: its last state is for a window that is gone

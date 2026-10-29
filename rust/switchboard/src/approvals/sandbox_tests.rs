@@ -704,3 +704,19 @@ mod live {
         assert!(boxed - plain < 200.0);
     }
 }
+
+/// His dictations not yet in his composer (~/.bise/dictation, his voice):
+/// an agent's command never reads nor writes them (architect m_49881).
+#[test]
+fn the_dictation_takes_are_closed_to_agents() {
+    for net in [false, true] {
+        let p = profile(&spec(), net);
+        assert!(p.contains("(deny file-read-data (subpath \"/h/.bise/dictation\"))"), "{p}");
+        let w = p.find("(deny file-write*
+").unwrap();
+        let end = w + p[w..].find("
+)
+").unwrap();
+        assert!(p[w..end].contains("(subpath \"/h/.bise/dictation\")"), "{p}");
+    }
+}

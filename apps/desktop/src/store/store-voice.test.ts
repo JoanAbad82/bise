@@ -91,6 +91,19 @@ describe("store: voice", () => {
     store.dictateRetry(b);
     expect(sent.length, "a dropped take is gone").toBe(n);
   });
+  it("dictation-keep: a take a draft holds that this window never saw (a relaunch) is asked again; done lets the core drop its sound", () => {
+    const { sent, store } = fake();
+    store.dictateRetry("d7-1");
+    expect(sent.at(-1)).toEqual({ cmd: "dictate_retry", id: "d7-1" });
+    expect(store.dictation("d7-1")).toEqual({ text: "", final: false, cancelled: false, error: null });
+    const n = sent.length;
+    store.dictateDone("d7-1");
+    expect(sent.length, "never while it is transcribed").toBe(n);
+    store.apply({ ev: "dictation", id: "d7-1", text: "back", final: true });
+    store.dictateDone("d7-1");
+    expect(sent.at(-1)).toEqual({ cmd: "dictate_cancel", id: "d7-1" });
+    expect(store.dictation("d7-1")?.text, "its words stay").toBe("back");
+  });
   it("I: esc ends a dictation at once, a stop the core never answers ends after a wait (amb-tools on the cut, m_20100)", () => {
     vi.useFakeTimers();
     try {

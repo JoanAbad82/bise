@@ -81,14 +81,16 @@ import {
   chipsOf,
   dictationAt,
   docOf,
+  draftOf,
   insertChip,
   insertText,
   isBlank,
   nodeType,
   segmentsOf,
+  takesOf,
   withChip,
 } from "./pmtext";
-import { useDictation } from "./dictation";
+import { useDictation, type Dictation } from "./dictation";
 import { fieldKey } from "./keys";
 import { addPaths, clipboardText, copyFrom, dropInto, pasteInto, useDropAnywhere, type PasteCtx } from "./paste";
 import { Strip } from "./Strip";
@@ -213,6 +215,8 @@ export function PmField(p: PmFieldProps): JSX.Element {
   const saved = useRef<Saved>(load(p.store, p.target));
   const browsing = useRef(-1);
   const timer = useRef<number | null>(null);
+  // the field's dictation (made below): its takes are parked when the draft goes, adopted when one comes
+  const dictRef = useRef<Dictation | null>(null);
 
   const entryNow = (): string => {
     const st = state();
@@ -225,7 +229,8 @@ export function PmField(p: PmFieldProps): JSX.Element {
     const st = state();
     if (st === null) return;
     const q = props.current;
-    const draft = isBlank(st.doc) ? null : entryOf(segmentsOf(st.doc));
+    // a take's place counts: a draft of one take still transcribed is kept (dictation-keep)
+    const draft = isBlank(st.doc) && takesOf(st.doc).length === 0 ? null : entryOf(draftOf(st.doc));
     const key = q.draftKey ?? q.target;
     if (key === q.target) {
       saved.current = { ...saved.current, draft };
@@ -337,6 +342,7 @@ export function PmField(p: PmFieldProps): JSX.Element {
       window.removeEventListener("pagehide", flushPending);
       window.removeEventListener("beforeunload", flushPending);
       unGrab();
+      dictRef.current?.park(); // its takes go on, their finals into this draft (parked.ts)
       writeNow(); // the screen goes: the draft is kept before the editor does
       // his caret too, while the field is still in the page with its focus: handoff.ts keeps it only for a swap
       const q = props.current;
@@ -380,6 +386,7 @@ export function PmField(p: PmFieldProps): JSX.Element {
       keepUnread(p.store, key, draft); // never dropped: its raw JSON stays aside
       setContent(null);
     }
+    dictRef.current?.adopt(); // its takes: still transcribed, failed, or asked again after a relaunch
     forget(); // another target's text never comes back
     changed.current(null);
     // the composer before this one of the same draft (the panel going full width or back, handoff.ts): his caret and focus
@@ -392,6 +399,7 @@ export function PmField(p: PmFieldProps): JSX.Element {
       if (caret.focused) v0.focus();
     }
     return () => {
+      dictRef.current?.park(); // the mic off, its takes go on into this draft (parked.ts)
       writeNow(); // the target changes or the screen goes: the draft is kept at once
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- the editor's content follows the target and the draft key only
@@ -725,6 +733,10 @@ export function PmField(p: PmFieldProps): JSX.Element {
     log: (line) => {
       (window as { bise?: Window["bise"] }).bise?.voice.log?.(line);
     },
+    draft: () => ({ key: props.current.draftKey ?? props.current.target, store: props.current.store }),
+    keep: () => {
+      writeNow();
+    },
   });
 
   const actions: ComposerActions = {
@@ -925,6 +937,7 @@ export function PmField(p: PmFieldProps): JSX.Element {
     paste.current = (e) => pasteInto(pasteCtx, e);
     drop.current = (e) => dropInto(pasteCtx, e);
     ctrlR.current = dictation.onCtrlR;
+    dictRef.current = dictation;
   });
 
   // ---- the attachment list (AttachList.tsx): ✕ removes the chip, a click previews it ----

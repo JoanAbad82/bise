@@ -11,7 +11,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { getSchema } from "@tiptap/core";
 import type { Node as PmNode } from "@tiptap/pm/model";
 import { buildMessage } from "../message";
-import { entryOf, entrySegments } from "../entry";
+import { entryOf, entrySegments, messageOf } from "../entry";
 import { load, type Store } from "../drafts";
 import type { ComposerActions } from "../actions";
 import type { ComposerSources, DictateState } from "../sources";
@@ -83,7 +83,7 @@ describe("(2) old drafts: nothing he typed is lost", () => {
 
   it("the saved entries read back and send the golden bytes", () => {
     for (const c of CASES) {
-      expect(buildMessage(entrySegments(saved(c.name)) ?? []), c.name).toEqual(c.golden);
+      expect(buildMessage(messageOf(entrySegments(saved(c.name)) ?? [])), c.name).toEqual(c.golden);
     }
   });
 
@@ -105,7 +105,7 @@ describe("(2) old drafts: nothing he typed is lost", () => {
       await Promise.resolve();
     });
     expect(onSend).toHaveBeenLastCalledWith(
-      buildMessage(entrySegments(draft) ?? []),
+      buildMessage(messageOf(entrySegments(draft) ?? [])),
     );
     // the history kept its old entries
     expect(load(store, "p/main").history[1]).toBe(sent);
@@ -220,10 +220,12 @@ describe("(3) the live dictation is in nothing he keeps or sends", () => {
     expect(getByTestId("composer.field").textContent).toBe(
       "note: on garde la file",
     );
-    // the screen goes mid-dictation: the draft holds only what he typed
+    // the screen goes mid-dictation: the draft holds what he typed and the take's place, never
+    // its words so far (dictation-keep: its final lands there)
     unmount();
     expect(entrySegments(load(store, "p/main").draft ?? "")).toEqual([
       { kind: "text", text: "note:" },
+      { kind: "take", id: "d1" },
     ]);
     // a send while he talks: only his typed words (the dictation is not his message yet)
     const again = await mount({

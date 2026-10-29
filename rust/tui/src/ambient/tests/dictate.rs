@@ -269,7 +269,7 @@ fn fed(t: &T, i: usize) -> (usize, bool) {
 
 /// Fix 2 (architect m_22168): a take whose final has no words keeps its
 /// sound; dictate_retry sends it to a fresh listener and gives one final,
-/// no partials; a retry with words frees it ('nothing to try again.').
+/// no partials; the window's ack after its words frees it ('nothing to try again.').
 #[test]
 fn a_failed_take_keeps_its_sound_and_a_retry_gives_one_final() {
     let mut t = T::new();
@@ -291,6 +291,9 @@ fn a_failed_take_keeps_its_sound_and_a_retry_gives_one_final() {
     again.send(Heard::Flushed).unwrap();
     t.until(|o| dictations(o).iter().any(|v| v["final"] == true));
     assert_eq!(dictations(&t.take()), vec![json!({"ev": "dictation", "id": "d1", "text": "found it", "final": true})]);
+    // the window has its words: its ack (dictate_cancel) frees the sound, silently
+    t.cmd(Cmd::DictateCancel { id: "d1".into() });
+    assert_eq!(dictations(&t.take()), Vec::<Value>::new());
     t.cmd(Cmd::DictateRetry { id: "d1".into() });
     assert_eq!(dictations(&t.take()), vec![json!({"ev": "dictation", "id": "d1", "text": "", "final": true, "error": "nothing to try again."})]);
     hub_quiet(&mut t);
@@ -342,24 +345,55 @@ fn an_empty_take_is_kept_until_he_cancels_it() {
     assert_eq!(dictations(&t.take()).last().unwrap()["error"], "nothing to try again.");
 }
 
-/// Memory only, the newest three takes: a fourth drops the oldest.
+/// dictation-keep (architect m_49881): a stopped take's sound is on disk
+/// from its stop, so a core started after a quit transcribes it again
+/// (the sound a core before it kept, read from the folder); cancel deletes it.
 #[test]
-fn the_core_keeps_the_last_three_takes() {
+fn a_stopped_take_is_on_disk_and_a_new_core_transcribes_it_again() {
     let mut t = T::new();
     t.ready();
-    for id in ["k1", "k2", "k3", "k4"] {
-        let heard = start(&mut t, id);
-        sound(&mut t, 800);
-        t.cmd(Cmd::DictateStop { id: id.into() });
-        heard.send(Heard::Failed("down".into())).unwrap();
-        t.until(|o| dictations(o).iter().any(|v| v["id"] == id && v["kept"] == true));
-    }
+    let dir = t.dir.join("dictation");
+    let _heard = start(&mut t, "d1");
+    sound(&mut t, 3200);
+    t.cmd(Cmd::DictateStop { id: "d1".into() });
+    assert_eq!(std::fs::metadata(dir.join("d1.pcm")).map(|m| m.len()).ok(), Some(6400), "on disk at the stop (16-bit), still transcribed");
+    // the app quit: this core is gone; the next one finds the file
+    let mut t2 = T::new();
+    t2.ready();
+    let dir2 = t2.dir.join("dictation");
+    std::fs::create_dir_all(&dir2).unwrap();
+    std::fs::copy(dir.join("d1.pcm"), dir2.join("d1.pcm")).unwrap();
+    let n = t2.fakes.listen.lock().unwrap().len();
+    t2.cmd(Cmd::DictateRetry { id: "d1".into() });
+    assert_eq!(fed(&t2, n), (3200, true), "the whole sound from the file, then the flush");
+    let again = t2.fakes.listen.lock().unwrap()[n].heard.clone();
+    again.send(Heard::Text(" back".into())).unwrap();
+    again.send(Heard::Flushed).unwrap();
+    t2.until(|o| dictations(o).iter().any(|v| v["final"] == true));
+    assert_eq!(dictations(&t2.take()), vec![json!({"ev": "dictation", "id": "d1", "text": "back", "final": true})]);
+    assert!(dir2.join("d1.pcm").exists(), "kept until the window has the words");
+    t2.cmd(Cmd::DictateCancel { id: "d1".into() });
+    assert!(!dir2.join("d1.pcm").exists(), "the window's ack deletes it");
+}
+
+/// A reloaded window asks again for a take the core still transcribes:
+/// nothing new starts, no final yet; its one final still comes.
+#[test]
+fn a_retry_while_the_take_is_transcribed_is_a_no_op() {
+    let mut t = T::new();
+    t.ready();
+    let heard = start(&mut t, "d1");
+    sound(&mut t, 800);
+    t.cmd(Cmd::DictateStop { id: "d1".into() });
     t.take();
-    t.cmd(Cmd::DictateRetry { id: "k1".into() });
-    assert_eq!(dictations(&t.take()).last().unwrap()["error"], "nothing to try again.");
     let n = t.fakes.listen.lock().unwrap().len();
-    t.cmd(Cmd::DictateRetry { id: "k2".into() });
-    assert_eq!(t.fakes.listen.lock().unwrap().len(), n + 1, "k2 is still kept");
+    t.cmd(Cmd::DictateRetry { id: "d1".into() });
+    assert_eq!(t.fakes.listen.lock().unwrap().len(), n, "no second listener");
+    assert_eq!(dictations(&t.take()), Vec::<Value>::new());
+    heard.send(Heard::Text(" still here".into())).unwrap();
+    heard.send(Heard::Flushed).unwrap();
+    t.until(|o| dictations(o).iter().any(|v| v["final"] == true));
+    assert_eq!(dictations(&t.take()), vec![json!({"ev": "dictation", "id": "d1", "text": "still here", "final": true})]);
 }
 
 /// amb-tools m_22412 (#40): a take ends a listening talk, its flush is

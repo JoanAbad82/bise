@@ -7,6 +7,11 @@
 // final lands in its own node); the first release of the press decides toggle or push-to-talk;
 // the double press is voice mode only right after a press that started a take, and it cancels
 // only that fresh take. Each decision is one line of app.log (never his words).
+// A take survives a chat switch, the field going and a relaunch (dictation-keep): the draft keeps
+// its node (entry.ts's `take`); at a switch `park` turns the mic off and hands every take to
+// parked.ts, which writes its final into that chat's draft; back on a draft, `adopt` takes its
+// takes again: still transcribed, it waits for the final; failed, its line offers 'try again'; one
+// this window never saw (a relaunch, a reload) is asked of the core again (its sound is on disk).
 import { useEffect, useEffectEvent, useRef, type RefObject } from "react";
 import { closeHistory } from "@tiptap/pm/history";
 import {
@@ -18,8 +23,10 @@ import type { FieldBar } from "../actions";
 import type { ComposerSources } from "../sources";
 import { dictated, HOLD_MS } from "../dictate";
 import { DOUBLE_CTRL_R_MS } from "@/voicemode/model";
-import { dictationAt, nodeType, offsetOf, plainText, posOf } from "./pmtext";
+import { dictationAt, nodeType, offsetOf, plainText, posOf, takesOf } from "./pmtext";
 import { RETRY_EVENT, shortReason } from "./schema";
+import type { Store } from "../drafts";
+import { park as parkTake, unpark } from "../parked";
 
 /** A transaction kept out of the undo history (the dictation's live node). */
 const offHistory = (tr: Transaction): Transaction =>
@@ -36,6 +43,10 @@ export interface DictationCtx {
   readonly log?: (line: string) => void;
   /** now in ms (tests give their clock) */
   readonly now?: () => number;
+  /** the draft the field shows (its key) and where drafts live: a parked take's final goes there */
+  readonly draft?: () => { key: string; store: Store };
+  /** the draft written now (a take started or failed: a quit keeps it) */
+  readonly keep?: () => void;
 }
 
 /** One take: its id (the store's), the mic on, the press that started it (+∞: decided). */
@@ -65,6 +76,10 @@ export interface Dictation {
   readonly hasFailed: () => boolean;
   /** ctrl+r in the field or anywhere through grab.ts; false: not this key */
   readonly onCtrlR: (e: KeyboardEvent) => boolean;
+  /** the field leaves its draft (another chat, or it goes): the mic off, each take parked */
+  readonly park: () => void;
+  /** the field shows a draft: its takes are the field's again */
+  readonly adopt: () => void;
 }
 
 export function useDictation(c: DictationCtx): Dictation {
@@ -123,11 +138,12 @@ export function useDictation(c: DictationCtx): Dictation {
       if (node !== null) {
         c.dispatch(offHistory(st.tr.setNodeMarkup(posOf(at), undefined, { ...node.attrs, text: "", wait: false, failed: true, reason: s.error === null ? "" : shortReason(s.error) })));
         failed.current.add(t.id);
+        c.keep?.();
       }
       return;
     }
-    // words with an error: they land (below), the take the core kept goes
-    if (s.kept === true) port.drop?.(t.id);
+    // words (an error with them or not): they land (below), the core lets the take's sound go
+    if (!s.cancelled && s.text.trim() !== "") port.done?.(t.id);
     if (at !== null) {
       // the node goes (out of the history), then his words where it was (one undo step)
       const before = plainText(st.doc).slice(0, at);
@@ -194,6 +210,7 @@ export function useDictation(c: DictationCtx): Dictation {
       update(t);
     });
     update(t); // a refusal comes at once ('the mic is busy.')
+    if (dict.current === t) c.keep?.(); // its place in the draft: a quit keeps the take
   };
   const stop = (): void => {
     const t = dict.current;
@@ -258,6 +275,57 @@ export function useDictation(c: DictationCtx): Dictation {
     for (const id of Array.from(failed.current)) if (dictationAt(st.doc, id) === null) dropOne(id, "its line gone");
   };
   const hasFailed = (): boolean => failed.current.size > 0;
+  /** the field leaves its draft: a take still listening stops (never a hot mic for a chat he left),
+   *  each take goes on in parked.ts, its final written into that draft; failed ones stay as they
+   *  are in it. Called before the draft is written (its nodes say transcribing). */
+  const park = (): void => {
+    const takes = [...older.current, ...(dict.current === null ? [] : [dict.current])];
+    if (dict.current?.mic === true) stop();
+    const where = c.draft?.();
+    const port = c.sources().dictate;
+    for (const t of takes) {
+      t.off();
+      if (port !== undefined && where !== undefined) {
+        log(`park ${t.id} (${where.key})`);
+        parkTake(port, where.store, where.key, t.id, c.log);
+      } else cancelOne(t, "the field went");
+    }
+    dict.current = null;
+    older.current = [];
+    failed.current.clear();
+    bar();
+  };
+  /** the field shows a draft: each of its takes is the field's again. Final while parked (a race):
+   *  it lands now; still transcribed: its final comes here; failed: 'try again'; never seen by this
+   *  window (a relaunch, a reload): the core is asked again for it (its sound is on disk). */
+  const adopt = (): void => {
+    const port = c.sources().dictate;
+    const st = c.state();
+    if (port === undefined || st === null) return;
+    for (const id of takesOf(st.doc)) {
+      unpark(id);
+      const at = dictationAt(st.doc, id);
+      const node = at === null ? null : (c.state()?.doc.nodeAt(posOf(at)) ?? null);
+      if (node === null) continue;
+      const s = port.read(id);
+      if (node.attrs.failed === true && (s === null || (s.final && s.kept === true))) {
+        failed.current.add(id);
+        continue;
+      }
+      const t: Take = { id, mic: false, downAt: Number.POSITIVE_INFINITY, startedAt: now(), stoppedAt: null, off: (): void => undefined };
+      if (dict.current === null) dict.current = t;
+      else older.current.unshift(t);
+      if (s === null) {
+        log(`resume ${id}`);
+        port.retry?.(id);
+      } else log(`adopt ${id}`);
+      t.off = port.subscribe(id, () => {
+        update(t);
+      });
+      update(t);
+    }
+    bar();
+  };
   /** ctrl+r: the mic on (held: push-to-talk; pressed: on until a key), again: off; twice within
    *  DOUBLE_CTRL_R_MS of a press that started a take (the TUI's): voice mode. In the field, or
    *  anywhere in the window through grab.ts (his try a43609b2). False: not this key. */
@@ -301,8 +369,9 @@ export function useDictation(c: DictationCtx): Dictation {
     if (e.timeStamp - d.downAt >= HOLD_MS) stop();
     else d.downAt = Number.POSITIVE_INFINITY;
   });
+  // the field goes: its takes were parked before the editor went (PmField's cleanup); any left go
   const gone = useEffectEvent((): void => {
-    cancel();
+    park();
   });
   useEffect(() => {
     const onUp = (e: KeyboardEvent): void => {
@@ -328,5 +397,5 @@ export function useDictation(c: DictationCtx): Dictation {
       window.removeEventListener(RETRY_EVENT, on);
     };
   }, []);
-  return { dict, lastR, start, stop, cancel, retry, sweep, hasFailed, onCtrlR };
+  return { dict, lastR, start, stop, cancel, retry, sweep, hasFailed, onCtrlR, park, adopt };
 }

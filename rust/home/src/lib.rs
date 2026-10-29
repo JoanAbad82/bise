@@ -61,6 +61,8 @@ pub fn exe_home_dir(exe_dir: &Path) -> PathBuf {
 
 /// Moves the whole state (the bise layout, at this path).
 pub const BISE_HOME: &str = "BISE_HOME";
+/// [`Home::dictation_dir`]'s name under the root (the sandbox denies it).
+pub const DICTATION_DIR: &str = "dictation";
 /// The stamp of the exported paths: `<HOME>\n<BISE_HOME>` they were computed for.
 pub const EXPORTS_FOR: &str = "BISE_EXPORTS_FOR";
 
@@ -220,6 +222,15 @@ impl Home {
     /// The image store (`$BEND_IMAGE_DIR`).
     pub fn images_dir(&self) -> PathBuf {
         self.or("BEND_IMAGE_DIR", self.root.join("images"))
+    }
+
+    /// The desktop core's dictation takes not yet in his composer (the
+    /// sound of each stopped take, one file each): kept across a quit so
+    /// a take still transcribed or failed comes back on relaunch. Machine
+    /// level like the core, not a cache (his unsent words); agents never
+    /// read it (the approvals sandbox denies it).
+    pub fn dictation_dir(&self) -> PathBuf {
+        self.root.join(DICTATION_DIR)
     }
 
     /// The TUI's crash logs.

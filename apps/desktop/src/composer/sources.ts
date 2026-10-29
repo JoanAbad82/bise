@@ -130,10 +130,14 @@ export interface DictatePort {
   /** The mic off: the final words follow. */
   readonly stop: (id: string) => void;
   readonly cancel: (id: string) => void;
-  /** A kept take (its final `kept`): transcribed once more, one more final for that id. */
+  /** A kept take (its final `kept`), or one a draft holds that this window doesn't know (a
+   *  relaunch): transcribed once more, one more final for that id. */
   readonly retry?: (id: string) => void;
   /** A kept take he let go: the core drops it. */
   readonly drop?: (id: string) => void;
+  /** A take's words are in his draft: the core lets its sound go (it keeps it until then, so a
+   *  reload or a quit loses nothing: dictation-keep). */
+  readonly done?: (id: string) => void;
   readonly read: (id: string) => DictateState | null;
   /** Called on each change of that dictation; returns the unsubscribe. */
   readonly subscribe: (id: string, fn: () => void) => () => void;

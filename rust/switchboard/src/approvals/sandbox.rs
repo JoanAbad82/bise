@@ -15,6 +15,8 @@
 
 use std::path::{Path, PathBuf};
 
+use bise_home::DICTATION_DIR;
+
 use super::paths::{fold, Fs, Roots};
 use super::secrets::{Held, Secrets};
 use super::{parse, tiers, CacheKey, Call};
@@ -185,6 +187,7 @@ pub fn profile(s: &Spec, net: bool) -> String {
     }
     denied.push(format!("(subpath {})", lit(&s.bise.join("hubs"))));
     denied.push(format!("(literal {})", lit(&s.bise.join("approvals.toml"))));
+    denied.push(format!("(subpath {})", lit(&s.bise.join(DICTATION_DIR))));
     let secrets = Secrets::of(&s.bise, &s.home);
     denied.extend(secrets.write_rules(&|p| lit(p)));
     denied.push(format!("(literal {})", lit(&s.cwd.join(".envrc"))));
@@ -204,6 +207,9 @@ pub fn profile(s: &Spec, net: bool) -> String {
     }
     // bise's secrets and the ssh private keys: never read (docs/issues/19)
     o.push_str(&secrets.profile_rules(&|p| lit(p)));
+    // his dictations not yet in his composer (his voice, ~/.bise/dictation): never read
+    o.push_str(&format!("(deny file-read-data (subpath {}))
+", lit(&s.bise.join(DICTATION_DIR))));
     // a sandboxed process may not exec a setuid program ("Operation not
     // permitted"): `ps` is one on macOS, and it only reads
     o.push_str("(allow process-exec (literal \"/bin/ps\") (with no-sandbox))\n");

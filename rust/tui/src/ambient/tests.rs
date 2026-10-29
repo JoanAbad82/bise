@@ -126,6 +126,7 @@ impl T {
                 let f = crate::voicemode::fakes::Fakes { mic: vf.mic.clone(), listen: vf.listen.clone(), synth: vf.synth.clone(), speaker: vf.speaker.clone() };
                 Box::new(move || Ok((f.ports(crate::voicemode::Route::Headphones), f.jobs(true), crate::voicemode::config::VoiceModeConfig::default())))
             },
+            dictation_dir: dir.join("dictation"),
         };
         let ports = match fake {
             Some(w) => {

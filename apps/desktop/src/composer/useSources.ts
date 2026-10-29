@@ -22,7 +22,7 @@ export function useComposerSources(project: string, extra: Partial<ComposerSourc
   const root = useProjects().find((p) => p.project === project)?.path;
   const store = useStore();
   const map = mapOf(getPref(usePrefs() as Prefs | null, mapPrefKey(project)));
-  // the mic through the store (bar I): only this window gets its words, a reload cancels
+  // the mic through the store (bar I): only this window gets its words; a reload or a quit keeps the takes (dictation-keep)
   const dictate = useMemo<DictatePort>(
     () => ({
       start: () => store.dictateStart(),
@@ -37,6 +37,9 @@ export function useComposerSources(project: string, extra: Partial<ComposerSourc
       },
       drop: (id) => {
         store.dictateDrop(id);
+      },
+      done: (id) => {
+        store.dictateDone(id);
       },
       read: (id) => store.dictation(id),
       subscribe: (id, fn) => store.subscribe(`dictation:${id}`, fn),

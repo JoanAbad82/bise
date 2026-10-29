@@ -46,6 +46,7 @@ function testMic() {
       states.set(id, { text: '', final: false, cancelled: false, error: null });
     },
     drop: (id) => calls.push(`drop ${id}`),
+    done: (id) => calls.push(`done ${id}`),
     read: (id) => states.get(id) ?? null,
     subscribe: (id, fn) => {
       subs.set(id, fn);
@@ -249,13 +250,13 @@ describe("dictation: a take with no words or an error, kept by the core, offers 
     expect(f.mic.calls.at(-1)).toBe('drop d2');
   });
 
-  it('words with an error land, and the kept take goes', async () => {
+  it('words with an error land, and the core lets the take go', async () => {
     const f = await mount();
     await f.press(0);
     await f.say('d1', { text: 'half of it' });
     await f.press(3000);
     await f.say('d1', { text: 'half of it', final: true, kept: true, error: 'the mic went away.' });
     expect(f.field.textContent).toBe('half of it');
-    expect(f.mic.calls.at(-1)).toBe('drop d1');
+    expect(f.mic.calls.at(-1)).toBe('done d1');
   });
 });

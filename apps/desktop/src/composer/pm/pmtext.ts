@@ -11,7 +11,7 @@
 import { Fragment, type Node as PmNode, type NodeType, type Schema } from '@tiptap/pm/model';
 import { TextSelection, type EditorState, type Transaction } from '@tiptap/pm/state';
 import type { Chip, Segment } from '../message';
-import { tidy } from '../entry';
+import { tidy, type DraftSeg } from '../entry';
 
 /** A node type of the field's schema (schema.ts names them all; a missing one is a bug). */
 export function nodeType(schema: Schema, name: 'doc' | 'paragraph' | 'hardBreak' | 'chip' | 'dictation'): NodeType {
@@ -52,6 +52,29 @@ export function segmentsOf(doc: PmNode): Segment[] {
   return tidy(out);
 }
 
+/** The draft's content: the message's, and each dictation take where it sits (its error once it
+ *  failed): a switch or a quit keeps the takes (dictation-keep). */
+export function draftOf(doc: PmNode): DraftSeg[] {
+  const out: DraftSeg[] = [];
+  doc.firstChild?.forEach((n) => {
+    if (n.isText) out.push({ kind: 'text', text: n.text ?? '' });
+    else if (n.type.name === 'hardBreak') out.push({ kind: 'text', text: '\n' });
+    else if (n.type.name === 'chip') out.push({ kind: 'chip', chip: n.attrs.chip as Chip });
+    else if (n.type.name === 'dictation' && n.attrs.id !== '')
+      out.push(n.attrs.failed === true ? { kind: 'take', id: n.attrs.id as string, failed: n.attrs.reason as string } : { kind: 'take', id: n.attrs.id as string });
+  });
+  return tidy(out);
+}
+
+/** The takes in the field, in order: their ids. */
+export function takesOf(doc: PmNode): string[] {
+  const out: string[] = [];
+  doc.firstChild?.forEach((n) => {
+    if (n.type.name === 'dictation' && n.attrs.id !== '') out.push(n.attrs.id as string);
+  });
+  return out;
+}
+
 /** Text as inline nodes: lines as text nodes, newlines as hard breaks. */
 export function inlineOf(schema: Schema, text: string): PmNode[] {
   const out: PmNode[] = [];
@@ -62,11 +85,14 @@ export function inlineOf(schema: Schema, text: string): PmNode[] {
   return out;
 }
 
-/** The document for these segments (a saved draft, a history entry). */
-export function docOf(schema: Schema, segs: readonly Segment[]): PmNode {
+/** The document for these segments (a saved draft, a history entry); a draft's take is its
+ *  dictation node, transcribing (`wait`) or failed with its reason. */
+export function docOf(schema: Schema, segs: readonly DraftSeg[]): PmNode {
   const kids: PmNode[] = [];
   for (const s of segs) {
     if (s.kind === 'chip') kids.push(nodeType(schema, 'chip').create({ chip: s.chip }));
+    else if (s.kind === 'take')
+      kids.push(nodeType(schema, 'dictation').create(s.failed === undefined ? { id: s.id, wait: true } : { id: s.id, failed: true, reason: s.failed }));
     else kids.push(...inlineOf(schema, s.text));
   }
   return nodeType(schema, 'doc').create(null, nodeType(schema, 'paragraph').create(null, kids));
