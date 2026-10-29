@@ -25,7 +25,8 @@ import { lookOf } from './maps';
 import { DAY, NIGHT } from './palette';
 import { STYLE } from './style';
 import { mergeRoot, type Merged } from './merge';
-import { makeOfficeScene, UP_LAYER, type OfficeScene } from './office-scene';
+import { APPEAR_S, makeOfficeScene, UP_LAYER, type OfficeScene } from './office-scene';
+import { POOF_S } from './poof';
 import { makeView } from './view';
 import { applyLight } from './sky-light';
 import { POOL, blendAt, blending, lightOf, retarget, type Blend, type Light } from '../sky';
@@ -104,7 +105,18 @@ interface Spot {
   live: boolean;
   /** live: its walls baked (its world's hundreds of meshes in a handful), its bims moving over them */
   walls: { readonly sig: string; readonly merged: Merged } | null;
+  /** its bims at its last still (null: never baked yet), and how long it stays live for a newcomer's pop (s, Date.now's) */
+  names: ReadonlySet<string> | null;
+  popUntil: number;
 }
+
+/**
+ * a newcomer in a far office pops in live, as the hero's always-live offices show it (his m_49844:
+ * « la même animation d'apparition que dans la hero section, le glitter »): its office posed live for
+ * the pop and its poof (office-scene APPEAR_S, poof.ts POOF_S) and a beat, then baked again
+ */
+const POP_LIVE_S = APPEAR_S + POOF_S + 0.3;
+const reducedNow = (): boolean => typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 const testMode = (): boolean => (window as Partial<Window> & { bise?: { test?: boolean } }).bise?.test === true;
 
@@ -174,7 +186,7 @@ export const makeTownRenderer: MakeTownRenderer = (canvas, opts = {}) => {
       // no grass block of its own (bims m_28807): the town's lawn is its ground
       const heads = opts.heads;
       const head = heads ? (name: string) => heads(id, name) : undefined;
-      s = { scene: makeOfficeScene(STYLE, { ground: false, themed, ...(head ? { head } : {}) }), shape: '', bake: null, live: false, walls: null };
+      s = { scene: makeOfficeScene(STYLE, { ground: false, themed, ...(head ? { head } : {}) }), shape: '', bake: null, live: false, walls: null, names: null, popUntil: 0 };
       spots.set(id, s);
     }
     return s;
@@ -561,6 +573,15 @@ export const makeTownRenderer: MakeTownRenderer = (canvas, opts = {}) => {
       const s = spotOf(id);
       const sig = stillSig(step);
       if (s.bake?.sig === sig) return false;
+      // a bim new since its last still: the office goes live for its pop and its glitter (liveIds), baked after
+      const names = new Set(step.frames.map((f) => f.name));
+      const was = s.names;
+      s.names = names;
+      if (was !== null && !reducedNow() && [...names].some((n) => !was.has(n))) {
+        s.popUntil = Date.now() / 1000 + POP_LIVE_S;
+        return true;
+      }
+      if (Date.now() / 1000 < s.popUntil) return false;
       if (posed(s, step, step.frames[0]?.pose.since ?? 0) === null && !s.scene.office()) return false;
       // baked where it stands in its own units, then placed: a new plan moves the bake, never bakes it again
       s.scene.root.position.set(0, 0, 0);
@@ -609,11 +630,14 @@ export const makeTownRenderer: MakeTownRenderer = (canvas, opts = {}) => {
       if (!f || !base || !plan) return [];
       // the hero's few offices: all of them, always (an office back in view would bake its walls again: ~100 ms)
       if (opts.allLive === true) return plan.offices.map((p) => p.id);
+      // an office whose newcomer pops in (still()): live a moment wherever the camera is
+      const now = Date.now() / 1000;
+      const popping = plan.offices.filter((p) => (spots.get(p.id)?.popUntil ?? 0) > now).map((p) => p.id);
       // close enough: the fit's width shows LIVE_ZOOM times less of the town
-      if ((base.right - base.left) / (f.right - f.left) < LIVE_ZOOM) return [];
+      if ((base.right - base.left) / (f.right - f.left) < LIVE_ZOOM) return popping;
       const cx = f.widthPx / 2;
       const cy = f.heightPx / 2;
-      return plan.offices
+      const near = plan.offices
         .filter((p) => inView(f, p))
         .map((p) => {
           const c = toScreen(f, { x: (p.fp.x0 + p.fp.x1) / 2, y: 0, z: (p.fp.z0 + p.fp.z1) / 2 });
@@ -622,6 +646,7 @@ export const makeTownRenderer: MakeTownRenderer = (canvas, opts = {}) => {
         .sort((a, b) => a.d - b.d)
         .slice(0, LIVE_MAX)
         .map((x) => x.id);
+      return [...near, ...popping.filter((id) => !near.includes(id))];
     },
     setSize(widthPx, maxHeightPx) {
       size = { w: Math.round(widthPx), maxH: Math.round(maxHeightPx) };

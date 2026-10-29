@@ -4,7 +4,7 @@
 // Owner: bim-pop.
 import { type BufferGeometry, Euler, type Group, InstancedMesh, type Material, Matrix4, OctahedronGeometry, Quaternion, Vector3 } from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-import { POOF_S, PUFF, SPARK, poofAt, puffBoost } from './poof';
+import { POOF_S, PUFF, SPARK, poofAt, puffBoost, sparkBoost } from './poof';
 import type { Style } from './style';
 
 /** the puffs' clay: warm paper, no glow, in both themes (designer m_39015); the sparkles' gold: the neon's (palette.ts), never the accent */
@@ -62,11 +62,12 @@ export function makePoofs(root: Group, style: Style): Poofs {
   return {
     draw(t, list, scale) {
       const boost = puffBoost(scale);
+      const spark = sparkBoost(scale);
       const live = list.filter((p) => t - p.t0 >= 0 && t - p.t0 < POOF_S).slice(-MAX);
       let ip = 0;
       let is = 0;
       for (const p of live) {
-        for (const b of poofAt(p.seed, t - p.t0, boost)) {
+        for (const b of poofAt(p.seed, t - p.t0, boost, spark)) {
           if (b.r <= 1e-3) continue;
           p3.set(p.x + b.x, p.y + b.y, p.z + b.z);
           s3.setScalar(b.r);

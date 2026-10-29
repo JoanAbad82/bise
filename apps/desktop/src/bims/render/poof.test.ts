@@ -2,7 +2,7 @@
 // after; the puffs grow to stay seen when the camera is far (designer m_39015), never past BOOST.
 import { describe, expect, it } from 'vitest';
 import { APPEAR_S } from './office-scene';
-import { POOF_S, PUFF, PUFF_MIN_PX, SPARK, poofAt, puffBoost } from './poof';
+import { POOF_S, PUFF, PUFF_MIN_PX, SPARK, SPARK_MIN_PX, poofAt, puffBoost, sparkBoost } from './poof';
 
 const steps = (n: number): number[] => Array.from({ length: n + 1 }, (_, i) => (i / n) * POOF_S);
 const seen = (s: number, boost = 1): number => poofAt(7, s, boost).filter((b) => b.r > 1e-3).length;
@@ -42,6 +42,24 @@ describe('a newcomer\'s poof', () => {
     expect(least).toBeGreaterThanOrEqual(PUFF_MIN_PX - 1e-9);
     // and never past its cap
     expect(puffBoost(10)).toBeLessThanOrEqual(2.5);
+  });
+
+  it("grows its sparkles far out so the glitter reads at the tile's fit, as the hero's close shots show it (his m_49844)", () => {
+    expect(sparkBoost(0.01)).toBe(1);
+    // the tile's fit: ~6 css px an office unit; a star's half length at least SPARK_MIN_PX there
+    const scale = 1 / 6;
+    const b = sparkBoost(scale);
+    expect((SPARK.size * b) / scale).toBeGreaterThanOrEqual(SPARK_MIN_PX - 1e-9);
+    expect(sparkBoost(10)).toBeLessThanOrEqual(4.5);
+    // boosted: bigger stars, a little further round the bim, still over its feet's ring
+    const at = (k: number) => poofAt(9, 0.3, 1, k).filter((x) => x.kind === 'spark' && x.r > 1e-3);
+    const near = at(1);
+    const far = at(b);
+    expect(far.length).toBe(near.length);
+    for (let i = 0; i < far.length; i++) {
+      expect((far[i]?.r ?? 0)).toBeGreaterThan(near[i]?.r ?? 0);
+      expect(Math.hypot(far[i]?.x ?? 0, far[i]?.z ?? 0)).toBeLessThanOrEqual(2 * Math.hypot(near[i]?.x ?? 0, near[i]?.z ?? 0) + 1e-9);
+    }
   });
 
   it('is the same poof for the same bim, and another for another', () => {
