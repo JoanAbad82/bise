@@ -122,6 +122,30 @@ describe('the weather', () => {
     expect(winter.clear / total(winter)).toBeLessThan(summer.clear / total(summer));
   });
 
+  it('rains only now and then: under 8% of the time in every season (his m_49832: « il pleut très souvent »)', () => {
+    const share: Record<string, number> = {};
+    let rain = 0;
+    let all = 0;
+    for (let mo = 1; mo <= 12; mo++) {
+      let r = 0;
+      let n = 0;
+      for (let d = 1; d <= 28; d++) for (const l of day(mo, d)) {
+        n++;
+        if (skyAt(l).weather === 'rain') r++;
+      }
+      rain += r;
+      all += n;
+      const s = seasonOf(mo);
+      share[s] = (share[s] ?? 0) + r / n / 3;
+    }
+    const year = rain / all;
+    const said = `year ${(year * 100).toFixed(1)}%, ${Object.entries(share).map(([s, v]) => `${s} ${(v * 100).toFixed(1)}%`).join(', ')}`;
+    for (const v of Object.values(share)) expect(v, said).toBeLessThan(0.08);
+    expect(year, said).toBeLessThan(0.07);
+    // still now and then: a rainy spell comes in every season but summer's rare ones
+    expect(year, said).toBeGreaterThan(0.02);
+  });
+
   it('every season rolls every weather it allows', () => {
     for (const mo of seasons) {
       const seen = new Set<Weather>();

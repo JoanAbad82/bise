@@ -110,12 +110,15 @@ export function sunAt(l: Local, lat = LAT): { el: number; az: number } {
 
 // ---- the weather: spells of whole slots
 
-/** each season's odds (sum 1) */
+/**
+ * each season's odds (sum 1). Rain only now and then (his m_49832: « il pleut très souvent, c'est un
+ * peu déprimant »): 4-7% of the time, the rest gone to clear and clouds (it was 11-22%, 16% a year)
+ */
 const ODDS: Readonly<Record<Season, Readonly<Record<Weather, number>>>> = {
-  winter: { clear: 0.22, clouds: 0.2, overcast: 0.2, rain: 0.14, snow: 0.14, fog: 0.1 },
-  spring: { clear: 0.36, clouds: 0.3, overcast: 0.1, rain: 0.18, snow: 0, fog: 0.06 },
-  summer: { clear: 0.6, clouds: 0.25, overcast: 0.04, rain: 0.11, snow: 0, fog: 0 },
-  autumn: { clear: 0.26, clouds: 0.26, overcast: 0.16, rain: 0.22, snow: 0, fog: 0.1 },
+  winter: { clear: 0.27, clouds: 0.23, overcast: 0.2, rain: 0.06, snow: 0.14, fog: 0.1 },
+  spring: { clear: 0.44, clouds: 0.34, overcast: 0.1, rain: 0.06, snow: 0, fog: 0.06 },
+  summer: { clear: 0.65, clouds: 0.27, overcast: 0.04, rain: 0.04, snow: 0, fog: 0 },
+  autumn: { clear: 0.34, clouds: 0.33, overcast: 0.16, rain: 0.07, snow: 0, fog: 0.1 },
 };
 export const oddsOf = (s: Season): Readonly<Record<Weather, number>> => ODDS[s];
 
