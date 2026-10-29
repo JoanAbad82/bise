@@ -79,6 +79,8 @@ export interface KeyCtx {
   readonly panelOpen?: boolean;
   /** the artifacts library's places in its order (artifacts/library.tsx libraryPlaces), none: no library */
   readonly library?: () => readonly At[] | undefined;
+  /** where bise's tab goes from here, as its rail button (railback.ts biseGo); none: bise's thread */
+  readonly bise?: () => Route;
 }
 
 const digit = (code: string): number | undefined => (/^Digit[0-9]$/.test(code) ? Number(code.slice(5)) : undefined);
@@ -99,7 +101,7 @@ export function keyAction(e: KeyLike, c: KeyCtx): KeyAct | undefined {
     e.metaKey === (m === 'meta') && e.altKey === (m === 'alt') && e.ctrlKey === (m === 'ctrl') && e.shiftKey === shift;
   const n = digit(e.code);
   if (n !== undefined && only('meta')) {
-    if (n === 0) return { go: { screen: 'bise' } };
+    if (n === 0) return { go: c.bise?.() ?? { screen: 'bise' } };
     // the artifacts library in view: ⌘1-9 are its rows, as the projects' in their place (designer m_45492)
     const lib = sideShows(c.route) === 'library' ? c.library?.() : undefined;
     if (lib !== undefined) {

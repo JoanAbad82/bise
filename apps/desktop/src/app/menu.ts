@@ -15,6 +15,7 @@ import { inboxAtOf, parseRoute, projectOf, type Route } from './route';
 import { askInbox, inboxFromMenu } from './inboxAsk';
 import { addProject } from './addProject';
 import { newAgent } from './newagent';
+import { biseBack } from './railback';
 import { useStore } from '@/store';
 import { menuEcho, type ScreenAction } from './keys';
 import { panel } from '@/terminal/panel';
@@ -84,7 +85,8 @@ export function useMenuRouting(router: Router) {
         if (p !== undefined) newAgent(p);
         return;
       }
-      const to = routeOfMenu(action);
+      // Go › bise as the rail's ':*': back to his last project or chat from a page (railback.ts)
+      const to = action === 'bise' ? biseBack.go(router.get(), { projects: store.projects(), agents: (p) => store.agents(p) }) : routeOfMenu(action);
       if (to === undefined) emitAction(action);
       else if (!menuEcho(windowKeyAt, Date.now())) router.go(to);
     });

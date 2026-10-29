@@ -43,6 +43,7 @@ import { Skel } from '@/ds';
 import { Main } from '@/ds';
 import { Sidebar, useWaitingTotal } from './Sidebar';
 import { SideRail } from './SideRail';
+import { biseBack } from './railback';
 import { useZen, useZenWatch } from './zen';
 import { Bar, Over, SIDEBAR_WIDTH_LABEL, useFrame } from './Frame';
 import { PanelHost } from './panel/Host';
@@ -95,6 +96,8 @@ export function App() {
     const key = routeKeyOf(ownWindow());
     const save = () => {
       if (key !== null) keep.setView(key, formatRoute(router.get()));
+      // the main window's last project or chat, where the rail's bise goes back from a page (railback.ts)
+      if (key === 'route') biseBack.saw(router.get());
       try {
         sessionStorage.setItem(HISTORY_KEY, JSON.stringify(router.saved()));
       } catch {
@@ -596,6 +599,8 @@ function useWindowKeys(openPalette: () => void, openHelp: () => void, onFrame: (
         typing: typingIn(document.activeElement),
         panelOpen: panelState.get().open,
         library: libraryPlaces,
+        // ⌘0 as the rail's ':*': back to his last project or chat from a page
+        bise: () => biseBack.go(router.get(), { projects: store.projects(), agents: (p) => store.agents(p) }),
         // ⌥N reads the numbers he sees (held), then they hold still a moment (agent-rank)
         numbers: (p) => {
           const n = numbersOf(p, store.agents(p), true, undefined, pinSetOf(store.prefs() as Prefs | null, 'agent').get(p));

@@ -10,8 +10,11 @@
 import {
   allItems,
   artifactGo,
+  createBiseBack,
   createKeep,
   createOuterWidth,
+  RAIL_GO,
+  type BiseBack,
   leftWidthOf,
   sideLayout,
   SIDE,
@@ -131,8 +134,17 @@ export function feature(now = 1_791_100_000_000): Feature {
   // the window's own keep (keep.ts) on a storage a reload finds again; written at once
   const disk = new Map<string, string>();
   const storage: KeepStore = { getItem: (k) => disk.get(k) ?? null, setItem: (k, v) => { disk.set(k, v); } };
-  const keepOpen = (): OuterWidth => createOuterWidth(createKeep(storage, () => clock, (f) => { f(); return () => undefined; }));
-  let outer = keepOpen();
+  // one keep per window, as keep.ts's one: the outer card's width and the bise tab's last place share it
+  const keepOpen = (): { outer: OuterWidth; back: BiseBack } => {
+    const k = createKeep(storage, () => clock, (f) => { f(); return () => undefined; });
+    return { outer: createOuterWidth(k), back: createBiseBack(k) };
+  };
+  let { outer, back } = keepOpen();
+  // the window shows `r`: App.tsx tells the bise tab each route
+  const moveTo = (r: Route): void => {
+    route = r;
+    back.saw(r);
+  };
   let win = 1440;
   // the room the left takes: the rail and a docked sidebar at its default width (frame-state.ts)
   const left = (): number => leftWidthOf(win, { hidden: false, width: SIDE.def });
@@ -146,7 +158,7 @@ export function feature(now = 1_791_100_000_000): Feature {
     s.onEffect((e) => {
       ran.push(e);
       // a tab's open (a card's chip) leaves the route where it is (app/edge.tsx)
-      if (e.out === 'nav' && e.tab !== true) route = navRoute(e.to);
+      if (e.out === 'nav' && e.tab !== true) moveTo(navRoute(e.to));
     });
     return s;
   };
@@ -184,7 +196,7 @@ export function feature(now = 1_791_100_000_000): Feature {
         // a click on an artifact's name (artifacts/leave.ts useGoArtifact): his browser, or the window's route
         const plan = artifactGo(store.artifacts(g.project).find((x) => x.id === g.id), g.project, g.id);
         if (plan.browser !== undefined) ran.push({ out: 'fx', fx: { fx: 'openExternal', args: [plan.browser] } });
-        else route = plan.route;
+        else moveTo(plan.route);
         return;
       }
       case 'chip': {
@@ -194,7 +206,11 @@ export function feature(now = 1_791_100_000_000): Feature {
         return;
       }
       case 'go':
-        route = g.route;
+        moveTo(g.route);
+        return;
+      case 'rail':
+        // a click on a rail button (app/SideRail.tsx): bise's goes back to his last project or chat
+        moveTo(g.place === 'bise' ? back.go(route, { projects: store.projects(), agents: (p) => store.agents(p) }) : RAIL_GO[g.place]);
         return;
       case 'win':
         win = g.width;
@@ -230,7 +246,7 @@ export function feature(now = 1_791_100_000_000): Feature {
     },
     reload() {
       store = open();
-      outer = keepOpen();
+      ({ outer, back } = keepOpen());
       for (const e of latest.snapshot()) store.apply(e);
       return f;
     },

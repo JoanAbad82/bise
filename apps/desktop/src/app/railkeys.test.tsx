@@ -20,7 +20,8 @@ import { HINT_HOLD_MS } from './held';
 import { keyAction, type KeyCtx, type KeyLike } from './keys';
 import { routeOfMenu } from './menu';
 import { createRouter, RouterContext } from './router';
-import { RAIL_GO, RAIL_KEYS, SideRail, type RailPlace } from './SideRail';
+import { RAIL_GO, type RailPlace } from './railback';
+import { RAIL_KEYS, SideRail } from './SideRail';
 
 afterEach(cleanup);
 
@@ -48,6 +49,11 @@ describe('each rail place has its own key, and it opens what a click opens', () 
     expect(keyAction(keyOfGlyph(PLACE_KEYS.search), ctx())).toEqual({ palette: true });
     expect(keyAction(keyOfGlyph(PLACE_KEYS.newProject), ctx())).toEqual({ newProject: true });
     expect(keyAction(keyOfGlyph(PLACE_KEYS.bise), ctx())).toEqual({ go: { screen: 'bise' } });
+  });
+
+  it("⌘0 goes where the rail's ':*' goes: back to his last chat from a page (railback.ts, his m_49841)", () => {
+    const chat = { screen: 'thread', project: 'a', agent: 'designer' } as const;
+    expect(keyAction(keyOfGlyph(PLACE_KEYS.bise), ctx({ route: { screen: 'settings' }, bise: () => chat }))).toEqual({ go: chat });
   });
 
   it('⌘I stays the inbox block in place (the Go menu, b1/b2); the page is ⇧⌘I', () => {

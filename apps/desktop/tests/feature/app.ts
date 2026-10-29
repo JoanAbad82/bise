@@ -27,6 +27,8 @@ export { rowBars } from '@/app/projectfacts';
 export { centreOf, goneLinkOf, goneRoute, type ArtCentre, type GoneLink } from '@/artifacts/gone';
 // the outer card's width by its border (side3d/outerwidth.ts) on the window's keep, and the layout that draws it
 export { createKeep, type KeepStore } from '@/app/keep';
+// the rail's places, and the bise tab's way back to his last project or chat on that keep (app/railback.ts)
+export { createBiseBack, RAIL_GO, type BiseBack, type RailPlace } from '@/app/railback';
 export { createOuterWidth, type OuterWidth } from '@/app/side3d/outerwidth';
 export { sideLayout, type CoinsAt } from '@/app/side3d/layout';
 export { leftWidthOf } from '@/app/frame-state';

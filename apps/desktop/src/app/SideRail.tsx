@@ -4,44 +4,20 @@
 // from the bottom; the line icons 18 (ds AppIcon); the current place --c-active and --c-text, the
 // others text-2; inbox's accent dot (8, at 6/6) only while something waits on him; each button a
 // tip with its key, and ⌘ held (held.ts, its one delay) the key's cap in place of its icon, as the
-// bar's sidebar button (rail-keys, designer m_45492). It replaces the old 'rail under 1200 px with an artifact open'. Owner: nm-frame.
+// bar's sidebar button (rail-keys, designer m_45492). It replaces the old 'rail under 1200 px with an artifact open'.
+// bise's button from a page goes back to his last project or chat, from bise's tab to its own
+// thread (railback.ts, his m_49841). Owner: nm-frame.
 import type { ReactNode } from 'react';
 import { AppIcon, type AppIconName, Kbd, Press } from '@/ds';
 import { PLACE_KEYS } from '@/settings/keys';
 import { frame } from '@/proto/words_frame.gen';
 import { panel } from '@/proto/words_panel.gen';
-import type { Route } from './route';
+import { useStore } from '@/store';
+import { biseBack, RAIL_GO, railPlaceOf, type RailPlace } from './railback';
 import { useRoute, useRouter } from './router';
 import { useModHeld } from './held';
 import { useWaitingTotal } from './Sidebar';
 import { waitsTip } from './tipwords';
-
-/** A rail place: the route it goes to and the key that does too. */
-export type RailPlace = 'bise' | 'inbox' | 'scheduled' | 'artifacts' | 'plugins' | 'settings';
-
-/** Which rail place a route sits in: the pages are theirs, every thread and project screen bise's. Pure. */
-export function railPlaceOf(route: Route): RailPlace {
-  switch (route.screen) {
-    case 'inbox':
-    case 'scheduled':
-    case 'artifacts':
-    case 'plugins':
-    case 'settings':
-      return route.screen;
-    default:
-      return 'bise';
-  }
-}
-
-/** Where each place goes: a click on its button, and its key (keys.ts). */
-export const RAIL_GO: Record<RailPlace, Route> = {
-  bise: { screen: 'bise' },
-  inbox: { screen: 'inbox' },
-  scheduled: { screen: 'scheduled' },
-  artifacts: { screen: 'artifacts', project: '' },
-  plugins: { screen: 'plugins' },
-  settings: { screen: 'settings' },
-};
 
 /** Each place's key (app/keys.ts opens it): its tip, its held cap, the Go menu. */
 export const RAIL_KEYS: Record<RailPlace, string> = {
@@ -67,6 +43,7 @@ export const railTip = (p: RailPlace): string => frame.tip_key({ what: NAMES[p],
 
 function RailButton({ place, on, children, dot, tip }: { place: RailPlace; on: boolean; children: ReactNode; dot?: boolean; tip?: string }) {
   const router = useRouter();
+  const store = useStore();
   // ⌘ held: the key's cap in place of the icon (one cap, never stacked over it; designer m_45492)
   const held = useModHeld('Meta');
   return (
@@ -76,7 +53,8 @@ function RailButton({ place, on, children, dot, tip }: { place: RailPlace; on: b
       aria-current={on ? 'page' : undefined}
       data-tip={tip ?? railTip(place)}
       onClick={() => {
-        router.go(RAIL_GO[place]);
+        // bise's: back to his last project or chat (railback.ts, his m_49841)
+        router.go(place === 'bise' ? biseBack.go(router.get(), { projects: store.projects(), agents: (p) => store.agents(p) }) : RAIL_GO[place]);
       }}
       data-testid={`app.rail.${place}`}
       data-held={held || undefined}

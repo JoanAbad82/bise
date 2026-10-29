@@ -4,7 +4,7 @@
 // in src/proto/fixtures.gen.ts (rust/proto/fixtures), never a hand-kept value, so a proto change
 // breaks a builder or a test at typecheck and the compiler shows what to fix. Test-only (never in
 // the bundle): a feature test imports this and run.ts, nothing else of the app (eslint).
-import type { AnswerResult, Artifact, Card, Folder, CoreEv, CoreCmd, HubEv, Mode, Part, ProjectRow, Route, SendReason } from './app';
+import type { AnswerResult, Artifact, Card, Folder, CoreEv, CoreCmd, HubEv, Mode, Part, ProjectRow, RailPlace, Route, SendReason } from './app';
 import { core_ev, hub_ev } from './app';
 
 export type Ev = HubEv | CoreEv;
@@ -158,6 +158,7 @@ export type Gesture =
   | { readonly g: 'art'; readonly project: string; readonly id: string }
   | { readonly g: 'chip'; readonly card: Card }
   | { readonly g: 'go'; readonly route: Route }
+  | { readonly g: 'rail'; readonly place: RailPlace }
   | { readonly g: 'win'; readonly width: number }
   | { readonly g: 'outer'; readonly want: number | null };
 
@@ -180,6 +181,8 @@ export const openArtifact = (project: string, id: string): Gesture => ({ g: 'art
 export const openChip = (c: Card): Gesture => ({ g: 'chip', card: c });
 /** He goes to that route (the rail, ⌘K, a link). */
 export const goTo = (route: Route): Gesture => ({ g: 'go', route });
+/** He clicks that button of the left rail (bise's ':*', inbox, scheduled, artifacts, plugins, settings). */
+export const rail = (place: RailPlace): Gesture => ({ g: 'rail', place });
 /** He makes the window this wide (the rail and a 240 sidebar on its left). */
 export const windowAt = (width: number): Gesture => ({ g: 'win', width });
 /** His drag (or ←/→) on the outer card's left border asks this width (the Splitter's want). */
