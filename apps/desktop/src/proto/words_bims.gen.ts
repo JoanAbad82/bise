@@ -346,4 +346,30 @@ export const bims = {
   trick_fs_air: "frontside air",
   /** the 900 (two and a half turns in the air, Tony Hawk 1999), tried at the 900th job */
   trick_nine: "900",
+  /** a trick's name: an ollie with a whole turn of the bim and its board */
+  trick_fs_360: "360 ollie",
+  /** a trick's name: a kickflip with a half turn of the board */
+  trick_varial_kickflip: "varial kickflip",
+  /** a trick's name: the board flips up end over end between the legs */
+  trick_hardflip: "hardflip",
+  /** a trick's name: the board wrapped end over end round the back foot */
+  trick_impossible: "impossible",
+  /** a trick's name: rolling on the front wheels */
+  trick_nose_manual: "nose manual",
+  /** a trick's name: the board turned across the way, skidding */
+  trick_powerslide: "powerslide",
+  /** a trick's name: a grind on the back truck, the front one dipped past the bar */
+  trick_smith: "smith grind",
+  /** a trick's name: a grind on the back truck, the board over the bar's far side */
+  trick_feeble: "feeble grind",
+  /** a trick's name: a grind on the front truck, the board turned a little */
+  trick_crooked: "crooked grind",
+  /** a trick's name: a slide on the board's tail, across the bar */
+  trick_tailslide: "tailslide",
+  /** a trick's name: the nose stalled on the coping */
+  trick_nose_stall: "nose stall",
+  /** a trick's name: in the air above the coping, back to the wall */
+  trick_bs_air: "backside air",
+  /** a trick's name: a grind along the bowl's coping */
+  trick_coping_grind: "frontside grind",
 } as const;

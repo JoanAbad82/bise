@@ -119,6 +119,10 @@ export function trickWords(k: TrickKey): string {
     heelflip: bims.trick_heelflip, shove_it: bims.trick_shove_it, tre_flip: bims.trick_tre_flip, fifty: bims.trick_fifty,
     five_o: bims.trick_five_o, boardslide: bims.trick_boardslide, nosegrind: bims.trick_nosegrind, manual: bims.trick_manual,
     no_comply: bims.trick_no_comply, carve: bims.trick_carve, fs_air: bims.trick_fs_air, nine: bims.trick_nine,
+    fs_360: bims.trick_fs_360, varial_kickflip: bims.trick_varial_kickflip, hardflip: bims.trick_hardflip, impossible: bims.trick_impossible,
+    nose_manual: bims.trick_nose_manual, powerslide: bims.trick_powerslide, smith: bims.trick_smith, feeble: bims.trick_feeble,
+    crooked: bims.trick_crooked, tailslide: bims.trick_tailslide, nose_stall: bims.trick_nose_stall, bs_air: bims.trick_bs_air,
+    coping_grind: bims.trick_coping_grind,
   };
   return W[k];
 }

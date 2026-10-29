@@ -126,6 +126,7 @@ function rideRamp(m: Move, c: Ctx, f: number): At {
   const stall = (d: number): At => ({ x: to + s * d * clamp01(Math.min(u, 1 - u) * 6), z: zc, ys: r, air: 0, dir: head });
   switch (m.trick) {
     case 'fs_air':
+    case 'bs_air':
       return { x: to, z: zc, ys: r, air: hop(u, 1.0), dir: head };
     case 'fs_180':
     case 'bs_180':
@@ -135,6 +136,7 @@ function rideRamp(m: Move, c: Ctx, f: number): At {
     case 'fifty':
       return { x: to, z: zc + (s === 1 ? -GRIND_Z : GRIND_Z) * ease(u), ys: r, air: 0, dir: head };
     case 'rock_to_fakie':
+    case 'nose_stall':
       return stall(0.12);
     default:
       // a stall on the deck past the coping (the drop in's too)
@@ -161,14 +163,16 @@ function rideQp(m: Move, c: Ctx, f: number): At {
     return { x, z, ys: surfaceAt(park, stage, x, z), air: 0, dir };
   }
   const u = (f - QP_A) / (QP_B - QP_A);
-  if (m.trick === 'axle_stall') return { x, z: q.zLip - 0.15 * clamp01(Math.min(u, 1 - u) * 6), ys: r, air: 0, dir };
+  // the stalls on its coping (both trucks, the nose, the front truck rocked over it); else an air
+  if (m.trick === 'axle_stall' || m.trick === 'nose_stall' || m.trick === 'rock_to_fakie') return { x, z: q.zLip - 0.15 * clamp01(Math.min(u, 1 - u) * 6), ys: r, air: 0, dir };
   return { x, z: q.zLip, ys: r, air: hop(u, m.trick === 'nine' ? 1.4 : 0.85), dir };
 }
 
 // ---- the bowl ----
 
 /** a carve's inset: deep in the bowl at its ends, up the wall at its middle; an air goes up to the coping */
-const bowlD = (air: boolean, g: number): number => (air ? 0.75 - 0.72 * Math.sin(Math.PI * g) : 0.75 - 0.45 * Math.sin(Math.PI * g));
+const bowlD = (air: boolean, g: number, grind = false): number =>
+  air ? 0.75 - 0.72 * Math.sin(Math.PI * g) : grind ? 0.75 - 0.68 * Math.min(1, 1.6 * Math.sin(Math.PI * g)) : 0.75 - 0.45 * Math.sin(Math.PI * g);
 const bowlTh = (c: Ctx, k: number): number => Math.PI + c.slot * 0.9 + k * Math.PI;
 
 function rideBowl(m: Move, c: Ctx, f: number): At {
@@ -187,8 +191,9 @@ function rideBowl(m: Move, c: Ctx, f: number): At {
     return { x, z, ys: surfaceAt(park, stage, x, z), air: 0 };
   }
   const g = first ? (f - BOWL_IN) / (1 - BOWL_IN) : f;
-  const air = m.trick === 'fs_air';
-  const p = bowlPoint(b, bowlD(air, g), th0 + Math.PI * g);
+  const air = m.trick === 'fs_air' || m.trick === 'bs_air';
+  // a grind: up to the coping and along it a while (its middle held at the top), then back down
+  const p = bowlPoint(b, bowlD(air, g, m.trick === 'coping_grind'), th0 + Math.PI * g);
   return { x: p.x, z: p.z, ys: surfaceAt(park, stage, p.x, p.z), air: air ? hop((g - 0.35) / 0.3, 0.8) : 0 };
 }
 
@@ -287,7 +292,9 @@ function rollWay(c: Ctx, home: Pt): Pt[] {
     }
   }
   const b = m.on ? portIn(park, stage, m.on, m.side, slot) : home;
-  pts.push(...route(park, stage, a, b));
+  // round through its free point when the line gave it one (skate.ts viaFor): the same two pieces, another way
+  if (m.via !== undefined) pts.push(...route(park, stage, a, m.via), ...route(park, stage, m.via, b).slice(1));
+  else pts.push(...route(park, stage, a, b));
   if (m.on === 'stairs') pts.push(...stairsEntry(park).slice(1));
   return pts;
 }
@@ -295,15 +302,20 @@ function rollWay(c: Ctx, home: Pt): Pt[] {
 /** the body through a trick at f (its whole move) and u (its trick's part, at a lip or in the air) */
 function stanceOf(m: Move, f: number, u: number): Stance {
   const k = m.trick;
-  const pop = (flip: Rot): Stance => {
-    // crouch, pop, the board turns under it in the air, caught, knees bent on the landing
+  const pop = (flip: Rot, spin = 0): Stance => {
+    // crouch, pop, the board turns under it in the air (`spin`: the bim turns with it), caught, knees bent on the landing
     if (f < 0.25) return { ...RIDE, knees: mix(0.5, 1.1, f / 0.25) };
     if (f < 0.75) {
       const v = (f - 0.25) / 0.5;
       const turn = ease(Math.min(1, v / 0.85));
-      return { ...RIDE, knees: 1.1, arms: 1.4, up: hop(v, 0.12), boardUp: hop(v, 0.22), board: [flip[0] * turn, flip[1] * turn, flip[2] * turn] };
+      return { ...RIDE, knees: 1.1, arms: spin === 0 ? 1.4 : 1.8, up: hop(v, spin === 0 ? 0.12 : 0.16), boardUp: hop(v, 0.22), board: [flip[0] * turn, flip[1] * turn, flip[2] * turn], spin: spin * turn };
     }
-    return { ...RIDE, knees: mix(1.0, 0.5, (f - 0.75) / 0.25) };
+    return { ...RIDE, knees: mix(1.0, 0.5, (f - 0.75) / 0.25), spin };
+  };
+  // a slide or a grind held on the bar's middle: the board's own angle there, eased in and out at its ends
+  const held = (board: Rot, o: Partial<Stance> = {}): Stance => {
+    const h = clamp01(Math.min(f - 0.15, 0.85 - f) * 8);
+    return { ...RIDE, knees: 0.75, arms: 1.4, ...o, board: [board[0] * h, board[1] * h, board[2] * h], spin: (o.spin ?? 0) * h };
   };
   // a turn at a lip or the coping: spun round by the trick's end
   const kick = (turn: number, a: number, b: number): number => turn * ease((u - a) / (b - a));
@@ -358,6 +370,42 @@ function stanceOf(m: Move, f: number, u: number): Stance {
       return air(m.on === 'bowl' ? Math.PI * 2 : Math.PI);
     case 'nine':
       return air(Math.PI * 5);
+    // his m_49836: the larger collection
+    case 'fs_360':
+      // a 360 ollie: the bim and its board one whole turn together
+      return pop([0, 0, 0], Math.PI * 2);
+    case 'varial_kickflip':
+      return pop([0, Math.PI, Math.PI * 2]);
+    case 'hardflip':
+      // the board flips up between the legs: a turn end over end and a half turn round
+      return pop([Math.PI * 2, -Math.PI, 0]);
+    case 'impossible':
+      // the board wrapped end over end round the back foot
+      return pop([-Math.PI * 2, 0, 0]);
+    case 'nose_manual':
+      return { ...RIDE, knees: 0.65, arms: 1.5, lean: 0.22, board: [0.28 * clamp01(Math.min(f, 1 - f) * 6), 0, 0] };
+    case 'powerslide': {
+      // the board and the bim turned across the way, skidding, then back straight
+      const h = clamp01(Math.min(f, 1 - f) * 4);
+      return { ...RIDE, knees: 1.0, arms: 1.3, lean: -0.12 * h, spin: (Math.PI / 2) * ease(h) };
+    }
+    case 'smith':
+      // the back truck on the bar, the front one dipped below its far side
+      return held([-0.22, 0, 0.32], { knees: 0.85, lean: -0.1 });
+    case 'feeble':
+      return held([-0.18, 0.3, 0.26], { knees: 0.8, lean: -0.08 });
+    case 'crooked':
+      return held([0.22, 0.38, 0], { knees: 0.8, lean: 0.14 });
+    case 'tailslide':
+      return held([-0.12, -Math.PI / 2, 0], { knees: 0.75, lean: -0.1, spin: -Math.PI / 2 });
+    case 'nose_stall':
+      // the nose on the coping, the back foot up, then turned back in
+      return { ...RIDE, knees: 0.8, arms: 1.3, lean: 0.18, board: [0.45 * hop(clamp01(u / 0.6), 1), 0, 0], spin: kick(Math.PI, 0.45, 0.95) };
+    case 'bs_air':
+      // back to the wall: the turn the other way (a full one in the bowl)
+      return air(m.on === 'bowl' ? -Math.PI * 2 : -Math.PI);
+    case 'coping_grind':
+      return { ...RIDE, knees: 0.8, arms: 1.4, lean: 0.06 };
     case 'roll':
       return RIDE;
   }

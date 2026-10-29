@@ -2,10 +2,10 @@
 // office's own room: a warm floor, a white stucco back wall with a sunset mural, a low left wall with
 // surfboards, a low hedge on the park side with a gap for the sandy path; the taco truck parked
 // inside (the eating place); the loft's desks and bean bags. The strip: grass, palms, the path. The
-// park on its own slab: a low border, seams, floodlights, benches, and its pieces as the project
-// grows (skate.ts FEATURE_STAGE): the funbox and a lone quarter pipe from the start, a curb at 3, the
-// flat rail at 5, the mini ramp at 7, the ledge and the 4-stair with its handrail at 9, the pool bowl
-// at 11, the vert ramp at 13 (where the quarter pipe was), a golden board at the mark at 14. The other
+// park on its own slab: a low border, seams, floodlights, benches, and every piece from the start
+// (skate.ts FEATURE_STAGE, his m_49836: the park whole at any size): the funbox, the curb, the flat
+// rail, the mini ramp, the ledge and the 4-stair with its handrail, the pool bowl, the vert ramp; a
+// golden board at the mark at 14 (the growth's one reward in the park). The other
 // stages are the office's (a plant, food and a palm, the chalkboard, the boombox, flowers, shade, more
 // palms, a beach shower, a tide pool); the frames are skateboard decks on the wall, golden at 500.
 // Never the app's pink or red. Owner: maps-d.

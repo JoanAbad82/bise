@@ -12,9 +12,14 @@ import type { Box, Park, Pt } from './model';
 /** the park's pieces a trick rides on */
 export type Feature = 'flat' | 'funbox' | 'qp' | 'curb' | 'rail' | 'ramp' | 'stairs' | 'ledge' | 'bowl' | 'vert';
 
-/** the stage each piece is built at (growth.ts's stages; the brief: 3 curb .. 13 vert, 14 the golden board) */
+/**
+ * the stage each piece is built at (growth.ts's stages). Every piece from the start (his m_49836:
+ * « le skatepark devrait toujours être complet indépendamment de la taille du bureau »; it was 3 curb
+ * .. 13 vert): the vert stands where the lone quarter pipe was, the golden board at the mark (skate.ts
+ * GOLDEN_STAGE) is the growth's one reward left in the park.
+ */
 export const FEATURE_STAGE: Readonly<Record<Feature, number>> = {
-  flat: 0, funbox: 0, qp: 0, curb: 3, rail: 5, ramp: 7, stairs: 9, ledge: 9, bowl: 11, vert: 13,
+  flat: 0, funbox: 0, qp: 0, curb: 0, rail: 0, ramp: 0, stairs: 0, ledge: 0, bowl: 0, vert: 0,
 };
 
 /** whether a piece stands at this stage (the vert stands where the lone quarter pipe was) */

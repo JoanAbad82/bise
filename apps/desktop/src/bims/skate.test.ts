@@ -47,11 +47,11 @@ describe('who skates', () => {
     expect(pastimes(idle6, office, 0, undefined).size).toBe(0);
   });
 
-  it('the Sunday pool session: one Sunday in four once the bowl is built, every idle bim, the bowl only', () => {
+  it('the Sunday pool session: one Sunday in four, at any stage (the park whole from the start, his m_49836), every idle bim, the bowl only', () => {
     const sundays = Array.from({ length: 8 }, (_, w) => dayOf(2026, 10, 4) + w * 7);
     const on = sundays.filter((day) => poolDay({ dow: 0, day, stage: 11 }));
     expect(on).toHaveLength(2);
-    expect(poolDay({ dow: 0, day: on[0] ?? 0, stage: 10 })).toBe(false);
+    expect(poolDay({ dow: 0, day: on[0] ?? 0, stage: 0 })).toBe(true);
     expect(poolDay({ dow: 1, day: (on[0] ?? 0) + 1, stage: 11 })).toBe(false);
     const p = pastimes(idle6, office, 0, fun({ stage: 11, dow: 0, day: on[0] ?? 0 }));
     expect(p.size).toBe(6);
@@ -61,11 +61,10 @@ describe('who skates', () => {
     }
   });
 
-  it('the 900: at the 900th job (the high-water mark), once the vert is built, one skater', () => {
+  it('the 900: at the 900th job (the high-water mark), on the vert, one skater', () => {
     const p = pastimes(idle6, office, 0, fun({ stage: 13, jobs: 900 }));
     expect([...p.values()].filter((x) => x.nine)).toHaveLength(1);
     expect([...pastimes(idle6, office, 0, fun({ stage: 13, jobs: 901 })).values()].some((x) => x.nine)).toBe(false);
-    expect([...pastimes(idle6, office, 0, fun({ stage: 12, jobs: 900 })).values()].some((x) => x.nine)).toBe(false);
     const nine: Pastime = { kind: 'skate', slot: 0, pool: false, nine: true, stage: 13 };
     expect(lineOf('a', 0, nine, park).moves.some((m) => m.trick === 'nine')).toBe(true);
   });
